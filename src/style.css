@@ -1,0 +1,421 @@
+:root {
+  font-family: "DM Sans", system-ui, sans-serif;
+  color: #e7e9d4;
+  background: #101f1e;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  border: 1px solid #c4d6ac30;
+  background: #203732;
+  color: #e9ecd8;
+  border-radius: 6px;
+  padding: 10px 15px;
+  transition: background 0.15s;
+}
+button:hover {
+  background: #3f5944;
+}
+button:focus-visible,
+input:focus-visible,
+canvas:focus-visible {
+  outline: 2px solid #d7bd76;
+  outline-offset: 2px;
+}
+small {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #b4c4aa;
+}
+#app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 24px;
+}
+header {
+  height: 102px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.mark {
+  font-size: 42px;
+  color: #d8bb78;
+}
+h1 {
+  font-family: "Libre Caslon Display", Georgia, serif;
+  font-weight: 400;
+  font-size: 36px;
+  margin: 2px 0 0;
+  letter-spacing: 0.2px;
+}
+h1 em {
+  color: #b7c69a;
+  font-style: normal;
+}
+.tools {
+  display: flex;
+  gap: 8px;
+}
+.tools button {
+  font-size: 12px;
+  background: transparent;
+}
+main {
+  position: relative;
+  flex: 1;
+  min-height: 200px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #8da78050;
+  background: #254538;
+}
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 100px #10241f66;
+}
+.location {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  letter-spacing: 2px;
+  font-size: 10px;
+  text-shadow: 0 2px 5px #000;
+  background: #172d28c9;
+  padding: 10px 14px;
+  border-radius: 30px;
+}
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d8bc79;
+  margin-right: 8px;
+}
+#clock {
+  color: #b8c7ae;
+  margin-left: 15px;
+}
+.intro {
+  position: absolute;
+  left: 5%;
+  top: 20%;
+  padding: 28px 32px;
+  background: linear-gradient(110deg, #142d29f5, #142d29e8);
+  border: 1px solid #c4d6ac50;
+  border-radius: 8px;
+  box-shadow: 0 20px 80px #0a1e2560;
+}
+.intro h2,
+aside h2 {
+  font-family: "Libre Caslon Display", Georgia, serif;
+  font-size: 44px;
+  font-weight: 400;
+  margin: 10px 0;
+}
+.intro p {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #c5d2ba;
+}
+.intro button {
+  background: #d8bb78;
+  color: #233b30;
+  font-weight: 700;
+  border: 0;
+  margin-top: 10px;
+}
+.intro button span {
+  margin-left: 28px;
+}
+.inventory {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #152b28ee;
+  padding: 12px 16px;
+  border: 1px solid #c4d6ac40;
+  border-radius: 9px;
+  box-shadow: 0 4px 20px #081f2540;
+  white-space: nowrap;
+}
+.inventory > div {
+  padding-right: 15px;
+  min-width: 155px;
+}
+.inventory small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 1.8px;
+}
+.inventory strong {
+  font-size: 13px;
+  font-weight: 500;
+  display: block;
+  margin-top: 4px;
+}
+.inventory button {
+  font-size: 12px;
+  padding: 10px;
+}
+kbd {
+  font: 10px system-ui;
+  color: #c7cdad;
+  margin-left: 8px;
+  border: 1px solid #abc18b40;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+#hint {
+  position: absolute;
+  bottom: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  padding: 10px 18px;
+  background: #132a25e8;
+  border: 1px solid #c4d6ac30;
+  border-radius: 30px;
+  font-size: 12px;
+  max-width: 90%;
+  width: max-content;
+  pointer-events: none;
+}
+#selection {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  font-size: 12px;
+  background: #142b27e8;
+  border: 1px solid #c4d6ac30;
+  border-radius: 6px;
+  padding: 12px;
+  max-width: 235px;
+  line-height: 1.6;
+}
+#selection:empty {
+  display: none;
+}
+aside {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 365px;
+  max-width: 94%;
+  background: #122b28f7;
+  backdrop-filter: blur(12px);
+  padding: 28px;
+  overflow: auto;
+  border-left: 1px solid #c4d6ac40;
+}
+aside #close {
+  float: right;
+  font-size: 11px;
+  padding: 5px 9px;
+}
+aside small {
+  display: block;
+  clear: both;
+  padding-top: 20px;
+}
+aside h2 {
+  font-size: 38px;
+}
+aside h3 {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 26px;
+}
+#events p,
+#agents p {
+  font-size: 12px;
+  line-height: 1.6;
+  border-top: 1px solid #c4d6ac20;
+  padding-top: 10px;
+  color: #c5d2ba;
+}
+#agents b {
+  color: #e5d89d;
+}
+#stats {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #acbf9f;
+}
+footer {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  font-size: 11px;
+  color: #a1b49e;
+}
+footer b {
+  font-weight: 500;
+  color: #d1dbbb;
+}
+footer i {
+  margin: 0 10px;
+}
+form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+label {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+}
+input {
+  width: 90px;
+  background: #203732;
+  color: #e7e9d4;
+  border: 1px solid #c4d6ac30;
+  border-radius: 5px;
+  padding: 8px;
+}
+form button {
+  font-size: 11px;
+  padding: 8px 12px;
+}
+@media (max-width: 700px) {
+  #app {
+    padding: 0 9px;
+  }
+  header {
+    height: 88px;
+    gap: 8px;
+  }
+  .mark {
+    font-size: 28px;
+  }
+  .brand {
+    gap: 8px;
+  }
+  .brand small {
+    font-size: 7px;
+    letter-spacing: 1px;
+  }
+  h1 {
+    font-size: 27px;
+  }
+  .tools {
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 150px;
+  }
+  .tools button {
+    font-size: 10px;
+    padding: 7px 8px;
+  }
+  .inventory {
+    bottom: 12px;
+    padding: 8px;
+    gap: 4px;
+    width: calc(100% - 20px);
+    justify-content: space-between;
+  }
+  .inventory > div {
+    min-width: 95px;
+    padding: 0;
+  }
+  .inventory strong {
+    font-size: 10px;
+  }
+  .inventory button {
+    font-size: 10px;
+    padding: 9px 6px;
+  }
+  kbd {
+    display: none;
+  }
+  .location {
+    top: 12px;
+    left: 12px;
+    font-size: 8px;
+  }
+  #hint {
+    bottom: 83px;
+    font-size: 11px;
+    white-space: normal;
+    width: 90%;
+  }
+  .intro {
+    left: 6%;
+    right: 6%;
+    padding: 20px;
+    top: 20%;
+  }
+  .intro h2 {
+    font-size: 35px;
+  }
+  .intro p {
+    font-size: 12px;
+  }
+  footer {
+    min-height: 83px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    font-size: 9px;
+  }
+  footer i {
+    margin: 0 5px;
+  }
+  #selection {
+    top: 58px;
+    right: 12px;
+    max-width: 190px;
+    font-size: 10px;
+  }
+}
+
+.credits {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #a1b49e;
+  margin-top: 30px;
+}
+.credits a {
+  color: #d8bb78;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
