@@ -17,7 +17,13 @@ var choices: VBoxContainer
 func _ready() -> void:
 	add_child(manager)
 	register_quests()
-	dialogue = DialogueManager.create_resource_from_text(FileAccess.get_file_as_string("res://game/data/warden.dialogue"))
+	# Load the imported DialogueResource. FileAccess cannot read the source .dialogue in an exported PCK.
+	dialogue = load("res://game/data/warden.dialogue") as DialogueResource
+	if dialogue == null or dialogue.lines.is_empty() or not dialogue.cues.has("warden"):
+		push_error("Missing or invalid imported warden dialogue resource")
+		assert(false, "Missing or invalid imported warden dialogue resource")
+		return
+	print("MOSSLIGHT_DIALOGUE_READY")
 
 func register_quests() -> void:
 	for row in JSON.parse_string(FileAccess.get_file_as_string("res://game/data/quests.json")):
@@ -108,7 +114,7 @@ func import_state(text: String) -> bool:
 	return true
 
 func talk() -> void:
-	if speaking: return
+	if speaking or dialogue == null: return
 	speaking = true
 	if ui == null: build_ui()
 	ui.show()
