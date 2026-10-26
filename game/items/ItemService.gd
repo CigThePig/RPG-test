@@ -48,7 +48,9 @@ func transfer(source: String, target: String, prototype: String, count: int) -> 
 		var amount := mini(count, item.get_stack_size())
 		var moving: InventoryItem = item if amount == item.get_stack_size() else bag(source).split_stack(item, amount)
 		bag(source).remove_item(moving)
-		bag(target).add_item_autosplitmerge(moving)
+		if not bag(target).add_item_autosplitmerge(moving):
+			bag(source).add_item_autosplitmerge(moving)
+			return false
 		count -= amount
 		if count == 0: break
 	return true

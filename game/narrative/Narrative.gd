@@ -10,6 +10,7 @@ var dialogue: DialogueResource
 var speaking: bool = false
 var ui: PanelContainer
 var text_label: Label
+var advancing := false
 var choices: VBoxContainer
 
 func _ready() -> void:
@@ -28,11 +29,16 @@ func accept_quest(id: int) -> bool:
 	var q = manager._get_quest_by_id(id)
 	if q == null or q.failed or manager.is_quest_completed(q): return false
 	if q.prerequisite > 0 and not completed(q.prerequisite): return false
+	if manager.is_quest_active(q): return false
 	manager.start_quest(q)
 	flags["accepted_%d" % id] = true
 	if q.event_kind == "item_acquired" and item_service != null:
 		var owned: int = item_service.count_item("player", q.target_value)
 		q.progress = maxi(q.progress, mini(q.required, owned))
+		q.objective_completed = q.progress >= q.required
+		finish_quest(q)
+	elif q.event_kind == "defeated":
+		q.progress = mini(q.required, int(flags.get("defeated:" + q.target_value, 0)))
 		q.objective_completed = q.progress >= q.required
 		finish_quest(q)
 	return true
@@ -43,6 +49,8 @@ func completed(id: int) -> bool:
 
 func receive(kind: String, actor: String, target: String, value: String, count: int) -> void:
 	if actor != "player": return
+	if kind == "defeated":
+		flags["defeated:" + value] = int(flags.get("defeated:" + value, 0)) + maxi(0, count)
 	for q in manager.get_active_quests().duplicate():
 		manager.update_quest(q, {"kind": kind, "actor": actor, "target": target, "value": value, "count": count})
 		finish_quest(q)
@@ -113,8 +121,8 @@ func build_ui() -> void:
 	style.set_border_width_all(2)
 	style.set_content_margin_all(18)
 	ui.add_theme_stylebox_override("panel", style)
-	ui.position = Vector2(240, 460)
-	ui.custom_minimum_size = Vector2(700, 240)
+	ui.position = Vector2(180, 300)
+	ui.custom_minimum_size = Vector2(920, 240)
 	layer.add_child(ui)
 	var box := VBoxContainer.new()
 	ui.add_child(box)
@@ -126,8 +134,15 @@ func build_ui() -> void:
 	box.add_child(choices)
 
 func advance(cue: String) -> void:
+	if advancing: return
+	advancing = true
+	for child in choices.get_children():
+		if child is Button: child.disabled = true
 	current_line = await dialogue.get_next_dialogue_line(cue, [self])
-	for child in choices.get_children(): child.queue_free()
+	advancing = false
+	for child in choices.get_children():
+		choices.remove_child(child)
+		child.queue_free()
 	if current_line == null:
 		speaking = false
 		ui.hide()
@@ -135,12 +150,14 @@ func advance(cue: String) -> void:
 	text_label.text = current_line.character + ": " + current_line.text
 	if current_line.responses.is_empty():
 		var button := Button.new()
+		button.custom_minimum_size.y = 64
 		button.text = "Continue"
 		button.pressed.connect(func(): advance(current_line.next_id))
 		choices.add_child(button)
 	else:
 		for response in current_line.responses:
 			var button := Button.new()
+			button.custom_minimum_size.y = 64
 			button.text = response.text
 			button.disabled = not response.is_allowed
 			button.pressed.connect(func(): advance(response.next_id))

@@ -10,8 +10,12 @@ public partial class Foundation : Node2D
     public Node Narrative { get; private set; } = null !;
     public Dictionary<string, CharacterView> Views { get; } = new();
     public RpgUi Ui => ui;
-    public bool GameplayBlocked => ui == null || ui.BlocksInput || Narrative.Get("speaking").AsBool();
+    public bool GameplayBlocked => ui == null || suspended || !World.Player.Alive || ui.BlocksInput || Narrative.Get("speaking").AsBool();
 
+    bool suspended;
+    public Vector2 TouchMovement { get; set; }
+    public bool CanManageItems => !suspended && World.Player.Alive && !Narrative.Get("speaking").AsBool() && !ui.MenuOpen;
+    public bool ManageItem(Func<bool> operation) => CanManageItems && operation();
     public bool UseQuickItem(string selector) => !GameplayBlocked && World.UseItem(World.Player, selector);
     public void ShowCharacters(bool show) => actors.Visible = show;
     Node items = null !, planner = null !;
@@ -232,12 +236,12 @@ public partial class Foundation : Node2D
     {
         if (ui == null)
             return;
-        if (!ui.BlocksInput && !Narrative.Get("speaking").AsBool())
+        if (!GameplayBlocked)
         {
             accumulator += Math.Min(delta, .1);
             while (accumulator >= 1.0 / 60)
             {
-                var v = Input.GetVector("west", "east", "north", "south");
+                var v = (Input.GetVector("west", "east", "north", "south") + TouchMovement).LimitLength();
                 World.PlayerMove(new(v.X, v.Y), 1f / 60);
                 World.Step(1f / 60);
                 accumulator -= 1.0 / 60;
@@ -295,7 +299,7 @@ public partial class Foundation : Node2D
             if (e.IsActionPressed(key))
                 Cast(key);
         if (e.IsActionPressed("potion"))
-            World.UsePotion(World.Player);
+            UseQuickItem("potion");
     }
 
     public void Cast(string ability)
@@ -322,6 +326,23 @@ public partial class Foundation : Node2D
 
         ui.Notify(World.Interact(a) ? "Interacted" : "Approach an object, fallen foe, or warden");
         drawnRegion = "";
+    }
+
+    public override void _Notification(int what)
+    {
+        if (what == NotificationApplicationPaused || what == NotificationApplicationFocusOut)
+        {
+            TouchMovement = Vector2.Zero;
+            suspended = true;
+            if (World != null && ui != null)
+            {
+                ui.PauseForVerification();
+                try { Persistence.Save(World, Narrative, ui.SaveSlot); }
+                catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }
+            }
+        }
+        if (what == NotificationApplicationResumed || what == NotificationApplicationFocusIn)
+            suspended = false;
     }
 
     public void CycleZoom()

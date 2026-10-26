@@ -10,7 +10,8 @@ config_version=5
 
 [application]
 
-config/name="Mosslight • RPG Foundation"
+config/name="Mosslight"
+config/icon="res://game/art/icon.svg"
 run/main_scene="res://game/dev/Foundation.tscn"
 config/features=PackedStringArray("4.6", "C#", "GL Compatibility")
 
@@ -23,6 +24,11 @@ DialogueManager="*res://addons/dialogue_manager/dialogue_manager.gd"
 window/size/viewport_width=1280
 window/size/viewport_height=800
 window/stretch/mode="canvas_items"
+window/handheld/orientation=0
+
+[input_devices]
+
+pointing/emulate_mouse_from_touch=true
 
 [dotnet]
 

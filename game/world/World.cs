@@ -450,8 +450,10 @@ public sealed class World
             return true;
         }
 
-        var corpse = Actors.Values.Where(b => !b.Alive && b.Region == a.Region && Vector2.Distance(a.Position, b.Position) < 48 && LineOfSight(a, b) && Items.HasLoot(b.Id)).OrderBy(b => Vector2.DistanceSquared(a.Position, b.Position)).FirstOrDefault();
-        return corpse != null && Items.LootAll(corpse.Id, a.Id);
+        var corpses = Actors.Values.Where(b => !b.Alive && b.Region == a.Region && Vector2.Distance(a.Position, b.Position) < 48 && LineOfSight(a, b) && Items.HasLoot(b.Id)).OrderBy(b => Vector2.DistanceSquared(a.Position, b.Position)).ThenBy(b => b.Id, StringComparer.Ordinal);
+        foreach (var corpse in corpses)
+            if (Items.LootAll(corpse.Id, a.Id)) return true;
+        return false;
     }
 
     public void Enter(ActorState a, string region)

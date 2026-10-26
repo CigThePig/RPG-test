@@ -1,0 +1,95 @@
+name: Android development APK
+on:
+  push:
+    branches: [main, feat/rpg-foundation]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GODOT_VERSION: 4.6.1
+      DOTNET_VERSION: 9.0.203
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.408
+            9.0.203
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install official Godot editor and matching .NET templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+          curl -fL --retry 3 "$base/Godot_v${GODOT_VERSION}-stable_mono_linux_x86_64.zip" -o "$RUNNER_TEMP/godot.zip"
+          curl -fL --retry 3 "$base/Godot_v${GODOT_VERSION}-stable_mono_export_templates.tpz" -o "$RUNNER_TEMP/templates.tpz"
+          unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP/godot"
+          editor="$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}-stable_mono_linux_x86_64/Godot_v${GODOT_VERSION}-stable_mono_linux.x86_64"
+          echo "GODOT=$editor" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono"
+          unzip -q "$RUNNER_TEMP/templates.tpz" -d "$RUNNER_TEMP/templates"
+          mv "$RUNNER_TEMP/templates/templates/"* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono/"
+      - name: Install pinned Android packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'platforms;android-35' 'build-tools;35.0.1' 'ndk;28.1.13356709' 'cmake;3.10.2.4988404'
+          echo "$ANDROID_HOME/build-tools/35.0.1" >> "$GITHUB_PATH"
+      - name: Configure SDK paths and development signing
+        env:
+          DEV_KEYSTORE: ${{ secrets.ANDROID_DEV_KEYSTORE_BASE64 }}
+          DEV_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_PASSWORD }}
+          DEV_ALIAS: ${{ secrets.ANDROID_DEV_KEYSTORE_ALIAS }}
+        run: python3 tools/configure-android.py
+      - name: Compile, fresh import and run integration checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/android
+          dotnet build
+          python3 tools/import-project.py 2>&1 | tee build/android/import.log
+          python3 tools/verify.py --headless
+          xvfb-run -a python3 tools/verify.py --visual
+      - name: Export signed ARM64 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse --short=12 HEAD)
+          echo "APK_NAME=Mosslight-android-arm64-debug-$sha" >> "$GITHUB_ENV"
+          "$GODOT" --headless --path . --export-debug Android "build/android/Mosslight-android-arm64-debug-$sha.apk" 2>&1 | tee build/android/export.log
+      - name: Verify package, .NET runtime, resources, ARM64 and signature
+        run: python3 tools/verify-apk.py build/android/${{ env.APK_NAME }}.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_NAME }}
+          path: |
+            build/android/*.apk
+            build/android/build-metadata.json
+            build/android/*.sha256
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-diagnostics-${{ github.run_id }}
+          path: |
+            build/android/*.log
+            build/verification-*.log
+            build/android/*manifest*
+            build/android/*signature*
+            docs/verification.json
+            docs/render-verification.json
+            docs/native-screenshots/

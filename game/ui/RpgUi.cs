@@ -10,6 +10,13 @@ public partial class RpgUi : CanvasLayer
     Label health = null !, message = null !, title = null !;
     PanelContainer panel = null !, menu = null !;
     VBoxContainer body = null !;
+    Control root = null !;
+    GridContainer hotbar = null !;
+    public TouchStick Stick { get; private set; } = null!;
+    Label metrics = null!;
+    bool showMetrics;
+    readonly Queue<double> frames = new();
+    public bool MenuOpen => menu.Visible;
     public bool BlocksInput => panel.Visible || menu.Visible;
     public bool SettingsOpen { get; private set; }
     public bool Muted { get; private set; }
@@ -17,14 +24,14 @@ public partial class RpgUi : CanvasLayer
 
     public override void _Ready()
     {
-        var root = new Control
+        root = new Control
         {
             LayoutMode = 0,
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         AddChild(root);
         var theme = new Theme();
-        theme.DefaultFontSize = 16;
+        theme.DefaultFontSize = 20;
         var style = new StyleBoxFlat
         {
             BgColor = new Color(.065f, .1f, .1f, .96f),
@@ -61,9 +68,10 @@ public partial class RpgUi : CanvasLayer
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         root.AddChild(message);
-        var hotbar = new HBoxContainer
+        hotbar = new GridContainer
         {
-            Position = new Vector2(24, 680)
+            Columns = 5,
+            Position = new Vector2(500, 640)
         };
         root.AddChild(hotbar);
         foreach (var(text, action)in new (string, Action)[]
@@ -95,14 +103,14 @@ public partial class RpgUi : CanvasLayer
         panel = new PanelContainer
         {
             Position = new Vector2(780, 100),
-            CustomMinimumSize = new Vector2(460, 510),
+            CustomMinimumSize = new Vector2(740, 510),
             Visible = false
         };
         root.AddChild(panel);
         body = new VBoxContainer();
         var scroll = new ScrollContainer
         {
-            CustomMinimumSize = new Vector2(420, 470)
+            CustomMinimumSize = new Vector2(690, 440)
         };
         panel.AddChild(scroll);
         scroll.AddChild(body);
@@ -110,17 +118,38 @@ public partial class RpgUi : CanvasLayer
         menu = new PanelContainer
         {
             Position = new Vector2(380, 160),
-            CustomMinimumSize = new Vector2(520, 430)
+            CustomMinimumSize = new Vector2(560, 430)
         };
         root.AddChild(menu);
         BuildMenu();
+        Stick = new TouchStick { App = App, Size = new Vector2(200, 200) };
+        root.AddChild(Stick);
+        metrics = new Label { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        root.AddChild(metrics);
+        GetViewport().SizeChanged += Layout;
+        Layout();
+    }
+
+    void Layout()
+    {
+        var size = GetViewport().GetVisibleRect().Size;
+        hotbar.Position = new Vector2(size.X - 760, size.Y - 160);
+        Stick.Position = new Vector2(40, size.Y - 260);
+        message.Position = new Vector2(24, size.Y - 45);
+        message.Size = new Vector2(size.X - 48, 40);
+        panel.Position = new Vector2((size.X - 740) / 2, 90);
+        panel.Size = panel.CustomMinimumSize = new Vector2(740, size.Y - 290);
+        menu.Position = new Vector2((size.X - 560) / 2, 70);
+        menu.Size = new Vector2(560, size.Y - 140);
+        metrics.Position = new Vector2(size.X - 480, 20);
     }
 
     static Button Button(Node parent, string text, Action action)
     {
         var b = new Button
         {
-            Text = text
+            Text = text,
+            CustomMinimumSize = new Vector2(0, 56)
         };
         b.Pressed += action;
         parent.AddChild(b);
@@ -138,6 +167,8 @@ public partial class RpgUi : CanvasLayer
 
     void Open(string heading)
     {
+        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
+        App.TouchMovement = Vector2.Zero;
         Clear(body);
         panel.Visible = true;
         body.AddChild(new Label { Text = heading });
@@ -147,6 +178,16 @@ public partial class RpgUi : CanvasLayer
     public void Notify(string text) => message.Text = text;
     public void Update()
     {
+        Stick.Visible = OS.HasFeature("mobile") && !App.GameplayBlocked;
+        if (App.GameplayBlocked) Stick.Cancel();
+        frames.Enqueue(GetProcessDeltaTime() * 1000);
+        while (frames.Count > 600) frames.Dequeue();
+        metrics.Visible = showMetrics;
+        if (showMetrics && frames.Count > 0)
+        {
+            var sorted = frames.OrderBy(x => x).ToArray();
+            metrics.Text = $"FPS {Engine.GetFramesPerSecond()} · p95 {sorted[(int)((sorted.Length - 1) * .95)]:0.0} ms\nActors {App.Views.Values.Count(v => v.Visible)}/{App.World.Actors.Count} · managed {GC.GetTotalMemory(false)/1048576.0:0} MB";
+        }
         var a = App.World.Player;
         health.Text = $"{a.Name}   ♥ {a.Health:0}/{a.MaxHealth}    Mana {a.Mana:0}/{a.MaxMana}    Lv {a.Level} · XP {a.Experience}/{a.Level * 100}    {a.State}\n{a.Region} · {(int)(App.World.Time / 60) % 24:00}:{(int)App.World.Time % 60:00}";
         foreach (var(id, button)in abilityButtons)
@@ -168,6 +209,7 @@ public partial class RpgUi : CanvasLayer
     public void ClosePanels() => panel.Hide();
     public void Inventory()
     {
+        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         Open("PACK & EQUIPMENT");
         body.AddChild(new Label { Text = App.World.Items.Describe("player") });
         using var catalog = JsonDocument.Parse(App.World.Items.Service.Call("catalog", "player").AsString());
@@ -180,7 +222,7 @@ public partial class RpgUi : CanvasLayer
             {
                 var button = Button(body, "Equip · " + title, () =>
                 {
-                    App.World.Items.Equip(App.World.Player, selector, slot);
+                    App.ManageItem(() => App.World.Items.Equip(App.World.Player, selector, slot));
                     Inventory();
                 });
                 button.TooltipText = row.GetProperty("properties").GetString();
@@ -189,7 +231,8 @@ public partial class RpgUi : CanvasLayer
             if (row.GetProperty("healing").GetSingle() > 0)
                 Button(body, "Use · " + title, () =>
                 {
-                    App.World.UseItem(App.World.Player, selector);
+                    ClosePanels();
+                    App.UseQuickItem(selector);
                     Inventory();
                 });
         }
@@ -197,7 +240,7 @@ public partial class RpgUi : CanvasLayer
         foreach (var recipe in App.World.Content.Recipes)
             Button(body, "Craft · " + System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(recipe.Id.Replace("_", " ")), () =>
             {
-                Notify(App.World.Items.Craft("player", recipe) ? "Crafted " + recipe.Output : "Missing ingredients");
+                Notify(App.ManageItem(() => App.World.Items.Craft("player", recipe)) ? "Crafted " + recipe.Output : "Missing ingredients");
                 Inventory();
             });
         var player = App.World.Player;
@@ -211,7 +254,7 @@ public partial class RpgUi : CanvasLayer
                 string title = row.GetProperty("title").GetString()!;
                 Button(body, "Buy · " + title + " · 5 crowns", () =>
                 {
-                    Notify(App.World.Items.Trade("player", merchant.Id, id, 5) ? "Purchase complete" : "Insufficient funds or stock");
+                    Notify(App.ManageItem(() => App.World.Items.Trade("player", merchant.Id, id, 5)) ? "Purchase complete" : "Insufficient funds or stock");
                     Inventory();
                 });
             }
@@ -220,12 +263,14 @@ public partial class RpgUi : CanvasLayer
 
     public void Journal()
     {
+        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         Open("QUEST JOURNAL");
         body.AddChild(new Label { Text = App.Narrative.Call("journal").AsString(), AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(400, 300) });
     }
 
     public void Character()
     {
+        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         var actor = App.World.Player;
         Open("WAYFARER");
         body.AddChild(new Label { Text = $"Level {actor.Level} · skill points {actor.SkillPoints}\nStrength {App.World.Stat(actor, "strength")}\nDefence {App.World.Stat(actor, "defence")}\nWeapon damage {App.World.Items.Bonus(actor, "damage")}\nFamily {actor.Appearance.Family} · seed {actor.Appearance.Seed}\nFlight {actor.Flies} · Swimming {actor.Swims} · Grasping {actor.Grasps}\nWarden reputation {actor.Reputation.GetValueOrDefault("wardens")}" });
@@ -240,7 +285,7 @@ public partial class RpgUi : CanvasLayer
             else
                 Button(body, $"Learn · {ability.Name} (level {ability.UnlockLevel} / {ability.UnlockCost} points)", () =>
                 {
-                    Notify(Progression.Unlock(App.World, actor, ability.Id) ? "Ability learned" : "Requirements not met");
+                    Notify(App.ManageItem(() => Progression.Unlock(App.World, actor, ability.Id)) ? "Ability learned" : "Requirements not met");
                     Character();
                 });
         }
@@ -248,13 +293,14 @@ public partial class RpgUi : CanvasLayer
         foreach (var skill in App.World.Content.Skills)
             Button(body, $"Train · {skill.Id} [{actor.SkillRanks.GetValueOrDefault(skill.Id)}/{skill.MaxRank}]", () =>
             {
-                Progression.Train(App.World, actor, skill.Id);
+                App.ManageItem(() => Progression.Train(App.World, actor, skill.Id));
                 Character();
             });
     }
 
     public void Map()
     {
+        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         Open("REGION MAP");
         var map = new RegionMap
         {
@@ -267,6 +313,8 @@ public partial class RpgUi : CanvasLayer
 
     public void Menu()
     {
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        App.TouchMovement = Vector2.Zero;
         panel.Hide();
         menu.Visible = !menu.Visible;
         if (menu.Visible)
@@ -277,7 +325,10 @@ public partial class RpgUi : CanvasLayer
     {
         Clear(menu);
         var box = new VBoxContainer();
-        menu.AddChild(box);
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(510, 600) };
+        menu.AddChild(scroll);
+        box.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        scroll.AddChild(box);
         box.AddChild(new Label { Text = "MOSSLIGHT\nRPG FOUNDATION", HorizontalAlignment = HorizontalAlignment.Center });
         Button(box, "Enter / Resume", () => menu.Hide());
         Button(box, "New game", () =>
@@ -328,6 +379,7 @@ public partial class RpgUi : CanvasLayer
             menu.Hide();
             Workshop();
         });
+        Button(box, "Performance overlay: " + (showMetrics ? "On" : "Off"), () => { showMetrics = !showMetrics; BuildMenu(); });
         Button(box, "Developer diagnostics", () =>
         {
             menu.Hide();
@@ -338,6 +390,7 @@ public partial class RpgUi : CanvasLayer
 
     public void Workshop()
     {
+        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         Open("PROCEDURAL CREATURE WORKSHOP");
         var family = new OptionButton();
         foreach (var f in PixelCreatures.Runtime.CreatureRuntime.Registry.Families)
@@ -365,6 +418,7 @@ public partial class RpgUi : CanvasLayer
 
     public void Diagnostics()
     {
+        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         Open("DEVELOPER TOOLS");
         body.AddChild(new Label { Text = $"Tick {App.World.Tick}\nActors {App.World.Actors.Count}\nRegions {App.World.RegionsById.Count}\nProjectiles {App.World.Projectiles.Count}\nManaged memory {GC.GetTotalMemory(false) / 1048576.0:0.0} MB\nFPS {Engine.GetFramesPerSecond()}\nEvents:\n" + string.Join("\n", App.World.Events.Recent.TakeLast(8).Select(e => $"{e.Kind}: {e.Actor} {e.Value}")) });
         Button(body, "Enter generated dungeon", () =>
