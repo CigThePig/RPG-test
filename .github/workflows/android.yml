@@ -126,7 +126,7 @@ jobs:
           path: build/emulator
       - name: Install official Android emulator and image
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'emulator' 'system-images;android-35;google_apis;x86_64'
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'emulator' 'system-images;android-35;google_apis;x86_64'
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name mosslight --package 'system-images;android-35;google_apis;x86_64'
           sudo chmod 666 /dev/kvm
       - name: Install, launch and exercise exported C# application

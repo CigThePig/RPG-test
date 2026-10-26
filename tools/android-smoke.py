@@ -5,7 +5,7 @@ out=Path('build/android-runtime');out.mkdir(parents=True,exist_ok=True)
 package='com.cigthepig.mosslight.dev'
 def run(*args, **kwargs):
     return subprocess.check_output(args, stderr=subprocess.STDOUT, **kwargs)
-def adb(*args): return run('adb',*args,text=True).strip()
+def adb(*args): return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True).strip()
 log=(out/'emulator.log').open('w')
 emulator=subprocess.Popen([os.environ['ANDROID_HOME']+'/emulator/emulator','-avd','mosslight',
     '-no-window','-no-audio','-no-boot-anim','-no-snapshot','-gpu','swiftshader_indirect','-skin','1280x800'],stdout=log,stderr=log)
