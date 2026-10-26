@@ -1,0 +1,17 @@
+# Architecture
+
+`src/world.js` is the authoritative headless simulation. `generate(seed)` creates geography, resources, identities and initial positions. Separately labelled random streams cover geography, population and scenery. `surface()` describes continuous geography; navigation samples cell centres. The renderer samples the same field at logical-pixel resolution, avoiding giant square shore tiles.
+
+`action()` owns player/target preconditions and effects. `build()` owns placement and material costs. Failed operations leave state untouched. `step()` owns time, plant regrowth, hunger, NPC target validation, food consumption and meal events. Both player and NPC operations mutate the same entity food counts. There is no competing library inventory or health model.
+
+NPC decisions: below the hunger threshold, rest; otherwise select the nearest reachable source with food, retain its path, and travel. Depletion/removal invalidates that choice on the next step. No source is a valid waiting state, not an exception. Breadth-first routes are cardinal and deterministic; wings allow water cells. Agents do not avoid each other, and scenery has no collision. Continuous shore artwork and cell navigation can differ within a boundary cell; precise physical shore collision is future work.
+
+`src/anatomy.json` is generated semantic data: wing rig count, leg rig count, upstream walk speed (clamped for the game), and anatomy hash. Locomotion capabilities use wings from actual PPC anatomy, rather than names or pixels. The bridge is intentionally not a biomechanics model. Both quadrupeds have different sampled anatomy hashes and speeds.
+
+`src/main.js` owns browser input, camera, sheet playback, drawing and UI. Simulation runs at a fixed 30 Hz; drawing uses requestAnimationFrame. Long stalls are capped, hidden tabs stop accumulating time, and focus loss clears held keys. The visual motor is pre-exported: gameplay speed and clip root speed are not perfectly synchronized, so some foot sliding remains possible. The first milestone uses idle/walk clips at 6 fps, all eight facings, original pivots and shadows.
+
+Static ground is a single ~5.1 MB RGBA canvas (1536 × 832). It rebuilds only on generation/load, never each frame. Decoded sheets/props are reused. Entities are depth sorted by ground position and culled against the viewport. Device pixel ratio is capped at 2. Mobile uses a smaller camera zoom and tap-to-route controls.
+
+Persistence reconstructs original geography from seed + generator version, then restores only the owned mutable fields: time, entity state, event ring, ID sequence, planting and harvest totals. Terrain and static textures are omitted. Entity arrays include persistent resources, NPCs and scenery to keep identity restoration straightforward. Save files validate IDs, positions, resources, catalog references, paths and counters. Version 1 saves have no migration layer; a future incompatible generator change must bump the version and provide migration or explicit rejection. One local-storage slot; no cloud sync or offline PWA installation.
+
+The event log stores actual state-changing actions (arrival, gathering, harvest, planting, construction, feeding, meals), capped at 100 entries. It is an observation aid rather than a full replay journal. Deterministic saved state continuation is tested; arbitrary past reconstruction from the bounded event log is not supported. Debug `window.game` exposes current world, metrics and existing simulation functions for inspection/testing; ordinary controls remain in the UI.

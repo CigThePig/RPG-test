@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#142c29" />
+    <title>Mosslight Reach · RPG-test</title>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div class="brand">
+          <span class="mark">✦</span>
+          <div>
+            <small>AN EXPERIMENTAL LIVING WORLD</small>
+            <h1>Mosslight <em>Reach</em></h1>
+          </div>
+        </div>
+        <div class="tools">
+          <button id="pause">Pause</button><button id="save">Save</button
+          ><button id="load">Load</button
+          ><button id="journal">Field notes</button>
+        </div>
+      </header>
+      <main>
+        <canvas
+          id="game"
+          tabindex="0"
+          aria-label="Mosslight Reach game world. WASD or arrow keys to move, E to interact."
+        ></canvas>
+        <div class="vignette"></div>
+        <div class="location">
+          <span class="dot"></span> THE REEDLANDS <span id="clock"></span>
+        </div>
+        <div class="intro">
+          <small>LEAVE A DIFFERENT WORLD BEHIND</small>
+          <h2>A place worth tending.</h2>
+          <p>
+            Follow the foragers. Pick berries, plant new patches,<br />and see
+            where a little food can lead.
+          </p>
+          <button id="begin">Explore the Reach <span>↗</span></button>
+        </div>
+        <div id="hint" role="status">Loading procedural artwork…</div>
+        <div id="selection"></div>
+        <aside id="notes" hidden>
+          <button id="close">Close ×</button><small>THE WORLD REMEMBERS</small>
+          <h2>Field notes</h2>
+          <div id="stats"></div>
+          <div id="agents"></div>
+          <h3>What happened</h3>
+          <div id="events"></div>
+          <p class="credits">
+            Procedural art by
+            <a
+              href="https://github.com/idlerunner00/procedural-pixel-creatures"
+              target="_blank"
+              rel="noreferrer"
+              >idlerunner00</a
+            >
+            · <a href="./credits.txt" target="_blank">Notices</a>
+          </p>
+        </aside>
+        <div class="inventory">
+          <div>
+            <small>POUCH</small><strong id="pouch">0 berries · 0 wood</strong>
+          </div>
+          <button id="plant" title="Costs 1 berry">Plant <kbd>1</kbd></button
+          ><button id="build" title="Costs 3 wood">
+            Build feeder <kbd>2</kbd></button
+          ><button id="interact">Interact <kbd>E</kbd></button>
+        </div>
+      </main>
+      <footer>
+        <span
+          ><b>WASD</b> move <i>·</i> <b>Click / touch</b> walk <i>·</i>
+          <b>E</b> interact</span
+        >
+        <form id="seedform">
+          <label for="seed">WORLD SEED</label
+          ><input
+            id="seed"
+            type="number"
+            min="0"
+            max="4294967295"
+            value="42"
+          /><button>New world ↻</button>
+        </form>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
