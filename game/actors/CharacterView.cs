@@ -1,0 +1,88 @@
+using Godot;
+using PixelCreatures.Runtime;
+using PixelCreatures.Core;
+
+namespace Mosslight;
+/// <summary>Presentation consumes actor state; the PPC genome never owns health, quests or inventory.</summary>
+public partial class CharacterView : Node2D
+{
+    public ActorState State { get; private set; } = null !;
+    public CreatureActor Creature { get; private set; } = null !;
+
+    Vector2 previous;
+    public void Setup(ActorState actor)
+    {
+        bool fresh = actor.Appearance.GenomeJson == "";
+        State = actor;
+        Creature = new CreatureActor
+        {
+            FamilyId = "",
+            AutoMove = false,
+            SyncNodePosition = false,
+            AnimationFps = 10,
+            Quality = 1,
+            CullOffscreen = true
+        };
+        AddChild(Creature);
+        var result = actor.Appearance.GenomeJson == "" ? null : CreatureRuntime.Serializer.Deserialize(actor.Appearance.GenomeJson);
+        if (result != null && !result.Ok)
+            throw new InvalidDataException(result.Describe());
+        var genome = result?.Genome ?? CreatureRuntime.Sample(actor.Appearance.Family, actor.Appearance.Seed);
+        Creature.SetGenome(genome, async: false);
+        actor.Appearance.GenomeJson = CreatureRuntime.Serializer.Serialize(genome);
+        var model = Creature.Model ?? throw new InvalidOperationException(Creature.LastError);
+        actor.Flies = model.Anatomy.Rig.Wings.Count > 0;
+        actor.Swims = model.Anatomy.Rig.Fins.Count > 0;
+        actor.Grasps = model.Anatomy.Rig.Arms.Count > 0 || model.Anatomy.Rig.Grippers.Count > 0;
+        if (fresh)
+            actor.Speed = Math.Clamp((float)model.Anatomy.Metrics.WalkSpeed, 40, 100);
+        actor.NaturalReach = Math.Clamp((float)model.Anatomy.Metrics.BodyLength * .1f, 0, 12);
+        actor.Radius = Math.Clamp((float)model.Anatomy.Metrics.BodyLength * .2f, 6, 11);
+        previous = new(actor.X, actor.Y);
+        Sync(1f / 60);
+    }
+
+    public void Equipment(string json)
+    {
+        if (State.Appearance.Family != "biped")
+            return;
+        var data = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json)!;
+        var genome = CreatureRuntime.Serializer.Deserialize(State.Appearance.GenomeJson).Genome!;
+        genome = genome.WithChoice("gear.weapon", data["weapon"]).WithChoice("gear.outfit", data["outfit"]);
+        Creature.SetGenome(genome, async: false);
+    }
+
+    public void Sync(float dt)
+    {
+        var now = new Vector2(State.X, State.Y);
+        Creature.MoveVelocity = (now - previous) / Math.Max(dt, .001f);
+        Creature.GroundPosition = now;
+        previous = now;
+        Position = GodotConvert.GroundToScreen(State.X, State.Y);
+        Creature.Resting = State.Activity == "rest" || !State.Alive;
+        Modulate = State.Alive ? Colors.White : new Color(.45f, .4f, .4f, .6f);
+        QueueRedraw();
+    }
+
+    public void Cue(string cue)
+    {
+        if (cue == "attack" || cue == "cast")
+            Creature.TriggerAction();
+        if (cue == "hit")
+            Creature.TriggerHit(Vector2.Left);
+    }
+
+    public override void _Draw()
+    {
+        if (!State.Alive)
+            return;
+        if (State.Health < State.MaxHealth)
+        {
+            DrawRect(new Rect2(-14, -50, 28, 3), new Color(.15f, .1f, .12f));
+            DrawRect(new Rect2(-14, -50, 28 * State.Health / State.MaxHealth, 3), new Color(.76f, .29f, .22f));
+        }
+
+        if (State.Statuses.Count > 0)
+            DrawCircle(new Vector2(0, -54), 2, new Color(1, .6f, .2f));
+    }
+}

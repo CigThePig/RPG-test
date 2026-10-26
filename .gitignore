@@ -3,3 +3,9 @@ dist/
 **/bin/
 **/obj/
 playwright-report/
+.godot/
+**/bin/
+**/obj/
+*.tmp
+build/
+examples/mosslight/docs/

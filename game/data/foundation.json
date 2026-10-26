@@ -1,0 +1,194 @@
+{
+  "abilities": [
+    {
+      "Id": "slash",
+      "Name": "Sword arc",
+      "Range": 44,
+      "Damage": 12,
+      "Cost": 0,
+      "Cooldown": 0.65,
+      "Windup": 0.14,
+      "Recovery": 0.24,
+      "Type": "physical",
+      "RequiresWeapon": true
+    },
+    {
+      "Id": "bite",
+      "Name": "Bite",
+      "Range": 32,
+      "Damage": 9,
+      "Cost": 0,
+      "Cooldown": 1.1,
+      "Windup": 0.3,
+      "Recovery": 0.4,
+      "Type": "physical"
+    },
+    {
+      "Id": "ember",
+      "Name": "Ember bolt",
+      "Range": 240,
+      "Damage": 18,
+      "Cost": 9,
+      "Cooldown": 1.5,
+      "Windup": 0.4,
+      "Recovery": 0.25,
+      "Type": "fire",
+      "ProjectileSpeed": 180,
+      "Status": "burn"
+    },
+    {
+      "Id": "mend",
+      "Name": "Mend",
+      "Range": 0,
+      "Damage": -25,
+      "Cost": 12,
+      "Cooldown": 4,
+      "Windup": 0.5,
+      "Recovery": 0.2,
+      "Type": "healing",
+      "Self": true
+    },
+    {
+      "Id": "ward",
+      "Name": "Bark ward",
+      "Range": 0,
+      "Damage": 0,
+      "Cost": 8,
+      "Cooldown": 8,
+      "Windup": 0.3,
+      "Recovery": 0.2,
+      "Type": "healing",
+      "Self": true,
+      "Status": "ward",
+      "UnlockLevel": 2,
+      "UnlockCost": 1
+    }
+  ],
+  "statuses": [
+    {
+      "Id": "burn",
+      "Duration": 4,
+      "Interval": 1,
+      "Damage": 3,
+      "MaxStacks": 3,
+      "Type": "fire"
+    },
+    {
+      "Id": "stagger",
+      "Duration": 0.6,
+      "Interval": 1,
+      "Damage": 0,
+      "MaxStacks": 1,
+      "BlocksActions": true
+    },
+    {
+      "Id": "ward",
+      "Duration": 5,
+      "Interval": 1,
+      "Damage": 0,
+      "MaxStacks": 1,
+      "Type": "physical",
+      "ModifierStat": "defence",
+      "Modifier": 8
+    }
+  ],
+  "recipes": [
+    {
+      "Id": "draught",
+      "Ingredients": {
+        "herb": 2
+      },
+      "Output": "potion",
+      "Count": 1
+    },
+    {
+      "Id": "forge_sword",
+      "Ingredients": {
+        "ore": 3,
+        "wood": 1
+      },
+      "Output": "iron_sword",
+      "Count": 1,
+      "Material": "iron",
+      "Quality": 2
+    },
+    {
+      "Id": "carve_staff",
+      "Ingredients": {
+        "wood": 3
+      },
+      "Output": "oak_staff",
+      "Count": 1,
+      "Material": "oak",
+      "Quality": 1
+    }
+  ],
+  "loot": [
+    {
+      "Item": "coin",
+      "Min": 2,
+      "Max": 7,
+      "Chance": 1
+    },
+    {
+      "Item": "herb",
+      "Min": 1,
+      "Max": 2,
+      "Chance": 0.7
+    }
+  ],
+  "factions": {
+    "reach:beasts": -100,
+    "beasts:reach": -100,
+    "reach:wardens": 60,
+    "wardens:reach": 60
+  },
+  "npcProfiles": [
+    {
+      "Id": "warden",
+      "Family": "biped",
+      "Faction": "wardens",
+      "Profession": "merchant",
+      "Schedule": [
+        {
+          "Hour": 0,
+          "Activity": "rest"
+        },
+        {
+          "Hour": 7,
+          "Activity": "trade"
+        },
+        {
+          "Hour": 18,
+          "Activity": "patrol"
+        }
+      ]
+    },
+    {
+      "Id": "beast",
+      "Family": "quadruped",
+      "Faction": "beasts",
+      "Profession": "hunter",
+      "Schedule": [
+        {
+          "Hour": 0,
+          "Activity": "patrol"
+        }
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "Id": "blades",
+      "Stat": "strength",
+      "PerRank": 2,
+      "MaxRank": 5
+    },
+    {
+      "Id": "lore",
+      "Stat": "power",
+      "PerRank": 3,
+      "MaxRank": 5
+    }
+  ]
+}

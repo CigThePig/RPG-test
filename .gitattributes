@@ -1,0 +1,3 @@
+# Preserve upstream formatting and source diffs; our own files retain normal whitespace checks.
+addons/** -whitespace
+third_party/** -whitespace

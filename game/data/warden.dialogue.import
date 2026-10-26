@@ -1,0 +1,16 @@
+[remap]
+
+importer="dialogue_manager"
+importer_version=18
+type="Resource"
+uid="uid://blbw3eb0pv5gr"
+path="res://.godot/imported/warden.dialogue-486d7abe711dcc97f25c0135d3043be7.tres"
+
+[deps]
+
+source_file="res://game/data/warden.dialogue"
+dest_files=["res://.godot/imported/warden.dialogue-486d7abe711dcc97f25c0135d3043be7.tres"]
+
+[params]
+
+defaults=true

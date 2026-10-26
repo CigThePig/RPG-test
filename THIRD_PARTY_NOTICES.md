@@ -12,7 +12,7 @@ The asset build uses .NET's installed framework/compiler; no runtime/SDK binarie
 
 ## JavaScript development dependencies
 
-Exact versions and all transitive resolutions are in `package-lock.json`. No JavaScript runtime dependencies ship with the game.
+Exact versions and all transitive resolutions are in `examples/mosslight/package-lock.json`. No JavaScript runtime dependencies ship with the game.
 
 | Package | Version | Use | License |
 | --- | --- | --- | --- |
@@ -20,8 +20,23 @@ Exact versions and all transitive resolutions are in `package-lock.json`. No Jav
 | Playwright | 1.56.1 | Chromium end-to-end testing | Apache-2.0 |
 | Prettier | 3.6.2 | formatting project source | MIT |
 
-Installed packages retain their original notices under `node_modules`; downloaded test browsers are development tools and are not committed or included in `dist`. GitHub Actions uses official checkout/setup-node/setup-dotnet/upload-artifact/upload-pages-artifact/deploy-pages actions at the major versions recorded in the workflow files.
+Installed packages retain their original notices under `node_modules`; downloaded test browsers are development tools and are not committed or included in `dist`. GitHub Actions uses the checkout/setup-node/setup-dotnet/upload-artifact actions and setup-godot at the versions recorded in the workflow. The old Pages deployment has been removed.
 
 ## Investigated, not incorporated
 
-claude-pxl (MIT), GdPlanningAI (Apache-2.0), and Worldloom (MIT) were inspected and declined for this milestone; exact commits and reasons are in [DECISIONS](docs/DECISIONS.md). No code or assets from those projects were copied. Other shortlist projects remain deferred/unverified for integration. Do not treat their mention in the assignment as license clearance.
+claude-pxl (MIT), GdPlanningAI (Apache-2.0), and Worldloom (MIT) were inspected and declined for this milestone; exact commits and reasons are in [historical decisions](docs/legacy/DECISIONS.md). No code or assets from those projects were copied. The expanded source audit and current adoption decisions are in `docs/SOURCE_AUDIT.md`. Mentioning an upstream does not imply its assets were copied or relicensed.
+
+## Native RPG foundation additions
+
+See `third_party/UPSTREAMS.json` and `docs/UPSTREAM_DEPENDENCIES.md` for exact revisions, authors, included paths, modifications and integration responsibilities.
+
+- **Procedural Pixel Creatures** — idlerunner00, MIT. Expanded to the original live Godot runtime and Plantfolk extension. Original source and all embedded notices retained.
+- **Gloot** — Peter Kish, MIT. Complete addon in `addons/gloot/`; license retained. Inventory/item restore validation patches documented.
+- **Dialogue Manager 4** — Nathan Hoad and contributors, MIT. Complete addon in `addons/dialogue_manager/`; license retained. Icon-reference portability patches documented.
+- **QuestSystem** — Shomy, MIT. Complete addon in `addons/quest_system/`; license retained. Ordered pool-restore patch documented.
+- **SPELL** — Emanuele Manzione, MIT. Complete engine-independent library source in `third_party/spell/`; license retained. Project file omitted in favour of the main .NET project.
+- **Graph Dungeon Generator** — Ahmed Khalifa, MIT. Original mission/layout grammar source and input rules in `third_party/graph_dungeon/`; license retained. Console entry point omitted; deterministic directory ordering added.
+- **Skelerealms** — Slashscreen, MIT. GOAP planning graph and PlannerNode adapted in `game/actors/Planner.gd`; license in `third_party/skelerealms/`. 3D entity/execution dependencies removed; value-aware goal/precondition checks added.
+- **gdfxr** — Haoyu Qiu, MIT. Original Godot SFXR port/editor in `addons/gdfxr/`; license retained. Used for local procedural audio generation.
+
+No code or assets from non-adopted audit candidates are included. In particular, GDQuest/Unity example artwork, native extension binaries and mixed-licence demo content were not acquired into the deliverable.

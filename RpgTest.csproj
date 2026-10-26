@@ -1,0 +1,16 @@
+<Project Sdk="Godot.NET.Sdk/4.6.1">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Optimize>true</Optimize>
+    <RootNamespace>Mosslight</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="tools/**;examples/**;third_party/**;vendor/**" />
+    <Compile Include="vendor/ppc/Core/**/*.cs" />
+    <Compile Include="third_party/spell/**/*.cs" />
+    <Compile Include="third_party/graph_dungeon/src/**/*.cs" />
+  </ItemGroup>
+</Project>

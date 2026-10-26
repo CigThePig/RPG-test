@@ -1,0 +1,90 @@
+[
+  {
+    "repository": "https://github.com/idlerunner00/procedural-pixel-creatures.git",
+    "revision": "a2207c4bd6f1be51d426684cf58f11668def7579",
+    "license": "MIT",
+    "destination": "addons/procedural_creatures",
+    "author": "idlerunner00",
+    "included": "vendor/ppc/Core; addons/procedural_creatures/Runtime; addons/procedural_creatures/Samples; addons/procedural_creatures_plantfolk; vendor/ppc/EnvironmentArt.cs",
+    "modifications": "None. Original source preserved; game and exporter adapters are separate.",
+    "responsibility": "Core anatomy/genomes/motor/rasterizer; live Godot renderer and queue; Plantfolk extension; offline art",
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+  },
+  {
+    "repository": "https://github.com/peter-kish/gloot.git",
+    "revision": "6b09b87ac07a8536779ef1ab0fafc7e99830f948",
+    "license": "MIT",
+    "destination": "addons/gloot",
+    "author": "Peter Kish",
+    "included": "addons/gloot",
+    "modifications": "inventory.gd propagates failed item restoration; inventory_item.gd rejects unknown prototypes.",
+    "responsibility": "Primary inventory, property bags, stacks, transfers, equipment slots, serialization, editor tools",
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+  },
+  {
+    "repository": "https://github.com/nathanhoad/godot_dialogue_manager.git",
+    "revision": "ebfc3f0cb6e146f8b27c76be288157fcde0f0ffc",
+    "license": "MIT",
+    "destination": "addons/dialogue_manager",
+    "author": "Nathan Hoad and contributors",
+    "included": "addons/dialogue_manager",
+    "modifications": "Replace three unstable UID-only icon references with asset paths (four files).",
+    "responsibility": "Dialogue parser/editor/runtime, conditions, mutations, choices, C# integration",
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+  },
+  {
+    "repository": "https://github.com/shomykohai/quest-system.git",
+    "revision": "d1d933c7b1822aceb637e3d6fe3a4814f973c3ee",
+    "license": "MIT",
+    "destination": "addons/quest_system",
+    "author": "Shomy",
+    "included": "addons/quest_system",
+    "modifications": "abstract_manager.gd restores ordered pool IDs without erasing an iterated list.",
+    "responsibility": "Quest resources, pool transitions, progression lifecycle, serialization",
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+  },
+  {
+    "repository": "https://github.com/emanzione/SPELL.git",
+    "revision": "520b63f1536bf29b04931509048117ab0d8e9ef6",
+    "license": "MIT",
+    "destination": "third_party/spell",
+    "author": "Emanuele Manzione",
+    "included": "third_party/spell",
+    "modifications": "No source changes; legacy project file excluded.",
+    "responsibility": "Requirement/cost/effect execution and instance lifecycle; C# definitions compile data into SPELL",
+    "build_dependencies": ".NET 8; no external package dependencies"
+  },
+  {
+    "repository": "https://github.com/amidos2006/GraphDungeonGenerator.git",
+    "revision": "3d55c329d2cf31b7c5941f7e3e66f2b873cc8f24",
+    "license": "MIT",
+    "destination": "third_party/graph_dungeon",
+    "author": "Ahmed Khalifa",
+    "included": "third_party/graph_dungeon/src; grammar; graphStart.txt; graphRecipe.txt",
+    "modifications": "Remove upstream console entry point; sort grammar folders/files ordinally. World adapter corrects the reversed door-direction convention.",
+    "responsibility": "Mission graph grammar, spatial embedding, keys/locks and solvability; game adds tile construction and exhaustive tile validation",
+    "build_dependencies": ".NET 8; no external package dependencies"
+  },
+  {
+    "repository": "https://github.com/SlashScreen/skelerealms",
+    "revision": "293dfd0b68541066bc505eadf03255d85218b4bf",
+    "license": "MIT",
+    "destination": "game/actors/Planner.gd",
+    "included": "GOAP planning graph, PlannerNode; execution/entity dependencies removed",
+    "modifications": "Extracted pure planner; value-aware preconditions/goals; game action definitions",
+    "author": "Slashscreen",
+    "responsibility": "Extracted GOAP graph search; authoritative action execution stays in World",
+    "build_dependencies": "Godot 4.6.1 GDScript"
+  },
+  {
+    "repository": "https://github.com/timothyqiu/gdfxr",
+    "revision": "8823532565967bfd3a39036a5154da85cf797b35",
+    "license": "MIT",
+    "destination": "addons/gdfxr",
+    "included": "addons/gdfxr",
+    "modifications": "None.",
+    "author": "Haoyu Qiu",
+    "responsibility": "SFXR synthesis, sound configuration/editor and WAV export",
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+  }
+]

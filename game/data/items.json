@@ -1,0 +1,12 @@
+{
+ "iron_sword":{"name":"Iron sword","max_stack_size":1,"slot":"weapon","damage":8,"material":"iron","condition":100},
+ "oak_staff":{"name":"Oak staff","max_stack_size":1,"slot":"weapon","damage":3,"power":6,"material":"oak","condition":100},
+ "leather_coat":{"name":"Leather coat","max_stack_size":1,"slot":"body","defence":4,"material":"leather","condition":100},
+ "potion":{"name":"Restorative draught","max_stack_size":20,"healing":35},
+ "herb":{"name":"Silverleaf","max_stack_size":50},
+ "ore":{"name":"Bog iron","max_stack_size":50},
+ "wood":{"name":"Seasoned wood","max_stack_size":50},
+ "coin":{"name":"Crowns","max_stack_size":999},
+ "relic":{"name":"Reach relic","max_stack_size":1},
+ "dungeon_key":{"name":"Ruin key","max_stack_size":30}
+}
