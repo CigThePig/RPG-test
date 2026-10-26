@@ -48,3 +48,13 @@ The production `game/dev/Foundation.tscn` provides equivalent focused environmen
 - Incapacitation uses tinted/resting PPC presentation; no bespoke death animation is claimed. Biped sword visuals map to PPC's available short-blade shape.
 - Saves deliberately store full region arrays in schema 1; generator/schema changes require a future explicit migration or retaining the old executable. This is not an implemented streaming/delta-save system.
 - Dungeon solvability verifies a valid key-spending route; it does not promise every possible key-spending order is recoverable. The adapter retains meaningful key consumption and rejects layouts with no valid route.
+
+## Android remediation and mobile checks
+
+`FoundationChecks` now includes historical defeat progression before acceptance and across restoration; distinct item-possession reconciliation; repeated reward rejection; all-family weapon reconciliation; failed/full/empty/partial Gloot loot transfers; and raw touch movement ownership, cancellation, dialogue/menu/death authority. The expanded suite currently executes 244 assertions.
+
+`python3 tools/verify.py --visual --mobile` runs the production UI with the mobile layout enabled in the desktop engine. It records `mobile-*.png` screenshots and `render-verification-mobile.json`. This is hosted software rendering, not Android GPU evidence. The native/reference CI remains in `.github/workflows/ci.yml`.
+
+The Android workflow additionally exports and structurally validates the signed ARM64 package, including its .NET publish payload. A separate x86_64 export is installed and launched in an Android emulator, with readiness/tick markers from the real C# composition root. The runtime evidence artifact includes install output, emulator log, logcat, screenshot and an explicit result. Read each actual workflow result; no package-only test is described as a runtime pass.
+
+The physical Galaxy S25 checklist, signing limitations and offline phone workflow are in [ANDROID_DEVELOPMENT.md](ANDROID_DEVELOPMENT.md). Full engine diagnostics invoked in the Android development menu write their verification JSON to `user://`, not the read-only exported resource tree.

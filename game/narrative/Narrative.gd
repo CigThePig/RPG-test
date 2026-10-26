@@ -118,6 +118,9 @@ func build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	ui = PanelContainer.new()
+	var theme := Theme.new()
+	theme.default_font_size = 22
+	ui.theme = theme
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.065, 0.1, 0.1, 0.98)
 	style.border_color = Color(0.48, 0.52, 0.34)

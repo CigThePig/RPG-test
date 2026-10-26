@@ -62,7 +62,7 @@ A separate x86_64 export exercises the same source on a GitHub-hosted Android em
 
 ## Toolchain and compatibility
 
-Godot 4.6.1 .NET with matching official `.mono` templates; .NET SDK 9.0.203 (desktop framework stays net8.0; Android selects net9.0); .NET 8 runtime also installed for desktop checks; Temurin JDK 17; Android platform 35/build tools 35.0.1, NDK 28.1.13356709 and CMake 3.10.2.4988404. The prebuilt APK template determines minimum/target API levels; actual badging is recorded rather than claiming unsupported overrides. Godot's prebuilt Android C# template requires net9.0. Godot's SDK obtains the Android Mono runtime packs during publish; this is not a .NET MAUI application.
+Godot 4.6.1 .NET with matching official `.mono` templates; .NET SDK 9.0.203 (desktop framework stays net8.0; Android selects net9.0); .NET 8 runtime also installed for desktop checks; Temurin JDK 17; Android platform 35/build tools 35.0.1, NDK 28.1.13356709 and CMake 3.10.2.4988404. The prebuilt APK template uses minimum API 24 and target API 35; verification checks these actual manifest values rather than claiming unsupported overrides. Godot's prebuilt Android C# template requires net9.0. Godot's SDK obtains the Android Mono runtime packs during publish; this is not a .NET MAUI application.
 
 Godot documents Android C# support as experimental. Desktop Linux/Windows presets remain available. Live PPC generation, animation, gear and genomes remain C#, not baked sprites. Pure CPU rasterization can use the original worker queue; texture upload happens after workers join on the Godot main thread. The project includes no remote service requirement, and requests no game network or storage permission.
 

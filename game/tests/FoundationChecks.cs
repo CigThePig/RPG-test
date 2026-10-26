@@ -369,8 +369,8 @@ public static class FoundationChecks
             string save = Persistence.Capture(w, app.Narrative);
             Advance(w, 1);
             Persistence.Restore(w, app.Narrative, save);
-            File.WriteAllText("/tmp/rpg-before.json", save);
-            File.WriteAllText("/tmp/rpg-after.json", Persistence.Capture(w, app.Narrative));
+            if (!OS.HasFeature("android")) File.WriteAllText("/tmp/rpg-before.json", save);
+            if (!OS.HasFeature("android")) File.WriteAllText("/tmp/rpg-after.json", Persistence.Capture(w, app.Narrative));
             Check(Persistence.Capture(w, app.Narrative) == save, "unified actor/item/quest/equipment save roundtrip");
             Advance(w, 1);
             string continuation = Persistence.Capture(w, app.Narrative);
@@ -434,7 +434,7 @@ public static class FoundationChecks
             measurements["assertions"] = assertions;
             measurements["elapsedSeconds"] = watch.Elapsed.TotalSeconds;
             measurements["environment"] = $"{OS.GetName()} {OS.GetProcessorName()} · Godot {Engine.GetVersionInfo()["string"]}";
-            var outPath = ProjectSettings.GlobalizePath("res://docs/verification.json");
+            var outPath = ProjectSettings.GlobalizePath(OS.HasFeature("android") ? "user://verification.json" : "res://docs/verification.json");
             File.WriteAllText(outPath, JsonSerializer.Serialize(measurements, Content.Json));
             GD.Print($"FOUNDATION CHECKS PASSED: {assertions}");
         }

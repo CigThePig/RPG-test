@@ -8,7 +8,7 @@
     "included": "vendor/ppc/Core; addons/procedural_creatures/Runtime; addons/procedural_creatures/Samples; addons/procedural_creatures_plantfolk; vendor/ppc/EnvironmentArt.cs",
     "modifications": "None. Original source preserved; game and exporter adapters are separate.",
     "responsibility": "Core anatomy/genomes/motor/rasterizer; live Godot renderer and queue; Plantfolk extension; offline art",
-    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 9.0.203; desktop net8.0 / Android net9.0"
   },
   {
     "repository": "https://github.com/peter-kish/gloot.git",
@@ -19,7 +19,7 @@
     "included": "addons/gloot",
     "modifications": "inventory.gd propagates failed item restoration; inventory_item.gd rejects unknown prototypes.",
     "responsibility": "Primary inventory, property bags, stacks, transfers, equipment slots, serialization, editor tools",
-    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 9.0.203; desktop net8.0 / Android net9.0"
   },
   {
     "repository": "https://github.com/nathanhoad/godot_dialogue_manager.git",
@@ -30,7 +30,7 @@
     "included": "addons/dialogue_manager",
     "modifications": "Replace three unstable UID-only icon references with asset paths (four files).",
     "responsibility": "Dialogue parser/editor/runtime, conditions, mutations, choices, C# integration",
-    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 9.0.203; desktop net8.0 / Android net9.0"
   },
   {
     "repository": "https://github.com/shomykohai/quest-system.git",
@@ -41,7 +41,7 @@
     "included": "addons/quest_system",
     "modifications": "abstract_manager.gd restores ordered pool IDs without erasing an iterated list.",
     "responsibility": "Quest resources, pool transitions, progression lifecycle, serialization",
-    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 9.0.203; desktop net8.0 / Android net9.0"
   },
   {
     "repository": "https://github.com/emanzione/SPELL.git",
@@ -85,6 +85,6 @@
     "modifications": "None.",
     "author": "Haoyu Qiu",
     "responsibility": "SFXR synthesis, sound configuration/editor and WAV export",
-    "build_dependencies": "Godot 4.6.1 .NET / SDK 8.0.408"
+    "build_dependencies": "Godot 4.6.1 .NET / SDK 9.0.203; desktop net8.0 / Android net9.0"
   }
 ]

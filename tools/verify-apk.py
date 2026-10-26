@@ -10,12 +10,16 @@ def run(*args):
         raise
 badging = run('aapt2', 'dump', 'badging', str(apk))
 assert "package: name='com.cigthepig.mosslight.dev'" in badging, badging
-assert "launchable-activity:" in badging, 'No launcher activity'
+(out/"package-badging.log").write_text(badging)
 assert "native-code: 'arm64-v8a'" in badging, 'Not ARM64-only'
 signature = run('apksigner', 'verify', '--verbose', '--print-certs', str(apk))
 assert 'certificate SHA-256 digest:' in signature, 'No signing certificate'
 manifest = run('aapt2', 'dump', 'xmltree', str(apk), '--file', 'AndroidManifest.xml')
 (out/'package-manifest.log').write_text(manifest)
+# Godot 4.6 uses an exported activity-alias; aapt2 does not list it as launchable-activity.
+assert 'E: activity-alias' in manifest and 'android.intent.action.MAIN' in manifest and 'android.intent.category.LAUNCHER' in manifest, 'Missing Android launcher alias/intent filter'
+assert 'android:exported' in manifest and '=true' in manifest, 'No exported launcher'
+assert "minSdkVersion:'24'" in badging and "targetSdkVersion:'35'" in badging, 'Unexpected template API levels'
 (out/'package-signature.log').write_text(signature)
 # Godot APK exports resources as ZIP assets, including embedded .NET publish files.
 with zipfile.ZipFile(apk) as z:
