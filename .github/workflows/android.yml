@@ -119,8 +119,8 @@ jobs:
     env:
       # Ubuntu 24.04 may create AVDs under ~/.config/.android while the emulator
       # searches ~/.android. Force one shared path for both SDK tools.
-      ANDROID_AVD_HOME: ${{ runner.temp }}/mosslight-avds
-      ANDROID_USER_HOME: ${{ runner.temp }}/mosslight-android
+      ANDROID_AVD_HOME: /tmp/mosslight-avds
+      ANDROID_USER_HOME: /tmp/mosslight-android
     steps:
       - uses: actions/checkout@v4
         with:
