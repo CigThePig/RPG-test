@@ -1,6 +1,7 @@
 extends Node
 signal reward(item: String, count: int)
 signal reputation(faction: String, amount: int)
+var item_service: Node
 var manager := QuestSystemManagerAPI.new()
 var definitions: Array[Quest] = []
 var flags: Dictionary = {}
@@ -29,6 +30,11 @@ func accept_quest(id: int) -> bool:
 	if q.prerequisite > 0 and not completed(q.prerequisite): return false
 	manager.start_quest(q)
 	flags["accepted_%d" % id] = true
+	if q.event_kind == "item_acquired" and item_service != null:
+		var owned: int = item_service.count_item("player", q.target_value)
+		q.progress = maxi(q.progress, mini(q.required, owned))
+		q.objective_completed = q.progress >= q.required
+		finish_quest(q)
 	return true
 
 func completed(id: int) -> bool:
@@ -39,12 +45,15 @@ func receive(kind: String, actor: String, target: String, value: String, count: 
 	if actor != "player": return
 	for q in manager.get_active_quests().duplicate():
 		manager.update_quest(q, {"kind": kind, "actor": actor, "target": target, "value": value, "count": count})
-		if q.objective_completed and not q.failed:
-			manager.complete_quest(q)
-			if not q.rewarded:
-				q.rewarded = true
-				reward.emit(q.reward_item, q.reward_count)
-				reputation.emit("wardens", 5)
+		finish_quest(q)
+
+func finish_quest(q: Quest) -> void:
+	if q.objective_completed and not q.failed and manager.is_quest_active(q):
+		manager.complete_quest(q)
+		if not q.rewarded:
+			q.rewarded = true
+			reward.emit(q.reward_item, q.reward_count)
+			reputation.emit("wardens", 5)
 
 func fail_quest(id: int) -> void:
 	var q = manager._get_quest_by_id(id)

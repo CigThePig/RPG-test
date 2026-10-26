@@ -26,6 +26,7 @@ public static class FoundationChecks
 
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
+        app.Ui.PauseForVerification();
         var measurements = new Dictionary<string, object>();
         var w = app.World;
         string original = Persistence.Capture(w, app.Narrative);
@@ -55,6 +56,11 @@ public static class FoundationChecks
             }
 
             var p = w.Player;
+            float healthBeforeModal = p.Health;
+            int potionBeforeModal = w.Items.Count(p.Id, "potion");
+            p.Health = 25;
+            Check(app.GameplayBlocked && !app.UseQuickItem("potion") && p.Health == 25 && w.Items.Count(p.Id, "potion") == potionBeforeModal, "modal hotbar item use cannot mutate a paused world");
+            p.Health = healthBeforeModal;
             Check(!Progression.Unlock(w, p, "ward"), "ability unlock enforces level/skill cost");
             Progression.Award(w, p, 100);
             Check(p.Level == 2 && p.SkillPoints == 1, "experience grants level and persistent skill point");
@@ -73,7 +79,30 @@ public static class FoundationChecks
             Check(w.Items.Service.Call("generate_item", p.Id, "oak_staff", "silver", 2).AsBool(), "procedural material/quality item composed in Gloot");
             Check(w.Items.Equip(p, "oak_staff", "weapon") && w.Items.Bonus(p, "power") > 6, "procedural material affects magical equipment power");
             Check(w.Items.Equip(p, "iron_sword", "weapon"), "replaced equipment returns to backpack");
+            w.Items.Service.Call("generate_item", p.Id, "oak_staff", "oak", 3);
+            using (var rows = JsonDocument.Parse(w.Items.Service.Call("catalog", p.Id).AsString()))
+            {
+                string selector = rows.RootElement.EnumerateArray().Last(row => row.GetProperty("id").GetString() == "oak_staff").GetProperty("selector").GetString()!;
+                Check(w.Items.Equip(p, selector, "weapon") && Math.Abs(w.Items.Bonus(p, "power") - 9.36f) < .01f, "equipment selection preserves unique generated instance identity");
+            }
+
+            w.Items.Equip(p, "iron_sword", "weapon");
             Check(w.Items.Equip(p, "leather_coat", "body") && w.Items.Bonus(p, "defence") == 4, "equipment alters authoritative defence");
+            var originalAppearance = p.Appearance;
+            app.ChangeAppearance("quadruped", 42);
+            Check(!p.Grasps && w.Items.Bonus(p, "damage") == 0 && w.Items.Count(p.Id, "iron_sword") >= 1, "anatomy change returns incompatible equipment to inventory");
+            var capabilityTarget = w.Actors["npc:2"];
+            float savedTargetX = capabilityTarget.X, savedTargetY = capabilityTarget.Y;
+            capabilityTarget.X = p.X + 20;
+            capabilityTarget.Y = p.Y;
+            w.Items.Service.Call("equip", p.Id, "iron_sword", "weapon", true);
+            Check(!w.Activate(p.Id, "slash", capabilityTarget.Id), "weapon abilities reject current incompatible anatomy even with corrupt equipment");
+            w.Items.Reconcile(p);
+            w.SetAppearance(p, originalAppearance);
+            w.Items.Equip(p, "iron_sword", "weapon");
+            app.RebuildViews();
+            capabilityTarget.X = savedTargetX;
+            capabilityTarget.Y = savedTargetY;
             var beast = w.Actors["npc:2"];
             Check(!w.Items.Equip(beast, "iron_sword", "weapon"), "anatomy prevents incompatible equipment");
             var recipe = w.Content.Recipes.Single(x => x.Id == "draught");
@@ -82,9 +111,12 @@ public static class FoundationChecks
             Check(w.Items.Craft(p.Id, recipe) && w.Items.Count(p.Id, "potion") == potions + 1, "crafting consumes and produces using Gloot");
             Check(app.Narrative.Call("completed", 3).AsBool(), "craft event completes actual QuestSystem quest");
             Check(!w.Items.Craft(p.Id, w.Content.Recipes.Single(x => x.Id == "forge_sword")), "invalid recipe transaction is atomic");
-            w.Items.Add(p.Id,"ore",3);w.Items.Add(p.Id,"wood",1);
-            Check(w.Items.Craft(p.Id,w.Content.Recipes.Single(x=>x.Id=="forge_sword")),"crafting constructs material/quality equipment");
-            Check(!w.Items.Service.Call("generate_item",p.Id,"iron_sword","unknown_material",2).AsBool(),"generated item rejects unknown material");
+            w.Items.Add(p.Id, "ore", 3);
+            w.Items.Add(p.Id, "wood", 1);
+            Check(w.Items.Craft(p.Id, w.Content.Recipes.Single(x => x.Id == "forge_sword")), "crafting constructs material/quality equipment");
+            Check(!w.Items.Service.Call("generate_item", p.Id, "iron_sword", "unknown_material", 2).AsBool(), "generated item rejects unknown material");
+            int herbsBeforeInvalid = w.Items.Count(p.Id, "herb");
+            Check(!w.Items.Craft(p.Id, new RecipeDef { Id = "invalid", Ingredients = new() { { "herb", 1 } }, Output = "unknown", Count = 1 }) && w.Items.Count(p.Id, "herb") == herbsBeforeInvalid, "invalid crafting output preserves ingredients");
             Check(w.Items.Trade(p.Id, "npc:0", "potion", 5), "merchant transfers existing stock for coins");
             Check(!w.Items.Trade(p.Id, "npc:0", "potion", 9999), "barter enforces funds");
             Check(app.Narrative.Call("accept_quest", 1).AsBool(), "quest acceptance");
@@ -110,6 +142,10 @@ public static class FoundationChecks
             w.Damage(p, b, 100, "physical");
             Check(app.Narrative.Call("completed", 1).AsBool(), "defeat events complete kill quest");
             Check(p.Reputation.GetValueOrDefault("wardens") >= 10, "quest rewards change reputation");
+            int secondCorpseLoot = w.Items.Count(b.Id, "coin");
+            int playerCoinsBeforeSecond = w.Items.Count(p.Id, "coin");
+            Check(w.Interact(p) && w.Items.Count(b.Id, "coin") == 0 && w.Items.Count(p.Id, "coin") == playerCoinsBeforeSecond + secondCorpseLoot, "empty overlapping corpse does not hide another corpse's loot");
+            string relicQuestAvailable = app.Narrative.Call("export_state").AsString();
             Check(app.Narrative.Call("accept_quest", 2).AsBool(), "quest unlocked after prerequisite");
             b.Health = 100;
             b.Invulnerable = 0;
@@ -144,6 +180,34 @@ public static class FoundationChecks
             p.Health = 30;
             p.State = ActionState.Idle;
             Check(w.UsePotion(p) && p.Health == 65, "consumable updates shared health");
+            var testRegion = new RegionState
+            {
+                Id = "geometry",
+                Width = 7,
+                Height = 5,
+                Tiles = Enumerable.Repeat(Terrain.Floor, 35).ToArray(),
+                Entrance = 15,
+                Objective = 19
+            };
+            testRegion.Features[17] = "herb";
+            testRegion.Tiles[16] = Terrain.Wall;
+            w.RegionsById[testRegion.Id] = testRegion;
+            string oldRegion = p.Region;
+            float oldX = p.X, oldY = p.Y;
+            p.Region = testRegion.Id;
+            p.X = testRegion.Center(15).X + 2;
+            p.Y = testRegion.Center(15).Y;
+            p.State = ActionState.Idle;
+            Check(!w.Interact(p), "resource interaction cannot cross a wall");
+            testRegion.Tiles[16] = Terrain.Water;
+            Check(w.VisibleTo(p, testRegion.Center(17)), "water does not block sight or projectile targeting");
+            int herbsBeforeModalInteraction = w.Items.Count(p.Id, "herb");
+            app.Interact();
+            Check(w.Items.Count(p.Id, "herb") == herbsBeforeModalInteraction && !testRegion.Depleted.Contains(17), "modal hotbar interaction cannot gather while simulation is paused");
+            p.Region = oldRegion;
+            p.X = oldX;
+            p.Y = oldY;
+            w.RegionsById.Remove(testRegion.Id);
             Check(app.World.Planner!.Call("choose", "safe", true).AsString() == "retreat", "adapted Skelerealms GOAP selects retreat");
             Check(app.World.Planner.Call("choose", "defeated", false).AsString() == "wait", "planner value preconditions reject unseen target");
             var generation = new List<double>();
@@ -205,6 +269,13 @@ public static class FoundationChecks
             Check(p.Region == "ruin" && r0 != w.RegionsById[p.Region], "persistent region transition");
             w.Items.Add(p.Id, "relic");
             Check(app.Narrative.Call("completed", 2).AsBool(), "dungeon item acquisition completes quest");
+            string completedNarrative = app.Narrative.Call("export_state").AsString(), completedItems = w.Items.Service.Call("export_state").AsString();
+            app.Narrative.Call("import_state", relicQuestAvailable);
+            int potionsBeforeReconcile = w.Items.Count(p.Id, "potion");
+            Check(app.Narrative.Call("accept_quest", 2).AsBool() && app.Narrative.Call("completed", 2).AsBool() && w.Items.Count(p.Id, "potion") == potionsBeforeReconcile + 3, "quest acceptance reconciles a relic collected before acceptance");
+            Check(!app.Narrative.Call("accept_quest", 2).AsBool() && w.Items.Count(p.Id, "potion") == potionsBeforeReconcile + 3, "repeated early-item quest acceptance cannot repeat rewards");
+            app.Narrative.Call("import_state", completedNarrative);
+            w.Items.Service.Call("import_state", completedItems);
             w.Enter(p, "reach");
             // Restore valid NPC positions before persistence validation.
             foreach (var a in w.Actors.Values.Where(a => a.Id != "player"))

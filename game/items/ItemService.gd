@@ -54,7 +54,7 @@ func transfer(source: String, target: String, prototype: String, count: int) -> 
 	return true
 
 func equip(owner: String, prototype: String, slot_name: String, grasping: bool) -> bool:
-	var item := bag(owner).get_item_with_prototype_id(prototype)
+	var item := find_item(owner, prototype)
 	if item == null or item.get_property("slot", "") != slot_name: return false
 	if slot_name == "weapon" and not grasping: return false
 	var key := owner + ":" + slot_name
@@ -181,3 +181,54 @@ func _exit_tree() -> void:
 	var cache = preload("res://addons/gloot/core/prototree/proto_tree_cache.gd")
 	for tree in cache._cache.values(): tree.clear()
 	cache._cache.clear()
+
+func can_produce(prototype: String, count: int, material: String, quality: int) -> bool:
+	if count < 1 or not protos.data.has(prototype): return false
+	if material == "": return true
+	var materials: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://game/data/materials.json"))
+	return materials.has(material) and quality >= 1 and quality <= 3 and int(protos.data[prototype].get("max_stack_size", 1)) == 1
+
+func find_item(owner: String, selector: String) -> InventoryItem:
+	for item in bag(owner).get_items():
+		if item.get_property("instance_id", "") == selector: return item
+	return bag(owner).get_item_with_prototype_id(selector)
+
+func catalog(owner: String) -> String:
+	var rows: Array = []
+	for item in bag(owner).get_items():
+		var id: String = item.get_prototype().get_prototype_id()
+		rows.append({"selector": item.get_property("instance_id", id), "id": id, "title": item.get_title(), "count": item.get_stack_size(), "slot": item.get_property("slot", ""), "healing": float(item.get_property("healing", 0)), "properties": item_details(item)})
+	return JSON.stringify(rows)
+
+func consume(owner: String, selector: String) -> float:
+	var item := find_item(owner, selector)
+	if item == null: return 0.0
+	var healing := float(item.get_property("healing", 0.0))
+	if healing <= 0.0: return 0.0
+	item.set_stack_size(item.get_stack_size() - 1)
+	return healing
+
+func item_details(item: InventoryItem) -> String:
+	var lines := PackedStringArray()
+	for property in ["material", "quality", "condition", "damage", "defence", "power", "mass", "healing"]:
+		if item.has_property(property): lines.append(property.capitalize() + ": " + str(item.get_property(property)))
+	return "\n".join(lines)
+
+func reconcile_equipment(owner: String, grasping: bool) -> void:
+	var key := owner + ":weapon"
+	if grasping or not slots.has(key): return
+	var item: InventoryItem = slots[key].get_item()
+	if item != null:
+		slots[key]._inventory.remove_item(item)
+		bag(owner).add_item(item)
+
+func unequip_all(owner: String) -> void:
+	for key in slots:
+		if not key.begins_with(owner + ":"): continue
+		var item: InventoryItem = slots[key].get_item()
+		if item != null:
+			slots[key]._inventory.remove_item(item)
+			bag(owner).add_item(item)
+
+func has_items(owner: String) -> bool:
+	return bags.has(owner) and bags[owner].get_item_count() > 0

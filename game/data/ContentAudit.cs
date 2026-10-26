@@ -8,8 +8,10 @@ public static class ContentAudit
     {
         var items = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(Godot.FileAccess.GetFileAsString("res://game/data/items.json"))!;
         var errors = content.Validate(items.Keys.ToHashSet());
-        using var materials=JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://game/data/materials.json"));
-        foreach(var recipe in content.Recipes)if(recipe.Material!=""&&(!materials.RootElement.TryGetProperty(recipe.Material,out _)||recipe.Quality<1||recipe.Quality>3||items[recipe.Output].GetProperty("max_stack_size").GetInt32()!=1))errors.Add($"recipe {recipe.Id}: invalid generated output material/quality");
+        using var materials = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://game/data/materials.json"));
+        foreach (var recipe in content.Recipes)
+            if (recipe.Material != "" && (!materials.RootElement.TryGetProperty(recipe.Material, out _) || recipe.Quality < 1 || recipe.Quality > 3 || items[recipe.Output].GetProperty("max_stack_size").GetInt32() != 1))
+                errors.Add($"recipe {recipe.Id}: invalid generated output material/quality");
         using var spawns = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://game/data/spawns.json"));
         foreach (var region in spawns.RootElement.EnumerateObject())
         {

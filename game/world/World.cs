@@ -60,7 +60,7 @@ public sealed class World
     }
 
     public bool Hostile(ActorState a, ActorState b) => a.Id != b.Id && (Content.Factions.GetValueOrDefault(a.Faction + ":" + b.Faction) + a.Reputation.GetValueOrDefault(b.Faction)) < 0;
-    public bool CanActivate(ActorState a, ActorState b, AbilityDef d) => a.Alive && b.Alive && a.Region == b.Region && a.Abilities.Contains(d.Id) && a.State is ActionState.Idle or ActionState.Moving && a.Mana >= d.Cost && a.Cooldowns.GetValueOrDefault(d.Id) <= 0 && (!d.RequiresWeapon || Items.Bonus(a, "damage") > 0) && (d.Self ? a == b : Hostile(a, b)) && (d.Self || Vector2.Distance(a.Position, b.Position) <= d.Range + a.NaturalReach) && LineOfSight(a, b);
+    public bool CanActivate(ActorState a, ActorState b, AbilityDef d) => a.Alive && b.Alive && a.Region == b.Region && a.Abilities.Contains(d.Id) && a.State is ActionState.Idle or ActionState.Moving && a.Mana >= d.Cost && a.Cooldowns.GetValueOrDefault(d.Id) <= 0 && (!d.RequiresWeapon || (a.Grasps && Items.Bonus(a, "damage") > 0)) && (d.Self ? a == b : Hostile(a, b)) && (d.Self || Vector2.Distance(a.Position, b.Position) <= d.Range + a.NaturalReach) && LineOfSight(a, b);
     public bool Activate(string id, string ability, string target)
     {
         if (!Actors.TryGetValue(id, out var actor) || !Actors.TryGetValue(target, out var victim) || !spells.TryGetValue(ability, out var spell))
@@ -110,6 +110,7 @@ public sealed class World
         target.Relationships[source.Id] = target.Relationships.GetValueOrDefault(source.Id) - actual;
         if (!target.Alive)
         {
+            Items.Service.Call("unequip_all", target.Id);
             target.PendingAbility = "";
             Presentation?.Invoke(target.Id, "dead");
             Events.Publish(new("defeated", source.Id, target.Id, target.Profile));
@@ -156,6 +157,8 @@ public sealed class World
     void Resolve(ActorState a, ActorState b, AbilityDef d, bool projectile = false)
     {
         if (!a.Alive || !b.Alive || a.Region != b.Region)
+            return;
+        if (d.RequiresWeapon && (!a.Grasps || Items.Bonus(a, "damage") <= 0))
             return;
         if (d.Self)
         {
@@ -281,18 +284,24 @@ public sealed class World
         }
     }
 
-    public bool LineOfSight(ActorState a, ActorState b)
+    public bool VisibleTo(ActorState actor, Vector2 point, bool allowBlockedTarget = false)
     {
-        if (a.Region != b.Region)
-            return false;
-        var r = RegionsById[a.Region];
-        int steps = (int)(Vector2.Distance(a.Position, b.Position) / 8) + 1;
-        for (int i = 1; i < steps; i++)
-            if (r.BlocksSight(r.Index(Vector2.Lerp(a.Position, b.Position, (float)i / steps))))
+        var region = RegionsById[actor.Region];
+        int target = region.Index(point);
+        int steps = (int)(Vector2.Distance(actor.Position, point) / 4) + 1;
+        for (int i = 1; i <= steps; i++)
+        {
+            int tile = region.Index(Vector2.Lerp(actor.Position, point, (float)i / steps));
+            if (allowBlockedTarget && tile == target)
+                continue;
+            if (region.BlocksSight(tile))
                 return false;
+        }
+
         return true;
     }
 
+    public bool LineOfSight(ActorState a, ActorState b) => a.Region == b.Region && VisibleTo(a, b.Position);
     public bool Move(ActorState a, Vector2 delta)
     {
         if (!a.Alive)
@@ -404,7 +413,7 @@ public sealed class World
         if (!a.Alive || a.State is not (ActionState.Idle or ActionState.Moving))
             return false;
         var r = RegionsById[a.Region];
-        var nearby = r.Features.Where(x => !r.Depleted.Contains(x.Key) && Vector2.Distance(r.Center(x.Key), a.Position) < 48).OrderBy(x => Vector2.DistanceSquared(r.Center(x.Key), a.Position)).ToArray();
+        var nearby = r.Features.Where(x => !r.Depleted.Contains(x.Key) && Vector2.Distance(r.Center(x.Key), a.Position) < 48 && VisibleTo(a, r.Center(x.Key), allowBlockedTarget: true)).OrderBy(x => Vector2.DistanceSquared(r.Center(x.Key), a.Position)).ToArray();
         foreach (var(at, kind)in nearby)
         {
             if (kind == "lock")
@@ -441,20 +450,8 @@ public sealed class World
             return true;
         }
 
-        var corpse = Actors.Values.FirstOrDefault(b => !b.Alive && b.Region == a.Region && Vector2.Distance(a.Position, b.Position) < 48);
-        if (corpse != null)
-        {
-            foreach (var l in Content.Loot)
-            {
-                int count = Items.Count(corpse.Id, l.Item);
-                if (count > 0)
-                    Items.Transfer(corpse.Id, a.Id, l.Item, count);
-            }
-
-            return true;
-        }
-
-        return false;
+        var corpse = Actors.Values.Where(b => !b.Alive && b.Region == a.Region && Vector2.Distance(a.Position, b.Position) < 48 && LineOfSight(a, b) && Items.HasLoot(b.Id)).OrderBy(b => Vector2.DistanceSquared(a.Position, b.Position)).FirstOrDefault();
+        return corpse != null && Items.LootAll(corpse.Id, a.Id);
     }
 
     public void Enter(ActorState a, string region)
@@ -510,16 +507,30 @@ public sealed class World
                     def.GetProperty("ability").GetString()!
                 }
             };
+            AnatomyAdapter.Apply(actor);
             Actors[actor.Id] = actor;
         }
     }
 
-    public bool UsePotion(ActorState a)
+    public void SetAppearance(ActorState actor, Appearance appearance)
     {
-        if (!a.Alive || a.State is not (ActionState.Idle or ActionState.Moving) || !Items.Take(a.Id, "potion", 1))
+        Cancel(actor);
+        actor.Appearance = appearance;
+        AnatomyAdapter.Apply(actor);
+        Items.Reconcile(actor);
+        Events.Publish(new("appearance_changed", actor.Id, "", appearance.Family));
+    }
+
+    public bool UsePotion(ActorState actor) => UseItem(actor, "potion");
+    public bool UseItem(ActorState actor, string selector)
+    {
+        if (!actor.Alive || actor.State is not (ActionState.Idle or ActionState.Moving))
             return false;
-        a.Health = Math.Min(a.MaxHealth, a.Health + 35);
-        Events.Publish(new("item_used", a.Id, "", "potion"));
+        float healing = Items.Service.Call("consume", actor.Id, selector).AsSingle();
+        if (healing <= 0)
+            return false;
+        actor.Health = Math.Min(actor.MaxHealth, actor.Health + healing);
+        Events.Publish(new("item_used", actor.Id, "", selector));
         return true;
     }
 
@@ -543,6 +554,7 @@ public sealed class World
                 "mend"
             }
         };
+        AnatomyAdapter.Apply(player);
         Actors.Add(player.Id, player);
         for (int i = 0; i < 8; i++)
         {
@@ -569,6 +581,7 @@ public sealed class World
             };
             a.HomeX = a.X;
             a.HomeY = a.Y;
+            AnatomyAdapter.Apply(a);
             Actors.Add(a.Id, a);
             if (i < 2)
             {

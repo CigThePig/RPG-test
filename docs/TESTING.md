@@ -13,7 +13,7 @@ Use Godot **4.6.1 .NET**, SDK **8.0.408**, and Python 3. Visual verification nee
 
 ## Executed evidence
 
-- **202 production integration assertions** pass inside Godot, spanning C#, GDScript and imported addon implementations. Source: `game/tests/FoundationChecks.cs`; raw timings: `docs/verification.json`.
+- **213 production integration assertions** pass inside Godot, spanning C#, GDScript and imported addon implementations. Source: `game/tests/FoundationChecks.cs`; raw timings: `docs/verification.json`.
 - All **nine registered PPC families** build deterministically and round-trip genomes, create live actor nodes and accept action/hit requests. The separate original exporter rendered **1,152 animation frames** for nine seeded family sheets, including Plantfolk, in approximately **3.1 seconds**, excluding compilation.
 - Actual SPELL cast requirements/costs/effects drive melee windup, projectile damage, interruption, mitigation, death and Gloot loot. Tests cover resources, friendly-fire rejection, cooldown/action exclusion, consumables, status ticks/stack caps, temporary modifiers, experience, skill points, training and ability unlocks.
 - Real Gloot inventories are tested for stack limits, split transfers, equipment/stat effects, generated material/quality items, crafting, merchant stock/payment and failed transactions. Snapshot validation rejects unknown items without mutating the running inventory.
@@ -31,6 +31,10 @@ Raw evidence records environment and workload. Machine: Linux hosted Intel Xeon 
 `verification.json` contains 600 fixed steps at each of 16, 64 and 128 actors, generation/navigation at three region sizes, thirty dungeon timings, managed-memory observations and serialized save sizes. These benchmarks omit full rendered actor presentation and must not be quoted as rendered game FPS.
 
 `render-verification.json` contains an actual 180-frame sample with nine visible actors (seventeen persistent actors including the unloaded dungeon). After grouping ground commands by texture, local samples were approximately **13–14 ms mean, 18–23 ms p95 and 26 ms p99**; the previous interleaved draw commands took around 26 ms mean. This is a short software-rendered test, not a sustained hardware/GPU performance guarantee. GC memory is managed memory, not total process or texture memory.
+
+## Review regressions
+
+Codex review findings are covered by executable cases: multiple overlapping corpses skip empty inventories; modal hotbar actions cannot mutate the paused world; anatomy changes return incompatible weapons and weapon abilities recheck current capabilities; acquisition quests reconcile already-owned relics at acceptance without repeating rewards. Additional regressions reject invalid crafting output before consumption and prevent interactions through walls. Equipment UI selects actual generated instance identities rather than a hardcoded prototype list.
 
 ## Development environments
 

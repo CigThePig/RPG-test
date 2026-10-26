@@ -3,7 +3,7 @@
 | Domain | Authoritative owner | Actual upstream contribution | Runtime connection |
 |---|---|---|---|
 | Entity identity/attributes/health/progression | `game/actors/State.cs`, `World` | Game adapters required by SPELL/PPC | IDs key all actor references and events |
-| Creature anatomy/genetics/animation | `vendor/ppc/Core`, PPC Runtime | Complete original core/runtime + Plantfolk | `CharacterView`, workshop, full genome saves |
+| Creature anatomy/genetics/animation | `vendor/ppc/Core`, PPC Runtime | Complete original core/runtime + Plantfolk | `AnatomyAdapter` owns semantic capabilities; `CharacterView`, workshop, full genome saves |
 | Inventory/stacks/containers | Gloot `Inventory`/`InventoryItem` | Complete Gloot addon | `ItemService.gd` ↔ `Items.cs`; no C# duplicate store |
 | Equipment slots/instances | Gloot `ItemSlot` | Original slot implementation | Slot checks, stat bonuses and PPC gear variants |
 | Procedural item construction | Gloot item properties | Original property bag/serialization | Material/quality constructor in `ItemService` |

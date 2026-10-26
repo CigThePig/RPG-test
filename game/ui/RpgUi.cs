@@ -1,4 +1,5 @@
 using Godot;
+using System.Text.Json;
 
 namespace Mosslight;
 public partial class RpgUi : CanvasLayer
@@ -70,7 +71,7 @@ public partial class RpgUi : CanvasLayer
             ("1 · Sword", () => App.Cast("slash")),
             ("2 · Ember", () => App.Cast("ember")),
             ("3 · Mend", () => App.Cast("mend")),
-            ("4 · Draught", () => App.World.UsePotion(App.World.Player)),
+            ("4 · Draught", () => App.UseQuickItem("potion")),
             ("E · Interact", App.Interact),
             ("I · Pack", Inventory),
             ("J · Journal", Journal),
@@ -99,7 +100,13 @@ public partial class RpgUi : CanvasLayer
         };
         root.AddChild(panel);
         body = new VBoxContainer();
-        panel.AddChild(body);
+        var scroll = new ScrollContainer
+        {
+            CustomMinimumSize = new Vector2(420, 470)
+        };
+        panel.AddChild(scroll);
+        scroll.AddChild(body);
+        body.CustomMinimumSize = new Vector2(400, 0);
         menu = new PanelContainer
         {
             Position = new Vector2(380, 160),
@@ -147,8 +154,15 @@ public partial class RpgUi : CanvasLayer
             var def = App.World.Content.Abilities.Single(d => d.Id == id);
             float cooldown = a.Cooldowns.GetValueOrDefault(id);
             button.Disabled = cooldown > 0 || a.Mana < def.Cost || !a.Alive;
-            button.Text = cooldown > 0 ? $"{def.Name} · {cooldown:0.0}s" : def.Name;
+            string binding = id == "slash" ? "1" : id == "ember" ? "2" : "3";
+            button.Text = cooldown > 0 ? $"{binding} · {def.Name} · {cooldown:0.0}s" : $"{binding} · {def.Name}";
         }
+    }
+
+    public void PauseForVerification()
+    {
+        panel.Hide();
+        menu.Show();
     }
 
     public void ClosePanels() => panel.Hide();
@@ -156,29 +170,52 @@ public partial class RpgUi : CanvasLayer
     {
         Open("PACK & EQUIPMENT");
         body.AddChild(new Label { Text = App.World.Items.Describe("player") });
-        Button(body, "Equip iron sword", () =>
+        using var catalog = JsonDocument.Parse(App.World.Items.Service.Call("catalog", "player").AsString());
+        foreach (var row in catalog.RootElement.EnumerateArray())
         {
-            App.World.Items.Equip(App.World.Player, "iron_sword", "weapon");
-            Inventory();
-        });
-        Button(body, "Equip leather coat", () =>
-        {
-            App.World.Items.Equip(App.World.Player, "leather_coat", "body");
-            Inventory();
-        });
+            string selector = row.GetProperty("selector").GetString()!;
+            string slot = row.GetProperty("slot").GetString()!;
+            string title = row.GetProperty("title").GetString()!;
+            if (slot != "")
+            {
+                var button = Button(body, "Equip · " + title, () =>
+                {
+                    App.World.Items.Equip(App.World.Player, selector, slot);
+                    Inventory();
+                });
+                button.TooltipText = row.GetProperty("properties").GetString();
+            }
+
+            if (row.GetProperty("healing").GetSingle() > 0)
+                Button(body, "Use · " + title, () =>
+                {
+                    App.World.UseItem(App.World.Player, selector);
+                    Inventory();
+                });
+        }
+
         foreach (var recipe in App.World.Content.Recipes)
-            Button(body, "Craft · " + recipe.Id, () =>
+            Button(body, "Craft · " + System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(recipe.Id.Replace("_", " ")), () =>
             {
                 Notify(App.World.Items.Craft("player", recipe) ? "Crafted " + recipe.Output : "Missing ingredients");
                 Inventory();
             });
-        var merchant = App.World.Actors.Values.FirstOrDefault(a => a.Profession == "merchant" && a.Alive && a.Region == App.World.Player.Region && System.Numerics.Vector2.Distance(a.Position, App.World.Player.Position) < 80);
+        var player = App.World.Player;
+        var merchant = App.World.Actors.Values.FirstOrDefault(a => a.Profession == "merchant" && a.Alive && a.Region == player.Region && System.Numerics.Vector2.Distance(a.Position, player.Position) < 80 && !App.World.Hostile(player, a) && App.World.LineOfSight(player, a));
         if (merchant != null)
-            Button(body, "Buy draught · 5 crowns", () =>
+        {
+            using var stock = JsonDocument.Parse(App.World.Items.Service.Call("catalog", merchant.Id).AsString());
+            foreach (var row in stock.RootElement.EnumerateArray())
             {
-                Notify(App.World.Items.Trade("player", merchant.Id, "potion", 5) ? "Purchase complete" : "Insufficient funds or stock");
-                Inventory();
-            });
+                string id = row.GetProperty("id").GetString()!;
+                string title = row.GetProperty("title").GetString()!;
+                Button(body, "Buy · " + title + " · 5 crowns", () =>
+                {
+                    Notify(App.World.Items.Trade("player", merchant.Id, id, 5) ? "Purchase complete" : "Insufficient funds or stock");
+                    Inventory();
+                });
+            }
+        }
     }
 
     public void Journal()
@@ -189,24 +226,30 @@ public partial class RpgUi : CanvasLayer
 
     public void Character()
     {
-        var a = App.World.Player;
+        var actor = App.World.Player;
         Open("WAYFARER");
-        body.AddChild(new Label { Text = $"Level {a.Level} · skill points {a.SkillPoints}\nStrength {a.Strength}\nDefence {a.Defence + App.World.Items.Bonus(a, "defence")}\nWeapon damage {App.World.Items.Bonus(a, "damage")}\nFamily {a.Appearance.Family} · seed {a.Appearance.Seed}\nFlight {a.Flies} · Swimming {a.Swims} · Grasping {a.Grasps}\nWarden reputation {a.Reputation.GetValueOrDefault("wardens")}\nAbilities: {string.Join(", ", a.Abilities)}" });
-        Button(body, "Learn Bark ward (level 2 / 1 point)", () =>
+        body.AddChild(new Label { Text = $"Level {actor.Level} · skill points {actor.SkillPoints}\nStrength {App.World.Stat(actor, "strength")}\nDefence {App.World.Stat(actor, "defence")}\nWeapon damage {App.World.Items.Bonus(actor, "damage")}\nFamily {actor.Appearance.Family} · seed {actor.Appearance.Seed}\nFlight {actor.Flies} · Swimming {actor.Swims} · Grasping {actor.Grasps}\nWarden reputation {actor.Reputation.GetValueOrDefault("wardens")}" });
+        foreach (var ability in App.World.Content.Abilities)
         {
-            Notify(Progression.Unlock(App.World, a, "ward") ? "Learned Bark ward" : "Requirements not met");
-            Character();
-        });
-        Button(body, "Train blades (1 point)", () =>
-        {
-            Progression.Train(App.World, a, "blades");
-            Character();
-        });
-        if (a.Abilities.Contains("ward"))
-            Button(body, "Cast Bark ward", () =>
+            if (actor.Abilities.Contains(ability.Id))
+                Button(body, "Use · " + ability.Name, () =>
+                {
+                    ClosePanels();
+                    App.Cast(ability.Id);
+                });
+            else
+                Button(body, $"Learn · {ability.Name} (level {ability.UnlockLevel} / {ability.UnlockCost} points)", () =>
+                {
+                    Notify(Progression.Unlock(App.World, actor, ability.Id) ? "Ability learned" : "Requirements not met");
+                    Character();
+                });
+        }
+
+        foreach (var skill in App.World.Content.Skills)
+            Button(body, $"Train · {skill.Id} [{actor.SkillRanks.GetValueOrDefault(skill.Id)}/{skill.MaxRank}]", () =>
             {
-                ClosePanels();
-                App.World.Activate(a.Id, "ward", a.Id);
+                Progression.Train(App.World, actor, skill.Id);
+                Character();
             });
     }
 

@@ -10,7 +10,9 @@ public partial class Foundation : Node2D
     public Node Narrative { get; private set; } = null !;
     public Dictionary<string, CharacterView> Views { get; } = new();
     public RpgUi Ui => ui;
+    public bool GameplayBlocked => ui == null || ui.BlocksInput || Narrative.Get("speaking").AsBool();
 
+    public bool UseQuickItem(string selector) => !GameplayBlocked && World.UseItem(World.Player, selector);
     public void ShowCharacters(bool show) => actors.Visible = show;
     Node items = null !, planner = null !;
     RpgUi ui = null !;
@@ -96,6 +98,7 @@ public partial class Foundation : Node2D
         AddChild(planner);
         Narrative = ScriptNode("res://game/narrative/Narrative.gd");
         AddChild(Narrative);
+        Narrative.Set("item_service", items);
         actors = new Node2D
         {
             YSortEnabled = true
@@ -206,21 +209,22 @@ public partial class Foundation : Node2D
     public void ChangeAppearance(string family, ulong seed)
     {
         var a = World.Player;
-        a.Appearance = new()
-        {
-            Family = family,
-            Seed = seed
-        };
+        World.SetAppearance(a, new Appearance { Family = family, Seed = seed });
         RebuildViews();
     }
 
     public void MutateAppearance(ulong seed)
     {
         var a = World.Player;
-        var genome = Views[a.Id].Creature.Genome!;
-        var schema = CreatureRuntime.Registry.GetFamily(a.Appearance.Family).Schema; /* upstream mutation interface validated below */
+        var genome = CreatureRuntime.Serializer.Deserialize(a.Appearance.GenomeJson).Genome!;
         a.Appearance.Seed = seed;
-        a.Appearance.GenomeJson = CreatureRuntime.Serializer.Serialize(GenomeOps.Mutate(genome, new MutationSettings(), seed));
+        var appearance = new Appearance
+        {
+            Family = a.Appearance.Family,
+            Seed = seed,
+            GenomeJson = CreatureRuntime.Serializer.Serialize(GenomeOps.Mutate(genome, new MutationSettings(), seed))
+        };
+        World.SetAppearance(a, appearance);
         RebuildViews();
     }
 
@@ -268,7 +272,7 @@ public partial class Foundation : Node2D
             return;
         }
 
-        if (ui.BlocksInput || Narrative.Get("speaking").AsBool())
+        if (GameplayBlocked)
             return;
         if (e.IsActionPressed("interact"))
             Interact();
@@ -296,7 +300,7 @@ public partial class Foundation : Node2D
 
     public void Cast(string ability)
     {
-        if (ui.BlocksInput || Narrative.Get("speaking").AsBool())
+        if (GameplayBlocked)
             return;
         var d = World.Content.Abilities.Single(x => x.Id == ability);
         var a = World.Player;
@@ -306,8 +310,10 @@ public partial class Foundation : Node2D
 
     public void Interact()
     {
+        if (GameplayBlocked)
+            return;
         var a = World.Player;
-        var npc = World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == a.Region && NVector.Distance(x.Position, a.Position) < 65);
+        var npc = World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == a.Region && NVector.Distance(x.Position, a.Position) < 65 && !World.Hostile(a, x) && World.LineOfSight(a, x));
         if (npc != null)
         {
             Narrative.Call("talk");

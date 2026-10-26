@@ -35,7 +35,8 @@ public sealed class StatusDef
 
 public sealed class RecipeDef
 {
-    public string Material {get;set;}=""; public int Quality {get;set;}=1;
+    public string Material { get; set; } = "";
+    public int Quality { get; set; } = 1;
     public string Id { get; set; } = "";
     public Dictionary<string, int> Ingredients { get; set; } = new();
     public string Output { get; set; } = "";

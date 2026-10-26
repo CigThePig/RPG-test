@@ -12,7 +12,6 @@ public partial class CharacterView : Node2D
     Vector2 previous;
     public void Setup(ActorState actor)
     {
-        bool fresh = actor.Appearance.GenomeJson == "";
         State = actor;
         Creature = new CreatureActor
         {
@@ -29,15 +28,6 @@ public partial class CharacterView : Node2D
             throw new InvalidDataException(result.Describe());
         var genome = result?.Genome ?? CreatureRuntime.Sample(actor.Appearance.Family, actor.Appearance.Seed);
         Creature.SetGenome(genome, async: false);
-        actor.Appearance.GenomeJson = CreatureRuntime.Serializer.Serialize(genome);
-        var model = Creature.Model ?? throw new InvalidOperationException(Creature.LastError);
-        actor.Flies = model.Anatomy.Rig.Wings.Count > 0;
-        actor.Swims = model.Anatomy.Rig.Fins.Count > 0;
-        actor.Grasps = model.Anatomy.Rig.Arms.Count > 0 || model.Anatomy.Rig.Grippers.Count > 0;
-        if (fresh)
-            actor.Speed = Math.Clamp((float)model.Anatomy.Metrics.WalkSpeed, 40, 100);
-        actor.NaturalReach = Math.Clamp((float)model.Anatomy.Metrics.BodyLength * .1f, 0, 12);
-        actor.Radius = Math.Clamp((float)model.Anatomy.Metrics.BodyLength * .2f, 6, 11);
         previous = new(actor.X, actor.Y);
         Sync(1f / 60);
     }
