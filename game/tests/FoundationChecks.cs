@@ -33,6 +33,58 @@ public static class FoundationChecks
         var watch = Stopwatch.StartNew();
         try
         {
+            // Exercise nonlinear progression using actual world defeat events before acceptance.
+            var early = w.Player;
+            var victims = w.Actors.Values.Where(a => a.Profile == "beast").Take(2).ToArray();
+            foreach (var victim in victims) w.Damage(early, victim, 10000, "magic");
+            Check(!app.Narrative.Call("completed", 1).AsBool(), "historical defeats do not auto-accept quest");
+            string beforeAcceptance = Persistence.Capture(w, app.Narrative);
+            Persistence.Restore(w, app.Narrative, beforeAcceptance);
+            int beforeReward = w.Items.Count("player", "coin");
+            Check(app.Narrative.Call("accept_quest", 1).AsBool() && app.Narrative.Call("completed", 1).AsBool(), "pre-acceptance defeats survive save and complete on acceptance");
+            Check(w.Items.Count("player", "coin") == beforeReward + 15, "historical achievement grants one reward");
+            string rewardedSave = Persistence.Capture(w, app.Narrative);
+            Persistence.Restore(w, app.Narrative, rewardedSave);
+            Check(!app.Narrative.Call("accept_quest", 1).AsBool() && w.Items.Count("player", "coin") == beforeReward + 15, "load and repeated acceptance cannot duplicate historical reward");
+            Persistence.Restore(w, app.Narrative, original);
+            var bag = w.Items.Service.Call("bag", "capacity-test").AsGodotObject() as Node;
+            w.Items.Add("capacity-test", "iron_sword");
+            var capacity = GD.Load<GDScript>("res://addons/gloot/core/constraints/item_count_constraint.gd").New().AsGodotObject() as Node;
+            bag!.AddChild(capacity!);
+            w.Items.Add("loot-test", "potion", 3);
+            w.Items.Add("loot-test", "iron_sword");
+            string beforeFailure = w.Items.Service.Call("export_state").AsString();
+            Check(!w.Items.LootAll("loot-test", "capacity-test"), "full destination rejects loot without reporting success");
+            Check(w.Items.Service.Call("export_state").AsString() == beforeFailure, "failed loot retains stacks and stable instance IDs");
+            Check(!w.Items.LootAll("empty-container", "player"), "empty container never reports successful loot");
+            capacity!.QueueFree();
+            await app.ToSignal(app.GetTree(), SceneTree.SignalName.ProcessFrame);
+            Check(w.Items.Transfer("loot-test", "player", "potion", 1) && w.Items.Count("loot-test", "potion") == 2, "partial loot leaves remaining stack in corpse");
+            Check(w.Items.LootAll("loot-test", "player") && !w.Items.HasLoot("loot-test"), "remaining loot moves once and empties container");
+            Check(!w.Items.LootAll("loot-test", "player"), "emptied container does not report repeated success");
+            Persistence.Restore(w, app.Narrative, original);
+            // Raw touch movement shares modal/focus authority with desktop.
+            var stick = app.Ui.Stick;
+            app.Ui.Menu(); // Resume.
+            stick._Input(new InputEventScreenTouch { Index = 7, Pressed = true, Position = stick.GlobalPosition + new Vector2(180, 100) });
+            Check(app.TouchMovement.X > .8f, "touch stick owns movement finger");
+            stick._Input(new InputEventScreenTouch { Index = 8, Pressed = false });
+            Check(app.TouchMovement.X > .8f, "other finger release does not cancel movement");
+            app.Ui.PauseForVerification();
+            app.Ui.Update();
+            Check(app.TouchMovement == Vector2.Zero, "modal opening cancels held touch movement");
+            stick._Input(new InputEventScreenDrag { Index = 7, Position = stick.GlobalPosition + new Vector2(180,100) });
+            Check(app.TouchMovement == Vector2.Zero, "drag cannot restart movement under modal");
+            bool ran = false;
+            Check(!app.ManageItem(() => { ran = true; return true; }) && !ran, "menu rejects programmatic item mutations");
+            app.Ui.Menu();
+            app.Narrative.Set("speaking", true);
+            Check(!app.UseQuickItem("potion") && !app.ManageItem(() => true), "dialogue blocks hotbar and inventory mutations");
+            app.Narrative.Set("speaking", false);
+            w.Player.Health = 0;
+            Check(app.GameplayBlocked && !app.UseQuickItem("potion") && !app.ManageItem(() => true), "death blocks player gameplay and equipment commands");
+            Persistence.Restore(w, app.Narrative, original);
+            app.Ui.PauseForVerification();
             var itemDefs = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(Godot.FileAccess.GetFileAsString("res://game/data/items.json"))!;
             Check(w.Content.Validate(itemDefs.Keys.ToHashSet()).Count == 0, "content definitions and references");
             foreach (var family in CreatureRuntime.Registry.Families)

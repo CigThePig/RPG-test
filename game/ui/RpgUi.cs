@@ -130,6 +130,25 @@ public partial class RpgUi : CanvasLayer
         Layout();
     }
 
+    readonly Dictionary<int, Button> touchButtons = new();
+    public override void _Input(InputEvent e)
+    {
+        if (e is not InputEventScreenTouch touch) return;
+        if (touch.Pressed)
+        {
+            var button = hotbar.GetChildren().OfType<Button>().FirstOrDefault(b => b.IsVisibleInTree() && !b.Disabled && b.GetGlobalRect().HasPoint(touch.Position));
+            if (button == null) return;
+            touchButtons[touch.Index] = button;
+            GetViewport().SetInputAsHandled();
+        }
+        else if (touchButtons.Remove(touch.Index, out var button))
+        {
+            if (button.IsVisibleInTree() && !button.Disabled && button.GetGlobalRect().HasPoint(touch.Position))
+                button.EmitSignal(Godot.Button.SignalName.Pressed);
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
     void Layout()
     {
         var size = GetViewport().GetVisibleRect().Size;

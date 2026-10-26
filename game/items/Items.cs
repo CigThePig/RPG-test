@@ -40,7 +40,15 @@ public sealed class Items(Node service, EventStream events)
         bool changed = false;
         using var catalog = JsonDocument.Parse(service.Call("catalog", source).AsString());
         foreach (var row in catalog.RootElement.EnumerateArray())
-            changed |= Transfer(source, target, row.GetProperty("id").GetString()!, row.GetProperty("count").GetInt32());
+        {
+            string item = row.GetProperty("id").GetString()!;
+            int count = row.GetProperty("count").GetInt32();
+            if (service.Call("transfer_stack", source, target, row.GetProperty("selector").GetString()!, count).AsBool())
+            {
+                events.Publish(new("item_acquired", target, source, item, count));
+                changed = true;
+            }
+        }
         return changed;
     }
 

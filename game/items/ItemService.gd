@@ -43,17 +43,31 @@ func take(owner: String, prototype: String, count: int) -> bool:
 
 func transfer(source: String, target: String, prototype: String, count: int) -> bool:
 	if source == target or count < 1 or count_item(source, prototype) < count: return false
-	# Move original instances, retaining condition, material, ownership and modifiers.
-	for item in bag(source).get_items_with_prototype_id(prototype):
+	var candidates := bag(source).get_items_with_prototype_id(prototype)
+	var space = bag(target)._constraint_manager.get_space_for(candidates[0])
+	# Reject capacity failure before detaching or splitting any original instances.
+	if not space.is_inf() and space.count < count: return false
+	for item in candidates:
 		var amount := mini(count, item.get_stack_size())
-		var moving: InventoryItem = item if amount == item.get_stack_size() else bag(source).split_stack(item, amount)
-		bag(source).remove_item(moving)
-		if not bag(target).add_item_autosplitmerge(moving):
-			bag(source).add_item_autosplitmerge(moving)
-			return false
+		if not transfer_instance(source, target, item, amount): return false
 		count -= amount
 		if count == 0: break
 	return true
+
+func transfer_instance(source: String, target: String, item: InventoryItem, count: int) -> bool:
+	if source == target or item == null or not bag(source).has_item(item) or count < 1 or count > item.get_stack_size(): return false
+	var space = bag(target)._constraint_manager.get_space_for(item)
+	if not space.is_inf() and space.count < count: return false
+	var moving: InventoryItem = item if count == item.get_stack_size() else bag(source).split_stack(item, count)
+	if moving == null: return false
+	# add_item transfers ownership itself. Automerge never silently truncates a full stack.
+	if not bag(target).add_item_automerge(moving):
+		if moving.get_inventory() == null: bag(source).add_item_automerge(moving)
+		return false
+	return true
+
+func transfer_stack(source: String, target: String, selector: String, count: int) -> bool:
+	return transfer_instance(source, target, find_item(source, selector), count)
 
 func equip(owner: String, prototype: String, slot_name: String, grasping: bool) -> bool:
 	var item := find_item(owner, prototype)
