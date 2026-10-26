@@ -34,37 +34,12 @@ with zipfile.ZipFile(apk) as z:
                    'game/data/items.json', 'game/data/quests.json', 'game/data/dungeon_rules.json',
                    'game/data/warden.dialogue.import']:
         require(suffix)
-    # Godot exports the imported DialogueManager resource, not the source .dialogue text.
-    # Resolve the generated path through the exported .import remap instead of hardcoding its hash.
+    # Godot's DialogueManager importer replaces the source .dialogue with a compiled .tres.
+    # Follow the actual exported remap; the import filename hash can change on reimport.
     remap = z.read(require('game/data/warden.dialogue.import')[0]).decode('utf-8')
     assert 'importer="dialogue_manager"' in remap, 'Incorrect dialogue importer'
     assert 'source_file="res://game/data/warden.dialogue"' in remap, 'Incorrect dialogue source mapping'
-    imported = re.search(r'(?m)^path="(res://\.godot/imported/[^"]+\.tres)"\s* in n or 'Foundation.scn' in n for n in names), 'Missing main scene or remap'
-    require('libgodot_android.so')
-    assert any('mono' in n.lower() and n.endswith('.so') for n in names), 'Missing Mono runtime'
-    native = [n for n in names if n.startswith('lib/') and n.endswith('.so')]
-    for n in native:
-        assert n.startswith('lib/arm64-v8a/'), f'Unexpected native architecture: {n}'
-        data = z.read(n)
-        assert data[:4] == b'\x7fELF' and data[4] == 2 and struct.unpack_from('<H',data,18)[0] == 183, f'Invalid AArch64 ELF: {n}'
-checksum = hashlib.sha256(apk.read_bytes()).hexdigest()
-(apk.with_suffix('.apk.sha256')).write_text(f'{checksum}  {apk.name}\n')
-metadata = dict(commit=run('git','rev-parse','HEAD').strip(), engine='4.6.1 .NET',
-                dotnet=run('dotnet','--version').strip(), framework='net9.0', android='Official Godot 4.6.1 template / ARM64; see badging for SDK levels',
-                package='com.cigthepig.mosslight.dev', filename=apk.name, bytes=apk.stat().st_size,
-                sha256=checksum, timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                signing=os.environ.get('SIGNING_MODE','unknown'),
-                verification='desktop integration and visual checks; APK metadata/signature/resources/runtime/ELF passed',
-                android_runtime='Installation and launch NOT exercised by package verification',
-                badging=badging, signature=signature)
-(out/'build-metadata.json').write_text(json.dumps(metadata, indent=2))
-print(json.dumps({k:v for k,v in metadata.items() if k not in ['badging','signature']}, indent=2))
-if os.environ.get('GITHUB_STEP_SUMMARY'):
-    with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
-        f.write(f'## Mosslight ARM64 development APK\n\n`{apk.name}` · {apk.stat().st_size/1048576:.1f} MiB\n\n'
-                f'Source: `{metadata["commit"]}`\n\nSHA-256: `{checksum}`\n\n'
-                f'Signing: {metadata["signing"]}\n\nStatic package checks passed. Android installation/launch requires a device check.\n')
-, remap)
+    imported = re.search(r'(?m)^path="(res://\.godot/imported/[^"]+\.tres)"\s*$', remap)
     assert imported, 'Missing compiled dialogue resource remap'
     compiled_path = 'assets/' + imported.group(1).removeprefix('res://')
     assert compiled_path in names, f'Missing packaged compiled dialogue resource: {compiled_path}'
