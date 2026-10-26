@@ -13,6 +13,8 @@ public partial class Foundation : Node2D
     public bool GameplayBlocked => ui == null || suspended || !World.Player.Alive || ui.BlocksInput || Narrative.Get("speaking").AsBool();
 
     bool suspended;
+    public bool SessionStarted { get; private set; }
+    public void ResumeGame() { SessionStarted = true; Ui.HideMenu(); }
     public Vector2 TouchMovement { get; set; }
     public bool CanManageItems => !suspended && World.Player.Alive && !Narrative.Get("speaking").AsBool() && !ui.MenuOpen;
     public bool ManageItem(Func<bool> operation) => CanManageItems && operation();
@@ -26,6 +28,7 @@ public partial class Foundation : Node2D
     string drawnRegion = "";
     Node2D ground = null !;
     double accumulator;
+    long lastRuntimeLog;
     Node audio = null !;
     readonly Dictionary<string, Key> bindings = new()
     {
@@ -150,6 +153,7 @@ public partial class Foundation : Node2D
             World.Player.Reputation[faction] = World.Player.Reputation.GetValueOrDefault(faction) + amount;
             World.Events.Publish(new("reputation_changed", "player", "", faction, amount));
         }));
+        GD.Print($"MOSSLIGHT_READY actors={World.Actors.Count} families={CreatureRuntime.Registry.Families.Count()} framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
         if (OS.GetCmdlineUserArgs().Contains("--test"))
             CallDeferred(nameof(RunChecks));
         if (OS.GetCmdlineUserArgs().Contains("--visual-check"))
@@ -253,7 +257,7 @@ public partial class Foundation : Node2D
         foreach (var(id, view)in Views)
         {
             view.Visible = World.Actors[id].Region == player.Region;
-            view.Creature.Paused = !view.Visible;
+            view.Creature.Paused = !view.Visible || GameplayBlocked;
             view.Sync((float)delta);
         }
 
@@ -264,6 +268,11 @@ public partial class Foundation : Node2D
             drawnRegion = player.Region;
         }
 
+        if (OS.HasFeature("android") && World.Tick - lastRuntimeLog >= 300)
+        {
+            lastRuntimeLog = World.Tick;
+            GD.Print($"MOSSLIGHT_RUNTIME tick={World.Tick} position={player.X:0.0},{player.Y:0.0} rasterizations={Views.Values.Sum(v => v.Creature.RenderCount)}");
+        }
         ui.Update();
         QueueRedraw();
     }
@@ -337,7 +346,7 @@ public partial class Foundation : Node2D
             if (World != null && ui != null)
             {
                 ui.PauseForVerification();
-                try { Persistence.Save(World, Narrative, ui.SaveSlot); }
+                try { if (SessionStarted) Persistence.SaveAutosave(World, Narrative); }
                 catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }
             }
         }

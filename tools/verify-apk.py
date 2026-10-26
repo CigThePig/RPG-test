@@ -37,7 +37,7 @@ with zipfile.ZipFile(apk) as z:
 checksum = hashlib.sha256(apk.read_bytes()).hexdigest()
 (apk.with_suffix('.apk.sha256')).write_text(f'{checksum}  {apk.name}\n')
 metadata = dict(commit=run('git','rev-parse','HEAD').strip(), engine='4.6.1 .NET',
-                dotnet=run('dotnet','--version').strip(), framework='net9.0', android='API 35 / ARM64 / min API 26',
+                dotnet=run('dotnet','--version').strip(), framework='net9.0', android='Official Godot 4.6.1 template / ARM64; see badging for SDK levels',
                 package='com.cigthepig.mosslight.dev', filename=apk.name, bytes=apk.stat().st_size,
                 sha256=checksum, timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 signing=os.environ.get('SIGNING_MODE','unknown'),

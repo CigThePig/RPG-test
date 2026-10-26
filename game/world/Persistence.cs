@@ -85,13 +85,19 @@ public static class Persistence
         return ProjectSettings.GlobalizePath($"user://slot-{slot}.json");
     }
 
-    public static void Save(World w, Node narrative, int slot)
+    public static double LastSaveMilliseconds { get; private set; }
+    public static string AutosavePath => ProjectSettings.GlobalizePath("user://autosave.json");
+    public static void SaveAutosave(World w, Node narrative) => WriteSnapshot(w, narrative, AutosavePath);
+    public static void LoadAutosave(World w, Node narrative) => Restore(w, narrative, File.ReadAllText(AutosavePath));
+    public static void Save(World w, Node narrative, int slot) => WriteSnapshot(w, narrative, SlotPath(slot));
+    static void WriteSnapshot(World w, Node narrative, string path)
     {
-        string path = SlotPath(slot);
+        var timer = System.Diagnostics.Stopwatch.StartNew();
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         string temporary = path + ".tmp";
         File.WriteAllText(temporary, Capture(w, narrative));
         File.Move(temporary, path, true);
+        LastSaveMilliseconds = timer.Elapsed.TotalMilliseconds;
     }
 
     public static void Load(World w, Node narrative, int slot) => Restore(w, narrative, File.ReadAllText(SlotPath(slot)));

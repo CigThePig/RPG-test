@@ -205,7 +205,7 @@ public partial class RpgUi : CanvasLayer
         if (showMetrics && frames.Count > 0)
         {
             var sorted = frames.OrderBy(x => x).ToArray();
-            metrics.Text = $"FPS {Engine.GetFramesPerSecond()} · p95 {sorted[(int)((sorted.Length - 1) * .95)]:0.0} ms\nActors {App.Views.Values.Count(v => v.Visible)}/{App.World.Actors.Count} · managed {GC.GetTotalMemory(false)/1048576.0:0} MB";
+            metrics.Text = $"FPS {Engine.GetFramesPerSecond()} · p50/p95/p99 {sorted[(int)((sorted.Length - 1) * .5)]:0.0}/{sorted[(int)((sorted.Length - 1) * .95)]:0.0}/{sorted[(int)((sorted.Length - 1) * .99)]:0.0} ms\nActors {App.Views.Values.Count(v => v.Visible)}/{App.World.Actors.Count} · managed {GC.GetTotalMemory(false)/1048576.0:0} MB\nRaster {PixelCreatures.Runtime.CreatureRenderQueue.LastRasterMs:0.0} ms · upload {PixelCreatures.Runtime.CreatureRenderQueue.LastUploadMs:0.0} ms · save {Persistence.LastSaveMilliseconds:0.0} ms";
         }
         var a = App.World.Player;
         health.Text = $"{a.Name}   ♥ {a.Health:0}/{a.MaxHealth}    Mana {a.Mana:0}/{a.MaxMana}    Lv {a.Level} · XP {a.Experience}/{a.Level * 100}    {a.State}\n{a.Region} · {(int)(App.World.Time / 60) % 24:00}:{(int)App.World.Time % 60:00}";
@@ -225,6 +225,7 @@ public partial class RpgUi : CanvasLayer
         menu.Show();
     }
 
+    public void HideMenu() => menu.Hide();
     public void ClosePanels() => panel.Hide();
     public void Inventory()
     {
@@ -349,11 +350,16 @@ public partial class RpgUi : CanvasLayer
         box.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         scroll.AddChild(box);
         box.AddChild(new Label { Text = "MOSSLIGHT\nRPG FOUNDATION", HorizontalAlignment = HorizontalAlignment.Center });
-        Button(box, "Enter / Resume", () => menu.Hide());
+        Button(box, "Enter / Resume", App.ResumeGame);
+        Button(box, "Recover background autosave", () =>
+        {
+            try { Persistence.LoadAutosave(App.World, App.Narrative); App.RebuildViews(); App.ResumeGame(); Notify("Recovered autosave"); }
+            catch (Exception e) { Notify(e.Message); }
+        });
         Button(box, "New game", () =>
         {
             App.Reset();
-            menu.Hide();
+            App.ResumeGame();
         });
         Button(box, $"Save slot: {SaveSlot} (click to cycle)", () =>
         {
@@ -378,7 +384,7 @@ public partial class RpgUi : CanvasLayer
             {
                 Persistence.Load(App.World, App.Narrative, SaveSlot);
                 App.RebuildViews();
-                menu.Hide();
+                App.ResumeGame();
                 Notify("Loaded slot " + SaveSlot);
             }
             catch (Exception e)
