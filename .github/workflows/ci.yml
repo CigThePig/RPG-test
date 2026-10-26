@@ -27,6 +27,8 @@ jobs:
         run: python3 tools/verify.py --headless
       - name: Rendered input, dialogue and UI verification
         run: xvfb-run -a python3 tools/verify.py --visual
+      - name: Phone layout and touch UI verification
+        run: xvfb-run -a python3 tools/verify.py --visual --mobile
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -34,7 +36,7 @@ jobs:
           path: |
             docs/native-screenshots/
             docs/verification.json
-            docs/render-verification.json
+            docs/render-verification*.json
             build/verification-*.log
   preserved-reference:
     runs-on: ubuntu-24.04

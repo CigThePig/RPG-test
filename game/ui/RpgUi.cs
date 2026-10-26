@@ -15,6 +15,7 @@ public partial class RpgUi : CanvasLayer
     public TouchStick Stick { get; private set; } = null!;
     Label metrics = null!;
     bool showMetrics;
+    public bool MobileLayout { get; set; } = OS.HasFeature("mobile") || OS.GetCmdlineUserArgs().Contains("--mobile-ui");
     readonly Queue<double> frames = new();
     public bool MenuOpen => menu.Visible;
     public bool BlocksInput => panel.Visible || menu.Visible;
@@ -90,7 +91,8 @@ public partial class RpgUi : CanvasLayer
 
         )
         {
-            var button = Button(hotbar, text, action);
+            var button = Button(hotbar, MobileLayout ? text.Split(" · ").Last() : text, action);
+            if (MobileLayout) button.CustomMinimumSize = new Vector2(135, 72);
             var id = text.StartsWith("1") ? "slash" : text.StartsWith("2") ? "ember" : text.StartsWith("3") ? "mend" : "";
             if (id != "")
             {
@@ -152,7 +154,7 @@ public partial class RpgUi : CanvasLayer
     void Layout()
     {
         var size = GetViewport().GetVisibleRect().Size;
-        hotbar.Position = new Vector2(size.X - 760, size.Y - 160);
+        hotbar.Position = new Vector2(size.X - 760, size.Y - (MobileLayout ? 200 : 160));
         Stick.Position = new Vector2(40, size.Y - 260);
         message.Position = new Vector2(24, size.Y - 45);
         message.Size = new Vector2(size.X - 48, 40);
@@ -194,15 +196,21 @@ public partial class RpgUi : CanvasLayer
         Button(body, "Close", () => panel.Hide());
     }
 
+    public override void _Process(double delta)
+    {
+        frames.Enqueue(delta * 1000);
+        while (frames.Count > 600) frames.Dequeue();
+    }
+
     public void Notify(string text) => message.Text = text;
     public void Update()
     {
-        Stick.Visible = OS.HasFeature("mobile") && !App.GameplayBlocked;
+        hotbar.Visible = !BlocksInput && !App.Narrative.Get("speaking").AsBool();
+        if (!hotbar.Visible) touchButtons.Clear();
+        Stick.Visible = MobileLayout && !App.GameplayBlocked;
         if (App.GameplayBlocked) Stick.Cancel();
-        frames.Enqueue(GetProcessDeltaTime() * 1000);
-        while (frames.Count > 600) frames.Dequeue();
         metrics.Visible = showMetrics;
-        if (showMetrics && frames.Count > 0)
+        if (showMetrics && frames.Count > 0 && App.World.Tick % 30 == 0)
         {
             var sorted = frames.OrderBy(x => x).ToArray();
             metrics.Text = $"FPS {Engine.GetFramesPerSecond()} · p50/p95/p99 {sorted[(int)((sorted.Length - 1) * .5)]:0.0}/{sorted[(int)((sorted.Length - 1) * .95)]:0.0}/{sorted[(int)((sorted.Length - 1) * .99)]:0.0} ms\nActors {App.Views.Values.Count(v => v.Visible)}/{App.World.Actors.Count} · managed {GC.GetTotalMemory(false)/1048576.0:0} MB\nRaster {PixelCreatures.Runtime.CreatureRenderQueue.LastRasterMs:0.0} ms · upload {PixelCreatures.Runtime.CreatureRenderQueue.LastUploadMs:0.0} ms · save {Persistence.LastSaveMilliseconds:0.0} ms";
@@ -215,7 +223,8 @@ public partial class RpgUi : CanvasLayer
             float cooldown = a.Cooldowns.GetValueOrDefault(id);
             button.Disabled = cooldown > 0 || a.Mana < def.Cost || !a.Alive;
             string binding = id == "slash" ? "1" : id == "ember" ? "2" : "3";
-            button.Text = cooldown > 0 ? $"{binding} · {def.Name} · {cooldown:0.0}s" : $"{binding} · {def.Name}";
+            string label = MobileLayout ? (id == "slash" ? "Attack" : def.Name.Split(' ')[0]) : $"{binding} · {def.Name}";
+            button.Text = cooldown > 0 ? $"{label} {cooldown:0.0}s" : label;
         }
     }
 

@@ -1,8 +1,12 @@
 # Mosslight — procedural fantasy RPG foundation
 
-Godot **4.6.1 .NET** / **.NET SDK 8.0.408**. One native 2D runtime integrating PPC creatures, Gloot inventory/equipment, SPELL abilities, Dialogue Manager 4, QuestSystem, Skelerealms planning and Graph Dungeon Generator.
+Godot **4.6.1 .NET** / **.NET SDK 9.0.203** (desktop net8.0 / Android net9.0). One native 2D runtime integrating PPC creatures, Gloot inventory/equipment, SPELL abilities, Dialogue Manager 4, QuestSystem, Skelerealms planning and Graph Dungeon Generator.
 
 ![Native application](docs/native-screenshots/exploration.png)
+
+## Play on Android
+
+[Download, install and play from your phone](docs/ANDROID_DEVELOPMENT.md). GitHub Actions builds a signed ARM64 APK for each PR/branch update. No desktop setup is required for phone testing.
 
 ## Start
 
@@ -14,7 +18,7 @@ python3 tools/import-project.py
 godot --path .
 ```
 
-Set `GODOT` to your executable path for the Python commands if needed. Open `project.godot` in the .NET editor and press F6/F5, or run the command above. Choose **Enter / Resume**. C# web export is not supported by this engine; this project targets native desktop. Linux and Windows export presets are provided.
+Set `GODOT` to your executable path for the Python commands if needed. Open `project.godot` in the .NET editor and press F6/F5, or run the command above. Choose **Enter / Resume**. C# web export is not supported by this engine; this project targets Android and native desktop. Android, Linux and Windows export presets are provided.
 
 **WASD** moves with terrain collision. **1 / 2 / 3** use melee, ember and healing abilities; **4** consumes a draught. **E** interacts with nearby resources, chests, fallen enemies, wardens and portals. **I / C / J / M** open inventory, character, quest journal and map. **Escape** opens pause/save/load/settings. Attack targeting selects the nearest hostile actor; directional attack selection and gamepad bindings can extend the same action API.
 

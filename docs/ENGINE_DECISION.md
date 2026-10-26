@@ -1,6 +1,6 @@
 # Engine decision
 
-**Implemented: Godot 4.6.1 .NET + .NET SDK 8.0.408, 2D compatibility renderer.** Native desktop is the delivery target. The choice changes the earlier browser-access priority: live arbitrary procedural anatomy and substantial reusable Godot RPG implementations now outweigh static browser hosting.
+**Implemented: Godot 4.6.1 .NET + .NET SDK 9.0.203, 2D compatibility renderer.** Android and native desktop share one runtime. Desktop targets net8.0 and Android conditionally targets net9.0. GitHub Actions builds APKs for phone-first development. The choice changes the earlier browser-access priority: live arbitrary procedural anatomy and substantial reusable Godot RPG implementations now outweigh static browser hosting.
 
 | Criterion | Canvas/Vite + baked PPC | Godot GDScript + baked PPC | Godot .NET + live PPC |
 |---|---|---|---|

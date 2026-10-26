@@ -63,6 +63,7 @@ jobs:
           python3 tools/import-project.py 2>&1 | tee build/android/import.log
           python3 tools/verify.py --headless
           xvfb-run -a python3 tools/verify.py --visual
+          xvfb-run -a python3 tools/verify.py --visual --mobile
       - name: Export signed ARM64 APK
         shell: bash
         run: |
@@ -108,7 +109,7 @@ jobs:
             build/android/*manifest*
             build/android/*signature*
             docs/verification.json
-            docs/render-verification.json
+            docs/render-verification*.json
             docs/native-screenshots/
 
   android-runtime:

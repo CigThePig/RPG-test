@@ -17,7 +17,7 @@ public static class VisualChecks
         await app.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
         var image = app.GetViewport().GetTexture().GetImage();
         Directory.CreateDirectory("docs/native-screenshots");
-        image.SavePng("docs/native-screenshots/" + name + ".png");
+        image.SavePng("docs/native-screenshots/" + (app.Ui.MobileLayout ? "mobile-" : "") + name + ".png");
     }
 
     public static async System.Threading.Tasks.Task Run(Foundation app)
@@ -63,6 +63,7 @@ public static class VisualChecks
         app.World.Enter(app.World.Player, "ruin");
         await Capture(app, "dungeon");
         app.World.Enter(app.World.Player, "reach");
+        if (app.Ui.MobileLayout) await Capture(app, "controls");
         app.Ui.Workshop();
         await Capture(app, "workshop");
         app.Ui.ClosePanels();
@@ -91,7 +92,7 @@ public static class VisualChecks
             totalRasterizations = app.Views.Values.Sum(v => v.Creature.RenderCount),
             managedBytes = GC.GetTotalMemory(false)
         };
-        File.WriteAllText("docs/render-verification.json", JsonSerializer.Serialize(data, Content.Json));
+        File.WriteAllText(app.Ui.MobileLayout ? "docs/render-verification-mobile.json" : "docs/render-verification.json", JsonSerializer.Serialize(data, Content.Json));
         GD.Print("VISUAL CHECKS PASSED");
     }
 }

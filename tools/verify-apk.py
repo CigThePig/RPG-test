@@ -4,14 +4,17 @@ import datetime, hashlib, json, os, re, struct, subprocess, sys, zipfile
 apk = Path(sys.argv[1]); out = apk.parent
 assert apk.is_file() and apk.stat().st_size > 1_000_000, 'Missing or empty APK'
 def run(*args):
-    return subprocess.check_output(args, stderr=subprocess.STDOUT, text=True)
-badging = run('aapt', 'dump', 'badging', str(apk))
+    try: return subprocess.check_output(args, stderr=subprocess.STDOUT, text=True)
+    except subprocess.CalledProcessError as e:
+        print(e.output, file=sys.stderr)
+        raise
+badging = run('aapt2', 'dump', 'badging', str(apk))
 assert "package: name='com.cigthepig.mosslight.dev'" in badging, badging
 assert "launchable-activity:" in badging, 'No launcher activity'
 assert "native-code: 'arm64-v8a'" in badging, 'Not ARM64-only'
 signature = run('apksigner', 'verify', '--verbose', '--print-certs', str(apk))
 assert 'certificate SHA-256 digest:' in signature, 'No signing certificate'
-manifest = run('aapt', 'dump', 'xmltree', str(apk), 'AndroidManifest.xml')
+manifest = run('aapt2', 'dump', 'xmltree', str(apk), '--file', 'AndroidManifest.xml')
 (out/'package-manifest.log').write_text(manifest)
 (out/'package-signature.log').write_text(signature)
 # Godot APK exports resources as ZIP assets, including embedded .NET publish files.
@@ -25,8 +28,9 @@ with zipfile.ZipFile(apk) as z:
         return hits
     for suffix in ['RpgTest.dll', 'GodotSharp.dll', 'System.Private.CoreLib.dll', '.dotnet-publish-manifest',
                    'game/data/items.json', 'game/data/quests.json', 'game/data/dungeon_rules.json',
-                   'game/data/warden.dialogue', 'game/dev/Foundation.tscn']:
+                   'game/data/warden.dialogue']:
         require(suffix)
+    assert any('Foundation.tscn' in n or 'Foundation.scn' in n for n in names), 'Missing main scene or remap'
     require('libgodot_android.so')
     assert any('mono' in n.lower() and n.endswith('.so') for n in names), 'Missing Mono runtime'
     native = [n for n in names if n.startswith('lib/') and n.endswith('.so')]

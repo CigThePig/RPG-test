@@ -63,6 +63,36 @@ public static class FoundationChecks
             Check(w.Items.LootAll("loot-test", "player") && !w.Items.HasLoot("loot-test"), "remaining loot moves once and empties container");
             Check(!w.Items.LootAll("loot-test", "player"), "emptied container does not report repeated success");
             Persistence.Restore(w, app.Narrative, original);
+            var playerAppearance = w.Player.Appearance;
+            foreach (var family in CreatureRuntime.Registry.Families)
+            {
+                w.SetAppearance(w.Player, new Appearance { Family = "biped", Seed = 42 });
+                w.Items.Equip(w.Player, "iron_sword", "weapon");
+                w.SetAppearance(w.Player, new Appearance { Family = family.Id, Seed = 42 });
+                Check(w.Player.Grasps || w.Items.Bonus(w.Player, "damage") == 0, "current anatomy reconciles equipped weapon: " + family.Id);
+            }
+            w.SetAppearance(w.Player, new Appearance { Family = "quadruped", Seed = 42 });
+            w.Items.Service.Call("equip", "player", "iron_sword", "weapon", true);
+            string incompatibleSave = Persistence.Capture(w, app.Narrative);
+            Persistence.Restore(w, app.Narrative, incompatibleSave);
+            Check(!w.Player.Grasps && w.Items.Bonus(w.Player, "damage") == 0, "restoration reconciles incompatible equipment before gameplay");
+            Persistence.Restore(w, app.Narrative, original);
+            // Possession at acceptance differs from a historical kill or post-acceptance craft.
+            foreach (var victim in w.Actors.Values.Where(a => a.Profile == "beast").Take(2).ToArray()) w.Damage(w.Player, victim, 10000, "magic");
+            app.Narrative.Call("accept_quest", 1);
+            w.Items.Add("player", "relic");
+            w.Items.Transfer("player", "relic-holder", "relic", 1);
+            app.Narrative.Call("accept_quest", 2);
+            Check(!app.Narrative.Call("completed", 2).AsBool(), "relic held by another owner does not satisfy player possession");
+            int rewardBeforeReturn = w.Items.Count("player", "potion");
+            w.Items.Transfer("relic-holder", "player", "relic", 1);
+            Check(app.Narrative.Call("completed", 2).AsBool() && w.Items.Count("player", "potion") == rewardBeforeReturn + 3, "returning relic progresses accepted quest once");
+            string relicComplete = Persistence.Capture(w, app.Narrative);
+            Persistence.Restore(w, app.Narrative, relicComplete);
+            Check(!app.Narrative.Call("accept_quest", 2).AsBool() && w.Items.Count("player", "potion") == rewardBeforeReturn + 3, "relic reward remains unique across restore");
+            w.Items.Take("player", "relic", 1);
+            Check(app.Narrative.Call("completed", 2).AsBool(), "completed acquisition remains an achievement after item leaves inventory");
+            Persistence.Restore(w, app.Narrative, original);
             // Raw touch movement shares modal/focus authority with desktop.
             var stick = app.Ui.Stick;
             app.Ui.Menu(); // Resume.

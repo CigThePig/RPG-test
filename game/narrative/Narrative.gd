@@ -11,6 +11,7 @@ var speaking: bool = false
 var ui: PanelContainer
 var text_label: Label
 var advancing := false
+var dialogue_epoch := 0
 var choices: VBoxContainer
 
 func _ready() -> void:
@@ -101,6 +102,8 @@ func import_state(text: String) -> bool:
 	manager.deserialize_quests(data.quests)
 	flags = data.flags
 	speaking = false
+	advancing = false
+	dialogue_epoch += 1
 	if ui != null: ui.hide()
 	return true
 
@@ -138,7 +141,10 @@ func advance(cue: String) -> void:
 	advancing = true
 	for child in choices.get_children():
 		if child is Button: child.disabled = true
-	current_line = await dialogue.get_next_dialogue_line(cue, [self])
+	var epoch := dialogue_epoch
+	var next_line = await dialogue.get_next_dialogue_line(cue, [self])
+	if epoch != dialogue_epoch: return
+	current_line = next_line
 	advancing = false
 	for child in choices.get_children():
 		choices.remove_child(child)

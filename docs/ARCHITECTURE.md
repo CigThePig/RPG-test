@@ -29,3 +29,9 @@ Godot FastNoiseLite generates repeatable regional fields with settlement/causewa
 One coordinator captures actor state, equipped/bag Gloot snapshots, narrative pools and quest properties, flags, faction changes, every generated region's current tiles and mutations, projectiles and a bounded causal event history. Atomic temporary-file replacement supports three slots. Schema and generator revisions are explicit and rejected on mismatch. Snapshot validation precedes mutation; bridge staging/rollback preserves a running session if restore fails. Full region arrays are stored in v1: this is a simple, reliable baseline rather than an unimplemented claim of delta streaming. Cross-region container/actor IDs remain stable.
 
 See the integration map for exact source origins, responsibilities and extension files. Save formats and engine pinning are implementation contracts; upgrades require deliberate migrations.
+
+## Android and input authority
+
+`Foundation.GameplayBlocked` gates movement, abilities, interactions and quick items for all devices. Pack management uses `CanManageItems`, allowing inspection/configuration in a pack while rejecting mutations under dialogue, pause, focus loss or death. Touch movement owns one finger; raw hotbar touch dispatch permits a second finger without relying on mouse emulation. Modal/focus changes cancel held movement. Background autosaves are separate from manual slots.
+
+Persistent narrative flags retain historical defeat totals before acceptance. Item acquisition objectives reconcile current Gloot possession on acceptance; crafting stays an after-acceptance objective. Reconciliation invokes the normal completion/reward path once, rather than replaying past events.
