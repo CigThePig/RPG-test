@@ -37,17 +37,16 @@ public static class ContentAudit
         foreach (var item in items)
             if (!item.Value.TryGetProperty("max_stack_size", out var count) || count.GetInt32() < 1)
                 errors.Add($"item {item.Key}: invalid stack size");
-        foreach (var file in new[]
-        {
-            "game/data/warden.dialogue",
-            "game/data/dungeon_rules.json",
-            "game/art/grass.png",
-            "game/art/water.png"
-        }
+        // JSON and grammar files are consumed as raw text and intentionally copied into PCKs.
+        if (!Godot.FileAccess.FileExists("res://game/data/dungeon_rules.json"))
+            errors.Add("Missing asset: game/data/dungeon_rules.json");
 
-        )
-            if (!Godot.FileAccess.FileExists("res://" + file))
-                errors.Add("Missing asset: " + file);
+        // Dialogue Manager and texture importers replace original source files on export.
+        // FileAccess.FileExists is false for those source paths in an Android APK even when
+        // the compiled resources are present and loadable through Godot's resource remaps.
+        foreach (var file in new[] { "game/data/warden.dialogue", "game/art/grass.png", "game/art/water.png" })
+            if (!Godot.ResourceLoader.Exists("res://" + file))
+                errors.Add("Missing imported resource: " + file);
         if (errors.Count > 0)
             throw new InvalidDataException(string.Join("\n", errors));
     }

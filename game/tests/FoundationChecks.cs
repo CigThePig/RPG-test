@@ -27,6 +27,11 @@ public static class FoundationChecks
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         app.Ui.PauseForVerification();
+        // Imported resources must resolve in a packaged Android build, even though their
+        // original source files are not available through FileAccess after export.
+        Check(ResourceLoader.Exists("res://game/data/warden.dialogue"), "compiled dialogue resolves through resource importer");
+        Check(ResourceLoader.Exists("res://game/art/grass.png") && ResourceLoader.Exists("res://game/art/water.png"),
+            "compiled environment textures resolve through resource importer");
         var measurements = new Dictionary<string, object>();
         var w = app.World;
         string original = Persistence.Capture(w, app.Narrative);
