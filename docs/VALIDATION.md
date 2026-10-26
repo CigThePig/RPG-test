@@ -17,6 +17,8 @@ The interaction loop is discover/inspect a food source, choose between gathering
 - **PPC asset regeneration passes.** `DOTNET_ROOT=/tmp/dotnet npm run art` ran with an installed .NET 8 SDK. Two complete runs produced identical SHA-256 hashes for all 32 exported art files. All 60 vendored C# core files match the pinned upstream source. The portable compiler wrapper avoids an environment-specific MSBuild/process-inspection failure; the normal SDK project remains available for development.
 - **Dependency audit passes.** `npm audit --audit-level=high` reported zero vulnerabilities after upgrading the initial Vite pin to patched 6.4.5. No runtime packages are installed.
 
+The first hosted run passed export/metadata/tests/build, then exposed the moving `ubuntu-latest` runner advancing to Ubuntu 26.04, which Playwright 1.56.1 does not support. The workflow now pins Ubuntu 24.04.
+
 CI re-runs export, verifies generated JSON against committed metadata, runs tests/build, executes Chromium, and uploads visual evidence. CI status and automated review findings must be inspected on the PR; local success alone is not a claim that hosted checks have finished.
 
 ## Measured performance

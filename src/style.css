@@ -414,3 +414,8 @@ form button {
 .credits a {
   color: #d8bb78;
 }
+
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}

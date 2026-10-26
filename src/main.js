@@ -20,6 +20,7 @@ const $ = (id) => document.getElementById(id),
   canvas = $("game"),
   ctx = canvas.getContext("2d");
 let world = generate(42),
+  ready = false,
   paused = false,
   started = false,
   route = [],
@@ -47,7 +48,7 @@ function setWorld(w) {
   selected = null;
   keys.clear();
   $("seed").value = w.seed;
-  makeGround();
+  if (ready) makeGround();
   updateUI();
 }
 async function image(file) {
@@ -74,7 +75,9 @@ async function init() {
       } else assets[key] = await image(key + ".png");
     }),
   );
+  ready = true;
   makeGround();
+  $("begin").disabled = false;
   hint("Click Explore to begin.");
   requestAnimationFrame(frame);
   window.game = {
