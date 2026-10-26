@@ -4,6 +4,8 @@ import os, subprocess, sys, time
 out=Path('build/android-runtime');out.mkdir(parents=True,exist_ok=True)
 package='com.cigthepig.mosslight.dev'
 def run(*args, **kwargs):
+    # Never let a disconnected ADB daemon strand the workflow indefinitely.
+    kwargs.setdefault('timeout', 20)
     return subprocess.check_output(args, stderr=subprocess.STDOUT, **kwargs)
 def adb(*args): return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True).strip()
 log=(out/'emulator.log').open('w')
@@ -15,7 +17,8 @@ try:
         if emulator.poll() is not None: raise RuntimeError('Emulator exited before boot')
         try:
             if adb('shell','getprop','sys.boot_completed')=='1': break
-        except subprocess.CalledProcessError: pass
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            (out/'boot-probe.log').write_text(str(error))
         time.sleep(2)
     else: raise RuntimeError('Emulator boot timed out')
     adb('shell','input','keyevent','82')
@@ -54,5 +57,8 @@ try:
 finally:
     try: (out/'logcat.log').write_text(adb('logcat','-d'))
     except Exception: pass
-    emulator.terminate()
+    if emulator.poll() is None:
+        emulator.terminate()
+        try: emulator.wait(timeout=10)
+        except subprocess.TimeoutExpired: emulator.kill()
     log.close()

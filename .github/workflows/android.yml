@@ -115,7 +115,12 @@ jobs:
   android-runtime:
     needs: apk
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      # Ubuntu 24.04 may create AVDs under ~/.config/.android while the emulator
+      # searches ~/.android. Force one shared path for both SDK tools.
+      ANDROID_AVD_HOME: ${{ runner.temp }}/mosslight-avds
+      ANDROID_USER_HOME: ${{ runner.temp }}/mosslight-android
     steps:
       - uses: actions/checkout@v4
         with:
@@ -126,8 +131,12 @@ jobs:
           path: build/emulator
       - name: Install official Android emulator and image
         run: |
+          set -euo pipefail
+          mkdir -p "$ANDROID_AVD_HOME" "$ANDROID_USER_HOME"
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'emulator' 'system-images;android-35;google_apis;x86_64'
-          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name mosslight --package 'system-images;android-35;google_apis;x86_64'
+          printf 'no\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name mosslight --package 'system-images;android-35;google_apis;x86_64'
+          "$ANDROID_HOME/emulator/emulator" -list-avds
+          "$ANDROID_HOME/emulator/emulator" -list-avds | grep -Fx mosslight
           sudo chmod 666 /dev/kvm
       - name: Install, launch and exercise exported C# application
         run: python3 tools/android-smoke.py build/emulator/Mosslight-emulator.apk
