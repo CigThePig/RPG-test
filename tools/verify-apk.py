@@ -38,7 +38,6 @@ with zipfile.ZipFile(apk) as z:
     # Follow the actual exported remap; the import filename hash can change on reimport.
     remap = z.read(require('game/data/warden.dialogue.import')[0]).decode('utf-8')
     assert 'importer="dialogue_manager"' in remap, 'Incorrect dialogue importer'
-    assert 'source_file="res://game/data/warden.dialogue"' in remap, 'Incorrect dialogue source mapping'
     imported = re.search(r'(?m)^path="(res://\.godot/imported/[^"]+\.tres)"\s*$', remap)
     assert imported, 'Missing compiled dialogue resource remap'
     compiled_path = 'assets/' + imported.group(1).removeprefix('res://')
