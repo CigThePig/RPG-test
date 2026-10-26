@@ -204,7 +204,11 @@ export function path(w, from, to, flies = false) {
     out.push({ x: (k % W) * TW + 24, y: Math.floor(k / W) * TH + 16 });
     k = seen.get(k);
   }
-  return out.reverse();
+  out.reverse();
+  // Cell routes alone cannot approach off-centre targets within the current cell.
+  // Keep the precise destination as the final waypoint, including same-cell trips.
+  if (distance(out.at(-1) ?? from, to) > 1) out.push({ x: to.x, y: to.y });
+  return out;
 }
 export function move(w, e, dx, dy) {
   const pos = { x: e.x + dx, y: e.y + dy };

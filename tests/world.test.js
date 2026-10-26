@@ -189,3 +189,31 @@ test("corrupt saves reject invalid inventory, sprite references, routes and simu
     assert.throws(() => load(JSON.stringify(v)));
   }
 });
+
+test("off-centre food in the same cell is approached and eaten rather than retried forever", () => {
+  for (const pos of [
+    { x: 343, y: 300 },
+    { x: 340, y: 289 },
+  ]) {
+    const w = generate(42),
+      p = player(w),
+      a = w.entities.find((e) => e.kind === "agent");
+    w.entities = [p, a];
+    p.x = 332;
+    p.y = 300;
+    p.wood = 3;
+    p.berries = 1;
+    Object.assign(a, pos, { hunger: 0.9, target: null, route: null });
+    assert.ok(build(w, "tray").ok);
+    const tray = w.entities.at(-1);
+    assert.ok(action(w, p.id, tray.id, "feed").ok);
+    assert.deepEqual(cell(a), cell(tray));
+    assert.ok(distance(a, tray) > 35);
+    assert.ok(path(w, a, tray, a.flies).length > 0);
+    const start = { x: a.x, y: a.y };
+    for (let i = 0; i < 60; i++) step(w, 1 / 30);
+    assert.equal(tray.food, 0);
+    assert.equal(a.meals, 1);
+    assert.ok(distance(a, start) > 0);
+  }
+});

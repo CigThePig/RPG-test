@@ -24,7 +24,7 @@ try {
       errors.push(`${r.status()} ${r.url()}`);
   });
   await page.goto(process.env.GAME_URL ?? "http://127.0.0.1:5173");
-  await page.waitForFunction(() => window.game);
+  await page.waitForFunction(() => window.game?.world);
   await page.screenshot({ path: "docs/screenshots/arrival.png" });
   await page.locator("#begin").click();
   const start = await page.evaluate(
@@ -115,6 +115,25 @@ try {
   await page.locator("#journal").click();
   assert.ok(await page.locator("#notes").isVisible());
   assert.deepEqual(errors, []);
+  // Network-delayed startup must not allow rendering before assets are decoded.
+  const slowPage = await browser.newPage();
+  slowPage.on("pageerror", (e) => errors.push(e.message));
+  await slowPage.route("**/art/manifest.json", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.continue();
+  });
+  await slowPage.goto(process.env.GAME_URL ?? "http://127.0.0.1:5173");
+  assert.ok(await slowPage.locator("#begin").isDisabled());
+  await slowPage.locator("#seed").fill("1337");
+  await slowPage.locator("#seedform button").click();
+  await slowPage.waitForFunction(() => window.game?.world);
+  assert.equal(await slowPage.evaluate(() => window.game.world.seed), 1337);
+  assert.ok(await slowPage.locator("#begin").isEnabled());
+  await slowPage.evaluate(() => localStorage.setItem("mosslight-v1", "{}"));
+  await slowPage.locator("#load").click();
+  assert.match(await slowPage.locator("#hint").textContent(), /invalid save/i);
+  assert.deepEqual(errors, []);
+  await slowPage.close();
   fs.writeFileSync(
     "docs/browser-measurements.json",
     JSON.stringify(performanceData, null, 2),
