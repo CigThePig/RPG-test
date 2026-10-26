@@ -38,11 +38,14 @@ try:
     # Landscape UI coordinate scaled from the logical 1280x800 base.
     bounds=adb('shell','wm','size').split()[-1].split('x');w,h=sorted(map(int,bounds),reverse=True)
     def tap(x,y): adb('shell','input','tap',str(int(x*w/1280)),str(int(y*h/800)))
-    tap(640,180) # Enter / Resume.
+    # Preserve a picture of the actual exported start menu, not just a readiness marker.
+    adb_path = os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb')
+    (out/'start-menu.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
+    tap(640,150) # First menu button: Enter / Resume.
     time.sleep(8)
     adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(220*w/1280)),str(int(640*h/800)),'1500')
     time.sleep(3)
-    (out/'exploration.png').write_bytes(run('adb','exec-out','screencap','-p'))
+    (out/'exploration.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
     adb('shell','input','keyevent','3') # Background triggers save and cancels held input.
     time.sleep(2)
     adb('shell','monkey','-p',package,'-c','android.intent.category.LAUNCHER','1')
