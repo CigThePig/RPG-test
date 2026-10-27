@@ -484,11 +484,14 @@ public partial class Foundation : Node2D
 
 public partial class TerrainView : Node2D
 {
+    readonly List<TerrainBatch> batches=new();
     public RegionState Region { get; set; } = null !;
     public Dictionary<string, Texture2D> Art { get; set; } = null !;
 
     public override void _Draw()
     {
+        batches.Clear();
+        var batch=new TerrainBatch();batches.Add(batch);
         // Ground layers do not overlap: group by texture so the engine can batch them.
         for (int y = 0; y < Region.Height; y++)
             for (int x = 0; x < Region.Width; x++)
@@ -502,9 +505,10 @@ public partial class TerrainView : Node2D
                     Terrain.Floor => new Color(.31f, .33f, .29f),
                     Terrain.Earth => new Color(.36f, .37f, .26f),
                     _ => new Color(.3f, .39f, .27f)};
-                DrawRect(new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), color);
+                batch.Rect(new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), color);
             }
 
+        batch.Draw(this);batch=new TerrainBatch();batches.Add(batch);
         foreach (var(terrain, key)in new[]
         {
             (Terrain.Grass, "grass"),
@@ -531,18 +535,19 @@ public partial class TerrainView : Node2D
                 if(tile is Terrain.Rock or Terrain.Wall)
                 {
                     float rise=tile==Terrain.Wall ? 14 : 8;
-                    DrawRect(new Rect2(p+new Vector2(0,-rise),new Vector2(24,12)),new Color(tile==Terrain.Wall ? "4d5d60" : "697268"));
-                    DrawRect(new Rect2(p+new Vector2(0,12-rise),new Vector2(24,rise)),new Color("354344"));
-                    DrawLine(p+new Vector2(0,-rise),p+new Vector2(24,-rise),new Color("92988a"),1);
-                    DrawLine(p+new Vector2(3,-rise+4),p+new Vector2(13,-rise+4),new Color("7d8477"),1);
+                    batch.Rect(new Rect2(p+new Vector2(0,-rise),new Vector2(24,12)),new Color(tile==Terrain.Wall ? "4d5d60" : "697268"));
+                    batch.Rect(new Rect2(p+new Vector2(0,12-rise),new Vector2(24,rise)),new Color("354344"));
+                    batch.Line(p+new Vector2(0,-rise),p+new Vector2(24,-rise),new Color("92988a"),1);
+                    batch.Line(p+new Vector2(3,-rise+4),p+new Vector2(13,-rise+4),new Color("7d8477"),1);
                 }
                 if(tile==Terrain.Water)
                 {
-                    if(y>0 && Region.Tiles[at-Region.Width]!=Terrain.Water) DrawLine(p,p+new Vector2(24,0),new Color("b2bea0"),2);
-                    if(y<Region.Height-1 && Region.Tiles[at+Region.Width]!=Terrain.Water) DrawLine(p+new Vector2(0,12),p+new Vector2(24,12),new Color("b2bea0"),2);
-                    if(x>0 && Region.Tiles[at-1]!=Terrain.Water) DrawLine(p,p+new Vector2(0,12),new Color("b2bea0"),2);
-                    if(x<Region.Width-1 && Region.Tiles[at+1]!=Terrain.Water) DrawLine(p+new Vector2(24,0),p+new Vector2(24,12),new Color("b2bea0"),2);
+                    if(y>0 && Region.Tiles[at-Region.Width]!=Terrain.Water) batch.Line(p,p+new Vector2(24,0),new Color("b2bea0"),2);
+                    if(y<Region.Height-1 && Region.Tiles[at+Region.Width]!=Terrain.Water) batch.Line(p+new Vector2(0,12),p+new Vector2(24,12),new Color("b2bea0"),2);
+                    if(x>0 && Region.Tiles[at-1]!=Terrain.Water) batch.Line(p,p+new Vector2(0,12),new Color("b2bea0"),2);
+                    if(x<Region.Width-1 && Region.Tiles[at+1]!=Terrain.Water) batch.Line(p+new Vector2(24,0),p+new Vector2(24,12),new Color("b2bea0"),2);
                 }
             }
+        batch.Draw(this);
     }
 }
