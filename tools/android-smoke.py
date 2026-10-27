@@ -119,14 +119,14 @@ try:
     else: raise RuntimeError('Touch movement never approached starting chest')
     assert float(positions[-1][0])>220,'Touch input did not change player coordinates'
     capture('chest.png')
-    tap(882,644) # Interact: left side of the named action cluster.
+    tap(878,644) # Interact: left side of the named action cluster.
     time.sleep(1)
     logs=adb('logcat','-d')
     assert 'MOSSLIGHT_GAMEPLAY kind=resource_depleted value=chest' in logs,'Touch interaction did not empty authoritative chest inventory'
     interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
     assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
     capture('exploration.png')
-    tap(1186,714) # Attack: the large primary button.
+    tap(1198,712) # Attack: the large primary button.
     deadline=time.monotonic()+15
     while time.monotonic()<deadline:
         logs=adb('logcat','-d')
@@ -134,7 +134,7 @@ try:
         time.sleep(.5)
     else: raise RuntimeError('Real Android Attack touch did not finish a free swing')
     assert len(re.findall(r'MOSSLIGHT_COMBAT kind=attack_started',logs))==1, 'Attack touch activated more than once'
-    tap(1070,716) # Dodge: beside the primary attack.
+    tap(1088,714) # Dodge: beside the primary attack.
     deadline=time.monotonic()+15
     while time.monotonic()<deadline:
         logs=adb('logcat','-d')
@@ -143,7 +143,7 @@ try:
     else: raise RuntimeError('Real Android Dodge touch did not complete')
     assert len(re.findall(r'MOSSLIGHT_COMBAT kind=dodge_started',logs))==1, 'Dodge touch activated more than once'
     capture('combat-controls.png')
-    tap(1067,609) # Pack: utility row above the combat thumb arc.
+    tap(1086,564) # Pack: utility row above the combat thumb arc.
     time.sleep(1)
     capture('inventory.png')
     pids=adb('shell','pidof','screenrecord').split()

@@ -33,7 +33,8 @@ public partial class Foundation : Node2D
     }
     void ConfigureView(CharacterView view)
     {
-        view.Creature.UseMeasuredExternalVelocity=Feel.Id!="baseline";
+        view.PreferMeasuredExternalVelocity=Feel.Id!="baseline";
+        view.Creature.UseMeasuredExternalVelocity=view.PreferMeasuredExternalVelocity;
         view.Creature.AnimationFps=view.State.Id=="player" && Feel.Id!="baseline" ? 20 : 10;
     }
     public override void _Process(double delta) => Trace?.Frame(delta);

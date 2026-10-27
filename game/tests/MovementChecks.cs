@@ -94,6 +94,20 @@ public static class MovementChecks
                 }
                 check(changes==0 && Math.Abs(DMath.WrapAngle(motor.Context.TargetYaw-motor.Yaw))<.03, "motor turns without oscillating: "+pair.label);
             }
+            // New input must be able to reverse a turn already in progress.
+            motor.Teleport(Vec3.Zero,0); motor.FacingOverride=Math.PI/2;
+            for(int i=0;i<6;i++) motor.Step(1.0/60);
+            double midYaw=motor.Yaw; motor.FacingOverride=-Math.PI/2;
+            for(int i=0;i<90;i++) motor.Step(1.0/60);
+            check(midYaw>0 && Math.Abs(DMath.WrapAngle(motor.Yaw+Math.PI/2))<.03, "new deliberate direction redirects a turn already in progress");
+            foreach(var family in CreatureRuntime.Registry.Families)
+            {
+                var dodgeModel=CreatureRuntime.Build(CreatureRuntime.Sample(family.Id,42));
+                var dodgeMotor=new CreatureMotor(dodgeModel,CreatureRuntime.Registry,new MotorOptions {InternalDrive=false});
+                dodgeMotor.DodgeBiped=family.Id=="biped";
+                for(int i=0;i<24;i++) { dodgeMotor.DodgeProgress=i/24.0; dodgeMotor.Step(1.0/60); }
+                check(double.IsFinite(dodgeMotor.Params.BodyPitch) && double.IsFinite(dodgeMotor.Params.Crouch), "dodge pose remains safe for family "+family.Id);
+            }
             motor.FacingOverride=null;
             motor.TriggerGameplayAction(.14,.24);
             for(int i=0;i<22;i++)motor.Step(1.0/60);
@@ -107,6 +121,27 @@ public static class MovementChecks
             var view=app.Views["player"];
             var viewMotor=view.Creature.Motor!;
             view.SnapPosition();view.Creature.ClearFacingRequest();
+            p.State=ActionState.Idle; p.X=500; p.Y=500; p.Cooldowns.Clear();
+            view.SnapPosition(); viewMotor.Teleport(new Vec3(p.X,0,p.Y),.37);
+            var facing=new V((float)Math.Cos(.37),(float)-Math.Sin(.37));
+            check(w.TryStartPlayerSlash(facing), "view fixture starts a captured-facing slash");
+            for(int i=0;i<15;i++)
+            {
+                w.Step(1f/60); view.Sync(1f/60);
+                viewMotor.SetWorldPosition(new Vec3(p.X,0,p.Y),new Vec3(view.Creature.MoveVelocity.X,0,view.Creature.MoveVelocity.Y));
+                viewMotor.Step(1.0/60);
+            }
+            check(Math.Abs(DMath.WrapAngle(viewMotor.Yaw-.37))<.001 && view.Creature.MoveVelocity==Vector2.Zero, "lunge holds the captured visual yaw without locomotion velocity");
+            w.Cancel(p); p.Cooldowns.Clear();
+            check(w.TryStartPlayerDodge(V.UnitY), "view fixture starts dodge perpendicular to facing");
+            for(int i=0;i<24;i++)
+            {
+                w.Step(1f/60); view.Sync(1f/60);
+                viewMotor.SetWorldPosition(new Vec3(p.X,0,p.Y),new Vec3(view.Creature.MoveVelocity.X,0,view.Creature.MoveVelocity.Y));
+                viewMotor.Step(1.0/60);
+            }
+            check(Math.Abs(DMath.WrapAngle(viewMotor.Yaw-.37))<.001 && view.Creature.MoveVelocity==Vector2.Zero, "dodge and its final increment do not create a velocity-facing turn");
+            view.Creature.ClearFacingRequest();
             viewMotor.Teleport(new Vec3(p.X,0,p.Y),0);
             p.State=ActionState.Staggered;p.X-=15;view.Cue("hit");view.Sync(1f/60);
             for(int i=0;i<20;i++)

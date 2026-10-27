@@ -55,7 +55,7 @@ public static class CombatChecks
             for (int i = 0; i < 8; i++) w.Step(Dt);
             enemy.X = 700; w.Step(Dt);
             check(enemy.Health == 1000, "enemy leaving reach during windup avoids the hit");
-            foreach (float degrees in new[] { 50f, 60f })
+            foreach (float degrees in new[] { 54.9f, 55.1f })
             {
                 ResetFight(); enemy.X = 700; enemy.Y = 500; w.TryStartPlayerSlash(V.UnitX);
                 for (int i = 0; i < 8; i++) w.Step(Dt);

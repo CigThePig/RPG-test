@@ -107,6 +107,10 @@ public static class VisualChecks
             app.World.CombatDiagnostic -= OnCombat;
             Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
             await Frames(app,2);
+            var mobileButtons=dodge.GetParent().GetChildren().OfType<Button>().Where(b=>b.IsVisibleInTree()).ToArray();
+            for(int i=0;i<mobileButtons.Length;i++) for(int j=i+1;j<mobileButtons.Length;j++)
+                if(mobileButtons[i].GetGlobalRect().Intersects(mobileButtons[j].GetGlobalRect()))
+                    throw new InvalidOperationException("Mobile touch targets overlap: "+mobileButtons[i].Text+" / "+mobileButtons[j].Text);
             if(attack.GetGlobalRect().Intersects(dodge.GetGlobalRect())) throw new InvalidOperationException("Attack and Dodge touch targets overlap");
         }
         // Use real GUI dispatch for desktop mice; headless checks exercise raw touch.

@@ -4,12 +4,12 @@ using MHLab.Spells;
 namespace Mosslight;
 public enum ActionState
 {
-    Idle,
-    Moving,
-    Windup,
-    Recovery,
-    Staggered,
-    Dead,
+    Idle = 0,
+    Moving = 1,
+    Windup = 2,
+    Recovery = 3,
+    Staggered = 4,
+    Dead = 5,
     Dodging = 6
 }
 

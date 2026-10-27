@@ -101,14 +101,14 @@ public partial class RpgUi : CanvasLayer
                 string actionName = text.Split(" · ").Last();
                 button.Position = actionName switch
                 {
-                    "Sword" => new Vector2(290, 132), "Dodge" => new Vector2(180, 138),
-                    "Ember" => new Vector2(90, 65), "Mend" => new Vector2(0, 5),
-                    "Draught" => new Vector2(90, -10), "Interact" => new Vector2(0, 80),
-                    "Pack" => new Vector2(185, 45), "Menu" => new Vector2(280, 40),
+                    "Sword" => new Vector2(312, 130), "Dodge" => new Vector2(208, 136),
+                    "Ember" => new Vector2(104, 80), "Mend" => new Vector2(0, 0),
+                    "Draught" => new Vector2(104, 0), "Interact" => new Vector2(0, 80),
+                    "Pack" => new Vector2(208, 0), "Menu" => new Vector2(312, 0),
                     _ => throw new InvalidOperationException("No mobile position for " + actionName)
                 };
                 bool primary = actionName == "Sword";
-                button.Size = button.CustomMinimumSize = primary ? new Vector2(112,104) : actionName == "Dodge" ? new Vector2(100,96) : new Vector2(84,68);
+                button.Size = button.CustomMinimumSize = primary ? new Vector2(112,104) : actionName == "Dodge" ? new Vector2(100,96) : new Vector2(96,68);
                 button.AddThemeFontSizeOverride("font_size", primary ? 23 : 18);
                 var face = new StyleBoxFlat { BgColor = new Color(primary ? "795433" : actionName == "Dodge" ? "355b56" : "263f43"), BorderColor = new Color("b0af7e"), BorderWidthLeft=2, BorderWidthRight=2, BorderWidthTop=2, BorderWidthBottom=2, CornerRadiusTopLeft=24, CornerRadiusTopRight=24, CornerRadiusBottomLeft=24, CornerRadiusBottomRight=24 };
                 button.AddThemeStyleboxOverride("normal", face);
@@ -192,8 +192,8 @@ public partial class RpgUi : CanvasLayer
     void Layout()
     {
         var size = GetViewport().GetVisibleRect().Size;
-        hotbar.Position = MobileLayout ? new Vector2(size.X - 440, size.Y - 270) : new Vector2(size.X - 760, size.Y - 160);
-        if (MobileLayout) hotbar.Size = new Vector2(420,250);
+        hotbar.Position = MobileLayout ? new Vector2(size.X - 450, size.Y - 270) : new Vector2(size.X - 760, size.Y - 160);
+        if (MobileLayout) hotbar.Size = new Vector2(430,250);
         Stick.Position = new Vector2(40, size.Y - 260);
         message.Position = new Vector2(24, size.Y - 45);
         message.Size = new Vector2(size.X - 48, 40);

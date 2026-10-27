@@ -10,6 +10,7 @@ public partial class CharacterView : Node2D
     public CreatureActor Creature { get; private set; } = null !;
 
     public bool HasLoot { get; set; }
+    public bool PreferMeasuredExternalVelocity { get; set; } = true;
     Vector2 previous;
     float attackTime, attackDuration, impactTime;
     Vector2 attackDirection = Vector2.Right;
@@ -58,7 +59,9 @@ public partial class CharacterView : Node2D
         // The last dodge increment can arrive on the same frame as the transition
         // to Idle. Do not let that displacement masquerade as walking intent.
         bool dodgeDisplacement = State.State == ActionState.Dodging || previousWasDodging;
-        Creature.MoveVelocity = dodgeDisplacement || State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
+        bool combatDisplacement = dodgeDisplacement || State.FreeSlash;
+        Creature.UseMeasuredExternalVelocity = combatDisplacement || PreferMeasuredExternalVelocity;
+        Creature.MoveVelocity = combatDisplacement || State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
         if (State.State is ActionState.Idle or ActionState.Moving && Creature.MoveVelocity.LengthSquared() > .25f) Creature.ClearFacingRequest();
         if (Creature.Motor != null)
         {
