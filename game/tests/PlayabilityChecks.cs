@@ -107,7 +107,8 @@ public static class PlayabilityChecks
             check(contents>0 && w.Items.HasLoot(owner),"chest rewards owned by Gloot before opening");
             check(w.Interact(p) && w.Items.Count(p.Id,"coin")==coins+contents && !w.Items.HasLoot(owner) && reach.Depleted.Contains(chest),"chest transfers actual inventory and depletes only when empty");
             int after=w.Items.Count(p.Id,"coin");
-            w.Interact(p);w.Enter(p,"reach");w.InitializeContainers(reach);
+            check(!w.Interact(p) && w.InteractionFeedback=="Chest already empty","repeated empty chest interaction gives specific feedback");
+            w.Enter(p,"reach");w.InitializeContainers(reach);
             check(w.Items.Count(p.Id,"coin")==after && !w.Items.HasLoot(owner),"repeated interaction and re-entry cannot refill chest");
             string emptySave=Persistence.Capture(w,app.Narrative);Persistence.Restore(w,app.Narrative,emptySave);
             check(w.RegionsById["reach"].Depleted.Contains(chest) && !w.Items.HasLoot(owner),"empty container survives coordinated restore");
@@ -116,6 +117,20 @@ public static class PlayabilityChecks
             check(old != emptySave,"legacy fixture actually removes new initialization metadata");
             Persistence.Restore(w,app.Narrative,old);w.InitializeContainers(w.RegionsById["reach"]);
             check(!w.Items.HasLoot(owner),"legacy region metadata cannot regenerate spent loot");
+            var legacy=System.Text.Json.Nodes.JsonNode.Parse(saved)!;
+            legacy["Regions"]!["reach"]!.AsObject().Remove("PlacementRevision");
+            var oldChest=w.RegionsById["reach"].Center(chest);
+            legacy["Actors"]!["npc:0"]!["X"]=oldChest.X;
+            legacy["Actors"]!["npc:0"]!["Y"]=oldChest.Y;
+            Persistence.Restore(w,app.Narrative,legacy.ToJsonString());
+            check(V.Distance(w.Actors["npc:0"].Position,oldChest)>=40 && w.RegionsById["reach"].PlacementRevision==1,"legacy chest-overlapping NPC is explicitly migrated");
+            string migrated=Persistence.Capture(w,app.Narrative);
+            var invalid=System.Text.Json.Nodes.JsonNode.Parse(saved)!;
+            invalid["Regions"]!["reach"]!.AsObject().Remove("PlacementRevision");
+            var tiles=invalid["Regions"]!["reach"]!["Tiles"]!.AsArray();
+            for(int i=0;i<tiles.Count;i++)tiles[i]=(int)Terrain.Wall;
+            bool rejected=false;try { Persistence.Restore(w,app.Narrative,invalid.ToJsonString()); }catch(InvalidOperationException){rejected=true;}
+            check(rejected && Persistence.Capture(w,app.Narrative)==migrated,"failed legacy placement migration cannot mutate running game");
             check(TouchStick.Analog(new Vector2(3,0))==Vector2.Zero && Math.Abs(TouchStick.Analog(new Vector2(72,72)).Length()-1)<.001f,"analog deadzone and diagonal normalization");
         }
         finally { Persistence.Restore(w,app.Narrative,saved); }

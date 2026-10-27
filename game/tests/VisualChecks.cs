@@ -46,9 +46,8 @@ public static class VisualChecks
         }
         app.Ui.Stick.Cancel();
         await Capture(app,"chest");
-        if(!app.World.Interact(player) || !region.Depleted.Contains(chest)) throw new InvalidOperationException("Visual chest walk/loot failed");
-        // Refresh presentation through the real interaction composition root.
         app.Interact();
+        if(!region.Depleted.Contains(chest)) throw new InvalidOperationException("Visual chest walk/loot failed");
         await Capture(app,"opened-chest");
         app.CollisionDebug=true;await Capture(app,"collision-overlay");app.CollisionDebug=false;
         app.Ui.Inventory();

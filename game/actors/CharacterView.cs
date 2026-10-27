@@ -9,6 +9,7 @@ public partial class CharacterView : Node2D
     public ActorState State { get; private set; } = null !;
     public CreatureActor Creature { get; private set; } = null !;
 
+    public bool HasLoot { get; set; }
     Vector2 previous;
     public void Setup(ActorState actor)
     {
@@ -67,7 +68,15 @@ public partial class CharacterView : Node2D
     public override void _Draw()
     {
         if (!State.Alive)
+        {
+            if (HasLoot)
+            {
+                DrawRect(new Rect2(-7,-15,14,12),new Color("b49364"));
+                DrawRect(new Rect2(-4,-18,8,4),new Color("d5bd85"));
+                DrawLine(new Vector2(-5,-12),new Vector2(5,-12),new Color("5b4936"),2);
+            }
             return;
+        }
         if (State.Health < State.MaxHealth)
         {
             DrawRect(new Rect2(-14, -50, 28, 3), new Color(.15f, .1f, .12f));

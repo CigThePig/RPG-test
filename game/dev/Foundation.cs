@@ -268,6 +268,7 @@ public partial class Foundation : Node2D
         {
             view.Visible = World.Actors[id].Region == player.Region;
             view.Creature.Paused = !view.Visible || GameplayBlocked;
+            view.HasLoot = !view.State.Alive && World.Items.HasLoot(id);
             view.Sync((float)delta);
         }
 
@@ -279,8 +280,8 @@ public partial class Foundation : Node2D
         var target = World.InteractionTargets(player).FirstOrDefault();
         foreach (var feature in features)
         {
-            feature.Selected = target.Value != null && feature.GetMeta("tile").AsInt32() == target.Key;
-            feature.QueueRedraw();
+            bool selected = target.Value != null && feature.GetMeta("tile").AsInt32() == target.Key;
+            if (feature.Selected != selected) { feature.Selected = selected; feature.QueueRedraw(); }
         }
         if (drawnRegion != player.Region)
         {
@@ -431,6 +432,19 @@ public partial class Foundation : Node2D
                 DrawSetTransform(Vector2.Zero);
                 DrawLine(p,p+GodotConvert.GroundToScreen(a.MotionX*.2f,a.MotionY*.2f),Colors.Yellow,1);
             }
+            foreach(var (at,kind) in r.Features)
+            {
+                var point=r.Center(at);
+                if(NVector.DistanceSquared(point,player.Position)>260*260)continue;
+                DrawSetTransform(GodotConvert.GroundToScreen(point.X,point.Y),0,new Vector2(1,.5f));
+                DrawArc(Vector2.Zero,48,0,Mathf.Tau,24,new Color(1,.7f,.2f,.35f),1);
+                DrawCircle(Vector2.Zero,2,Colors.Gold);DrawSetTransform(Vector2.Zero);
+            }
+            var playerScreen=GodotConvert.GroundToScreen(player.X,player.Y);
+            var input=World.LastInput*40;
+            DrawLine(playerScreen,playerScreen+GodotConvert.GroundToScreen(input.X,input.Y),World.LastBlockedReason=="" ? Colors.Gold : Colors.Red,2);
+            foreach(var actor in World.Actors.Values.Where(a=>a.Region==player.Region))
+                DrawRect(new Rect2(GodotConvert.GroundToScreen(actor.HomeX,actor.HomeY)-new Vector2(2,2),new Vector2(4,4)),Colors.Magenta);
             var target=World.InteractionTargets(player).FirstOrDefault();
             if(target.Value!=null)
             {

@@ -84,10 +84,7 @@ public static class Persistence
         w.Projectiles = s.Projectiles;
         w.Events.Recent = s.Events;
         foreach (var actor in w.Actors.Values)
-        {
-            AnatomyAdapter.Apply(actor);
             w.Items.Reconcile(actor);
-        }
 
         w.RebuildSpells();
     }
