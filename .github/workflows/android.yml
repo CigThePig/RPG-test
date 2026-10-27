@@ -138,6 +138,11 @@ jobs:
           "$ANDROID_HOME/emulator/emulator" -list-avds
           "$ANDROID_HOME/emulator/emulator" -list-avds | grep -Fx mosslight
           sudo chmod 666 /dev/kvm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install screenshot verification dependency
+        run: python3 -m pip install Pillow==11.3.0
       - name: Install, launch and exercise exported C# application
         run: python3 tools/android-smoke.py build/emulator/Mosslight-emulator.apk
       - uses: actions/upload-artifact@v4

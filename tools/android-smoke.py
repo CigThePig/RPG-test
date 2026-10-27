@@ -1,6 +1,8 @@
 """Hosted x86_64 Android runtime smoke; ARM64 phone performance remains separate."""
 from pathlib import Path
 import os, subprocess, sys, time, re
+from PIL import Image
+from io import BytesIO
 out=Path('build/android-runtime');out.mkdir(parents=True,exist_ok=True)
 package='com.cigthepig.mosslight.dev'
 def run(*args, **kwargs):
@@ -10,7 +12,7 @@ def run(*args, **kwargs):
 def adb(*args): return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True).strip()
 log=(out/'emulator.log').open('w')
 emulator=subprocess.Popen([os.environ['ANDROID_HOME']+'/emulator/emulator','-avd','mosslight',
-    '-no-window','-no-audio','-no-boot-anim','-no-snapshot','-gpu','swiftshader_indirect','-skin','1280x800'],stdout=log,stderr=log)
+    '-no-window','-no-audio','-no-boot-anim','-no-snapshot','-gpu','swangle','-skin','1280x800'],stdout=log,stderr=log)
 try:
     deadline=time.monotonic()+240
     while time.monotonic()<deadline:
@@ -42,9 +44,24 @@ try:
     # Godot on first launch. Dismiss it before taking evidence or tapping our menu.
     tap(880,190) # System 'Got it', outside the game UI.
     time.sleep(2)
-    # Preserve a picture of the actual exported start menu, not just a readiness marker.
+    # Readiness is CPU-side; shader failure can leave a fully running game blank.
     adb_path = os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb')
-    (out/'start-menu.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
+    def capture(name, wait=0):
+        deadline=time.monotonic()+wait
+        while True:
+            data=run(adb_path, 'exec-out', 'screencap', '-p')
+            (out/name).write_bytes(data)
+            pixels=list(Image.open(BytesIO(data)).convert('RGB').resize((160,100)).getdata())
+            colors=len(set(pixels))
+            green=sum(g>r*1.04 and g>b*1.04 for r,g,b in pixels)
+            # Starting Reach scenery must be present behind the HUD/menu/pack.
+            # A Godot splash, solid gray frame or system screen is not gameplay evidence.
+            if colors>64 and green>len(pixels)*.01:
+                with (out/'image-validation.log').open('a') as f: f.write(f'{name}: colors={colors}, terrain_pixels={green}\n')
+                return
+            if time.monotonic()>=deadline: raise AssertionError(f'{name}: missing rendered world (colors={colors}, terrain_pixels={green})')
+            time.sleep(1)
+    capture('start-menu.png',wait=45)
     tap(640,150) # First menu button: Enter / Resume.
     time.sleep(8)
     # Exercise actual touch ownership, then open the starting Gloot chest.
@@ -57,26 +74,27 @@ try:
         if positions and float(positions[-1][0])>=265: break
     else: raise RuntimeError('Touch movement never approached starting chest')
     assert float(positions[-1][0])>220,'Touch input did not change player coordinates'
-    (out/'chest.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
+    capture('chest.png')
     tap(1145,635)
     time.sleep(1)
     logs=adb('logcat','-d')
     assert 'MOSSLIGHT_GAMEPLAY kind=resource_depleted value=chest' in logs,'Touch interaction did not empty authoritative chest inventory'
-    (out/'exploration.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
+    capture('exploration.png')
     tap(580,715) # Pack: second row, first button.
     time.sleep(1)
-    (out/'inventory.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
+    capture('inventory.png')
     adb('shell','input','keyevent','3') # Background triggers save and cancels held input.
     time.sleep(2)
     adb('shell','monkey','-p',package,'-c','android.intent.category.LAUNCHER','1')
     time.sleep(3)
+    capture('resumed-menu.png',wait=15)
     assert adb('shell','pidof',package),'Application not running after resume'
     logs=adb('logcat','-d');(out/'logcat.log').write_text(logs)
     assert 'MOSSLIGHT_INPUT_CANCELLED' in logs,'Background did not cancel gameplay input'
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
-    for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception']:
+    for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, measured player movement, Gloot chest depletion, inventory screenshot, gameplay ticks, background input cancellation/resume. ARM64 device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, inventory screenshot, gameplay ticks, background input cancellation/resume. ARM64 device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     try: (out/'logcat.log').write_text(adb('logcat','-d'))
