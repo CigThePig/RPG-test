@@ -83,8 +83,23 @@ public static class DodgeChecks
             Persistence.Restore(w, app.Narrative, during); p = w.Player;
             check(p.State == ActionState.Idle && p.Position == savedPos && Math.Abs(p.Cooldowns["dodge"] - cooldown) < .0001f && !World.DodgeImmune(p), "loading a dodge retains position and cooldown but clears transient state");
             p.Cooldowns.Clear(); check(w.TryStartPlayerDodge(V.UnitX), "dodge starts before lifecycle cancellation");
-            w.CancelPlayerDodge();
-            check(p.State == ActionState.Idle && p.Cooldowns["dodge"] > 0 && !World.DodgeImmune(p), "pause cancellation clears motion and preserves cooldown");
+            var beforePause = p.Position;
+            var oldAutosave = File.Exists(Persistence.AutosavePath) ? File.ReadAllBytes(Persistence.AutosavePath) : null;
+            try
+            {
+                // Exercise the actual application lifecycle path, while preserving
+                // any pre-existing local autosave if this suite is run by a player.
+                app._Notification((int)Godot.Node.NotificationApplicationPaused);
+                app._Notification((int)Godot.Node.NotificationApplicationResumed);
+                for (int i = 0; i < 10; i++) w.Step(Dt);
+                check(p.State == ActionState.Idle && p.Position == beforePause && p.Cooldowns["dodge"] > 0 && !World.DodgeImmune(p), "background and resume cancel dodge movement and retain cooldown");
+            }
+            finally
+            {
+                app._Notification((int)Godot.Node.NotificationApplicationResumed);
+                if (oldAutosave == null) File.Delete(Persistence.AutosavePath);
+                else File.WriteAllBytes(Persistence.AutosavePath, oldAutosave);
+            }
         }
         finally { Persistence.Restore(w, app.Narrative, saved); app.RebuildViews(); }
     }
