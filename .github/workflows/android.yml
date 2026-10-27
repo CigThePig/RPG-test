@@ -145,6 +145,8 @@ jobs:
       - name: Install pinned video tools without distro updates
         timeout-minutes: 4
         run: python3 tools/setup-video.py
+      - name: Verify Android native window classification
+        run: python3 tools/test_android_window.py
       - name: Install, launch and exercise exported C# application
         run: python3 tools/android-smoke.py build/emulator/Mosslight-emulator.apk
       - uses: actions/upload-artifact@v4

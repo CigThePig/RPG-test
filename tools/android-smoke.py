@@ -2,6 +2,7 @@
 from pathlib import Path
 import os, subprocess, sys, time, re, json
 import xml.etree.ElementTree as ET
+from android_window import anr_messages, has_game_focus
 from PIL import Image
 from io import BytesIO
 out=Path('build/android-runtime');out.mkdir(parents=True,exist_ok=True)
@@ -48,18 +49,17 @@ try:
     def ensure_foreground(timeout=30):
         deadline=time.monotonic()+timeout
         while time.monotonic()<deadline:
-            windows=adb('shell','dumpsys','window','windows')
-            focus=next((line for line in windows.splitlines() if 'mCurrentFocus=' in line),'')
-            if package in focus: return
+            windows=adb('shell','dumpsys','window')
+            (out/'focus-windows.txt').write_text(windows)
             # Hosted Google APIs images can show an unrelated launcher ANR over
             # a healthy game. Inspect the actual native modal, never dismiss a
             # Mosslight ANR or accept scenery behind a blocking system dialog.
             adb('shell','uiautomator','dump','/sdcard/mosslight-window.xml')
             xml=adb('shell','cat','/sdcard/mosslight-window.xml')
             (out/'native-window.xml').write_text(xml)
-            if "isn't responding" in xml or 'is not responding' in xml:
-                texts=[n.get('text','') for n in ET.fromstring(xml).iter('node')]
-                assert any('Pixel Launcher' in text and 'responding' in text for text in texts), 'Game or unexpected application ANR blocks input'
+            messages=anr_messages(xml)
+            if messages:
+                assert all('Pixel Launcher' in text for text in messages), 'Game or unexpected application ANR blocks input'
                 nodes=ET.fromstring(xml).iter('node')
                 close=next((n for n in nodes if n.get('resource-id')=='android:id/aerr_close' or n.get('text')=='Close app'),None)
                 assert close is not None, 'Launcher ANR close control missing'
@@ -67,6 +67,7 @@ try:
                 assert len(box)==4
                 adb('shell','input','tap',str((box[0]+box[2])//2),str((box[1]+box[3])//2))
                 continue
+            if has_game_focus(xml,package): return
             got_it=next((n for n in ET.fromstring(xml).iter('node') if n.get('text')=='Got it'),None)
             if got_it is not None:
                 box=list(map(int,re.findall(r'\d+',got_it.get('bounds',''))))
