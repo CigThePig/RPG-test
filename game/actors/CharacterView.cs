@@ -18,6 +18,7 @@ public partial class CharacterView : Node2D
         {
             FamilyId = "",
             AutoMove = false,
+            UseMeasuredExternalVelocity = true,
             SyncNodePosition = false,
             AnimationFps = 10,
             Quality = 1,
@@ -34,6 +35,8 @@ public partial class CharacterView : Node2D
         previous = new(actor.X, actor.Y);
         Sync(1f / 60);
     }
+
+    public void SnapPosition() { previous=new Vector2(State.X,State.Y); Creature.Teleport(previous); Creature.MoveVelocity=Vector2.Zero; }
 
     public void Equipment(string json)
     {

@@ -2,7 +2,7 @@
 Movie mode proves visual behavior at a fixed clock, NOT real-time frame pacing.
 """
 from pathlib import Path
-import argparse, json, os, subprocess, statistics, math, hashlib
+import argparse, json, os, subprocess, statistics, math, hashlib, time
 from PIL import Image, ImageChops, ImageStat, ImageDraw
 root=Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser();p.add_argument('--presets',default='baseline,precise,soft,explore');p.add_argument('--realtime',action='store_true');p.add_argument('--output',default='build/gameplay');a=p.parse_args()
@@ -15,12 +15,39 @@ for preset in a.presets.split(','):
     command=[os.environ.get('GODOT','godot'),'--path',str(root),'--audio-driver','Dummy','--resolution','1280x800']
     if not a.realtime: command+=['--write-movie',str(folder/'gameplay.avi'),'--fixed-fps','60']
     command+=['--','--gameplay-check','--mobile-ui',f'--preset={preset}',f'--evidence={folder}']
-    result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=360)
+    recorder=None
+    capture_utc=time.time()
+    if a.realtime:
+        recorder=subprocess.Popen(['ffmpeg','-v','error','-y','-f','x11grab','-video_size','1280x800','-framerate','30','-i',os.environ['DISPLAY'],'-c:v','libx264','-preset','ultrafast','-crf','24','-pix_fmt','yuv420p',str(folder/'gameplay.mp4')],stdin=subprocess.PIPE)
+    try:
+        result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=360)
+    finally:
+        if recorder is not None:
+            recorder.communicate(b'q',timeout=30)
+            if recorder.returncode:raise RuntimeError('Real-time FFmpeg capture failed')
     logs=result.stdout+result.stderr;(folder/'engine.log').write_text(logs)
     if result.returncode or 'GAMEPLAY REPLAY PASSED' not in logs or 'ERROR:' in logs:raise RuntimeError(logs[-6000:])
     rows=[json.loads(line) for line in (folder/'trace.jsonl').read_text(encoding='utf-8-sig').splitlines()]
     samples=[r for r in rows if r['kind']=='sample'];assert samples
+    def state_digest(trace):
+        # Exclude rendering/time/environment. Keep received analog, authoritative
+        # position/state, collision and scenario for each physics iteration.
+        state=[(r['scenario'],r['tick'],round(r['x'],4),round(r['y'],4),round(r['analog'],4),r['action'],r['blocked']) for r in trace if r['kind']=='sample']
+        return hashlib.sha256(json.dumps(state).encode()).hexdigest()
+    digest=state_digest(rows)
+    repeat=folder/'repeat';repeat.mkdir(exist_ok=True)
+    repeat_command=[os.environ.get('GODOT','godot'),'--headless','--path',str(root),'--audio-driver','Dummy','--fixed-fps','60','--','--gameplay-check','--mobile-ui',f'--preset={preset}',f'--evidence={repeat}']
+    repeated=subprocess.run(repeat_command,cwd=root,capture_output=True,text=True,timeout=120)
+    (repeat/'engine.log').write_text(repeated.stdout+repeated.stderr)
+    assert repeated.returncode==0 and 'GAMEPLAY REPLAY PASSED' in repeated.stdout and 'ERROR:' not in repeated.stdout+repeated.stderr, 'Replay repetition failed'
+    repeat_rows=[json.loads(line) for line in (repeat/'trace.jsonl').read_text(encoding='utf-8-sig').splitlines()]
+    assert state_digest(repeat_rows)==digest, 'Non-deterministic physics/input replay; compare trace.jsonl with repeat/trace.jsonl'
     session=rows[0]
+    assert any(r['renderCount']>0 for r in samples), 'Creature was never rasterized'
+    assert all(not r['renderError'] for r in samples), 'Creature raster errors'
+    rendered=[r for r in rows if r['kind']=='render-frame']
+    gaps=[rendered[i]['wallMs']-rendered[i-1]['wallMs'] for i in range(1,len(rendered))]
+    pacing={f'p{int(q*100)}ms':percentile(gaps,q) for q in [.5,.95,.99]} if gaps else {}
     groups={}
     problems=[]
     for r in samples:
@@ -43,23 +70,23 @@ for preset in a.presets.split(','):
         assert max(speeds)/min(speeds)<1.03,(preset,speeds)
     if not a.realtime:
         run(['ffmpeg','-v','error','-y','-i',str(folder/'gameplay.avi'),'-c:v','libx264','-preset','fast','-crf','24','-pix_fmt','yuv420p','-an',str(folder/'gameplay.mp4')])
-        run(['ffmpeg','-v','error','-i',str(folder/'gameplay.mp4'),'-vf','fps=2,scale=640:400',str(folder/'frame-%03d.png')])
-        images=sorted(folder.glob('frame-*.png'));assert len(images)>20,'Insufficient video frames'
-        changed=0
-        for previous,current in zip(images,images[1:]):
-            old=Image.open(previous).convert('RGB').crop((120,80,520,280));new=Image.open(current).convert('RGB').crop((120,80,520,280))
-            changed+=sum(ImageStat.Stat(ImageChops.difference(old,new)).mean)>1
-        assert changed>8,'Frozen gameplay recording'
-        for f in images[::5]:
-            im=Image.open(f).convert('RGB');assert len(im.getcolors(im.width*im.height))>100,'Blank rendering'
-        # Frame/time labels make every thumbnail locatable in the full clip and trace.
-        chosen=[images[round(i*(len(images)-1)/19)] for i in range(20)]
-        sheet=Image.new('RGB',(4*320,5*220));draw=ImageDraw.Draw(sheet)
-        for i,f in enumerate(chosen):
-            im=Image.open(f);im.thumbnail((320,200));x=(i%4)*320;y=(i//4)*220;sheet.paste(im,(x,y));draw.text((x+5,y+201),f'{preset} t={(int(f.stem.split("-")[-1])-1)/2:.1f}s',fill='white')
-        sheet.save(folder/'contact-sheet.jpg')
-        (folder/'gameplay.avi').unlink()
-        for f in images:f.unlink()
-    report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(subprocess.check_output(['git','status','--porcelain'],cwd=root,text=True)),'preset':preset,'movieMode':not a.realtime,'environment':session,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}
+    run(['ffmpeg','-v','error','-i',str(folder/'gameplay.mp4'),'-vf','fps=2,scale=640:400',str(folder/'frame-%03d.png')])
+    images=sorted(folder.glob('frame-*.png'));assert len(images)>20,'Insufficient video frames'
+    changed=0
+    for previous,current in zip(images,images[1:]):
+        old=Image.open(previous).convert('RGB').crop((120,80,520,280));new=Image.open(current).convert('RGB').crop((120,80,520,280))
+        changed+=sum(ImageStat.Stat(ImageChops.difference(old,new)).mean)>1
+    assert changed>8,'Frozen gameplay recording'
+    for f in images[::5]:
+        im=Image.open(f).convert('RGB');assert len(im.getcolors(im.width*im.height))>100,'Blank rendering'
+    # Frame/time labels make every thumbnail locatable in the full clip and trace.
+    chosen=[images[round(i*(len(images)-1)/19)] for i in range(20)]
+    sheet=Image.new('RGB',(4*320,5*220));draw=ImageDraw.Draw(sheet)
+    for i,f in enumerate(chosen):
+        im=Image.open(f);im.thumbnail((320,200));x=(i%4)*320;y=(i//4)*220;sheet.paste(im,(x,y));draw.text((x+5,y+201),f'{preset} t={(int(f.stem.split("-")[-1])-1)/2:.1f}s',fill='white')
+    sheet.save(folder/'contact-sheet.jpg')
+    if (folder/'gameplay.avi').exists(): (folder/'gameplay.avi').unlink()
+    for f in images:f.unlink()
+    report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(subprocess.check_output(['git','status','--porcelain'],cwd=root,text=True)),'preset':preset,'stateDigest':digest,'deterministicRepeat':True,'movieMode':not a.realtime,'captureStartUnix':capture_utc,'environment':session,'renderWallPacing':pacing,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}
     (folder/'report.json').write_text(json.dumps(report,indent=2));summary[preset]=metrics
 (out/'comparison.json').write_text(json.dumps(summary,indent=2));print(json.dumps(summary,indent=2))

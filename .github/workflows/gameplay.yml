@@ -1,0 +1,62 @@
+name: Gameplay videos and movement comparison
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      extended:
+        description: Record all four presets plus real-time frame pacing
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: gameplay-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  gameplay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.408
+            9.0.203
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.6.1
+          use-dotnet: true
+          include-templates: false
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
+      - run: python3 -m pip install Pillow==11.3.0
+      - run: git rev-parse HEAD > game/data/build-source.txt
+      - run: dotnet build
+      - run: python3 tools/import-project.py
+      - name: Deterministic production touch replay and actual rendered movies
+        env:
+          EXTENDED: ${{ inputs.extended || false }}
+        run: |
+          if [ "$EXTENDED" = true ]; then presets=baseline,precise,soft,explore; else presets=baseline,precise; fi
+          xvfb-run -a python3 tools/gameplay-verify.py --presets "$presets"
+      - name: Real-time frame pacing and desktop capture
+        if: inputs.extended
+        run: xvfb-run -a python3 tools/gameplay-verify.py --presets precise --realtime --output build/gameplay-realtime
+      - name: Evidence index
+        if: always()
+        run: |
+          echo '## Gameplay evidence' >> "$GITHUB_STEP_SUMMARY"
+          echo "Source: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Download gameplay-evidence for MP4 clips, contact sheets, trace.jsonl, scenarios.json and report.json. Movie Maker clips use a fixed clock; only the separate real-time run measures runtime pacing. Automated checks do not establish subjective feel.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gameplay-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/gameplay/
+            build/gameplay-realtime/
+          retention-days: 14

@@ -9,3 +9,6 @@ playwright-report/
 *.tmp
 build/
 examples/mosslight/docs/
+
+game/data/build-source.txt
+__pycache__/

@@ -12,9 +12,10 @@ public sealed class GameplayReplay
     V origin;
     float distance;
     readonly List<object> results=new();
+    Queue<V> route=new();
     public bool Finished { get; private set; }
     public string Output { get; }
-    record Scenario(string Id,int Ticks,V Start,Vector2 Direction);
+    record Scenario(string Id,int Ticks,V Start,Vector2 Direction,string Region="feel-lab");
     readonly Scenario[] scenarios = {
         new("horizontal",100,new(300,300),Vector2.Right),
         new("vertical",100,new(300,300),Vector2.Down),
@@ -28,7 +29,10 @@ public sealed class GameplayReplay
         new("narrow-passage",100,new(700,588),Vector2.Right),
         new("menu-cancel",70,new(300,300),Vector2.Right),
         new("multitouch",70,new(300,300),Vector2.Right),
-        new("chest",100,new(374,300),Vector2.Right)
+        new("chest",100,new(374,300),Vector2.Right),
+        new("settlement-route",240,new(0,0),Vector2.Right,"reach"),
+        new("dungeon-route",240,new(0,0),Vector2.Right,"ruin"),
+        new("combat-movement",180,new(0,0),Vector2.Right,"reach")
     };
     public GameplayReplay(Foundation owner)
     {
@@ -61,16 +65,45 @@ public sealed class GameplayReplay
             if(++index>=scenarios.Length){Finish();return;}
             local=0; distance=0;
             var s=scenarios[index]; var p=app.World.Player;
-            p.X=s.Start.X;p.Y=s.Start.Y;p.State=ActionState.Idle;p.StateRemaining=0;
+            if(p.Region!=s.Region)app.World.Enter(p,s.Region);
+            var map=app.World.RegionsById[p.Region];
+            var start=s.Region=="feel-lab" ? s.Start : map.Center(map.Entrance);
+            p.X=start.X;p.Y=start.Y;p.State=ActionState.Idle;p.StateRemaining=0;
+            p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.Statuses.Clear();p.Cooldowns.Clear();p.PendingAbility="";
+            route.Clear();
+            if(s.Id.EndsWith("-route"))
+            {
+                var best=map.Features.Keys.Select(at=>map.Path(p.Position,map.Center(at),p)).Where(path=>path.Count>0).OrderByDescending(path=>path.Count).First();
+                route=new Queue<V>(best.Select(map.Center));
+            }
+            if(s.Id=="combat-movement")
+            {
+                var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast" && a.Alive);
+                enemy.Region=p.Region;
+                var at=map.FindPlacement(p.Position+new V(110,0),enemy,app.World.Actors.Values);
+                enemy.X=at.X;enemy.Y=at.Y;
+                app.Views[enemy.Id].SnapPosition();
+            }
             app.ControllerVelocity=Vector2.Zero;
             app.Ui.ClosePanels(); app.ResumeGame();
-            app.Views[p.Id].Creature.Teleport(new Vector2(p.X,p.Y));
+            app.Views[p.Id].SnapPosition();
             origin=p.Position;
             app.Ui.Notify($"REPLAY · {app.Feel.Id} · {s.Id}");
             app.Trace.Scenario=s.Id; app.Trace.Marker("scenario-start/teleport");
             Touch(true);
         }
         var test=scenarios[index]; var direction=test.Direction;
+        if(test.Id.EndsWith("-route"))
+        {
+            while(route.Count>0 && V.Distance(app.World.Player.Position,route.Peek())<5)route.Dequeue();
+            if(route.Count==0)direction=Vector2.Zero;
+            else {var d=route.Peek()-app.World.Player.Position;direction=GodotConvert.GroundToScreen(d.X,d.Y).Normalized();}
+        }
+        if(test.Id=="combat-movement")
+        {
+            direction=Vector2.Right.Rotated(local*Mathf.Pi/90);
+            if(local==30 || local==100)app.Cast("ember");
+        }
         if(test.Id=="tap-stop" && local>=3) direction=Vector2.Zero;
         if(test.Id=="reversal" && local>=45) direction=Vector2.Left;
         if(test.Id=="eight-turns") direction=Vector2.Right.Rotated((local/20)*Mathf.Pi/4);
@@ -105,6 +138,7 @@ public sealed class GameplayReplay
     {
         if(index<0||Finished)return;
         var p=app.World.Player.Position;
+        if(!app.World.RegionsById[app.World.Player.Region].CanStand(p,app.World.Player))throw new InvalidOperationException("Replay lost footprint clearance: "+scenarios[index].Id);
         if(local>1)distance+=V.Distance(p,previous);
         previous=p;
     }

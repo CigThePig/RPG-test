@@ -11,6 +11,8 @@ public sealed class PlaytestTrace : IDisposable
     readonly Stopwatch clock = new();
     readonly Foundation app;
     long rows;
+    string lastBlocked="";
+    ActionState lastAction;
     public bool Active => writer != null;
     public string LastPath { get; private set; } = "";
     public string Scenario { get; set; } = "free-play";
@@ -38,17 +40,25 @@ public sealed class PlaytestTrace : IDisposable
         if(e is InputEventScreenTouch t) Write(new {kind="touch", tick=app.World.Tick, frame=Engine.GetFramesDrawn(), wallMs=clock.Elapsed.TotalMilliseconds, finger=t.Index, x=t.Position.X, y=t.Position.Y, pressed=t.Pressed, canceled=t.Canceled});
         if(e is InputEventScreenDrag d) Write(new {kind="drag", tick=app.World.Tick, frame=Engine.GetFramesDrawn(), wallMs=clock.Elapsed.TotalMilliseconds, finger=d.Index, x=d.Position.X, y=d.Position.Y});
     }
+    public void Flush() => writer?.Flush();
+    public void Frame(double delta)
+    {
+        if(Active)Write(new {kind="render-frame", frame=Engine.GetFramesDrawn(), tick=app.World.Tick, wallMs=clock.Elapsed.TotalMilliseconds, engineDeltaMs=delta*1000});
+    }
     public void Sample(double dt)
     {
         if(!Active) return;
-        var p=app.World.Player; var stick=app.Ui.Stick; var c=app.Camera;
+        var p=app.World.Player;
+        if(lastBlocked!=app.World.LastBlockedReason){lastBlocked=app.World.LastBlockedReason;Marker("collision/"+lastBlocked);}
+        if(lastAction!=p.State){lastAction=p.State;Marker("action/"+p.State);}
+        var stick=app.Ui.Stick; var c=app.Camera;
         var screen=app.GetViewport().GetCanvasTransform()*GodotConvert.GroundToScreen(p.X,p.Y);
         Write(new { kind="sample", scenario=Scenario, preset=app.Feel.Id, tick=app.World.Tick, frame=Engine.GetFramesDrawn(), wallMs=clock.Elapsed.TotalMilliseconds,
             x=p.X, y=p.Y, vx=app.World.ActualVelocity.X, vy=app.World.ActualVelocity.Y, requestedX=app.World.RequestedVelocity.X, requestedY=app.World.RequestedVelocity.Y,
             screenInputX=app.ScreenInput.X, screenInputY=app.ScreenInput.Y, groundInputX=app.World.LastInput.X, groundInputY=app.World.LastInput.Y,
             finger=stick.Finger, anchorX=stick.Anchor.X, anchorY=stick.Anchor.Y, displacementX=stick.Displacement.X, displacementY=stick.Displacement.Y, analog=app.TouchMovement.Length(),
             speed=app.World.Stat(p,"speed"), radius=p.Radius, flies=p.Flies, swims=p.Swims, action=p.State.ToString(), blocked=app.World.LastBlockedReason, attempts=app.World.CollisionAttempts, slides=app.World.CollisionSlides,
-            animation=app.Views[p.Id].Creature.State.ToString(), yaw=app.Views[p.Id].Creature.Motor?.Yaw,
+            renderCount=app.Views[p.Id].Creature.RenderCount, renderError=app.Views[p.Id].Creature.LastError, animation=app.Views[p.Id].Creature.State.ToString(), yaw=app.Views[p.Id].Creature.Motor?.Yaw,
             cameraX=c.GetScreenCenterPosition().X, cameraY=c.GetScreenCenterPosition().Y, cameraTargetX=c.Position.X, cameraTargetY=c.Position.Y, zoom=c.Zoom.X, playerScreenX=screen.X, playerScreenY=screen.Y,
             physicsMs=dt*1000, simulationMs=app.SimulationMs, droppedSeconds=app.DroppedSeconds, fps=Engine.GetFramesPerSecond(), rasterMs=CreatureRenderQueue.LastRasterMs, uploadMs=CreatureRenderQueue.LastUploadMs,
             managedBytes=app.World.Tick%60==0 ? GC.GetTotalMemory(false) : 0 });

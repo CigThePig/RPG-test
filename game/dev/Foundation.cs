@@ -12,7 +12,7 @@ public partial class Foundation : Node2D
     public RpgUi Ui => ui;
     public bool GameplayBlocked => ui == null || suspended || !World.Player.Alive || ui.BlocksInput || Narrative.Get("speaking").AsBool();
 
-    public MovementFeel Feel { get; private set; } = MovementFeel.Presets[0];
+    public MovementFeel Feel { get; private set; } = MovementFeel.Presets[1];
     public Camera2D Camera => camera;
     public Vector2 ScreenInput { get; private set; }
     public Vector2 ControllerVelocity { get; set; }
@@ -20,7 +20,8 @@ public partial class Foundation : Node2D
     public PlaytestTrace Trace { get; private set; } = null!;
     GameplayReplay? replay;
     public bool VerificationMode => OS.GetCmdlineUserArgs().Any(x => x is "--test" or "--visual-check" or "--gameplay-check");
-    public void SelectFeel(MovementFeel feel) { Feel=feel; ControllerVelocity=Vector2.Zero; camera.PositionSmoothingSpeed=feel.CameraFollow; camera.Zoom=Vector2.One*feel.Zoom; Trace?.Marker("preset/"+feel.Id); Trace?.Write(new {kind="configuration", tick=World.Tick, frame=Engine.GetFramesDrawn(), configuration=feel}); }
+    public void SelectFeel(MovementFeel feel) { Feel=feel; ControllerVelocity=Vector2.Zero; camera.PositionSmoothingSpeed=feel.CameraFollow; camera.Zoom=Vector2.One*feel.Zoom; foreach(var v in Views.Values) { v.Creature.UseMeasuredExternalVelocity=feel.Id!="baseline"; v.Creature.AnimationFps=v.State.Id=="player" && feel.Id!="baseline" ? 20 : 10; } Trace?.Marker("preset/"+feel.Id); Trace?.Write(new {kind="configuration", tick=World.Tick, frame=Engine.GetFramesDrawn(), configuration=feel}); }
+    public override void _Process(double delta) => Trace?.Frame(delta);
     public override void _ExitTree() => Trace?.Dispose();
     bool suspended;
     bool sessionEntered;
@@ -174,7 +175,7 @@ public partial class Foundation : Node2D
         }));
         GD.Print($"MOSSLIGHT_READY actors={World.Actors.Count} families={CreatureRuntime.Registry.Families.Count()} framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
         var preset=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--preset="))?.Split('=',2)[1];
-        SelectFeel(MovementFeel.Presets.FirstOrDefault(x=>x.Id==preset) ?? MovementFeel.Presets[0]);
+        SelectFeel(MovementFeel.Presets.FirstOrDefault(x=>x.Id==preset) ?? MovementFeel.Presets[1]);
         if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
         if (OS.GetCmdlineUserArgs().Contains("--test"))
             CallDeferred(nameof(RunChecks));
@@ -201,6 +202,7 @@ public partial class Foundation : Node2D
         {
             if (OS.HasFeature("android") && e.Kind is "resource_depleted" or "region_entered")
                 GD.Print($"MOSSLIGHT_GAMEPLAY kind={e.Kind} value={e.Value} tick={World.Tick}");
+            if(Trace.Active && e.Kind is "region_entered" or "resource_depleted" or "ability_started" or "defeated")Trace.Marker(e.Kind+"/"+e.Value);
             Narrative.Call("receive", e.Kind, e.Actor, e.Target, e.Value, e.Count);
             if (e.Kind == "region_entered")
                 RebuildViews();
@@ -234,6 +236,8 @@ public partial class Foundation : Node2D
             var view = new CharacterView();
             actors.AddChild(view);
             view.Setup(a);
+            view.Creature.UseMeasuredExternalVelocity=Feel.Id!="baseline";
+            view.Creature.AnimationFps=a.Id=="player" && Feel.Id!="baseline" ? 20 : 10;
             Views[a.Id] = view;
             view.Equipment(items.Call("equipment_appearance", a.Id).AsString());
         }
@@ -393,6 +397,7 @@ public partial class Foundation : Node2D
     {
         if (what == NotificationApplicationPaused || what == NotificationApplicationFocusOut)
         {
+            Trace?.Marker("lifecycle/pause"); Trace?.Flush();
             TouchMovement = Vector2.Zero;
             ui?.Stick.Cancel();
             if (OS.HasFeature("android")) GD.Print("MOSSLIGHT_INPUT_CANCELLED");

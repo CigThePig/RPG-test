@@ -1,10 +1,12 @@
 """Hosted x86_64 Android runtime smoke; ARM64 phone performance remains separate."""
 from pathlib import Path
-import os, subprocess, sys, time, re
+import os, subprocess, sys, time, re, json
 from PIL import Image
 from io import BytesIO
 out=Path('build/android-runtime');out.mkdir(parents=True,exist_ok=True)
 package='com.cigthepig.mosslight.dev'
+recorder=None
+recording_start=None
 def run(*args, **kwargs):
     # Never let a disconnected ADB daemon strand the workflow indefinitely.
     kwargs.setdefault('timeout', 20)
@@ -64,6 +66,9 @@ try:
     capture('start-menu.png',wait=45)
     tap(640,150) # First menu button: Enter / Resume.
     time.sleep(8)
+    # ADB screenrecord captures the actual Android surface, including frame pacing.
+    recording_start=time.time()
+    recorder=subprocess.Popen([adb_path,'shell','screenrecord','--bit-rate','4000000','--time-limit','90','/sdcard/mosslight-playtest.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     # Exercise actual touch ownership, then open the starting Gloot chest.
     # Read release positions from production diagnostics instead of assuming emulator FPS.
     for attempt in range(12):
@@ -85,6 +90,24 @@ try:
     tap(580,715) # Pack: second row, first button.
     time.sleep(1)
     capture('inventory.png')
+    pids=adb('shell','pidof','screenrecord').split()
+    for pid in pids:
+        if pid.isdigit(): adb('shell','kill','-2',pid)
+    stdout,stderr=recorder.communicate(timeout=15)
+    (out/'screenrecord.log').write_bytes(stdout+stderr)
+    adb('pull','/sdcard/mosslight-playtest.mp4',str(out/'gameplay.mp4'))
+    assert (out/'gameplay.mp4').stat().st_size>10000,'Empty Android recording'
+    run('ffmpeg','-v','error','-i',str(out/'gameplay.mp4'),'-vf','fps=2,scale=640:400',str(out/'frame-%03d.png'))
+    frames=sorted(out.glob('frame-*.png'));assert len(frames)>5,'Insufficient Android recording frames'
+    from PIL import ImageChops, ImageStat, ImageDraw
+    changed=sum(sum(ImageStat.Stat(ImageChops.difference(Image.open(a).convert('RGB').crop((100,70,540,280)),Image.open(b).convert('RGB').crop((100,70,540,280)))).mean)>1 for a,b in zip(frames,frames[1:]))
+    assert changed>2,'Frozen Android gameplay video'
+    sheet=Image.new('RGB',(1280,880));draw=ImageDraw.Draw(sheet)
+    for i in range(16):
+        f=frames[round(i*(len(frames)-1)/15)];im=Image.open(f);im.thumbnail((320,200));x=i%4*320;y=i//4*220;sheet.paste(im,(x,y));draw.text((x+4,y+200),f'Android t={(int(f.stem.split("-")[-1])-1)/2:.1f}s',fill='white')
+    sheet.save(out/'contact-sheet.jpg')
+    for f in frames:f.unlink()
+    (out/'recording.json').write_text(json.dumps({'captureStartUnix':recording_start,'source':run('git','rev-parse','HEAD',text=True).strip(),'platform':'hosted x86_64 Android emulator','input':'ADB OS touch events','positions':positions,'fps':'screenrecord variable; inspect video PTS','synchronization':'captureStartUnix anchors screenrecord; logcat timestamps and MOSSLIGHT_TOUCH_RELEASE provide coarse input/displacement correlation, not sub-frame latency'},indent=2))
     adb('shell','input','keyevent','3') # Background triggers save and cancels held input.
     time.sleep(2)
     adb('shell','monkey','-p',package,'-c','android.intent.category.LAUNCHER','1')
@@ -99,6 +122,10 @@ try:
     (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, inventory screenshot, gameplay ticks, background input cancellation/resume. ARM64 device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
+    if recorder is not None and recorder.poll() is None:
+        recorder.terminate()
+        try: recorder.wait(timeout=10)
+        except subprocess.TimeoutExpired: recorder.kill()
     try: (out/'logcat.log').write_text(adb('logcat','-d'))
     except Exception: pass
     if emulator.poll() is None:

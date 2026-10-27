@@ -59,6 +59,7 @@ namespace PixelCreatures.Runtime
         public CreatureMotor? Motor { get; private set; }
         public CreatureGenome? Genome => Model?.Genome;
         public Vector2 GroundPosition { get; set; }
+        public bool UseMeasuredExternalVelocity { get; set; }
         public Vector2 MoveVelocity { get; set; }
         public ImageTexture? Texture => _texture;
         public PixelFrame? Frame => _frame;
@@ -323,7 +324,7 @@ namespace PixelCreatures.Runtime
             {
                 var before = Motor.Position;
                 if (AutoMove) Motor.DesiredVelocity = new Vec3(MoveVelocity.X, 0, MoveVelocity.Y);
-                else Motor.SetWorldPosition(new Vec3(GroundPosition.X, 0, GroundPosition.Y));
+                else Motor.SetWorldPosition(new Vec3(GroundPosition.X, 0, GroundPosition.Y), UseMeasuredExternalVelocity ? new Vec3(MoveVelocity.X,0,MoveVelocity.Y) : null);
                 Motor.Step(_clock.StepSize);
                 if (AutoMove && CanMove != null && !CanMove(new Vector2((float)before.X, (float)before.Z), new Vector2((float)Motor.Position.X, (float)Motor.Position.Z)))
                     Motor.Teleport(before, Motor.Yaw);

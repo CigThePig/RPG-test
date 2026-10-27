@@ -147,8 +147,12 @@ namespace PixelCreatures.Core.Motion
         }
 
         /// <summary>External drive: the game sets the world position every frame; velocity is derived.</summary>
-        public void SetWorldPosition(Vec3 position)
+        // Host-provided measured velocity avoids deriving a spike then zeros when
+        // several motor ticks consume one external physics position after a long frame.
+        private Vec3? _externalVelocity;
+        public void SetWorldPosition(Vec3 position, Vec3? measuredVelocity = null)
         {
+            _externalVelocity = measuredVelocity;
             _externalPos = new Vec3(position.X, 0, position.Z);
             _externalSet = true;
         }
@@ -199,8 +203,8 @@ namespace PixelCreatures.Core.Motion
             }
             else if (_externalSet)
             {
-                Vec3 v = (_externalPos - ctx.Position) / dt;
-                ctx.Velocity = Vec3.Lerp(ctx.Velocity, v, DMath.DampFactor(0.05, dt));
+                Vec3 v = _externalVelocity ?? ((_externalPos - ctx.Position) / dt);
+                ctx.Velocity = _externalVelocity.HasValue ? v : Vec3.Lerp(ctx.Velocity, v, DMath.DampFactor(0.05, dt));
                 ctx.Position = _externalPos;
             }
             ctx.Acceleration = Vec3.Lerp(ctx.Acceleration, (ctx.Velocity - _prevVelocity) / dt, DMath.DampFactor(0.08, dt));
