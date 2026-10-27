@@ -84,6 +84,15 @@ namespace PixelCreatures.Core.Motion
         public Vec3 DesiredVelocity { get; set; }
         /// <summary>Yaw to face while standing (null = keep).</summary>
         public double? FacingOverride { get; set; }
+        // Combat can freeze the exact current yaw, including between quantized directions.
+        public bool FacingOverrideExact { get; set; }
+        public void LockCurrentFacing(double yaw)
+        {
+            _ctx.Yaw = _ctx.TargetYaw = DMath.WrapAngle(yaw);
+            _ctx.YawRate = 0;
+            FacingOverride = _ctx.Yaw;
+            FacingOverrideExact = true;
+        }
         public bool Resting { get => _rest.Requested; set => _rest.Requested = value; }
 
         public Vec3 Position => _ctx.Position;
@@ -260,10 +269,10 @@ namespace PixelCreatures.Core.Motion
             else if (FacingOverride.HasValue) desired = FacingOverride.Value;
             if (desired.HasValue && _rest.Progress < 0.01)
             {
-                double target = Quantize(desired.Value);
+                double target = FacingOverrideExact && !Options.FaceVelocity ? DMath.WrapAngle(desired.Value) : Quantize(desired.Value);
                 // hysteresis: keep the current target unless the new direction is clearly different
                 double step = Options.Facing == FacingMode.Four ? DMath.HalfPi : (Options.Facing == FacingMode.Eight ? DMath.Pi / 4 : 0);
-                if (step > 0 && Math.Abs(DMath.WrapAngle(desired.Value - ctx.TargetYaw)) < step * 0.5 + 0.14) target = ctx.TargetYaw;
+                if (!FacingOverrideExact && step > 0 && Math.Abs(DMath.WrapAngle(desired.Value - ctx.TargetYaw)) < step * 0.5 + 0.14) target = ctx.TargetYaw;
                 ctx.TargetYaw = target;
             }
             double delta = DMath.WrapAngle(ctx.TargetYaw - ctx.Yaw);

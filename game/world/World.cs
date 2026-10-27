@@ -28,6 +28,8 @@ public sealed class World
     public Godot.Node? Planner { get; set; }
 
     public event Action<string, string, string>? Presentation;
+    // Separate from narrative events: opt-in, bounded by the existing trace writer.
+    public event Action<string, Vector2, string>? CombatDiagnostic;
     public World(Content content, Godot.Node itemService, int seed = 42)
     {
         Content = content;
@@ -78,6 +80,73 @@ public sealed class World
         return ok;
     }
 
+    static bool TryDirection(Vector2 value, out Vector2 direction)
+    {
+        direction = Vector2.Zero;
+        if (!float.IsFinite(value.X) || !float.IsFinite(value.Y) || value.LengthSquared() < .000001f || !float.IsFinite(value.LengthSquared())) return false;
+        direction = Vector2.Normalize(value);
+        return true;
+    }
+
+    /// <summary>Starts only the player sword swing; target selection occurs at impact.</summary>
+    public bool TryStartPlayerSlash(Vector2 direction)
+    {
+        var a = Player;
+        var d = Content.Abilities.Single(x => x.Id == "slash");
+        if (!TryDirection(direction, out var facing) || !a.Alive || !a.Abilities.Contains(d.Id) ||
+            a.State is not (ActionState.Idle or ActionState.Moving) || a.Mana < d.Cost ||
+            a.Cooldowns.GetValueOrDefault(d.Id) > 0 ||
+            (d.RequiresWeapon && (!a.Grasps || Items.Bonus(a, "damage") <= 0))) return false;
+        a.Mana -= d.Cost;
+        a.Cooldowns[d.Id] = d.Cooldown;
+        a.MotionX = a.MotionY = 0;
+        a.State = ActionState.Windup;
+        a.StateRemaining = d.Windup;
+        a.PendingAbility = d.Id;
+        a.Target = "";
+        a.FreeSlash = true;
+        a.ActionElapsed = 0;
+        a.ActionDirectionX = facing.X; a.ActionDirectionY = facing.Y;
+        Presentation?.Invoke(a.Id, "attack", "");
+        Events.Publish(new("ability_started", a.Id, "", d.Id));
+        CombatDiagnostic?.Invoke("attack_started", facing, "slash");
+        return true;
+    }
+
+    ActorState? PlayerSlashTarget(ActorState attacker, AbilityDef ability)
+    {
+        var direction = new Vector2(attacker.ActionDirectionX, attacker.ActionDirectionY);
+        float maxRange = ability.Range + attacker.NaturalReach + CombatTuning.SlashImpactTolerance;
+        float maxDistanceSquared = maxRange * maxRange;
+        float minimumDot = MathF.Cos(CombatTuning.SlashArcHalfDegrees * MathF.PI / 180);
+        ActorState? best = null;
+        float bestDistance = float.PositiveInfinity;
+        foreach (var candidate in Actors.Values)
+        {
+            if (!candidate.Alive || candidate.Region != attacker.Region || !Hostile(attacker, candidate)) continue;
+            var offset = candidate.Position - attacker.Position;
+            float distance = offset.LengthSquared();
+            if (distance > maxDistanceSquared || (distance > .000001f && Vector2.Dot(offset / MathF.Sqrt(distance), direction) < minimumDot) || !LineOfSight(attacker, candidate)) continue;
+            if (distance < bestDistance || (distance == bestDistance && best != null && StringComparer.Ordinal.Compare(candidate.Id, best.Id) < 0))
+            { best = candidate; bestDistance = distance; }
+        }
+        return best;
+    }
+
+    static float SmoothStep(float t) { t = Math.Clamp(t, 0, 1); return t * t * (3 - 2 * t); }
+    void AdvanceSlashLunge(ActorState a, float dt)
+    {
+        float previous = a.ActionElapsed;
+        a.ActionElapsed += dt;
+        float span = CombatTuning.SlashLungeEnd - CombatTuning.SlashLungeStart;
+        float distance = CombatTuning.SlashLungeDistance * (SmoothStep((a.ActionElapsed - CombatTuning.SlashLungeStart) / span) - SmoothStep((previous - CombatTuning.SlashLungeStart) / span));
+        if (distance <= 0) return;
+        var before = a.Position;
+        int attempts = CollisionAttempts;
+        Move(a, new Vector2(a.ActionDirectionX, a.ActionDirectionY) * distance);
+        if (CollisionAttempts != attempts) CombatDiagnostic?.Invoke("attack_lunge_collision", a.Position - before, LastBlockedReason);
+    }
+
     public void BeginAbility(ActorState a, ActorState b, AbilityDef d)
     {
         a.MotionX = 0;
@@ -93,14 +162,17 @@ public sealed class World
     public void Cancel(ActorState a)
     {
         a.PendingAbility = "";
+        a.FreeSlash = false;
+        a.ActionElapsed = 0;
+        a.ActionDirectionX = a.ActionDirectionY = 0;
         a.State = a.Alive ? ActionState.Idle : ActionState.Dead;
         a.StateRemaining = 0;
     }
 
-    public void Damage(ActorState source, ActorState target, float amount, string type, bool periodic = false)
+    public bool Damage(ActorState source, ActorState target, float amount, string type, bool periodic = false)
     {
         if (!target.Alive || (!periodic && target.Invulnerable > 0) || (!periodic && source.Region != target.Region) || !Hostile(source, target))
-            return;
+            return false;
         float resistance = type == "physical" ? Stat(target, "defence") : 0;
         float actual = Math.Max(1, amount - resistance);
         target.Health = Math.Max(0, target.Health - actual);
@@ -127,6 +199,7 @@ public sealed class World
                 if (random.NextDouble() <= l.Chance)
                     Items.Add(target.Id, l.Item, random.Next(l.Min, l.Max + 1));
         }
+        return true;
     }
 
     public static int StableId(string text)
@@ -177,8 +250,9 @@ public sealed class World
 
         if (!projectile && (Vector2.Distance(a.Position, b.Position) > d.Range + a.NaturalReach + 8 || !LineOfSight(a, b)))
             return;
-        Damage(a, b, d.Damage + Stat(a, "strength") + Stat(a, d.Type == "physical" ? "damage" : "power"), d.Type);
-        if (b.Alive && d.Status != "")
+        // Intentionally non-damaging hostile effects retain their status-only behavior.
+        bool connected = d.Damage <= 0 ? Hostile(a, b) : Damage(a, b, d.Damage + Stat(a, "strength") + Stat(a, d.Type == "physical" ? "damage" : "power"), d.Type);
+        if (connected && b.Alive && d.Status != "")
             ApplyStatus(b, d.Status, a.Id);
     }
 
@@ -214,6 +288,8 @@ public sealed class World
 
             if (!a.Alive)
                 continue;
+            if (a.FreeSlash && a.State is ActionState.Windup or ActionState.Recovery)
+                AdvanceSlashLunge(a, dt);
             if (a.StateRemaining > 0)
             {
                 a.StateRemaining -= dt;
@@ -222,7 +298,13 @@ public sealed class World
                     if (a.State == ActionState.Windup && a.PendingAbility != "")
                     {
                         var d = Content.Abilities.Single(x => x.Id == a.PendingAbility);
-                        if (Actors.TryGetValue(a.Target, out var t))
+                        if (a.Id == "player" && a.FreeSlash && d.Id == "slash")
+                        {
+                            var target = PlayerSlashTarget(a, d);
+                            CombatDiagnostic?.Invoke("attack_impact", new Vector2(a.ActionDirectionX, a.ActionDirectionY), target?.Id ?? "miss");
+                            if (target != null) Resolve(a, target, d);
+                        }
+                        else if (Actors.TryGetValue(a.Target, out var t))
                         {
                             if (d.ProjectileSpeed > 0)
                                 Projectiles.Add(new() { Source = a.Id, Target = t.Id, Ability = d.Id, X = a.X, Y = a.Y });
@@ -235,7 +317,11 @@ public sealed class World
                         a.StateRemaining = d.Recovery;
                     }
                     else
+                    {
                         a.State = ActionState.Idle;
+                        a.FreeSlash = false;
+                        a.ActionElapsed = 0;
+                    }
                 }
             }
 

@@ -1,6 +1,7 @@
 using Godot;
 using PixelCreatures.Runtime;
 using PixelCreatures.Core.Genetics;
+using PixelCreatures.Core.Rendering;
 using NVector = System.Numerics.Vector2;
 
 namespace Mosslight;
@@ -241,6 +242,10 @@ public partial class Foundation : Node2D
             if (e.Kind == "item_equipped" && Views.TryGetValue(e.Actor, out var changed))
                 changed.Equipment(items.Call("equipment_appearance", e.Actor).AsString());
         };
+        World.CombatDiagnostic += (kind, direction, context) =>
+        {
+            if (Trace.Active) Trace.Write(new { kind = "combat", action = kind, tick = World.Tick, x = direction.X, y = direction.Y, context });
+        };
         World.Presentation += (id, cue, targetId) =>
         {
             if (Views.TryGetValue(id, out var view))
@@ -406,8 +411,22 @@ public partial class Foundation : Node2D
             return;
         var d = World.Content.Abilities.Single(x => x.Id == ability);
         var a = World.Player;
+        if (ability == "slash")
+        {
+            ui.Notify(World.TryStartPlayerSlash(VisualFacing()) ? d.Name : "Cannot attack: action, equipment, mana or cooldown");
+            return;
+        }
         var t = d.Self ? a : World.Actors.Values.Where(x => World.CanActivate(a, x, d)).OrderBy(x => NVector.DistanceSquared(a.Position, x.Position)).FirstOrDefault();
         ui.Notify(t != null && World.Activate(a.Id, ability, t.Id) ? d.Name : "No valid target, equipment, mana or cooldown");
+    }
+
+    // PPC yaw maps to east/south ground coordinates; projection to screen is separate.
+    public NVector VisualFacing()
+    {
+        double yaw = Views.TryGetValue("player", out var view) && view.Creature.Motor != null
+            ? view.Creature.Motor.Yaw : PixelCamera.DirectionYaw(7);
+        if (!double.IsFinite(yaw)) yaw = PixelCamera.DirectionYaw(7);
+        return new NVector((float)Math.Cos(yaw), (float)-Math.Sin(yaw));
     }
 
     public void Interact()

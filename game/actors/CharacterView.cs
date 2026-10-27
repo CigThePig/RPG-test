@@ -71,7 +71,13 @@ public partial class CharacterView : Node2D
     {
         if (cue is "attack" or "cast")
         {
-            if (target != null && target.Id != State.Id)
+            if (State.Id == "player" && State.FreeSlash)
+            {
+                var ground = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
+                Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(ground.X, ground.Y));
+                attackDirection = GodotConvert.GroundToScreen(ground.X, ground.Y).Normalized();
+            }
+            else if (target != null && target.Id != State.Id)
             {
                 var delta = target.Position - State.Position;
                 if (delta.LengthSquared() > .001f)

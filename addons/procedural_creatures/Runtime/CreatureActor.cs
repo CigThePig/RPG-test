@@ -106,6 +106,7 @@ namespace PixelCreatures.Runtime
         private int _pendingSteps;
         private MotionStateKind _lastState = MotionStateKind.Idle;
         private double? _facingRequest;
+        private bool _exactFacingRequest;
         private bool _restRequest;
         private bool _started;
         private bool _culled;
@@ -200,7 +201,11 @@ namespace PixelCreatures.Runtime
             Motor = new CreatureMotor(model, CreatureRuntime.Registry, new MotorOptions { Facing = Facing, InternalDrive = AutoMove });
             double yaw = oldMotor?.Yaw ?? PixelCamera.DirectionYaw(7);
             Motor.Teleport(new Vec3(GroundPosition.X, 0, GroundPosition.Y), yaw);
-            if (_facingRequest.HasValue) Motor.FacingOverride = _facingRequest;
+            if (_facingRequest.HasValue)
+            {
+                if (_exactFacingRequest) Motor.LockCurrentFacing(_facingRequest.Value);
+                else Motor.FacingOverride = _facingRequest;
+            }
             if (oldMotor != null && oldMotor.Resting) Motor.SnapRest(true);
             else if (_restRequest) Motor.SnapRest(true);
             Motor.Resting = _restRequest;
@@ -249,13 +254,22 @@ namespace PixelCreatures.Runtime
         public void FaceYaw(double yaw)
         {
             _facingRequest = yaw;
-            if (Motor != null) Motor.FacingOverride = yaw;
+            _exactFacingRequest = false;
+            if (Motor != null) { Motor.FacingOverrideExact = false; Motor.FacingOverride = yaw; }
+        }
+
+        public void LockFacingYaw(double yaw)
+        {
+            _facingRequest = yaw;
+            _exactFacingRequest = true;
+            Motor?.LockCurrentFacing(yaw);
         }
 
         public void ClearFacingRequest()
         {
             _facingRequest = null;
-            if (Motor != null) Motor.FacingOverride = null;
+            _exactFacingRequest = false;
+            if (Motor != null) { Motor.FacingOverride = null; Motor.FacingOverrideExact = false; }
         }
 
         public void FaceDirection(int dir8) => FaceYaw(PixelCamera.DirectionYaw(dir8));

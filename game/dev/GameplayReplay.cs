@@ -98,6 +98,8 @@ public sealed class GameplayReplay
             if(s.Id=="attack-readability")
             {
                 app.World.Events.Recent.Clear();
+                // The fixture's enemy is east; don't depend on the preceding scenario's yaw.
+                app.Views["player"].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X, 0, p.Y), 0);
                 var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
                 enemy.Region=p.Region;enemy.X=344;enemy.Y=300;enemy.Speed=0;
                 enemy.Health=enemy.MaxHealth=10000;enemy.Abilities.Clear();
