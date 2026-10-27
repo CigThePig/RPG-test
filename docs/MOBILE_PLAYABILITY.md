@@ -52,3 +52,13 @@ Inspecting the earlier runtime artifact revealed a false positive: input and Glo
 ## Touch/mouse duplicate-dispatch repair
 
 Actual rendered Android evidence exposed a further defect hidden by the earlier blank emulator frames: the custom hotbar touch handler and Godot's emulated mouse event could both dispatch one physical tap. This replaced successful chest feedback with an empty-chest message and could double-run other hotbar actions. Cancelled action fingers are discarded without activating their button. The UI now consumes emulated mouse events over its manually dispatched hotbar while retaining native mouse emulation for menus/dialogue/scrolling and real desktop mouse events. Android smoke asserts exactly one world interaction for its one chest tap, in addition to checking Gloot depletion and rendered images.
+
+## Codex review follow-up: anatomy clearance and session recovery
+
+Review findings `4384339685` and `4384339690` are addressed on the existing PR branch.
+
+Appearance changes now stage PPC-derived capabilities, radius, reach and speed before mutating the actor or Gloot equipment. The shared RegionState clearance model checks the proposed body at its current position. If needed, placement finds a clear reachable location, including repairing an invalid home position. If no safe location exists, the change returns false without modifying the actor, caller's appearance, equipment, action state or event stream; the workshop reports the rejection. Mutation no longer changes the old appearance seed before a successful application.
+
+Session recovery now recognizes actual World.Tick progress as well as explicit Enter/Resume. Escape and the initial menu's Pack/Journal/Character/Map routes therefore become eligible for background autosave as soon as simulation advances. Untouched initial menus remain ineligible, and resetting the world clears explicit session-entry state.
+
+The running engine suite now passes **347 assertions**. Added cases use actual PPC flight and size differences, water-to-ground changes, footprint growth beside rock, executable movement after relocation, atomic rejection in a water-only map, and safe workshop rejection. Each of the five alternate menu-entry routes advances production simulation and invokes the real application-pause autosave path, then parses the resulting saved progress. Tests preserve the pre-existing autosave and restore world/UI state afterward. Physical-device limits described above remain unchanged.

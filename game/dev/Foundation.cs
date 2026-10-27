@@ -13,8 +13,11 @@ public partial class Foundation : Node2D
     public bool GameplayBlocked => ui == null || suspended || !World.Player.Alive || ui.BlocksInput || Narrative.Get("speaking").AsBool();
 
     bool suspended;
-    public bool SessionStarted { get; private set; }
-    public void ResumeGame() { SessionStarted = true; Ui.HideMenu(); }
+    bool sessionEntered;
+    // A real simulation tick also establishes a session, regardless of which UI
+    // route dismissed the initial menu. Loaded progress is eligible for recovery.
+    public bool SessionStarted => sessionEntered || (World != null && World.Tick > 0);
+    public void ResumeGame() { sessionEntered = true; Ui.HideMenu(); }
     public Vector2 TouchMovement { get; set; }
     public bool CanManageItems => !suspended && World.Player.Alive && !Narrative.Get("speaking").AsBool() && !ui.MenuOpen;
     public bool ManageItem(Func<bool> operation) => CanManageItems && operation();
@@ -166,6 +169,9 @@ public partial class Foundation : Node2D
 
     public void Reset()
     {
+        sessionEntered = false;
+        accumulator = 0;
+        TouchMovement = Vector2.Zero;
         if (World != null)
         {
             items.Call("import_state", "{\"serial\":0,\"bags\":{},\"slots\":{}}");
@@ -223,7 +229,8 @@ public partial class Foundation : Node2D
     public void ChangeAppearance(string family, ulong seed)
     {
         var a = World.Player;
-        World.SetAppearance(a, new Appearance { Family = family, Seed = seed });
+        if (!World.SetAppearance(a, new Appearance { Family = family, Seed = seed }))
+        { ui.Notify("No safe position for that body; appearance unchanged"); return; }
         RebuildViews();
     }
 
@@ -231,14 +238,14 @@ public partial class Foundation : Node2D
     {
         var a = World.Player;
         var genome = CreatureRuntime.Serializer.Deserialize(a.Appearance.GenomeJson).Genome!;
-        a.Appearance.Seed = seed;
         var appearance = new Appearance
         {
             Family = a.Appearance.Family,
             Seed = seed,
             GenomeJson = CreatureRuntime.Serializer.Serialize(GenomeOps.Mutate(genome, new MutationSettings(), seed))
         };
-        World.SetAppearance(a, appearance);
+        if (!World.SetAppearance(a, appearance))
+        { ui.Notify("No safe position for that body; appearance unchanged"); return; }
         RebuildViews();
     }
 

@@ -38,6 +38,7 @@ public static class FoundationChecks
         var watch = Stopwatch.StartNew();
         try
         {
+            ReviewChecks.Run(app, Check);
             PlayabilityChecks.Run(app, Check);
             // Exercise nonlinear progression using actual world defeat events before acceptance.
             var early = w.Player;

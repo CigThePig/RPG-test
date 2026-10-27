@@ -557,13 +557,36 @@ public sealed class World
         }
     }
 
-    public void SetAppearance(ActorState actor, Appearance appearance)
+    public bool SetAppearance(ActorState actor, Appearance appearance)
     {
+        // Stage the body and a safe location before changing live state or equipment.
+        // A loss of flight/swimming or a larger radius must not strand the actor.
+        var staged = new ActorState { Id = actor.Id, Region = actor.Region, Appearance = new Appearance
+        {
+            Family = appearance.Family, Seed = appearance.Seed,
+            GenomeJson = appearance.GenomeJson, Generator = appearance.Generator
+        }, Speed = actor.Speed };
+        AnatomyAdapter.Apply(staged);
+        var region = RegionsById[actor.Region];
+        var position = actor.Position;
+        if (!region.CanStand(position, staged))
+        {
+            try { position = region.FindPlacement(position, staged, Actors.Values); }
+            catch (InvalidOperationException) { return false; }
+        }
+        var home = new Vector2(actor.HomeX, actor.HomeY);
+        if (!region.CanStand(home, staged)) home = position;
+
         Cancel(actor);
-        actor.Appearance = appearance;
-        AnatomyAdapter.Apply(actor);
+        actor.Appearance = staged.Appearance;
+        actor.Flies = staged.Flies; actor.Swims = staged.Swims; actor.Grasps = staged.Grasps;
+        actor.Radius = staged.Radius; actor.NaturalReach = staged.NaturalReach; actor.Speed = staged.Speed;
+        actor.X = position.X; actor.Y = position.Y;
+        actor.HomeX = home.X; actor.HomeY = home.Y;
+        actor.MotionX = actor.MotionY = 0;
         Items.Reconcile(actor);
         Events.Publish(new("appearance_changed", actor.Id, "", appearance.Family));
+        return true;
     }
 
     public bool UsePotion(ActorState actor) => UseItem(actor, "potion");
