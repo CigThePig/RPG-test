@@ -103,6 +103,16 @@ public static class CombatChecks
             float stopped = p.X; w.Cancel(p);
             for (int i = 0; i < 20; i++) w.Step(Dt);
             check(Math.Abs(p.X - stopped) < .001f, "interrupted lunge never resumes unused displacement");
+            ResetFight(); p.Mana = p.MaxMana;
+            if (!p.Abilities.Contains("ward")) p.Abilities.Add("ward");
+            check(w.Activate(p.Id, "ward", p.Id), "targeted self-buff still starts through SPELL");
+            for (int i = 0; i < 24; i++) w.Step(Dt);
+            check(p.Statuses.Any(x => x.Id == "ward"), "non-damaging self-buff still applies its status");
+            w.Cancel(p); p.Cooldowns.Clear(); p.Mana = p.MaxMana; p.Health = p.MaxHealth - 40;
+            float beforeHealing = p.Health;
+            check(w.Activate(p.Id, "mend", p.Id), "targeted self-heal still starts through SPELL");
+            for (int i = 0; i < 35; i++) w.Step(Dt);
+            check(p.Health > beforeHealing, "targeted healing still restores health");
             w.Cancel(p); p.Cooldowns.Clear(); p.Grasps = false;
             check(!w.TryStartPlayerSlash(V.UnitX) && !p.Cooldowns.ContainsKey("slash"), "incompatible anatomy rejects slash without cooldown");
         }
