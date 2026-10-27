@@ -16,6 +16,9 @@ public sealed class World
     public EventStream Events { get; } = new();
     public string InteractionFeedback { get; private set; } = "Approach an object or fallen foe";
     public string LastBlockedReason { get; private set; } = "";
+    public Vector2 RequestedVelocity { get; private set; }
+    public int CollisionAttempts { get; private set; }
+    public int CollisionSlides { get; private set; }
     public Vector2 LastInput { get; private set; }
     public Vector2 ActualVelocity { get; private set; }
     public ActorState Player => Actors["player"];
@@ -325,12 +328,14 @@ public sealed class World
             }
             if (a.Id == "player")
             {
+                CollisionAttempts++;
                 int at = r.Index(a.Position + delta);
                 LastBlockedReason = at < 0 ? "Map boundary" : r.Features.GetValueOrDefault(at) == "lock" ? "Locked door" : "Terrain / footprint: " + r.Tiles[at];
             }
             var x = new Vector2(a.X + delta.X, a.Y);
             if (r.CanStand(x, a))
             {
+                if(a.Id=="player" && delta.X!=0)CollisionSlides++;
                 a.X = x.X;
                 moved |= delta.X != 0;
             }
@@ -338,6 +343,7 @@ public sealed class World
             var y = new Vector2(a.X, a.Y + delta.Y);
             if (r.CanStand(y, a))
             {
+                if(a.Id=="player" && delta.Y!=0)CollisionSlides++;
                 a.Y = y.Y;
                 moved |= delta.Y != 0;
             }
@@ -346,17 +352,23 @@ public sealed class World
         return moved;
     }
 
-    public bool PlayerMove(Vector2 direction, float dt)
+    public void ClearPlayerMotion() { ActualVelocity=RequestedVelocity=Vector2.Zero; LastInput=Vector2.Zero; LastBlockedReason=""; CollisionAttempts=CollisionSlides=0; }
+
+    public bool PlayerMove(Vector2 direction, float dt, float speedScale=1, bool projected=false)
     {
         var a = Player;
-        if (a.State is not (ActionState.Idle or ActionState.Moving))
-            return false;
-        if (direction.LengthSquared() > 1)
-            direction = Vector2.Normalize(direction);
+        ActualVelocity=RequestedVelocity=Vector2.Zero;
+        CollisionAttempts=CollisionSlides=0;
+        LastInput=direction; LastBlockedReason="";
+        if (a.State is not (ActionState.Idle or ActionState.Moving)) { LastBlockedReason="Action: "+a.State; return false; }
+        if(!float.IsFinite(dt)||dt<=0||!float.IsFinite(speedScale)||speedScale<0||!float.IsFinite(direction.X)||!float.IsFinite(direction.Y))return false;
+        float magnitude=projected ? new Vector2(direction.X,direction.Y*.5f).Length() : direction.Length();
+        if(magnitude>1)direction/=magnitude;
         LastInput = direction;
         LastBlockedReason = "";
         var before = a.Position;
-        bool moved = Move(a, direction * Math.Max(0, Stat(a, "speed")) * dt);
+        RequestedVelocity=direction * Math.Max(0, Stat(a, "speed")) * speedScale;
+        bool moved = Move(a, RequestedVelocity * dt);
         ActualVelocity = dt > 0 ? (a.Position - before) / dt : Vector2.Zero;
         a.State = moved ? ActionState.Moving : ActionState.Idle;
         return moved;

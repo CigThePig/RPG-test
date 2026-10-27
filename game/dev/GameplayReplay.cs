@@ -1,0 +1,129 @@
+using Godot;
+using PixelCreatures.Runtime;
+using V=System.Numerics.Vector2;
+namespace Mosslight;
+/// <summary>Tick-scheduled real input dispatch. Fixture setup is explicit; controller is never mocked.</summary>
+public sealed class GameplayReplay
+{
+    readonly Foundation app;
+    int frame;
+    int local;
+    int index=-1;
+    V origin;
+    float distance;
+    readonly List<object> results=new();
+    public bool Finished { get; private set; }
+    public string Output { get; }
+    record Scenario(string Id,int Ticks,V Start,Vector2 Direction);
+    readonly Scenario[] scenarios = {
+        new("horizontal",100,new(300,300),Vector2.Right),
+        new("vertical",100,new(300,300),Vector2.Down),
+        new("diagonal",100,new(300,300),new Vector2(1,1).Normalized()),
+        new("tap-stop",50,new(300,300),Vector2.Right),
+        new("reversal",100,new(300,300),Vector2.Right),
+        new("eight-turns",160,new(300,300),Vector2.Right),
+        new("analog-ramp",100,new(300,300),Vector2.Right),
+        new("wall-slide",140,new(680,300),new Vector2(1,1).Normalized()),
+        new("wall-recover",140,new(680,300),Vector2.Right),
+        new("narrow-passage",100,new(700,588),Vector2.Right),
+        new("menu-cancel",70,new(300,300),Vector2.Right),
+        new("multitouch",70,new(300,300),Vector2.Right),
+        new("chest",100,new(374,300),Vector2.Right)
+    };
+    public GameplayReplay(Foundation owner)
+    {
+        app=owner;
+        var args=OS.GetCmdlineUserArgs();
+        Output=args.FirstOrDefault(x=>x.StartsWith("--evidence="))?.Split('=',2)[1] ?? "build/gameplay";
+        Directory.CreateDirectory(Output);
+        app.Trace.Start(Path.Combine(Output,"trace.jsonl"));
+        app.Trace.Marker("replay-warmup");
+        app.ResumeGame();
+        // Dedicated region with production circular collision, terrain view, PPC, UI and camera.
+        // No changes to authored regions or on-disk saves.
+        var r=new RegionState {Id="feel-lab",Width=64,Height=48,Tiles=Enumerable.Repeat(Terrain.Grass,64*48).ToArray(),Entrance=12*64+12, ContainersInitialized=false};
+        for(int y=0;y<48;y++) for(int x=0;x<64;x++)
+            if(x==0||y==0||x==63||y==47||(x==30 && y!=24))r.Tiles[y*64+x]=Terrain.Rock;
+        r.Features[12*64+18]="chest";
+        app.World.RegionsById[r.Id]=r; app.World.InitializeContainers(r);
+        app.World.Player.Region=r.Id;
+        app.RebuildViews();
+    }
+    void Touch(bool pressed) => Input.ParseInputEvent(new InputEventScreenTouch {Index=7,Pressed=pressed,Position=app.Ui.Stick.GlobalPosition+app.Ui.Stick.Size/2});
+    void Drag(Vector2 direction) => Input.ParseInputEvent(new InputEventScreenDrag {Index=7,Position=app.Ui.Stick.GlobalPosition+app.Ui.Stick.Size/2+direction*72});
+    public void BeforeStep()
+    {
+        if(Finished)return;
+        if(frame++<30)return; // scene is ready; warm raster cache, not a wall-clock sleep
+        if(index<0 || local>=scenarios[index].Ticks)
+        {
+            if(index>=0) EndScenario();
+            if(++index>=scenarios.Length){Finish();return;}
+            local=0; distance=0;
+            var s=scenarios[index]; var p=app.World.Player;
+            p.X=s.Start.X;p.Y=s.Start.Y;p.State=ActionState.Idle;p.StateRemaining=0;
+            app.ControllerVelocity=Vector2.Zero;
+            app.Ui.ClosePanels(); app.ResumeGame();
+            app.Views[p.Id].Creature.Teleport(new Vector2(p.X,p.Y));
+            origin=p.Position;
+            app.Ui.Notify($"REPLAY · {app.Feel.Id} · {s.Id}");
+            app.Trace.Scenario=s.Id; app.Trace.Marker("scenario-start/teleport");
+            Touch(true);
+        }
+        var test=scenarios[index]; var direction=test.Direction;
+        if(test.Id=="tap-stop" && local>=3) direction=Vector2.Zero;
+        if(test.Id=="reversal" && local>=45) direction=Vector2.Left;
+        if(test.Id=="eight-turns") direction=Vector2.Right.Rotated((local/20)*Mathf.Pi/4);
+        if(test.Id=="analog-ramp") direction*=Math.Min(1,local/60f);
+        if(test.Id=="wall-recover" && local>=65)direction=Vector2.Left;
+        if(test.Id=="menu-cancel")
+        {
+            if(local==20)app.Ui.Menu();
+            if(local==40)app.ResumeGame();
+            if(local>=20)direction=Vector2.Zero;
+        }
+        if(test.Id=="multitouch" && local==30)
+        {
+            var b=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(x=>x.Text.Contains("Draught"));
+            var pos=b.GetGlobalRect().GetCenter();
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=pos});
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=pos});
+        }
+        if(test.Id=="chest" && V.Distance(app.World.Player.Position,new V(444,300))<30)direction=Vector2.Zero;
+        Drag(direction);
+        if(local==test.Ticks-15)Touch(false);
+        if(test.Id=="chest" && local==test.Ticks-5)
+        {
+            // Keyboard event goes through _UnhandledInput and production interaction guards.
+            Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.E,Pressed=true});
+            Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.E,Pressed=false});
+        }
+        local++;
+    }
+    V previous;
+    public void AfterStep()
+    {
+        if(index<0||Finished)return;
+        var p=app.World.Player.Position;
+        if(local>1)distance+=V.Distance(p,previous);
+        previous=p;
+    }
+    void EndScenario()
+    {
+        Touch(false);
+        var s=scenarios[index]; var p=app.World.Player;
+        bool valid=app.World.RegionsById[p.Region].CanStand(p.Position,p);
+        bool moved=distance>1;
+        results.Add(new {scenario=s.Id,ticks=s.Ticks,groundDistance=distance,projectedDisplacement=GodotConvert.GroundToScreen(p.X-origin.X,p.Y-origin.Y).Length(),x=p.X,y=p.Y,clearance=valid,moved,frame=Engine.GetFramesDrawn(),speed=p.Speed});
+        app.Trace.Marker("scenario-end");
+        if(s.Id=="chest" && !app.World.RegionsById[p.Region].Depleted.Contains(12*64+18))throw new InvalidOperationException("Chest input interaction failed");
+        if(!valid||!moved)throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
+    }
+    void Finish()
+    {
+        Finished=true;
+        app.Trace.Dispose();
+        File.WriteAllText(Path.Combine(Output,"scenarios.json"),System.Text.Json.JsonSerializer.Serialize(results,Content.Json));
+        GD.Print("GAMEPLAY REPLAY PASSED");app.GetTree().Quit();
+    }
+}

@@ -15,6 +15,8 @@ public partial class RpgUi : CanvasLayer
     public TouchStick Stick { get; private set; } = null!;
     Label metrics = null!;
     bool showMetrics;
+    bool labVisible;
+    Button marker = null!;
     public bool MobileLayout { get; set; } = OS.HasFeature("mobile") || OS.GetCmdlineUserArgs().Contains("--mobile-ui");
     readonly Queue<double> frames = new();
     public bool MenuOpen => menu.Visible;
@@ -129,6 +131,8 @@ public partial class RpgUi : CanvasLayer
         root.AddChild(Stick);
         metrics = new Label { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
         root.AddChild(metrics);
+        marker=Button(root,"Mark issue",()=> { App.Trace.Marker("player-observation"); Notify("Marked this moment in playtest trace"); });
+        marker.Position=new Vector2(1040,110); marker.Visible=false;
         GetViewport().SizeChanged += Layout;
         Layout();
     }
@@ -221,7 +225,10 @@ public partial class RpgUi : CanvasLayer
         if (!hotbar.Visible) touchButtons.Clear();
         Stick.Visible = MobileLayout && !App.GameplayBlocked;
         if (App.GameplayBlocked) Stick.Cancel();
-        metrics.Visible = showMetrics;
+        marker.Visible=App.Trace.Active && !BlocksInput;
+        marker.Position=new Vector2(GetViewport().GetVisibleRect().Size.X-180,110);
+        metrics.Visible = showMetrics || labVisible;
+        if(labVisible && !showMetrics) metrics.Text=$"FEEL LAB · {App.Feel.Id} · {(App.Trace.Active ? "REC" : "idle")}\nSpeed {App.World.ActualVelocity.Length():0.0} · input {App.TouchMovement.Length():0.00}";
         if (showMetrics && frames.Count > 0 && App.World.Tick % 30 == 0)
         {
             var sorted = frames.OrderBy(x => x).ToArray();
@@ -431,12 +438,44 @@ public partial class RpgUi : CanvasLayer
         });
         Button(box, "Collision / navigation overlay: " + (App.CollisionDebug ? "On" : "Off"), () => { App.CollisionDebug = !App.CollisionDebug; BuildMenu(); });
         Button(box, "Performance overlay: " + (showMetrics ? "On" : "Off"), () => { showMetrics = !showMetrics; BuildMenu(); });
+        Button(box, "Game-feel lab / record playtest", () => { menu.Hide(); FeelLab(); });
         Button(box, "Developer diagnostics", () =>
         {
             menu.Hide();
             Diagnostics();
         });
         Button(box, "Quit", () => GetTree().Quit());
+    }
+
+    public void FeelLab()
+    {
+        Open("GAME-FEEL LAB · development tools");
+        labVisible=true;
+        body.AddChild(new Label { Text=$"Active: {App.Feel.Id} · baseline restores original controls\nCompare the same settlement chest → road → ruin route.\nRecording stays local; use Android Screen recorder for video." });
+        foreach(var preset in MovementFeel.Presets)
+            Button(body,$"{preset.Id} · speed ×{preset.Scale:0.0} · response {preset.Response*1000:0}ms",()=> { App.SelectFeel(preset); ClosePanels(); Notify("Feel preset: "+preset.Id); });
+        void Slider(string label,double min,double max,double step,double value,Action<float> changed)
+        {
+            var caption=new Label {Text=$"{label}: {value:0.00}"};body.AddChild(caption);
+            var slider=new HSlider {MinValue=min,MaxValue=max,Step=step,Value=value,CustomMinimumSize=new Vector2(550,44)};
+            slider.ValueChanged+=v=> {caption.Text=$"{label}: {v:0.00}";changed((float)v);};body.AddChild(slider);
+        }
+        Slider("Player speed multiplier",1,4,.1,App.Feel.Scale,v=>App.SelectFeel(App.Feel with {Id="custom",Scale=v}));
+        Slider("Response seconds (release always immediate)",0,.12,.01,App.Feel.Response,v=>App.SelectFeel(App.Feel with {Id="custom",Response=v}));
+        Slider("Joystick dead zone",.02,.25,.01,App.Feel.Deadzone,v=>App.SelectFeel(App.Feel with {Id="custom",Deadzone=v}));
+        Slider("Joystick curve",.5,1.5,.05,App.Feel.Curve,v=>App.SelectFeel(App.Feel with {Id="custom",Curve=v}));
+        Slider("Camera follow rate",6,30,1,App.Feel.CameraFollow,v=>App.SelectFeel(App.Feel with {Id="custom",CameraFollow=v}));
+        Slider("Camera zoom",1,2,.05,App.Feel.Zoom,v=>App.SelectFeel(App.Feel with {Id="custom",Zoom=v}));
+        Button(body,App.Trace.Active ? "Stop local recording" : "Start local recording",()=>
+        {
+            if(App.Trace.Active)App.Trace.Dispose();
+            else App.Trace.Start(ProjectSettings.GlobalizePath("user://playtests/session.jsonl"));
+            ClosePanels(); Notify(App.Trace.Active ? "Recording · tap Mark issue at any time" : "Recording stopped");
+        });
+        foreach(var label in new[]{"Movement too slow","Turning awkward","Collision sticky","Camera wrong","Animation disconnected","Performance stutter"})
+            Button(body,"Mark · "+label,()=> {App.Trace.Marker(label);ClosePanels();});
+        Button(body,"Stop and export playtest ZIP to Files…",()=>PlaytestExport.Show(App));
+        Button(body,"Hide lab overlay",()=> {labVisible=false;ClosePanels();});
     }
 
     public void Workshop()

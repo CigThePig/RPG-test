@@ -12,6 +12,16 @@ public partial class Foundation : Node2D
     public RpgUi Ui => ui;
     public bool GameplayBlocked => ui == null || suspended || !World.Player.Alive || ui.BlocksInput || Narrative.Get("speaking").AsBool();
 
+    public MovementFeel Feel { get; private set; } = MovementFeel.Presets[0];
+    public Camera2D Camera => camera;
+    public Vector2 ScreenInput { get; private set; }
+    public Vector2 ControllerVelocity { get; set; }
+    public double DroppedSeconds { get; private set; }
+    public PlaytestTrace Trace { get; private set; } = null!;
+    GameplayReplay? replay;
+    public bool VerificationMode => OS.GetCmdlineUserArgs().Any(x => x is "--test" or "--visual-check" or "--gameplay-check");
+    public void SelectFeel(MovementFeel feel) { Feel=feel; ControllerVelocity=Vector2.Zero; camera.PositionSmoothingSpeed=feel.CameraFollow; camera.Zoom=Vector2.One*feel.Zoom; Trace?.Marker("preset/"+feel.Id); Trace?.Write(new {kind="configuration", tick=World.Tick, frame=Engine.GetFramesDrawn(), configuration=feel}); }
+    public override void _ExitTree() => Trace?.Dispose();
     bool suspended;
     bool sessionEntered;
     // A real simulation tick also establishes a session, regardless of which UI
@@ -148,12 +158,14 @@ public partial class Foundation : Node2D
                 art[name] = GD.Load<Texture2D>(path);
         }
 
+        Trace = new PlaytestTrace(this);
         Reset();
         ui = new RpgUi
         {
             App = this
         };
         AddChild(ui);
+        AddChild(new PlaytestInputObserver { Trace=Trace });
         Narrative.Connect("reward", Callable.From<string, int>((item, count) => World.Items.Add("player", item, count)));
         Narrative.Connect("reputation", Callable.From<string, int>((faction, amount) =>
         {
@@ -161,6 +173,9 @@ public partial class Foundation : Node2D
             World.Events.Publish(new("reputation_changed", "player", "", faction, amount));
         }));
         GD.Print($"MOSSLIGHT_READY actors={World.Actors.Count} families={CreatureRuntime.Registry.Families.Count()} framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+        var preset=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--preset="))?.Split('=',2)[1];
+        SelectFeel(MovementFeel.Presets.FirstOrDefault(x=>x.Id==preset) ?? MovementFeel.Presets[0]);
+        if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
         if (OS.GetCmdlineUserArgs().Contains("--test"))
             CallDeferred(nameof(RunChecks));
         if (OS.GetCmdlineUserArgs().Contains("--visual-check"))
@@ -253,23 +268,28 @@ public partial class Foundation : Node2D
     {
         if (ui == null)
             return;
+        try { replay?.BeforeStep(); } catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); return; }
         if (!GameplayBlocked)
         {
+            DroppedSeconds += Math.Max(0,delta-.1);
             accumulator += Math.Min(delta, .1);
             while (accumulator >= 1.0 / 60)
             {
                 var v = (Input.GetVector("west", "east", "north", "south") + TouchMovement).LimitLength();
                 // Input describes screen direction; PPC projects ground south at half height.
-                var groundInput = GodotConvert.ScreenToGround(v).Normalized() * v.Length();
+                ScreenInput=v;
+                if (GameplayBlocked || v == Vector2.Zero || Feel.Response <= 0) ControllerVelocity=v;
+                else ControllerVelocity=ControllerVelocity.Lerp(v,1-MathF.Exp(-(1f/60)/Feel.Response));
+                var groundInput = Feel.Convert(ControllerVelocity);
                 var timer = System.Diagnostics.Stopwatch.StartNew();
-                World.PlayerMove(new(groundInput.X, groundInput.Y), 1f / 60);
+                World.PlayerMove(new(groundInput.X, groundInput.Y), 1f / 60, Feel.Scale, Feel.ScreenUniform);
                 World.Step(1f / 60);
                 SimulationMs = timer.Elapsed.TotalMilliseconds;
                 accumulator -= 1.0 / 60;
             }
         }
         else
-            accumulator = 0;
+        { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; World.ClearPlayerMotion(); }
         var player = World.Player;
         foreach (var(id, view)in Views)
         {
@@ -302,6 +322,8 @@ public partial class Foundation : Node2D
             GD.Print($"MOSSLIGHT_RUNTIME tick={World.Tick} position={player.X:0.0},{player.Y:0.0} rasterizations={Views.Values.Sum(v => v.Creature.RenderCount)}");
         }
         ui.Update();
+        Trace.Sample(delta);
+        replay?.AfterStep();
         QueueRedraw();
     }
 
@@ -378,7 +400,7 @@ public partial class Foundation : Node2D
             if (World != null && ui != null)
             {
                 ui.PauseForVerification();
-                try { if (SessionStarted) Persistence.SaveAutosave(World, Narrative); }
+                try { if (SessionStarted && replay == null) Persistence.SaveAutosave(World, Narrative); }
                 catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }
             }
         }
