@@ -42,6 +42,20 @@ public static class Persistence
         foreach (var p in s.Projectiles)
             if (!s.Actors.ContainsKey(p.Source) || !s.Actors.ContainsKey(p.Target) || !content.Abilities.Any(a => a.Id == p.Ability) || !float.IsFinite(p.X) || !float.IsFinite(p.Y) || !float.IsFinite(p.Remaining))
                 throw new InvalidDataException("Invalid projectile");
+        foreach (var actor in s.Actors.Values) AnatomyAdapter.Apply(actor);
+        // Schema-1 saves retain their full terrain, feature IDs and Gloot bags.
+        // Repair only legacy spawn positions; never regenerate a saved region or loot.
+        foreach (var region in s.Regions.Values.Where(r => r.PlacementRevision == 0))
+        {
+            foreach (var actor in s.Actors.Values.Where(a => a.Region == region.Id && a.Alive).OrderBy(a => a.Id == "player" ? 0 : 1))
+                if (!region.CanStand(actor.Position, actor) || (actor.Id != "player" && region.Features.Keys.Any(at => System.Numerics.Vector2.Distance(actor.Position,region.Center(at)) < 40)))
+                {
+                    var point = region.FindPlacement(actor.Position,actor,s.Actors.Values);
+                    actor.X = actor.HomeX = point.X; actor.Y = actor.HomeY = point.Y;
+                    actor.MotionX = actor.MotionY = 0;
+                }
+            region.PlacementRevision = 1;
+        }
         return s;
     }
 

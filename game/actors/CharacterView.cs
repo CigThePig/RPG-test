@@ -28,6 +28,8 @@ public partial class CharacterView : Node2D
             throw new InvalidDataException(result.Describe());
         var genome = result?.Genome ?? CreatureRuntime.Sample(actor.Appearance.Family, actor.Appearance.Seed);
         Creature.SetGenome(genome, async: false);
+        float body = (float)Creature.Model!.Anatomy.Metrics.BodyLength;
+        Creature.Scale = Vector2.One * Math.Clamp(actor.Radius / Math.Max(1, body * .2f), .25f, 1);
         previous = new(actor.X, actor.Y);
         Sync(1f / 60);
     }

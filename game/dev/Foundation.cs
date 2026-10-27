@@ -26,6 +26,9 @@ public partial class Foundation : Node2D
     Node2D actors = null !;
     Dictionary<string, Texture2D> art = new();
     string drawnRegion = "";
+    readonly List<FeatureView> features = new();
+    public bool CollisionDebug { get; set; }
+    public double SimulationMs { get; private set; }
     Node2D ground = null !;
     double accumulator;
     long lastRuntimeLog;
@@ -119,7 +122,8 @@ public partial class Foundation : Node2D
         camera = new Camera2D
         {
             Zoom = new Vector2(1.5f, 1.5f),
-            PositionSmoothingEnabled = true
+            PositionSmoothingEnabled = true,
+            PositionSmoothingSpeed = 12
         };
         AddChild(camera);
         audio = ScriptNode("res://game/audio/AudioService.gd");
@@ -174,6 +178,8 @@ public partial class Foundation : Node2D
         };
         World.Events.Published += e =>
         {
+            if (OS.HasFeature("android") && e.Kind is "resource_depleted" or "region_entered")
+                GD.Print($"MOSSLIGHT_GAMEPLAY kind={e.Kind} value={e.Value} tick={World.Tick}");
             Narrative.Call("receive", e.Kind, e.Actor, e.Target, e.Value, e.Count);
             if (e.Kind == "region_entered")
                 RebuildViews();
@@ -246,8 +252,12 @@ public partial class Foundation : Node2D
             while (accumulator >= 1.0 / 60)
             {
                 var v = (Input.GetVector("west", "east", "north", "south") + TouchMovement).LimitLength();
-                World.PlayerMove(new(v.X, v.Y), 1f / 60);
+                // Input describes screen direction; PPC projects ground south at half height.
+                var groundInput = GodotConvert.ScreenToGround(v).Normalized() * v.Length();
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+                World.PlayerMove(new(groundInput.X, groundInput.Y), 1f / 60);
                 World.Step(1f / 60);
+                SimulationMs = timer.Elapsed.TotalMilliseconds;
                 accumulator -= 1.0 / 60;
             }
         }
@@ -261,7 +271,17 @@ public partial class Foundation : Node2D
             view.Sync((float)delta);
         }
 
-        camera.Position = GodotConvert.GroundToScreen(player.X, player.Y);
+        var region = World.RegionsById[player.Region];
+        var bounds = GodotConvert.GroundToScreen(region.Width * 24, region.Height * 24);
+        var half = GetViewportRect().Size / camera.Zoom / 2;
+        var focus = GodotConvert.GroundToScreen(player.X, player.Y);
+        camera.Position = new Vector2(bounds.X <= half.X*2 ? bounds.X/2 : Mathf.Clamp(focus.X,half.X,bounds.X-half.X), bounds.Y <= half.Y*2 ? bounds.Y/2 : Mathf.Clamp(focus.Y,half.Y,bounds.Y-half.Y));
+        var target = World.InteractionTargets(player).FirstOrDefault();
+        foreach (var feature in features)
+        {
+            feature.Selected = target.Value != null && feature.GetMeta("tile").AsInt32() == target.Key;
+            feature.QueueRedraw();
+        }
         if (drawnRegion != player.Region)
         {
             BuildTerrain();
@@ -317,7 +337,7 @@ public partial class Foundation : Node2D
             return;
         var d = World.Content.Abilities.Single(x => x.Id == ability);
         var a = World.Player;
-        var t = d.Self ? a : World.Actors.Values.Where(x => x.Alive && x.Region == a.Region && World.Hostile(a, x)).OrderBy(x => NVector.DistanceSquared(a.Position, x.Position)).FirstOrDefault();
+        var t = d.Self ? a : World.Actors.Values.Where(x => World.CanActivate(a, x, d)).OrderBy(x => NVector.DistanceSquared(a.Position, x.Position)).FirstOrDefault();
         ui.Notify(t != null && World.Activate(a.Id, ability, t.Id) ? d.Name : "No valid target, equipment, mana or cooldown");
     }
 
@@ -327,13 +347,14 @@ public partial class Foundation : Node2D
             return;
         var a = World.Player;
         var npc = World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == a.Region && NVector.Distance(x.Position, a.Position) < 65 && !World.Hostile(a, x) && World.LineOfSight(a, x));
-        if (npc != null)
+        if (npc != null && !World.InteractionTargets(a).Any() && !World.Actors.Values.Any(x => !x.Alive && x.Region == a.Region && NVector.Distance(x.Position,a.Position) < 48 && World.Items.HasLoot(x.Id)))
         {
             Narrative.Call("talk");
             return;
         }
 
-        ui.Notify(World.Interact(a) ? "Interacted" : "Approach an object, fallen foe, or warden");
+        World.Interact(a);
+        ui.Notify(World.InteractionFeedback);
         drawnRegion = "";
     }
 
@@ -342,6 +363,8 @@ public partial class Foundation : Node2D
         if (what == NotificationApplicationPaused || what == NotificationApplicationFocusOut)
         {
             TouchMovement = Vector2.Zero;
+            ui?.Stick.Cancel();
+            if (OS.HasFeature("android")) GD.Print("MOSSLIGHT_INPUT_CANCELLED");
             suspended = true;
             if (World != null && ui != null)
             {
@@ -374,6 +397,16 @@ public partial class Foundation : Node2D
             Art = art
         };
         ground.AddChild(tilemap);
+        foreach (var feature in features) { actors.RemoveChild(feature); feature.QueueFree(); }
+        features.Clear();
+        foreach (var (at, kind) in r.Features)
+        {
+            var pos = r.Center(at);
+            var feature = new FeatureView { Kind = kind, Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
+            feature.SetMeta("tile",at);
+            actors.AddChild(feature); features.Add(feature);
+        }
+        camera.ResetSmoothing();
     }
 
     public override void _Draw()
@@ -381,20 +414,30 @@ public partial class Foundation : Node2D
         if (World == null)
             return;
         var r = World.RegionsById[World.Player.Region];
-        foreach (var(index, kind)in r.Features)
+        if (CollisionDebug)
         {
-            if (r.Depleted.Contains(index) || r.OpenDoors.Contains(index))
-                continue;
-            var p = r.Center(index);
-            var screen = GodotConvert.GroundToScreen(p.X, p.Y);
-            var color = kind switch
+            var player = World.Player;
+            for (int at=0; at<r.Tiles.Length; at++)
             {
-                "portal" or "exit" => new Color(.5f, .8f, .8f),
-                "lock" => Colors.Orange,
-                "relic" => Colors.Gold,
-                _ => new Color(.65f, .72f, .4f)};
-            DrawCircle(screen, kind == "portal" ? 9 : 5, color);
-            DrawString(ThemeDB.FallbackFont, screen + new Vector2(-12, 20), kind, HorizontalAlignment.Left, -1, 12, color);
+                var p = r.Center(at);
+                if (NVector.DistanceSquared(p,player.Position) > 260*260) continue;
+                DrawRect(new Rect2(GodotConvert.GroundToScreen(p.X-12,p.Y-12),new Vector2(24,12)),r.CanStand(p,player) ? new Color(0,1,0,.12f) : new Color(1,0,0,.3f));
+            }
+            foreach(var a in World.Actors.Values.Where(a=>a.Region==player.Region))
+            {
+                var p=GodotConvert.GroundToScreen(a.X,a.Y);
+                DrawSetTransform(p,0,new Vector2(1,.5f));
+                DrawArc(Vector2.Zero,a.Radius,0,Mathf.Tau,24,Colors.Cyan,1);
+                DrawSetTransform(Vector2.Zero);
+                DrawLine(p,p+GodotConvert.GroundToScreen(a.MotionX*.2f,a.MotionY*.2f),Colors.Yellow,1);
+            }
+            var target=World.InteractionTargets(player).FirstOrDefault();
+            if(target.Value!=null)
+            {
+                var path=r.Path(player.Position,r.Center(target.Key),player);
+                var previous=GodotConvert.GroundToScreen(player.X,player.Y);
+                foreach(int at in path) { var p=r.Center(at);var next=GodotConvert.GroundToScreen(p.X,p.Y);DrawLine(previous,next,Colors.Gold,2);previous=next; }
+            }
         }
 
         foreach (var p in World.Projectiles)
@@ -479,11 +522,27 @@ public partial class TerrainView : Node2D
                         DrawTextureRect(texture, new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), false, new Color(1, 1, 1, .32f));
         }
 
-        if (!Art.TryGetValue("rock1", out var rock))
-            return;
         for (int y = 0; y < Region.Height; y++)
             for (int x = 0; x < Region.Width; x++)
-                if (Region.Tiles[y * Region.Width + x] == Terrain.Rock && (x * 7 + y * 11) % 3 == 0)
-                    DrawTexture(rock, GodotConvert.GroundToScreen(x * 24, y * 24) + new Vector2(-8, -15), new Color(1, 1, 1, .8f));
+            {
+                int at=y*Region.Width+x;
+                var tile=Region.Tiles[at];
+                var p=GodotConvert.GroundToScreen(x*24,y*24);
+                if(tile is Terrain.Rock or Terrain.Wall)
+                {
+                    float rise=tile==Terrain.Wall ? 14 : 8;
+                    DrawRect(new Rect2(p+new Vector2(0,-rise),new Vector2(24,12)),new Color(tile==Terrain.Wall ? "4d5d60" : "697268"));
+                    DrawRect(new Rect2(p+new Vector2(0,12-rise),new Vector2(24,rise)),new Color("354344"));
+                    DrawLine(p+new Vector2(0,-rise),p+new Vector2(24,-rise),new Color("92988a"),1);
+                    DrawLine(p+new Vector2(3,-rise+4),p+new Vector2(13,-rise+4),new Color("7d8477"),1);
+                }
+                if(tile==Terrain.Water)
+                {
+                    if(y>0 && Region.Tiles[at-Region.Width]!=Terrain.Water) DrawLine(p,p+new Vector2(24,0),new Color("b2bea0"),2);
+                    if(y<Region.Height-1 && Region.Tiles[at+Region.Width]!=Terrain.Water) DrawLine(p+new Vector2(0,12),p+new Vector2(24,12),new Color("b2bea0"),2);
+                    if(x>0 && Region.Tiles[at-1]!=Terrain.Water) DrawLine(p,p+new Vector2(0,12),new Color("b2bea0"),2);
+                    if(x<Region.Width-1 && Region.Tiles[at+1]!=Terrain.Water) DrawLine(p+new Vector2(24,0),p+new Vector2(24,12),new Color("b2bea0"),2);
+                }
+            }
     }
 }

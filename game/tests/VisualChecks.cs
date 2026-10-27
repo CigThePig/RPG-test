@@ -33,6 +33,24 @@ public static class VisualChecks
         if (app.World.Player.X <= before)
             throw new InvalidOperationException("Visual movement input did not move player");
         await Capture(app, "exploration");
+        var player=app.World.Player;
+        var region=app.World.RegionsById[player.Region];
+        int chest=region.Features.Single(x=>x.Value=="chest").Key;
+        var chestPos=region.Center(chest);
+        // Walk to the chest using the same screen-space input conversion as touch.
+        for(int i=0;i<240 && System.Numerics.Vector2.Distance(player.Position,chestPos)>28;i++)
+        {
+            var d=chestPos-player.Position;
+            app.TouchMovement=PixelCreatures.Runtime.GodotConvert.GroundToScreen(d.X,d.Y).Normalized();
+            await Frames(app,1);
+        }
+        app.Ui.Stick.Cancel();
+        await Capture(app,"chest");
+        if(!app.World.Interact(player) || !region.Depleted.Contains(chest)) throw new InvalidOperationException("Visual chest walk/loot failed");
+        // Refresh presentation through the real interaction composition root.
+        app.Interact();
+        await Capture(app,"opened-chest");
+        app.CollisionDebug=true;await Capture(app,"collision-overlay");app.CollisionDebug=false;
         app.Ui.Inventory();
         await Capture(app, "inventory");
         app.Ui.ClosePanels();

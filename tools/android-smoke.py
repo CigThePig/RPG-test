@@ -1,6 +1,6 @@
 """Hosted x86_64 Android runtime smoke; ARM64 phone performance remains separate."""
 from pathlib import Path
-import os, subprocess, sys, time
+import os, subprocess, sys, time, re
 out=Path('build/android-runtime');out.mkdir(parents=True,exist_ok=True)
 package='com.cigthepig.mosslight.dev'
 def run(*args, **kwargs):
@@ -47,19 +47,36 @@ try:
     (out/'start-menu.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
     tap(640,150) # First menu button: Enter / Resume.
     time.sleep(8)
-    adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(220*w/1280)),str(int(640*h/800)),'1500')
-    time.sleep(3)
+    # Exercise actual touch ownership, then open the starting Gloot chest.
+    # Read release positions from production diagnostics instead of assuming emulator FPS.
+    for attempt in range(12):
+        adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(280*w/1280)),str(int(640*h/800)),'600')
+        time.sleep(.4)
+        logs=adb('logcat','-d')
+        positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
+        if positions and float(positions[-1][0])>=265: break
+    else: raise RuntimeError('Touch movement never approached starting chest')
+    assert float(positions[-1][0])>220,'Touch input did not change player coordinates'
+    (out/'chest.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
+    tap(1145,635)
+    time.sleep(1)
+    logs=adb('logcat','-d')
+    assert 'MOSSLIGHT_GAMEPLAY kind=resource_depleted value=chest' in logs,'Touch interaction did not empty authoritative chest inventory'
     (out/'exploration.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
+    tap(580,715) # Pack: second row, first button.
+    time.sleep(1)
+    (out/'inventory.png').write_bytes(run(adb_path, 'exec-out', 'screencap', '-p'))
     adb('shell','input','keyevent','3') # Background triggers save and cancels held input.
     time.sleep(2)
     adb('shell','monkey','-p',package,'-c','android.intent.category.LAUNCHER','1')
     time.sleep(3)
     assert adb('shell','pidof',package),'Application not running after resume'
     logs=adb('logcat','-d');(out/'logcat.log').write_text(logs)
+    assert 'MOSSLIGHT_INPUT_CANCELLED' in logs,'Background did not cancel gameplay input'
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, gameplay ticks, screenshot, background/resume. ARM64 device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, measured player movement, Gloot chest depletion, inventory screenshot, gameplay ticks, background input cancellation/resume. ARM64 device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     try: (out/'logcat.log').write_text(adb('logcat','-d'))

@@ -14,6 +14,10 @@ public sealed class World
     public Content Content { get; }
     public Items Items { get; }
     public EventStream Events { get; } = new();
+    public string InteractionFeedback { get; private set; } = "Approach an object or fallen foe";
+    public string LastBlockedReason { get; private set; } = "";
+    public Vector2 LastInput { get; private set; }
+    public Vector2 ActualVelocity { get; private set; }
     public ActorState Player => Actors["player"];
     public SpellsContext Spells { get; private set; } = new();
 
@@ -304,15 +308,26 @@ public sealed class World
     public bool LineOfSight(ActorState a, ActorState b) => a.Region == b.Region && VisibleTo(a, b.Position);
     public bool Move(ActorState a, Vector2 delta)
     {
-        if (!a.Alive)
+        if (!a.Alive || !float.IsFinite(delta.X) || !float.IsFinite(delta.Y))
             return false;
         var r = RegionsById[a.Region];
         bool moved = false;
         // Small substeps prevent wall tunnelling, including knockback and large frame deltas.
-        int steps = Math.Max(1, (int)Math.Ceiling(delta.Length() / 4));
+        int steps = Math.Max(1, (int)Math.Ceiling(delta.Length() / Math.Min(2, a.Radius / 2)));
         delta /= steps;
         for (int n = 0; n < steps; n++)
         {
+            if (r.CanStand(a.Position + delta, a))
+            {
+                a.X += delta.X; a.Y += delta.Y;
+                moved |= delta.LengthSquared() > 0;
+                continue;
+            }
+            if (a.Id == "player")
+            {
+                int at = r.Index(a.Position + delta);
+                LastBlockedReason = at < 0 ? "Map boundary" : r.Features.GetValueOrDefault(at) == "lock" ? "Locked door" : "Terrain / footprint: " + r.Tiles[at];
+            }
             var x = new Vector2(a.X + delta.X, a.Y);
             if (r.CanStand(x, a))
             {
@@ -338,7 +353,11 @@ public sealed class World
             return false;
         if (direction.LengthSquared() > 1)
             direction = Vector2.Normalize(direction);
-        bool moved = Move(a, direction * a.Speed * dt);
+        LastInput = direction;
+        LastBlockedReason = "";
+        var before = a.Position;
+        bool moved = Move(a, direction * Math.Max(0, Stat(a, "speed")) * dt);
+        ActualVelocity = dt > 0 ? (a.Position - before) / dt : Vector2.Zero;
         a.State = moved ? ActionState.Moving : ActionState.Idle;
         return moved;
     }
@@ -393,19 +412,31 @@ public sealed class World
             Rest(a, dt);
     }
 
-    void Follow(ActorState a, Vector2 target, float dt)
+    public void Follow(ActorState a, Vector2 target, float dt)
     {
-        var path = RegionsById[a.Region].Path(a.Position, target, a);
-        if (path.Count == 0)
-            return;
-        var delta = RegionsById[a.Region].Center(path[0]) - a.Position;
-        if (delta.Length() > 1)
+        a.MotionX = a.MotionY = 0;
+        var r = RegionsById[a.Region];
+        Vector2 waypoint = target;
+        if (!r.CanTravel(a.Position, target, a))
         {
-            var velocity = Vector2.Normalize(delta) * a.Speed;
-            a.MotionX = velocity.X;
-            a.MotionY = velocity.Y;
-            a.State = ActionState.Moving;
+            var path = r.Path(a.Position, target, a);
+            if (path.Count == 0) return;
+            waypoint = r.Center(path[0]);
         }
+        var delta = waypoint - a.Position;
+        if (delta.Length() <= .1f) return;
+        // Planning happens every .2s. Stop exactly at the waypoint instead of
+        // overshooting it and alternating direction on subsequent plans.
+        var velocity = Vector2.Normalize(delta) * Math.Min(Math.Max(0, Stat(a, "speed")), delta.Length() / Math.Max(.001f, dt));
+        a.MotionX = velocity.X; a.MotionY = velocity.Y;
+        a.State = ActionState.Moving;
+    }
+
+    public IEnumerable<KeyValuePair<int, string>> InteractionTargets(ActorState a)
+    {
+        var r = RegionsById[a.Region];
+        return r.Features.Where(x => !r.Depleted.Contains(x.Key) && !r.OpenDoors.Contains(x.Key) && Vector2.Distance(r.Center(x.Key), a.Position) < 48 && VisibleTo(a, r.Center(x.Key), allowBlockedTarget: x.Value == "lock"))
+            .OrderBy(x => Vector2.DistanceSquared(r.Center(x.Key), a.Position)).ThenBy(x => x.Key);
     }
 
     public bool Interact(ActorState a)
@@ -413,7 +444,8 @@ public sealed class World
         if (!a.Alive || a.State is not (ActionState.Idle or ActionState.Moving))
             return false;
         var r = RegionsById[a.Region];
-        var nearby = r.Features.Where(x => !r.Depleted.Contains(x.Key) && Vector2.Distance(r.Center(x.Key), a.Position) < 48 && VisibleTo(a, r.Center(x.Key), allowBlockedTarget: true)).OrderBy(x => Vector2.DistanceSquared(r.Center(x.Key), a.Position)).ToArray();
+        InteractionFeedback = "No accessible object nearby";
+        var nearby = InteractionTargets(a).ToArray();
         foreach (var(at, kind)in nearby)
         {
             if (kind == "lock")
@@ -421,7 +453,8 @@ public sealed class World
                 if (r.OpenDoors.Contains(at))
                     continue;
                 if (!Items.Take(a.Id, "dungeon_key", 1))
-                    return false;
+                { InteractionFeedback = "A ruin key is required"; return false; }
+                InteractionFeedback = "Door unlocked";
                 r.OpenDoors.Add(at);
                 foreach (var adjacent in r.Neighbours(at))
                     if (r.Features.GetValueOrDefault(adjacent) == "lock")
@@ -432,17 +465,25 @@ public sealed class World
 
             if (kind is "portal" or "exit")
             {
+                InteractionFeedback = kind == "portal" ? "Entered the ruin" : "Returned to the Reach";
                 Enter(a, kind == "portal" ? "ruin" : "reach");
                 return true;
             }
 
             if (kind == "chest")
             {
-                Items.Transfer(a.Region + ":" + at, a.Id, "potion", 1);
-                Items.Add(a.Id, "coin", 5);
+                string owner = a.Region + ":" + at;
+                bool changed = Items.LootAll(owner, a.Id);
+                if (Items.HasLoot(owner))
+                { InteractionFeedback = changed ? "Some loot collected; make room for the rest" : "Inventory full"; return changed; }
+                InteractionFeedback = changed ? "Chest emptied — loot added to pack" : "Chest is empty";
             }
             else if (kind is "herb" or "ore" or "wood" or "relic" or "key")
-                Items.Add(a.Id, kind == "key" ? "dungeon_key" : kind, kind is "relic" or "key" ? 1 : 3);
+            {
+                if (!Items.Add(a.Id, kind == "key" ? "dungeon_key" : kind, kind is "relic" or "key" ? 1 : 3))
+                { InteractionFeedback = "Inventory full"; return false; }
+                InteractionFeedback = "Collected " + kind;
+            }
             else
                 continue;
             r.Depleted.Add(at);
@@ -452,7 +493,7 @@ public sealed class World
 
         var corpses = Actors.Values.Where(b => !b.Alive && b.Region == a.Region && Vector2.Distance(a.Position, b.Position) < 48 && LineOfSight(a, b) && Items.HasLoot(b.Id)).OrderBy(b => Vector2.DistanceSquared(a.Position, b.Position)).ThenBy(b => b.Id, StringComparer.Ordinal);
         foreach (var corpse in corpses)
-            if (Items.LootAll(corpse.Id, a.Id)) return true;
+            if (Items.LootAll(corpse.Id, a.Id)) { InteractionFeedback = "Loot collected"; return true; }
         return false;
     }
 
@@ -466,9 +507,7 @@ public sealed class World
         var pos = r.Center(r.Entrance);
         a.X = pos.X;
         a.Y = pos.Y;
-        foreach (var(at, kind)in r.Features)
-            if (kind == "chest" && Items.Count(region + ":" + at, "potion") == 0 && !r.Depleted.Contains(at))
-                Items.Add(region + ":" + at, "potion");
+        InitializeContainers(r);
         PopulateRegion(region);
         Events.Publish(new("region_entered", a.Id, "", region));
     }
@@ -510,6 +549,8 @@ public sealed class World
                 }
             };
             AnatomyAdapter.Apply(actor);
+            var placed = r.FindPlacement(actor.Position, actor, Actors.Values);
+            actor.X = actor.HomeX = placed.X; actor.Y = actor.HomeY = placed.Y;
             Actors[actor.Id] = actor;
         }
     }
@@ -534,6 +575,21 @@ public sealed class World
         actor.Health = Math.Min(actor.MaxHealth, actor.Health + healing);
         Events.Publish(new("item_used", actor.Id, "", selector));
         return true;
+    }
+
+    public void InitializeContainers(RegionState r)
+    {
+        if (r.ContainersInitialized) return;
+        foreach (var (at, kind) in r.Features.OrderBy(x => x.Key))
+        {
+            if (kind != "chest" || r.Depleted.Contains(at)) continue;
+            string owner = r.Id + ":" + at;
+            var random = new Random(unchecked(r.Seed ^ at * 7919));
+            Items.Add(owner, "potion", 1 + random.Next(2));
+            Items.Add(owner, "coin", 4 + random.Next(9));
+            Items.Add(owner, new[] { "herb", "ore", "wood" }[random.Next(3)], 2 + random.Next(3));
+        }
+        r.ContainersInitialized = true;
     }
 
     public void NewGame()
@@ -584,6 +640,8 @@ public sealed class World
             a.HomeX = a.X;
             a.HomeY = a.Y;
             AnatomyAdapter.Apply(a);
+            var placed = r.FindPlacement(a.Position, a, Actors.Values);
+            a.X = a.HomeX = placed.X; a.Y = a.HomeY = placed.Y;
             Actors.Add(a.Id, a);
             if (i < 2)
             {
@@ -599,8 +657,6 @@ public sealed class World
         Items.Add("player", "potion", 3);
         Items.Add("player", "coin", 20);
         Items.Add("player", "herb", 4);
-        foreach (var(at, kind)in r.Features)
-            if (kind == "chest")
-                Items.Add("reach:" + at, "potion");
+        InitializeContainers(r);
     }
 }

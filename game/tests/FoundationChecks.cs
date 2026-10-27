@@ -38,6 +38,7 @@ public static class FoundationChecks
         var watch = Stopwatch.StartNew();
         try
         {
+            PlayabilityChecks.Run(app, Check);
             // Exercise nonlinear progression using actual world defeat events before acceptance.
             var early = w.Player;
             var victims = w.Actors.Values.Where(a => a.Profile == "beast").Take(2).ToArray();
@@ -102,9 +103,14 @@ public static class FoundationChecks
             var stick = app.Ui.Stick;
             app.Ui.Menu(); // Resume.
             stick._Input(new InputEventScreenTouch { Index = 7, Pressed = true, Position = stick.GlobalPosition + new Vector2(180, 100) });
+            stick._Input(new InputEventScreenDrag { Index = 7, Position = stick.GlobalPosition + new Vector2(240, 100) });
             Check(app.TouchMovement.X > .8f, "touch stick owns movement finger");
             stick._Input(new InputEventScreenTouch { Index = 8, Pressed = false });
             Check(app.TouchMovement.X > .8f, "other finger release does not cancel movement");
+            stick._Input(new InputEventScreenTouch { Index = 7, Pressed = false, Canceled = true });
+            Check(app.TouchMovement == Vector2.Zero,"OS finger cancellation stops movement");
+            stick._Input(new InputEventScreenTouch { Index = 7, Pressed = true, Position = stick.GlobalPosition + new Vector2(100,100) });
+            stick._Input(new InputEventScreenDrag { Index = 7, Position = stick.GlobalPosition + new Vector2(240,100) });
             app.Ui.PauseForVerification();
             app.Ui.Update();
             Check(app.TouchMovement == Vector2.Zero, "modal opening cancels held touch movement");

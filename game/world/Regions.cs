@@ -24,11 +24,13 @@ public sealed class RegionState
     public Dictionary<int, string> Features { get; set; } = new();
     public HashSet<int> OpenDoors { get; set; } = new();
     public HashSet<int> Depleted { get; set; } = new();
+    public bool ContainersInitialized { get; set; } = true;
+    public int PlacementRevision { get; set; }
     public int Entrance { get; set; }
     public int Objective { get; set; }
 
     public const int Tile = 24;
-    public int Index(Vector2 p) => (int)(p.Y / Tile) * Width + (int)(p.X / Tile);
+    public int Index(Vector2 p) => p.X < 0 || p.Y < 0 || p.X >= Width * Tile || p.Y >= Height * Tile ? -1 : (int)(p.Y / Tile) * Width + (int)(p.X / Tile);
     public Vector2 Center(int index) => new((index % Width + .5f) * Tile, (index / Width + .5f) * Tile);
     public bool Passable(int index, ActorState a)
     {
@@ -48,27 +50,53 @@ public sealed class RegionState
     public bool BlocksSight(int index) => index < 0 || index >= Tiles.Length || Tiles[index] is Terrain.Wall or Terrain.Rock || (Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index));
     public bool CanStand(Vector2 p, ActorState a)
     {
-        foreach (var offset in new[]
-        {
-            new Vector2(-a.Radius, -a.Radius),
-            new Vector2(a.Radius, -a.Radius),
-            new Vector2(-a.Radius, a.Radius),
-            new Vector2(a.Radius, a.Radius)
-        }
-
-        )
-        {
-            var v = p + offset;
-            if (v.X < 0 || v.Y < 0 || v.X >= Width * Tile || v.Y >= Height * Tile || !Passable(Index(v), a))
-                return false;
-        }
-
+        if (!float.IsFinite(p.X) || !float.IsFinite(p.Y) || p.X - a.Radius < 0 || p.Y - a.Radius < 0 || p.X + a.Radius >= Width * Tile || p.Y + a.Radius >= Height * Tile)
+            return false;
+        // Circle versus every intersected tile: the four-corner approximation missed
+        // interior blockers for large bodies and falsely blocked rounded corners.
+        for (int y = (int)((p.Y - a.Radius) / Tile); y <= (int)((p.Y + a.Radius) / Tile); y++)
+            for (int x = (int)((p.X - a.Radius) / Tile); x <= (int)((p.X + a.Radius) / Tile); x++)
+            {
+                if (Passable(y * Width + x, a)) continue;
+                var nearest = new Vector2(Math.Clamp(p.X, x * Tile, (x + 1) * Tile), Math.Clamp(p.Y, y * Tile, (y + 1) * Tile));
+                if (Vector2.DistanceSquared(p, nearest) < a.Radius * a.Radius) return false;
+            }
         return true;
+    }
+
+    public bool CanTravel(Vector2 from, Vector2 to, ActorState a)
+    {
+        int steps = Math.Max(1, (int)Math.Ceiling(Vector2.Distance(from, to) / Math.Min(2, a.Radius / 2)));
+        for (int i = 0; i <= steps; i++)
+            if (!CanStand(Vector2.Lerp(from, to, (float)i / steps), a)) return false;
+        return true;
+    }
+
+    public Vector2 FindPlacement(Vector2 preferred, ActorState a, IEnumerable<ActorState> occupants)
+    {
+        var others = occupants.Where(b => b.Region == a.Region && b.Id != a.Id && b.Alive).ToArray();
+        var reachable = new HashSet<int> { Entrance };
+        var pending = new Queue<int>(); pending.Enqueue(Entrance);
+        while(pending.Count>0)
+        {
+            int at=pending.Dequeue();
+            foreach(int next in Neighbours(at))
+                if(!reachable.Contains(next) && CanTravel(Center(at),Center(next),a)) { reachable.Add(next);pending.Enqueue(next); }
+        }
+        foreach (int at in reachable.OrderBy(i => Vector2.DistanceSquared(Center(i), preferred)).ThenBy(i => i))
+        {
+            var point = Center(at);
+            if (!CanStand(point, a) || Features.Keys.Any(i => Vector2.DistanceSquared(Center(i), point) < 40 * 40)) continue;
+            if (others.Any(b => Vector2.DistanceSquared(b.Position, point) < MathF.Pow(a.Radius + b.Radius + 16, 2))) continue;
+            return point;
+        }
+        throw new InvalidOperationException("No clear actor placement in " + Id);
     }
 
     public List<int> Path(Vector2 start, Vector2 end, ActorState a)
     {
         int s = Index(start), t = Index(end);
+        if (s < 0 || t < 0 || !CanStand(start, a) || !CanStand(end, a)) return new();
         var prev = new Dictionary<int, int>
         {
             {
@@ -84,7 +112,7 @@ public sealed class RegionState
             if (n == t)
                 break;
             foreach (var k in Neighbours(n))
-                if (!prev.ContainsKey(k) && CanStand(Center(k), a))
+                if (!prev.ContainsKey(k) && CanTravel(n == s ? start : Center(n), Center(k), a))
                 {
                     prev[k] = n;
                     q.Enqueue(k);
@@ -124,6 +152,8 @@ public static class Regions
         var r = new RegionState
         {
             Seed = seed,
+            ContainersInitialized = false,
+            PlacementRevision = 1,
             Width = width,
             Height = height,
             Tiles = new Terrain[width * height]
@@ -144,10 +174,16 @@ public static class Regions
                     r.Tiles[n] = Terrain.Rock;
             }
 
-        // Settlement clearing and a connected causeway form authored constraints within generated geography.
-        for (int y = height / 2 - 4; y <= height / 2 + 4; y++)
-            for (int x = 3; x < width - 3; x++)
-                r.Tiles[y * width + x] = Terrain.Earth;
+        // A compact settlement and a winding, three-cell road preserve landscape
+        // barriers without flattening a nine-cell strip across the entire region.
+        for (int y = 1; y < height-1; y++)
+            for (int x = 1; x < width-1; x++)
+            {
+                float sx=(x-10)/7f, sy=(y-height/2)/4f;
+                int roadY = height/2 + (int)MathF.Round(MathF.Sin((x-8)*.14f)*2);
+                if(sx*sx+sy*sy < 1 || (x>=8 && x<=width-8 && Math.Abs(y-roadY)<=1))
+                    r.Tiles[y*width+x]=Terrain.Earth;
+            }
         r.Entrance = (height / 2) * width + 8;
         r.Objective = (height / 2) * width + width - 8;
         r.Features[r.Objective] = "portal";
@@ -155,6 +191,16 @@ public static class Regions
         r.Features[r.Entrance + width * 2] = "herb";
         r.Features[r.Entrance + width * 2 + 3] = "ore";
         r.Features[r.Entrance + width * 2 + 6] = "wood";
+        // Keep reachable interaction stands around each authored feature; connect
+        // them to the road rather than erasing unrelated natural barriers.
+        foreach(int at in r.Features.Keys.Append(r.Entrance))
+        {
+            int fx=at%width, fy=at/width;
+            int roadY=height/2+(int)MathF.Round(MathF.Sin((fx-8)*.14f)*2);
+            for(int y=Math.Min(fy-1,roadY-1);y<=Math.Max(fy+1,roadY+1);y++)
+                for(int x=fx-1;x<=fx+1;x++)
+                    if(x>0&&x<width-1&&y>0&&y<height-1) r.Tiles[y*width+x]=Terrain.Earth;
+        }
         return r;
     }
 
@@ -178,6 +224,8 @@ public static class Regions
             {
                 Id = "ruin",
                 Seed = seed,
+            ContainersInitialized = false,
+            PlacementRevision = 1,
                 Width = w,
                 Height = h,
                 Tiles = Enumerable.Repeat(Terrain.Wall, w * h).ToArray()

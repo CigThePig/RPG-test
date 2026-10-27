@@ -17,6 +17,10 @@ func bag(owner: String) -> Inventory:
 func add(owner: String, prototype: String, count: int = 1) -> bool:
 	if count <= 0 or not protos.data.has(prototype): return false
 	var inventory := bag(owner)
+	var probe := inventory.create_item(prototype)
+	var space = inventory._constraint_manager.get_space_for(probe)
+	# Preflight the whole grant so a partially full bag cannot repeatedly farm a node.
+	if not space.is_inf() and space.count < count: return false
 	for n in count:
 		var item := inventory.create_item(prototype)
 		serial += 1

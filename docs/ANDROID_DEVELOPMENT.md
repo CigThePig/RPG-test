@@ -71,3 +71,9 @@ Official references: [C# requirements](https://docs.godotengine.org/en/4.6/tutor
 ## Direct APK links after merging
 
 Actions artifacts are ZIP archives and require GitHub sign-in. A manually initiated development prerelease can attach a validated APK for a direct `.apk` download. Only distribute a successful trusted `main` build this way; do not automatically publish PR artifacts. GitHub's release editor can attach an extracted APK from the phone. No public release is created by the build workflow.
+
+## Playability build
+
+See [MOBILE_PLAYABILITY.md](MOBILE_PLAYABILITY.md) for collision/placement/container changes and save handling. The in-game menu now exposes collision/navigation and performance overlays. Secondary character/journal/map screens are available from that menu on phones. The stick anchors near the initial thumb contact; drag to move and lift to stop. Opening menus/dialogue or backgrounding cancels held movement.
+
+The runtime smoke test checks release coordinates and a real chest-depletion event after touch interaction; merely reaching the splash/menu or advancing ticks is insufficient. Download the ARM64 artifact only from the tested source commit's Android workflow, and check the separate `android-runtime` job before installing. Existing development-signing limitations still apply: changing the generated signing key can require uninstalling the previous APK, which removes local saves. Use configured persistent signing secrets for reliable in-place updates.

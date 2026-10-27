@@ -91,6 +91,7 @@ public partial class RpgUi : CanvasLayer
 
         )
         {
+            if (MobileLayout && (text.StartsWith("J ·") || text.StartsWith("C ·") || text.StartsWith("M ·"))) continue;
             var button = Button(hotbar, MobileLayout ? text.Split(" · ").Last() : text, action);
             if (MobileLayout) button.CustomMinimumSize = new Vector2(135, 72);
             var id = text.StartsWith("1") ? "slash" : text.StartsWith("2") ? "ember" : text.StartsWith("3") ? "mend" : "";
@@ -213,7 +214,7 @@ public partial class RpgUi : CanvasLayer
         if (showMetrics && frames.Count > 0 && App.World.Tick % 30 == 0)
         {
             var sorted = frames.OrderBy(x => x).ToArray();
-            metrics.Text = $"FPS {Engine.GetFramesPerSecond()} · p50/p95/p99 {sorted[(int)((sorted.Length - 1) * .5)]:0.0}/{sorted[(int)((sorted.Length - 1) * .95)]:0.0}/{sorted[(int)((sorted.Length - 1) * .99)]:0.0} ms\nActors {App.Views.Values.Count(v => v.Visible)}/{App.World.Actors.Count} · managed {GC.GetTotalMemory(false)/1048576.0:0} MB\nRaster {PixelCreatures.Runtime.CreatureRenderQueue.LastRasterMs:0.0} ms · upload {PixelCreatures.Runtime.CreatureRenderQueue.LastUploadMs:0.0} ms · save {Persistence.LastSaveMilliseconds:0.0} ms";
+            metrics.Text = $"XY {App.World.Player.X:0},{App.World.Player.Y:0} · tile {App.World.RegionsById[App.World.Player.Region].Index(App.World.Player.Position)} · stand {App.World.RegionsById[App.World.Player.Region].CanStand(App.World.Player.Position,App.World.Player)}\nInput {App.World.LastInput.Length():0.00} · velocity {App.World.ActualVelocity.Length():0.0} · sim {App.SimulationMs:0.00}ms\nBlocked {App.World.LastBlockedReason}\nFPS {Engine.GetFramesPerSecond()} · p50/p95/p99 {sorted[(int)((sorted.Length - 1) * .5)]:0.0}/{sorted[(int)((sorted.Length - 1) * .95)]:0.0}/{sorted[(int)((sorted.Length - 1) * .99)]:0.0} ms\nActors {App.Views.Values.Count(v => v.Visible)}/{App.World.Actors.Count} · managed {GC.GetTotalMemory(false)/1048576.0:0} MB\nRaster {PixelCreatures.Runtime.CreatureRenderQueue.LastRasterMs:0.0} ms · upload {PixelCreatures.Runtime.CreatureRenderQueue.LastUploadMs:0.0} ms · save {Persistence.LastSaveMilliseconds:0.0} ms";
         }
         var a = App.World.Player;
         health.Text = $"{a.Name}   ♥ {a.Health:0}/{a.MaxHealth}    Mana {a.Mana:0}/{a.MaxMana}    Lv {a.Level} · XP {a.Experience}/{a.Level * 100}    {a.State}\n{a.Region} · {(int)(App.World.Time / 60) % 24:00}:{(int)App.World.Time % 60:00}";
@@ -360,6 +361,8 @@ public partial class RpgUi : CanvasLayer
         scroll.AddChild(box);
         box.AddChild(new Label { Text = "MOSSLIGHT\nRPG FOUNDATION", HorizontalAlignment = HorizontalAlignment.Center });
         Button(box, "Enter / Resume", App.ResumeGame);
+        foreach (var entry in new (string, Action)[] { ("Pack", Inventory), ("Journal", Journal), ("Character", Character), ("Map", Map) })
+            Button(box, entry.Item1, () => { menu.Hide(); entry.Item2(); });
         Button(box, "Recover background autosave", () =>
         {
             try { Persistence.LoadAutosave(App.World, App.Narrative); App.RebuildViews(); App.ResumeGame(); Notify("Recovered autosave"); }
@@ -413,6 +416,7 @@ public partial class RpgUi : CanvasLayer
             menu.Hide();
             Workshop();
         });
+        Button(box, "Collision / navigation overlay: " + (App.CollisionDebug ? "On" : "Off"), () => { App.CollisionDebug = !App.CollisionDebug; BuildMenu(); });
         Button(box, "Performance overlay: " + (showMetrics ? "On" : "Off"), () => { showMetrics = !showMetrics; BuildMenu(); });
         Button(box, "Developer diagnostics", () =>
         {
