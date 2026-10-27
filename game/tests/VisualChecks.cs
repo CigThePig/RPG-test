@@ -64,6 +64,51 @@ public static class VisualChecks
             if(!app.Ui.MenuOpen)throw new InvalidOperationException("Menu edge touch plus emulated mouse did not open exactly once");
             app.Ui.Menu();await Frames(app,2);
         }
+        if (app.Ui.MobileLayout)
+        {
+            // Exercise action ownership through the actual input pipeline while a
+            // different finger owns the stick, including canceled and dragged touches.
+            string snapshot=Persistence.Capture(app.World,app.Narrative);
+            var mobilePlayer=app.World.Player;
+            var dodge=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Dodge" && b.IsVisibleInTree());
+            var attack=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Attack" && b.IsVisibleInTree());
+            var dodgePoint=dodge.GetGlobalRect().GetCenter();
+            var dodgeSize=dodge.Size;
+            int starts=0;
+            void OnCombat(string kind, System.Numerics.Vector2 direction, string context) { if(kind=="dodge_started") starts++; }
+            app.World.CombatDiagnostic += OnCombat;
+            var mobileStick=app.Ui.Stick;
+            var stickPoint=mobileStick.GlobalPosition+mobileStick.Size/2;
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=7,Pressed=true,Position=stickPoint});
+            Input.ParseInputEvent(new InputEventScreenDrag {Index=7,Position=stickPoint+new Vector2(72,0)});
+            await Frames(app,2);
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
+            await Frames(app,1);
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Canceled=true,Position=dodgePoint});
+            await Frames(app,2);
+            if(starts!=0) throw new InvalidOperationException("Canceled Dodge touch activated");
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
+            await Frames(app,1);
+            Input.ParseInputEvent(new InputEventScreenDrag {Index=8,Position=dodgePoint+new Vector2(-180,-180)});
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=dodgePoint+new Vector2(-180,-180)});
+            await Frames(app,2);
+            if(starts!=0) throw new InvalidOperationException("Dodge touch released outside activated");
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
+            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=dodgePoint,GlobalPosition=dodgePoint});
+            await Frames(app,1);
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=dodgePoint});
+            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=dodgePoint,GlobalPosition=dodgePoint});
+            await Frames(app,2);
+            if(starts!=1 || mobilePlayer.State!=ActionState.Dodging || mobilePlayer.ActionDirectionX<.99f || mobileStick.Finger!=7)
+                throw new InvalidOperationException("Dodge multitouch, direction or emulated mouse ownership failed");
+            if(dodge.Size!=dodgeSize) throw new InvalidOperationException("Dodge cooldown changed button dimensions");
+            app.World.CancelPlayerDodge();
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=7,Pressed=false,Position=stickPoint});
+            app.World.CombatDiagnostic -= OnCombat;
+            Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
+            await Frames(app,2);
+            if(attack.GetGlobalRect().Intersects(dodge.GetGlobalRect())) throw new InvalidOperationException("Attack and Dodge touch targets overlap");
+        }
         // Use real GUI dispatch for desktop mice; headless checks exercise raw touch.
         var draught=app.Ui.GetChildren().OfType<Control>().First().FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.Contains("Draught"));
         var point=draught.GetGlobalRect().GetCenter();

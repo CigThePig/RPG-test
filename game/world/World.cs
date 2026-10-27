@@ -300,7 +300,7 @@ public sealed class World
         if (!projectile && (Vector2.Distance(a.Position, b.Position) > d.Range + a.NaturalReach + 8 || !LineOfSight(a, b)))
             return false;
         // Intentionally non-damaging hostile effects retain their status-only behavior.
-        bool connected = d.Damage <= 0 ? Hostile(a, b) : Damage(a, b, d.Damage + Stat(a, "strength") + Stat(a, d.Type == "physical" ? "damage" : "power"), d.Type);
+        bool connected = d.Damage <= 0 ? Hostile(a, b) && !DodgeImmune(b) : Damage(a, b, d.Damage + Stat(a, "strength") + Stat(a, d.Type == "physical" ? "damage" : "power"), d.Type);
         if (connected && b.Alive && d.Status != "")
             ApplyStatus(b, d.Status, a.Id);
         return connected;
@@ -379,6 +379,7 @@ public sealed class World
                     }
                     else
                     {
+                        if (a.FreeSlash) CombatDiagnostic?.Invoke("attack_completed", new Vector2(a.ActionDirectionX, a.ActionDirectionY), "slash");
                         a.State = ActionState.Idle;
                         a.FreeSlash = false;
                         a.ActionElapsed = 0;

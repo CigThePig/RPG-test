@@ -12,6 +12,9 @@ public sealed class GameplayReplay
     V origin;
     float distance;
     double incomingYaw;
+    int combatHits, combatMisses, dodges, dodgedHits;
+    int turnSign, turnChanges;
+    double turnPrevious;
     readonly List<object> results=new();
     Queue<V> route=new();
     public bool Finished { get; private set; }
@@ -35,7 +38,17 @@ public sealed class GameplayReplay
         new("settlement-route",240,new(0,0),Vector2.Right,"reach"),
         new("dungeon-route",240,new(0,0),Vector2.Right,"ruin"),
         new("combat-movement",180,new(0,0),Vector2.Right,"reach"),
-        new("attack-readability",200,new(300,300),Vector2.Right)
+        new("attack-readability",200,new(300,300),Vector2.Right),
+        new("combat-empty",170,new(300,300),Vector2.Zero),
+        new("combat-ahead",75,new(300,300),Vector2.Zero),
+        new("combat-behind",75,new(300,300),Vector2.Zero),
+        new("combat-enter",75,new(300,300),Vector2.Zero),
+        new("combat-wall",75,new(700,300),Vector2.Zero),
+        new("dodge-idle",75,new(300,300),Vector2.Zero),
+        new("dodge-held",75,new(300,300),Vector2.Right),
+        new("dodge-wall",75,new(700,300),Vector2.Zero),
+        new("dodge-evasion",75,new(300,300),Vector2.Zero),
+        new("turn-south-north",100,new(300,300),Vector2.Up)
     };
     public GameplayReplay(Foundation owner)
     {
@@ -44,6 +57,12 @@ public sealed class GameplayReplay
         Output=args.FirstOrDefault(x=>x.StartsWith("--evidence="))?.Split('=',2)[1] ?? "build/gameplay";
         Directory.CreateDirectory(Output);
         app.Trace.Start(Path.Combine(Output,"trace.jsonl"));
+        app.World.CombatDiagnostic += (kind, _, context) =>
+        {
+            if (kind == "attack_impact") { if (context.StartsWith("hit/")) combatHits++; else combatMisses++; }
+            if (kind == "dodge_started") dodges++;
+            if (kind == "direct_hit_dodged") dodgedHits++;
+        };
         app.Trace.Marker("replay-warmup");
         app.ResumeGame();
         // Dedicated region with production circular collision, terrain view, PPC, UI and camera.
@@ -63,6 +82,13 @@ public sealed class GameplayReplay
         r.Features[18*64+18]="ore";
         r.Features[17*64+20]="wood";
         return r;
+    }
+    void TapAction(string label)
+    {
+        var button=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.StartsWith(label));
+        var at=button.GetGlobalRect().GetCenter();
+        Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=at});
+        Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=at});
     }
     void Touch(bool pressed) => Input.ParseInputEvent(new InputEventScreenTouch {Index=7,Pressed=pressed,Position=app.Ui.Stick.GlobalPosition+app.Ui.Stick.Size/2});
     void Drag(Vector2 direction) => Input.ParseInputEvent(new InputEventScreenDrag {Index=7,Position=app.Ui.Stick.GlobalPosition+app.Ui.Stick.Size/2+direction*72});
@@ -109,6 +135,22 @@ public sealed class GameplayReplay
             app.ControllerVelocity=Vector2.Zero;
             app.Ui.ClosePanels(); app.ResumeGame();
             app.Views[p.Id].SnapPosition();
+            if (s.Id.StartsWith("combat-") && s.Id != "combat-movement" || s.Id.StartsWith("dodge-") || s.Id == "turn-south-north")
+            {
+                combatHits=combatMisses=dodges=dodgedHits=0; turnSign=turnChanges=0;
+                var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
+                enemy.Region="reach"; enemy.Abilities.Clear();
+                if (s.Id is "combat-ahead" or "combat-behind" or "combat-enter" or "dodge-evasion")
+                {
+                    enemy.Region=p.Region; enemy.X=p.X+(s.Id=="combat-behind" ? -30 : s.Id=="combat-enter" ? 100 : 40); enemy.Y=p.Y;
+                    enemy.Health=enemy.MaxHealth=10000; enemy.Invulnerable=0; enemy.State=ActionState.Recovery; enemy.StateRemaining=100;
+                    app.Views[enemy.Id].SnapPosition();
+                }
+                double yaw=s.Id=="turn-south-north" ? -Math.PI/2 : 0;
+                app.Views[p.Id].Creature.ClearFacingRequest();
+                app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),yaw);
+                turnPrevious=yaw;
+            }
             origin=p.Position;
             app.Ui.Notify($"REPLAY · {app.Feel.Id} · {s.Id}");
             app.Trace.Scenario=s.Id; app.Trace.Marker("scenario-start/teleport");
@@ -153,6 +195,27 @@ public sealed class GameplayReplay
         }
         if(test.Id=="attack-readability" && local==145 && Math.Abs(PixelCreatures.Core.DMath.WrapAngle(app.Views["player"].Creature.Motor!.Yaw-incomingYaw))>.12)
             throw new InvalidOperationException("Incoming hit changed player facing");
+        if (test.Id == "combat-empty" && (local is 10 or 60 or 110)) TapAction("Attack");
+        if (test.Id is "combat-ahead" or "combat-behind" or "combat-enter" or "combat-wall")
+        {
+            if (local == 10) TapAction("Attack");
+            if (test.Id == "combat-enter" && local == 16)
+            {
+                var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
+                enemy.X=app.World.Player.X+30; enemy.Y=app.World.Player.Y; app.Views[enemy.Id].SnapPosition();
+            }
+        }
+        if (test.Id.StartsWith("dodge-"))
+        {
+            if (local == 12) TapAction("Dodge");
+            if (test.Id == "dodge-held" && local >= 36) direction=Vector2.Zero;
+            if (test.Id == "dodge-evasion" && local == 17)
+            {
+                var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
+                app.World.Projectiles.Add(new ProjectileState { Source=enemy.Id, Target="player", Ability="ember", X=app.World.Player.X, Y=app.World.Player.Y });
+            }
+        }
+        if (test.Id == "turn-south-north" && local >= 70) direction=Vector2.Zero;
         if(test.Id=="tap-stop" && local>=3) direction=Vector2.Zero;
         if(test.Id=="reversal" && local>=45) direction=Vector2.Left;
         if(test.Id=="eight-turns") direction=Vector2.Right.Rotated((local/20)*Mathf.Pi/4);
@@ -193,6 +256,15 @@ public sealed class GameplayReplay
         var p=app.World.Player.Position;
         if(!app.World.RegionsById[app.World.Player.Region].CanStand(p,app.World.Player))throw new InvalidOperationException("Replay lost footprint clearance: "+scenarios[index].Id);
         if(local>1)distance+=V.Distance(p,previous);
+        if (scenarios[index].Id=="turn-south-north")
+        {
+            var motor=app.Views["player"].Creature.Motor!;
+            double delta=PixelCreatures.Core.DMath.WrapAngle(motor.Yaw-turnPrevious);
+            double error=Math.Abs(PixelCreatures.Core.DMath.WrapAngle(motor.Context.TargetYaw-motor.Yaw));
+            int sign=Math.Abs(delta)>.00001 ? Math.Sign(delta) : 0;
+            if (error>.12 && sign!=0) { if(turnSign!=0 && sign!=turnSign) turnChanges++; turnSign=sign; }
+            turnPrevious=motor.Yaw;
+        }
         previous=p;
     }
     void EndScenario()
@@ -205,6 +277,12 @@ public sealed class GameplayReplay
         app.Trace.Marker("scenario-end");
         if(s.Id=="attack-readability" && !app.World.Events.Recent.Any(e=>e.Kind=="damage" && e.Target=="player"))throw new InvalidOperationException("Hit-reaction fixture never hit the player");
         if(s.Id=="attack-readability" && app.World.Events.Recent.Count(e=>e.Kind=="ability_started" && e.Actor=="player" && e.Value=="slash")!=3)throw new InvalidOperationException("Three Attack touches did not activate exactly three slashes");
+        if (s.Id=="combat-empty" && combatMisses!=3) throw new InvalidOperationException("Empty Attack touches did not produce three misses");
+        if ((s.Id is "combat-ahead" or "combat-enter") && combatHits!=1) throw new InvalidOperationException("Directional replay did not hit its eligible target: "+s.Id);
+        if ((s.Id is "combat-behind" or "combat-wall") && combatMisses!=1) throw new InvalidOperationException("Directional replay did not miss: "+s.Id);
+        if (s.Id.StartsWith("dodge-") && dodges!=1) throw new InvalidOperationException("Dodge touch did not start exactly one dodge: "+s.Id);
+        if (s.Id=="dodge-evasion" && dodgedHits!=1) throw new InvalidOperationException("Dodge did not reject the incoming projectile");
+        if (s.Id=="turn-south-north" && (turnChanges!=0 || Math.Abs(PixelCreatures.Core.DMath.WrapAngle(app.Views["player"].Creature.Motor!.Yaw-Math.PI/2))>.12)) throw new InvalidOperationException("South-to-north facing oscillated or did not complete");
         if(s.Id=="chest" && !app.World.RegionsById[p.Region].Depleted.Contains(12*64+18))throw new InvalidOperationException("Chest input interaction failed");
         if(!valid||!moved)throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
     }

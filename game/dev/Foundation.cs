@@ -249,6 +249,8 @@ public partial class Foundation : Node2D
         World.CombatDiagnostic += (kind, direction, context) =>
         {
             if (Trace.Active) Trace.Write(new { kind = "combat", action = kind, tick = World.Tick, x = direction.X, y = direction.Y, context });
+            if (OS.HasFeature("android") && (kind is "attack_started" or "attack_completed" or "dodge_started" or "dodge_completed"))
+                GD.Print($"MOSSLIGHT_COMBAT kind={kind} tick={World.Tick}");
         };
         World.Presentation += (id, cue, targetId) =>
         {

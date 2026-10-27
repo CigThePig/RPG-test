@@ -87,6 +87,34 @@ for preset in a.presets.split(','):
     for i,f in enumerate(chosen):
         im=Image.open(f);im.thumbnail((320,200));x=(i%4)*320;y=(i//4)*220;sheet.paste(im,(x,y));draw.text((x+5,y+201),f'{preset} t={(int(f.stem.split("-")[-1])-1)/2:.1f}s',fill='white')
     sheet.save(folder/'contact-sheet.jpg')
+    if not a.realtime and 'combat-empty' in groups:
+        # Extract actual movie frames at gameplay states, including 50ms samples
+        # matching the preferred 20-FPS procedural raster cadence.
+        requests=[]
+        for name in ['combat-empty','combat-ahead','combat-behind','combat-enter','combat-wall',
+                     'dodge-idle','dodge-held','dodge-wall','dodge-evasion']:
+            values=groups[name]
+            action='Windup' if name.startswith('combat') else 'Dodging'
+            start=next(i for i,r in enumerate(values) if r['action']==action)
+            for label,offset in [('start',0),('middle',8 if action=='Windup' else 12),('recovery',20)]:
+                row=values[min(start+offset,len(values)-1)]
+                requests.append((name+' '+label, max(0,int(row['frame'])-1)))
+        values=groups['dodge-idle']; start=next(i for i,r in enumerate(values) if r['action']=='Dodging')
+        for i in range(8): requests.append((f'dodge 20fps +{i*50}ms',max(0,int(values[min(start+i*3,len(values)-1)]['frame'])-1)))
+        values=groups['turn-south-north']
+        for i in range(8): requests.append((f'south to north {i}',max(0,int(values[min(i*7,len(values)-1)]['frame'])-1)))
+        indices=sorted(set(frame for _,frame in requests))
+        select='+'.join(f'eq(n\\,{frame})' for frame in indices)
+        run(['ffmpeg','-v','error','-y','-i',str(folder/'gameplay.mp4'),'-vf',f'select={select},scale=320:200','-vsync','0',str(folder/'combat-%03d.png')])
+        selected=sorted(folder.glob('combat-*.png'))
+        assert len(selected)==len(indices), 'Missing requested combat movie frames'
+        by_frame=dict(zip(indices,selected))
+        combat=Image.new('RGB',(1280,math.ceil(len(requests)/4)*220));draw=ImageDraw.Draw(combat)
+        for i,(label,frame) in enumerate(requests):
+            x=(i%4)*320;y=(i//4)*220;combat.paste(Image.open(by_frame[frame]).convert('RGB'),(x,y))
+            draw.text((x+4,y+202),f'{label} frame {frame}',fill='white')
+        combat.save(folder/'combat-contact-sheet.jpg')
+        for f in selected:f.unlink()
     if (folder/'gameplay.avi').exists(): (folder/'gameplay.avi').unlink()
     for f in images:f.unlink()
     report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(subprocess.check_output(['git','status','--porcelain'],cwd=root,text=True)),'preset':preset,'stateDigest':digest,'deterministicRepeat':True,'movieMode':not a.realtime,'captureStartUnix':capture_utc,'environment':session,'renderWallPacing':pacing,'simulationSeconds':(samples[-1]['tick']-samples[0]['tick'])/60,'wallSeconds':(samples[-1]['wallMs']-samples[0]['wallMs'])/1000,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}

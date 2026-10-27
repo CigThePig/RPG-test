@@ -52,6 +52,15 @@ public static class DodgeChecks
             for (int i = 0; i < 6; i++) w.Step(Dt);
             check(w.Damage(enemy, p, 5, "fire", periodic: true) && p.State == ActionState.Staggered && !World.DodgeImmune(p), "periodic damage retains existing effect and interrupts dodge");
             check(p.Cooldowns["dodge"] > 0, "interrupted dodge keeps cooldown");
+            p.State = ActionState.Idle; p.StateRemaining = 0; p.Invulnerable = 0; p.Cooldowns.Clear(); p.X = 520; p.Y = 500;
+            for (int y = 0; y < r.Height; y++) r.Tiles[y * r.Width + 23] = Terrain.Rock;
+            check(w.TryStartPlayerDodge(V.UnitX), "dodge starts toward a wall");
+            for (int i = 0; i < 24; i++) w.Step(Dt);
+            check(p.X <= 552 - p.Radius + .05f && r.CanStand(p.Position, p), "dodge collision stops at wall without tunnelling");
+            for (int y = 0; y < r.Height; y++) r.Tiles[y * r.Width + 23] = Terrain.Grass;
+            p.State = ActionState.Idle; p.StateRemaining = 0; p.Invulnerable = 0; p.Cooldowns.Clear(); p.X = 500; p.Y = 500;
+            check(w.TryStartPlayerDodge(V.UnitX), "dodge starts while vulnerable");
+            check(w.Damage(enemy, p, 5, "physical") && p.State == ActionState.Staggered && !World.DodgeImmune(p), "hit before immunity interrupts dodge normally");
             p.State = ActionState.Idle; p.StateRemaining = 0; p.Invulnerable = 0; p.Cooldowns.Clear();
             check(w.TryStartPlayerDodge(V.UnitX), "dodge starts before save");
             for (int i = 0; i < 8; i++) w.Step(Dt);

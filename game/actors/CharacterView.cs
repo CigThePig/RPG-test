@@ -14,6 +14,7 @@ public partial class CharacterView : Node2D
     float attackTime, attackDuration, impactTime;
     Vector2 attackDirection = Vector2.Right;
     bool attackArc;
+    bool previousWasDodging;
     public void Setup(ActorState actor)
     {
         State = actor;
@@ -54,7 +55,10 @@ public partial class CharacterView : Node2D
     public void Sync(float dt)
     {
         var now = new Vector2(State.X, State.Y);
-        Creature.MoveVelocity = State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
+        // The last dodge increment can arrive on the same frame as the transition
+        // to Idle. Do not let that displacement masquerade as walking intent.
+        bool dodgeDisplacement = State.State == ActionState.Dodging || previousWasDodging;
+        Creature.MoveVelocity = dodgeDisplacement || State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
         if (State.State is ActionState.Idle or ActionState.Moving && Creature.MoveVelocity.LengthSquared() > .25f) Creature.ClearFacingRequest();
         if (Creature.Motor != null)
         {
@@ -74,6 +78,7 @@ public partial class CharacterView : Node2D
         if (State.State is ActionState.Staggered or ActionState.Dead) attackDuration = 0;
         Creature.GroundPosition = now;
         previous = now;
+        previousWasDodging = State.State == ActionState.Dodging;
         Position = GodotConvert.GroundToScreen(State.X, State.Y);
         Creature.Resting = State.Activity == "rest" || !State.Alive;
         Modulate = State.Alive ? Colors.White : new Color(.45f, .4f, .4f, .6f);

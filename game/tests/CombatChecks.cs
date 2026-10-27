@@ -39,6 +39,52 @@ public static class CombatChecks
             check(w.TryStartPlayerSlash(V.UnitX), "directional slash starts with enemy behind");
             for (int i = 0; i < 9; i++) w.Step(Dt);
             check(enemy.Health == health, "directional slash misses enemy behind");
+            void ResetFight()
+            {
+                w.Cancel(p); p.X = 500; p.Y = 500; p.Cooldowns.Clear(); p.Invulnerable = 0;
+                enemy.Region = r.Id; enemy.Health = enemy.MaxHealth = 1000; enemy.Invulnerable = 0;
+                enemy.State = ActionState.Recovery; enemy.StateRemaining = 100; enemy.MotionX = enemy.MotionY = 0;
+            }
+            ResetFight(); enemy.X = 700; enemy.Y = 500;
+            w.TryStartPlayerSlash(V.UnitX);
+            for (int i = 0; i < 8; i++) w.Step(Dt);
+            enemy.X = p.X + 30; enemy.Y = p.Y; w.Step(Dt);
+            check(enemy.Health < 1000, "enemy entering reach during windup is evaluated at impact");
+            ResetFight(); enemy.X = 530; enemy.Y = 500;
+            w.TryStartPlayerSlash(V.UnitX);
+            for (int i = 0; i < 8; i++) w.Step(Dt);
+            enemy.X = 700; w.Step(Dt);
+            check(enemy.Health == 1000, "enemy leaving reach during windup avoids the hit");
+            foreach (float degrees in new[] { 50f, 60f })
+            {
+                ResetFight(); enemy.X = 700; enemy.Y = 500; w.TryStartPlayerSlash(V.UnitX);
+                for (int i = 0; i < 8; i++) w.Step(Dt);
+                float angle = degrees * MathF.PI / 180;
+                // Account for the next fixed-step lunge; test the impact position.
+                enemy.X = p.X + 2.81f + 35 * MathF.Cos(angle); enemy.Y = p.Y + 35 * MathF.Sin(angle);
+                w.Step(Dt);
+                check((enemy.Health < 1000) == (degrees < 55), "slash half-angle excludes targets beyond 55 degrees: " + degrees);
+            }
+            ResetFight(); enemy.X = 540; enemy.Y = 500;
+            var other = w.Actors.Values.Where(a => a.Profile == "beast" && a.Id != enemy.Id).First();
+            other.Region = r.Id; other.X = enemy.X; other.Y = enemy.Y; other.Health = other.MaxHealth = 1000;
+            other.Invulnerable = 0; other.State = ActionState.Recovery; other.StateRemaining = 100;
+            w.TryStartPlayerSlash(V.UnitX);
+            for (int i = 0; i < 9; i++) w.Step(Dt);
+            var first = StringComparer.Ordinal.Compare(enemy.Id, other.Id) < 0 ? enemy : other;
+            var second = first == enemy ? other : enemy;
+            check(first.Health < 1000 && second.Health == 1000, "equal-distance targets use ordinal ID and only one is damaged");
+            other.Region = "reach";
+            ResetFight(); p.X = 480; enemy.X = 545; enemy.Y = 500;
+            for (int y = 0; y < r.Height; y++) r.Tiles[y * r.Width + 21] = Terrain.Rock;
+            w.TryStartPlayerSlash(V.UnitX); for (int i = 0; i < 20; i++) w.Step(Dt);
+            check(enemy.Health == 1000 && r.CanStand(p.Position, p) && p.X <= 504 - p.Radius + .05f, "wall blocks slash line of sight and lunge collision");
+            for (int y = 0; y < r.Height; y++) r.Tiles[y * r.Width + 21] = Terrain.Grass;
+            ResetFight(); enemy.X = 700; w.TryStartPlayerSlash(V.UnitX);
+            for (int i = 0; i < 6; i++) w.Step(Dt);
+            float stopped = p.X; w.Cancel(p);
+            for (int i = 0; i < 20; i++) w.Step(Dt);
+            check(Math.Abs(p.X - stopped) < .001f, "interrupted lunge never resumes unused displacement");
             w.Cancel(p); p.Cooldowns.Clear(); p.Grasps = false;
             check(!w.TryStartPlayerSlash(V.UnitX) && !p.Cooldowns.ContainsKey("slash"), "incompatible anatomy rejects slash without cooldown");
         }
