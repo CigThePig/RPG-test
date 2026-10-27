@@ -49,7 +49,11 @@ public sealed class PlaytestTrace : IDisposable
         if(e is InputEventScreenTouch t) Write(new {kind="touch", tick=app.World.Tick, frame=Engine.GetFramesDrawn(), wallMs=clock.Elapsed.TotalMilliseconds, finger=t.Index, x=t.Position.X, y=t.Position.Y, pressed=t.Pressed, canceled=t.Canceled});
         if(e is InputEventScreenDrag d) Write(new {kind="drag", tick=app.World.Tick, frame=Engine.GetFramesDrawn(), wallMs=clock.Elapsed.TotalMilliseconds, finger=d.Index, x=d.Position.X, y=d.Position.Y});
     }
-    public void Flush() => writer?.Flush();
+    public void Flush()
+    {
+        try {writer?.Flush();}
+        catch(IOException) { Dispose(); }
+    }
     public void Frame(double delta)
     {
         if(Active)Write(new {kind="render-frame", frame=Engine.GetFramesDrawn(), tick=app.World.Tick, wallMs=clock.Elapsed.TotalMilliseconds, engineDeltaMs=delta*1000});
@@ -72,5 +76,5 @@ public sealed class PlaytestTrace : IDisposable
             physicsMs=dt*1000, simulationMs=app.SimulationMs, droppedSeconds=app.DroppedSeconds, fps=Engine.GetFramesPerSecond(), rasterMs=CreatureRenderQueue.LastRasterMs, uploadMs=CreatureRenderQueue.LastUploadMs,
             managedBytes=app.World.Tick%60==0 ? GC.GetTotalMemory(false) : 0 });
     }
-    public void Dispose() { writer?.Dispose(); writer=null; clock.Stop(); }
+    public void Dispose() { try {writer?.Dispose();} catch(IOException) { } finally {writer=null; clock.Stop();} }
 }

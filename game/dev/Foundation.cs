@@ -203,7 +203,7 @@ public partial class Foundation : Node2D
             World.Player.Reputation[faction] = World.Player.Reputation.GetValueOrDefault(faction) + amount;
             World.Events.Publish(new("reputation_changed", "player", "", faction, amount));
         }));
-        GD.Print($"MOSSLIGHT_READY actors={World.Actors.Count} families={CreatureRuntime.Registry.Families.Count()} framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+        GD.Print($"MOSSLIGHT_READY actors={World.Actors.Count} families={CreatureRuntime.Registry.Families.Count()} framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription} source={BuildIdentity.Source}");
         var preset=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--preset="))?.Split('=',2)[1];
         SelectFeel(MovementFeel.Presets.FirstOrDefault(x=>x.Id==preset) ?? MovementFeel.Presets[1]);
         if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
@@ -507,6 +507,13 @@ public partial class Foundation : Node2D
                 DrawCircle(Vector2.Zero,2,Colors.Gold);DrawSetTransform(Vector2.Zero);
             }
             var playerScreen=GodotConvert.GroundToScreen(player.X,player.Y);
+            var desired=World.RequestedVelocity*.2f;
+            var accepted=World.ActualVelocity*.2f;
+            var requestedEnd=playerScreen+GodotConvert.GroundToScreen(desired.X,desired.Y);
+            var acceptedEnd=playerScreen+GodotConvert.GroundToScreen(accepted.X,accepted.Y);
+            DrawLine(playerScreen,requestedEnd,Colors.DodgerBlue,3);
+            DrawLine(playerScreen,acceptedEnd,Colors.LimeGreen,2);
+            DrawLine(acceptedEnd,requestedEnd,Colors.Red,1);
             var input=World.LastInput*40;
             DrawLine(playerScreen,playerScreen+GodotConvert.GroundToScreen(input.X,input.Y),World.LastBlockedReason=="" ? Colors.Gold : Colors.Red,2);
             foreach(var actor in World.Actors.Values.Where(a=>a.Region==player.Region))

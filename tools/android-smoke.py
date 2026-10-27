@@ -40,6 +40,8 @@ try:
         if 'FATAL EXCEPTION' in logs or 'Fatal signal' in logs: raise RuntimeError('Android crash during launch')
         time.sleep(2)
     else: raise RuntimeError('C# scene or imported dialogue readiness marker never arrived')
+    source=run('git','rev-parse','HEAD',text=True).strip()
+    assert 'source='+source in logs, 'Exported build is missing its exact source revision'
     # Landscape UI coordinate scaled from the logical 1280x800 base.
     bounds=adb('shell','wm','size').split()[-1].split('x');w,h=sorted(map(int,bounds),reverse=True)
     def tap(x,y): adb('shell','input','tap',str(int(x*w/1280)),str(int(y*h/800)))
@@ -158,6 +160,16 @@ try:
     (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, inventory screenshot, gameplay ticks, background input cancellation/resume. ARM64 device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
+    # Preserve the real surface recording on failure as well as success. ADB
+    # process termination alone can leave screenrecord running with an unclosed MP4.
+    if recorder is not None and recorder.poll() is None:
+        try:
+            for pid in adb('shell','pidof','screenrecord').split():
+                if pid.isdigit(): adb('shell','kill','-2',pid)
+            recorder.communicate(timeout=15)
+            adb('pull','/sdcard/mosslight-playtest.mp4',str(out/'gameplay-failure.mp4'))
+        except Exception as error:
+            (out/'recording-cleanup.log').write_text(str(error))
     if recorder is not None and recorder.poll() is None:
         recorder.terminate()
         try: recorder.wait(timeout=10)

@@ -362,7 +362,7 @@ public sealed class World
         var a = Player;
         ActualVelocity=RequestedVelocity=Vector2.Zero;
         CollisionAttempts=CollisionSlides=0;
-        LastInput=direction; LastBlockedReason="";
+        LastInput=float.IsFinite(direction.X) && float.IsFinite(direction.Y) ? direction : Vector2.Zero; LastBlockedReason="";
         if (a.State is not (ActionState.Idle or ActionState.Moving)) { LastBlockedReason="Action: "+a.State; return false; }
         if(!float.IsFinite(dt)||dt<=0||!float.IsFinite(speedScale)||speedScale<0||!float.IsFinite(direction.X)||!float.IsFinite(direction.Y))return false;
         float magnitude=projected ? new Vector2(direction.X,direction.Y*.5f).Length() : direction.Length();
