@@ -81,6 +81,19 @@ public static class MovementChecks
             motor.TriggerGameplayAction(.14,.24);
             motor.TriggerHit(Vec3.UnitX);
             check(!motor.ActionActive,"incoming hit cancels interrupted attack pose instead of completing a ghost swing");
+            var view=app.Views["player"];
+            var viewMotor=view.Creature.Motor!;
+            view.SnapPosition();view.Creature.ClearFacingRequest();
+            viewMotor.Teleport(new Vec3(p.X,0,p.Y),0);
+            p.State=ActionState.Staggered;p.X-=15;view.Cue("hit");view.Sync(1f/60);
+            for(int i=0;i<20;i++)
+            {
+                if(i==14)p.State=ActionState.Idle;
+                view.Sync(1f/60);
+                // Legacy baseline derives and smooths velocity from external positions.
+                viewMotor.SetWorldPosition(new Vec3(p.X,0,p.Y));viewMotor.Step(1.0/60);
+            }
+            check(Math.Abs(viewMotor.Yaw)<.001,"stationary post-stagger view ignores residual baseline motor velocity");
             Persistence.Restore(w,app.Narrative,saved);
             string beforeCourse=Persistence.Capture(w,app.Narrative);
             var autosave=File.Exists(Persistence.AutosavePath) ? File.ReadAllBytes(Persistence.AutosavePath) : null;

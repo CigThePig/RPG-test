@@ -56,7 +56,7 @@ public partial class CharacterView : Node2D
         var now = new Vector2(State.X, State.Y);
         Creature.MoveVelocity = State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
         if (State.State is ActionState.Idle or ActionState.Moving && Creature.MoveVelocity.LengthSquared() > .25f) Creature.ClearFacingRequest();
-        if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = State.State is ActionState.Idle or ActionState.Moving;
+        if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = (State.State is ActionState.Idle or ActionState.Moving) && Creature.MoveVelocity.LengthSquared() > .25f;
         if (!Creature.Paused) attackTime += dt;
         if (State.State is ActionState.Staggered or ActionState.Dead) attackDuration = 0;
         Creature.GroundPosition = now;
