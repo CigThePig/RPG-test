@@ -12,7 +12,7 @@ public sealed class GameplayReplay
     V origin;
     float distance;
     double incomingYaw;
-    int combatHits, combatMisses, dodges, dodgedHits;
+    int combatHits, combatMisses, dodges, dodgedHits, lungeCollisions;
     int turnSign, turnChanges;
     double turnPrevious;
     readonly List<object> results=new();
@@ -62,6 +62,7 @@ public sealed class GameplayReplay
             if (kind == "attack_impact") { if (context.StartsWith("hit/")) combatHits++; else combatMisses++; }
             if (kind == "dodge_started") dodges++;
             if (kind == "direct_hit_dodged") dodgedHits++;
+            if (kind == "attack_lunge_collision") lungeCollisions++;
         };
         app.Trace.Marker("replay-warmup");
         app.ResumeGame();
@@ -137,7 +138,12 @@ public sealed class GameplayReplay
             app.Views[p.Id].SnapPosition();
             if (s.Id.StartsWith("combat-") && s.Id != "combat-movement" || s.Id.StartsWith("dodge-") || s.Id == "turn-south-north")
             {
-                combatHits=combatMisses=dodges=dodgedHits=0; turnSign=turnChanges=0;
+                combatHits=combatMisses=dodges=dodgedHits=lungeCollisions=0; turnSign=turnChanges=0;
+                if (s.Id is "combat-wall" or "dodge-wall")
+                {
+                    // Start two units from the wall using the actual actor radius.
+                    p.X=720-p.Radius-2; app.Views[p.Id].SnapPosition();
+                }
                 var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
                 enemy.Region="reach"; enemy.Abilities.Clear();
                 if (s.Id is "combat-ahead" or "combat-behind" or "combat-enter" or "dodge-evasion")
@@ -280,6 +286,8 @@ public sealed class GameplayReplay
         if (s.Id=="combat-empty" && combatMisses!=3) throw new InvalidOperationException("Empty Attack touches did not produce three misses");
         if ((s.Id is "combat-ahead" or "combat-enter") && combatHits!=1) throw new InvalidOperationException("Directional replay did not hit its eligible target: "+s.Id);
         if ((s.Id is "combat-behind" or "combat-wall") && combatMisses!=1) throw new InvalidOperationException("Directional replay did not miss: "+s.Id);
+        if (s.Id=="combat-wall" && lungeCollisions==0) throw new InvalidOperationException("Lunge fixture never contacted the wall");
+        if (s.Id=="dodge-wall" && (distance>5 || !valid)) throw new InvalidOperationException("Wall did not block the dodge");
         if (s.Id.StartsWith("dodge-") && dodges!=1) throw new InvalidOperationException("Dodge touch did not start exactly one dodge: "+s.Id);
         if (s.Id=="dodge-evasion" && dodgedHits!=1) throw new InvalidOperationException("Dodge did not reject the incoming projectile");
         if (s.Id=="turn-south-north" && (turnChanges!=0 || Math.Abs(PixelCreatures.Core.DMath.WrapAngle(app.Views["player"].Creature.Motor!.Yaw-Math.PI/2))>.12)) throw new InvalidOperationException("South-to-north facing oscillated or did not complete");

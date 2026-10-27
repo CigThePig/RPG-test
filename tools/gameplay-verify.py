@@ -122,7 +122,7 @@ for preset in a.presets.split(','):
             # Center on the authoritative player's projected ground point, keeping
             # headroom for limb and trail inspection at the real 20-FPS cadence.
             cx=float(row['playerScreenX']);cy=float(row['playerScreenY'])
-            crop=img.crop((round(cx-120),round(cy-130),round(cx+120),round(cy+20))).resize((320,200),Image.Resampling.NEAREST)
+            crop=img.crop((round(cx-120),round(cy-110),round(cx+120),round(cy+40))).resize((320,200),Image.Resampling.NEAREST)
             close.paste(crop,(x,y))
             draw.text((x+4,y+202),f'{label} frame {frame}',fill='white')
             close_draw.text((x+4,y+202),f'{label} frame {frame}',fill='white')

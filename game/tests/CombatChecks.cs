@@ -82,10 +82,10 @@ public static class CombatChecks
             var second = first == enemy ? other : enemy;
             check(first.Health < 1000 && second.Health == 1000, "equal-distance targets use ordinal ID and only one is damaged");
             other.Region = "reach";
-            ResetFight(); p.X = 480; enemy.X = 545; enemy.Y = 500;
+            ResetFight(); p.X = 490; enemy.X = 545; enemy.Y = 500;
             for (int y = 0; y < r.Height; y++) r.Tiles[y * r.Width + 21] = Terrain.Rock;
             w.TryStartPlayerSlash(V.UnitX); for (int i = 0; i < 20; i++) w.Step(Dt);
-            check(enemy.Health == 1000 && r.CanStand(p.Position, p) && p.X <= 504 - p.Radius + .05f, "wall blocks slash line of sight and lunge collision");
+            check(enemy.Health == 1000 && r.CanStand(p.Position, p) && p.X <= 504 - p.Radius + .05f && p.X < 501.9f, "wall blocks slash line of sight and lunge collision");
             ResetFight(); p.X = 490; enemy.X = 700;
             w.TryStartPlayerSlash(V.Normalize(new V(1,1))); for (int i = 0; i < 15; i++) w.Step(Dt);
             check(r.CanStand(p.Position,p) && p.X <= 504-p.Radius+.05f && p.Y > 500, "diagonal lunge slides safely along wall");
