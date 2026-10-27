@@ -129,6 +129,10 @@ public sealed class GameplayReplay
             if(local>=10)direction=Vector2.Zero;
             if(local is 25 or 75 or 150)
             {
+                // Reset target range after knockback so every speed preset exercises the same three strikes.
+                var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
+                enemy.X=app.World.Player.X+28;enemy.Y=app.World.Player.Y;app.Views[enemy.Id].SnapPosition();
+                app.Trace.Marker("fixture/target-range-reset-for-slash");
                 var button=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.StartsWith("Attack"));
                 var pos=button.GetGlobalRect().GetCenter();
                 Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=pos});

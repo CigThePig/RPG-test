@@ -81,6 +81,7 @@ public static class MovementChecks
             motor.TriggerGameplayAction(.14,.24);
             motor.TriggerHit(Vec3.UnitX);
             check(!motor.ActionActive,"incoming hit cancels interrupted attack pose instead of completing a ghost swing");
+            app.RebuildViews(); // Bind presentation to the current restored authoritative actors.
             var view=app.Views["player"];
             var viewMotor=view.Creature.Motor!;
             view.SnapPosition();view.Creature.ClearFacingRequest();
