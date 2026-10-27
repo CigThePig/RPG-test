@@ -1,6 +1,7 @@
 """Hosted x86_64 Android runtime smoke; ARM64 phone performance remains separate."""
 from pathlib import Path
 import os, subprocess, sys, time, re, json
+import xml.etree.ElementTree as ET
 from PIL import Image
 from io import BytesIO
 out=Path('build/android-runtime');out.mkdir(parents=True,exist_ok=True)
@@ -42,6 +43,34 @@ try:
     # Landscape UI coordinate scaled from the logical 1280x800 base.
     bounds=adb('shell','wm','size').split()[-1].split('x');w,h=sorted(map(int,bounds),reverse=True)
     def tap(x,y): adb('shell','input','tap',str(int(x*w/1280)),str(int(y*h/800)))
+    def ensure_foreground(timeout=30):
+        deadline=time.monotonic()+timeout
+        while time.monotonic()<deadline:
+            windows=adb('shell','dumpsys','window','windows')
+            focus=next((line for line in windows.splitlines() if 'mCurrentFocus=' in line),'')
+            if package in focus: return
+            # Hosted Google APIs images can show an unrelated launcher ANR over
+            # a healthy game. Inspect the actual native modal, never dismiss a
+            # Mosslight ANR or accept scenery behind a blocking system dialog.
+            adb('shell','uiautomator','dump','/sdcard/mosslight-window.xml')
+            xml=adb('shell','cat','/sdcard/mosslight-window.xml')
+            (out/'native-window.xml').write_text(xml)
+            if "isn't responding" in xml or 'is not responding' in xml:
+                texts=[n.get('text','') for n in ET.fromstring(xml).iter('node')]
+                assert any('Pixel Launcher' in text and 'responding' in text for text in texts), 'Game or unexpected application ANR blocks input'
+                nodes=ET.fromstring(xml).iter('node')
+                close=next((n for n in nodes if n.get('resource-id')=='android:id/aerr_close' or n.get('text')=='Close app'),None)
+                assert close is not None, 'Launcher ANR close control missing'
+                box=list(map(int,re.findall(r'\d+',close.get('bounds',''))))
+                assert len(box)==4
+                adb('shell','input','tap',str((box[0]+box[2])//2),str((box[1]+box[3])//2))
+                continue
+            got_it=next((n for n in ET.fromstring(xml).iter('node') if n.get('text')=='Got it'),None)
+            if got_it is not None:
+                box=list(map(int,re.findall(r'\d+',got_it.get('bounds',''))))
+                if len(box)==4: adb('shell','input','tap',str((box[0]+box[2])//2),str((box[1]+box[3])//2))
+            time.sleep(.5)
+        raise RuntimeError('Mosslight never acquired foreground input focus')
     # Fresh Android emulators display a system immersive-mode confirmation over
     # Godot on first launch. Dismiss it before taking evidence or tapping our menu.
     tap(880,190) # System 'Got it', outside the game UI.
@@ -63,9 +92,15 @@ try:
                 return
             if time.monotonic()>=deadline: raise AssertionError(f'{name}: missing rendered world (colors={colors}, terrain_pixels={green})')
             time.sleep(1)
+    ensure_foreground()
     capture('start-menu.png',wait=45)
-    tap(640,150) # First menu button: Enter / Resume.
-    time.sleep(8)
+    tap(640,178) # Center of Enter / Resume; avoid its top edge.
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline:
+        if 'MOSSLIGHT_SESSION_STARTED' in adb('logcat','-d'): break
+        ensure_foreground(timeout=10)
+        time.sleep(.5)
+    else: raise RuntimeError('Resume tap never entered a gameplay session')
     # ADB screenrecord captures the actual Android surface, including frame pacing.
     recording_start=time.time()
     recorder=subprocess.Popen([adb_path,'shell','screenrecord','--bit-rate','4000000','--time-limit','90','/sdcard/mosslight-playtest.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -74,6 +109,7 @@ try:
     for attempt in range(12):
         adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(280*w/1280)),str(int(640*h/800)),'600')
         time.sleep(.4)
+        ensure_foreground(timeout=10)
         logs=adb('logcat','-d')
         positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
         if positions and float(positions[-1][0])>=265: break

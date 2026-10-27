@@ -58,7 +58,7 @@ public partial class Foundation : Node2D
     // A real simulation tick also establishes a session, regardless of which UI
     // route dismissed the initial menu. Loaded progress is eligible for recovery.
     public bool SessionStarted => sessionEntered || (World != null && World.Tick > 0);
-    public void ResumeGame() { sessionEntered = true; Ui.HideMenu(); }
+    public void ResumeGame() { sessionEntered = true; Ui.HideMenu(); if(OS.HasFeature("android"))GD.Print($"MOSSLIGHT_SESSION_STARTED tick={World.Tick}"); }
     public Vector2 TouchMovement { get; set; }
     public bool CanManageItems => !suspended && World.Player.Alive && !Narrative.Get("speaking").AsBool() && !ui.MenuOpen;
     public bool ManageItem(Func<bool> operation) => CanManageItems && operation();
