@@ -136,6 +136,12 @@ public partial class RpgUi : CanvasLayer
     readonly Dictionary<int, Button> touchButtons = new();
     public override void _Input(InputEvent e)
     {
+        // Hotbar touches are dispatched below for independent multitouch ownership.
+        // Godot also synthesizes a mouse click for the same finger; consuming that
+        // event prevents a second native Button.Pressed without disabling mouse
+        // emulation for menus, dialogue, scroll panels or actual desktop mice.
+        if (e is InputEventMouse mouse && mouse.Device == InputEvent.DeviceIdEmulation && hotbar.IsVisibleInTree() && hotbar.GetGlobalRect().HasPoint(mouse.Position))
+        { GetViewport().SetInputAsHandled(); return; }
         if (e is not InputEventScreenTouch touch) return;
         if (touch.Pressed)
         {

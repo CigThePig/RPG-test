@@ -356,6 +356,7 @@ public partial class Foundation : Node2D
 
         World.Interact(a);
         ui.Notify(World.InteractionFeedback);
+        if (OS.HasFeature("android")) GD.Print($"MOSSLIGHT_INTERACT feedback={World.InteractionFeedback}");
         drawnRegion = "";
     }
 

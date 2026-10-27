@@ -25,6 +25,17 @@ public static class VisualChecks
         await Frames(app, 30);
         await Capture(app, "menu");
         app.Ui.Menu();
+        await Frames(app,2);
+        // Use real GUI dispatch for desktop mice; headless checks exercise raw touch.
+        var draught=app.Ui.GetChildren().OfType<Control>().First().FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.Contains("Draught"));
+        var point=draught.GetGlobalRect().GetCenter();
+        int potions=app.World.Items.Count("player","potion");
+        Input.ParseInputEvent(new InputEventMouseButton { Device=0,ButtonIndex=MouseButton.Left,Pressed=true,Position=point,GlobalPosition=point });
+        await Frames(app,1);
+        Input.ParseInputEvent(new InputEventMouseButton { Device=0,ButtonIndex=MouseButton.Left,Pressed=false,Position=point,GlobalPosition=point });
+        await Frames(app,2);
+        if(app.World.Items.Count("player","potion")!=potions-1) throw new InvalidOperationException("Real desktop mouse hotbar dispatch failed");
+        app.World.Items.Add("player","potion");
         // Input flows through Godot's actual action mapping and physics process.
         float before = app.World.Player.X;
         Input.ActionPress("east");
