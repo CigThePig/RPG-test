@@ -36,7 +36,7 @@ for preset in a.presets.split(','):
         return hashlib.sha256(json.dumps(state).encode()).hexdigest()
     digest=state_digest(rows)
     repeat=folder/'repeat';repeat.mkdir(exist_ok=True)
-    repeat_command=[os.environ.get('GODOT','godot'),'--headless','--path',str(root),'--audio-driver','Dummy','--fixed-fps','60','--','--gameplay-check','--mobile-ui',f'--preset={preset}',f'--evidence={repeat}']
+    repeat_command=[os.environ.get('GODOT','godot'),'--resolution','1280x800','--path',str(root),'--audio-driver','Dummy','--fixed-fps','60','--','--gameplay-check','--mobile-ui',f'--preset={preset}',f'--evidence={repeat}']
     repeated=subprocess.run(repeat_command,cwd=root,capture_output=True,text=True,timeout=120)
     (repeat/'engine.log').write_text(repeated.stdout+repeated.stderr)
     assert repeated.returncode==0 and 'GAMEPLAY REPLAY PASSED' in repeated.stdout and 'ERROR:' not in repeated.stdout+repeated.stderr, 'Replay repetition failed'

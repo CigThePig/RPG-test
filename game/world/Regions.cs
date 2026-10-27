@@ -48,10 +48,12 @@ public sealed class RegionState
     }
 
     public bool BlocksSight(int index) => index < 0 || index >= Tiles.Length || Tiles[index] is Terrain.Wall or Terrain.Rock || (Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index));
-    public bool CanStand(Vector2 p, ActorState a)
+    public bool CanStand(Vector2 p, ActorState a) => BlockingCell(p,a)==-1;
+    // -1 means clear; -2 is a boundary/invalid position; otherwise the blocking footprint tile.
+    public int BlockingCell(Vector2 p, ActorState a)
     {
         if (!float.IsFinite(p.X) || !float.IsFinite(p.Y) || p.X - a.Radius < 0 || p.Y - a.Radius < 0 || p.X + a.Radius >= Width * Tile || p.Y + a.Radius >= Height * Tile)
-            return false;
+            return -2;
         // Circle versus every intersected tile: the four-corner approximation missed
         // interior blockers for large bodies and falsely blocked rounded corners.
         for (int y = (int)((p.Y - a.Radius) / Tile); y <= (int)((p.Y + a.Radius) / Tile); y++)
@@ -59,9 +61,9 @@ public sealed class RegionState
             {
                 if (Passable(y * Width + x, a)) continue;
                 var nearest = new Vector2(Math.Clamp(p.X, x * Tile, (x + 1) * Tile), Math.Clamp(p.Y, y * Tile, (y + 1) * Tile));
-                if (Vector2.DistanceSquared(p, nearest) < a.Radius * a.Radius) return false;
+                if (Vector2.DistanceSquared(p, nearest) < a.Radius * a.Radius) return y * Width + x;
             }
-        return true;
+        return -1;
     }
 
     public bool CanTravel(Vector2 from, Vector2 to, ActorState a)

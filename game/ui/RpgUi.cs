@@ -469,7 +469,7 @@ public partial class RpgUi : CanvasLayer
         Button(body,App.Trace.Active ? "Stop local recording" : "Start local recording",()=>
         {
             if(App.Trace.Active)App.Trace.Dispose();
-            else App.Trace.Start(ProjectSettings.GlobalizePath("user://playtests/session.jsonl"));
+            else { try {App.Trace.Start(ProjectSettings.GlobalizePath("user://playtests/session.jsonl"));} catch(Exception e) {Notify("Recording failed: "+e.Message);return;} }
             ClosePanels(); Notify(App.Trace.Active ? "Recording · tap Mark issue at any time" : "Recording stopped");
         });
         foreach(var label in new[]{"Movement too slow","Turning awkward","Collision sticky","Camera wrong","Animation disconnected","Performance stutter"})

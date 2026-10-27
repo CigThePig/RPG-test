@@ -329,23 +329,26 @@ public sealed class World
             if (a.Id == "player")
             {
                 CollisionAttempts++;
-                int at = r.Index(a.Position + delta);
-                LastBlockedReason = at < 0 ? "Map boundary" : r.Features.GetValueOrDefault(at) == "lock" ? "Locked door" : "Terrain / footprint: " + r.Tiles[at];
+                int at = r.BlockingCell(a.Position + delta,a);
+                LastBlockedReason = at < 0 ? "Map boundary" : r.Features.GetValueOrDefault(at) == "lock" ? "Locked door" : $"Terrain / footprint: {r.Tiles[at]} at {at%r.Width},{at/r.Width}";
             }
-            var x = new Vector2(a.X + delta.X, a.Y);
-            if (r.CanStand(x, a))
+            // Advance to contact before sliding. Previously an entire (up to 2px)
+            // substep vanished at contact; deterministic bisection retains the valid
+            // part and makes wall clearance less sensitive to approach speed.
+            float lo=0,hi=1;
+            for(int k=0;k<6;k++) { float mid=(lo+hi)*.5f; if(r.CanStand(a.Position+delta*mid,a))lo=mid;else hi=mid; }
+            var accepted=delta*lo;
+            a.X+=accepted.X;a.Y+=accepted.Y;moved |= accepted.LengthSquared()>0;
+            var remainder=delta*(1-lo);
+            // Prefer the larger tangent request rather than always preferring X.
+            bool xFirst=Math.Abs(remainder.X)>=Math.Abs(remainder.Y);
+            for(int axis=0;axis<2;axis++)
             {
-                if(a.Id=="player" && delta.X!=0)CollisionSlides++;
-                a.X = x.X;
-                moved |= delta.X != 0;
-            }
-
-            var y = new Vector2(a.X, a.Y + delta.Y);
-            if (r.CanStand(y, a))
-            {
-                if(a.Id=="player" && delta.Y!=0)CollisionSlides++;
-                a.Y = y.Y;
-                moved |= delta.Y != 0;
+                bool horizontal=(axis==0)==xFirst;
+                var slide=horizontal ? new Vector2(remainder.X,0) : new Vector2(0,remainder.Y);
+                if(slide.LengthSquared()==0 || !r.CanStand(a.Position+slide,a))continue;
+                a.X+=slide.X;a.Y+=slide.Y;moved=true;
+                if(a.Id=="player")CollisionSlides++;
             }
         }
 
