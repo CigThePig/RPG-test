@@ -26,6 +26,7 @@ public partial class CharacterView : Node2D
             UseMeasuredExternalVelocity = true,
             SyncNodePosition = false,
             AnimationFps = 10,
+            ActionAnimationFps = 30,
             Quality = 1,
             CullOffscreen = true
         };
@@ -67,7 +68,8 @@ public partial class CharacterView : Node2D
         {
             var motor = Creature.Motor;
             motor.Options.FaceVelocity = (State.State is ActionState.Idle or ActionState.Moving) && Creature.MoveVelocity.LengthSquared() > .25f;
-            motor.DodgeProgress = State.State == ActionState.Dodging ? State.ActionElapsed / CombatTuning.DodgeDuration : null;
+            motor.DodgeProgress = State.State == ActionState.Dodging ? State.ActionElapsed / CombatTuning.DodgeDuration :
+                previousWasDodging && State.State == ActionState.Idle ? 1.0 : null;
             motor.DodgeBiped = State.Appearance.Family == "biped";
             if (motor.DodgeProgress.HasValue)
             {
@@ -114,6 +116,12 @@ public partial class CharacterView : Node2D
             impactTime = ability?.Windup ?? .14f;
             attackDuration = impactTime + (ability?.Recovery ?? .24f);
             attackArc = cue == "attack" && ability?.Id == "slash";
+        }
+        if (cue == "dodge")
+        {
+            // Preserve the initial combat-facing yaw so the roll axis remains stable.
+            Creature.LockFacingYaw(Creature.Motor?.Yaw ?? 0);
+            if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
         }
         if (cue == "hit")
         {

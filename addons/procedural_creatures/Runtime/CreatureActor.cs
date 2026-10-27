@@ -36,6 +36,8 @@ namespace PixelCreatures.Runtime
         [Export(PropertyHint.Range, "0,60")] public int AnimationFps { get; set; } = 15;
         /// <summary>Classic stepped look: the node moves only on animation ticks.</summary>
         [Export] public bool SteppedMovement { get; set; }
+        /// <summary>Optional higher pose rasterization frequency only while performing a biped roll.</summary>
+        [Export(PropertyHint.Range, "0,60")] public int ActionAnimationFps { get; set; }
         [Export] public FacingMode Facing { get; set; } = FacingMode.Eight;
         [Export] public bool DrawShadow { get; set; } = true;
         [Export(PropertyHint.Range, "0,2")] public int Quality { get; set; } = 2;
@@ -110,6 +112,7 @@ namespace PixelCreatures.Runtime
         private bool _restRequest;
         private bool _started;
         private bool _culled;
+        private bool _wasActionRendering;
         private Vector2I _extentMin, _extentMax;
 
         public override void _Ready()
@@ -361,7 +364,15 @@ namespace PixelCreatures.Runtime
                 EmitSignal(SignalName.MotionStateChanged, state.ToString());
             }
 
-            double frameInterval = AnimationFps > 0 ? 1.0 / AnimationFps : 0;
+            bool actionRendering = Motor.DodgeBiped && Motor.DodgeProgress.HasValue;
+            if (actionRendering != _wasActionRendering)
+            {
+                _dirty = true; // First crouch and final recovery must not wait for the idle-rate tick.
+                _sinceRender = 1e9;
+                _wasActionRendering = actionRendering;
+            }
+            int poseFps = actionRendering ? Math.Max(AnimationFps, ActionAnimationFps) : AnimationFps;
+            double frameInterval = poseFps > 0 ? 1.0 / poseFps : 0;
             bool tick = steps > 0 && _sinceRender + 1e-9 >= frameInterval;
             Vector2 screen = GodotConvert.GroundToScreen(GroundPosition.X, GroundPosition.Y);
             if (SurfaceHeight != null) screen.Y -= SurfaceHeight(GroundPosition);

@@ -108,6 +108,36 @@ public static class MovementChecks
                 for(int i=0;i<24;i++) { dodgeMotor.DodgeProgress=i/24.0; dodgeMotor.Step(1.0/60); }
                 check(double.IsFinite(dodgeMotor.Params.BodyPitch) && double.IsFinite(dodgeMotor.Params.Crouch), "dodge pose remains safe for family "+family.Id);
             }
+            // New roll is a separate contact-aware action pose; it must not corrupt
+            // the walking plant solver and must be deterministic for diagonal travel.
+            foreach (ulong seed in new ulong[] { 42, 1337 })
+            {
+                var rm=CreatureRuntime.Build(CreatureRuntime.Sample("biped",seed));
+                foreach(var direction in new[]{(f:1.0,s:0.0),(f:0.0,s:1.0),(f:.70710678,s:.70710678),(f:-1.0,s:0.0)})
+                {
+                    var rollMotor=new CreatureMotor(rm,CreatureRuntime.Registry,new MotorOptions { InternalDrive=false, FaceVelocity=false });
+                    rollMotor.DodgeBiped=true;
+                    rollMotor.DodgeForwardComponent=direction.f; rollMotor.DodgeSideComponent=direction.s;
+                    rollMotor.Teleport(Vec3.Zero,0);
+                    for(int frame=0;frame<=24;frame++)
+                    {
+                        rollMotor.DodgeProgress=frame/24.0;
+                        rollMotor.SetWorldPosition(Vec3.Zero,Vec3.Zero);
+                        rollMotor.Step(1.0/60);
+                        if(frame==0||frame==7||frame==12||frame==18||frame==24)
+                        {
+                            var pose=rollMotor.Pose.Skeleton;
+                            check(rollMotor.Params.OverrideBodyRotation && double.IsFinite(pose.World[rm.Anatomy.Rig.Head].Origin.Y)
+                                && double.IsFinite(pose.World[rm.Anatomy.Rig.Pelvis].Origin.Y),
+                                "contact roll pose finite "+seed+" "+direction+" "+frame);
+                        }
+                    }
+                    rollMotor.DodgeProgress=null;
+                    rollMotor.Step(1.0/60);
+                    check(!rollMotor.Params.OverrideBodyRotation && !((LeggedLocomotion)rollMotor.Locomotion).RollActive,
+                        "roll returns gait ownership "+seed+" "+direction);
+                }
+            }
             motor.FacingOverride=null;
             motor.TriggerGameplayAction(.14,.24);
             for(int i=0;i<22;i++)motor.Step(1.0/60);

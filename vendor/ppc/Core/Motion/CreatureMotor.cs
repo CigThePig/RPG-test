@@ -70,6 +70,7 @@ namespace PixelCreatures.Core.Motion
         private bool _pendingAction;
         private ActionStyle _pendingStyle;
         private long _steps;
+        private bool _wasRolling;
 
         public MotorOptions Options { get; }
         public CreatureModel Model { get; }
@@ -260,6 +261,13 @@ namespace PixelCreatures.Core.Motion
                 _action.Trigger(ctx, _pendingStyle);
             }
 
+            bool rolling = DodgeProgress.HasValue && DodgeBiped && _loco is LeggedLocomotion;
+            if (_loco is LeggedLocomotion legs)
+            {
+                legs.RollActive = rolling;
+                if (!rolling && _wasRolling) legs.ResetPlants(ctx);
+            }
+            _wasRolling = rolling;
             _loco.Step(ctx, dt);
             ComputePose(dt, initialize: false);
             _ = oldPos;
@@ -325,30 +333,18 @@ namespace PixelCreatures.Core.Motion
             _rest.Evaluate(ctx, ref p);
             _action.Evaluate(ctx, ref p);
             _hit.Evaluate(ctx, ref p);
-            if (DodgeProgress.HasValue)
+            bool exclusiveRoll = DodgeProgress.HasValue && DodgeBiped && _loco is LeggedLocomotion;
+            if (exclusiveRoll)
             {
-                double u = DMath.Clamp(DodgeProgress.Value, 0, 1);
-                double tuck = Math.Sin(Math.PI * u);
-                if (DodgeBiped)
-                {
-                    // Tuck, rotate through one full turn, then stand. The axis follows
-                    // the locked travel direction relative to the creature's facing.
-                    double turnU = DMath.Clamp((u - .10) / .75, 0, 1);
-                    double rotation = DMath.TwoPi * (turnU * turnU * (3 - 2 * turnU));
-                    if (Math.Abs(DodgeForwardComponent) >= Math.Abs(DodgeSideComponent))
-                        p.BodyPitch += Math.CopySign(rotation, DodgeForwardComponent);
-                    else
-                        p.BodyRoll += Math.CopySign(rotation, DodgeSideComponent);
-                    p.Crouch += .8 * tuck;
-                    p.LegTuck = Math.Max(p.LegTuck, .9 * tuck);
-                    p.ArmRaise += .6 * tuck;
-                }
-                else
-                {
-                    // Other anatomies retain a modest, safe evasive tuck.
-                    p.BodyPitch += .45 * tuck;
-                    p.Crouch += .35 * tuck;
-                }
+                // Replace locomotion/action pose rather than adding a spin to it.
+                p = RollMotion.Evaluate(ctx, DodgeProgress!.Value, DodgeForwardComponent, DodgeSideComponent);
+            }
+            else if (DodgeProgress.HasValue)
+            {
+                // Families without biped roll anatomy retain a small non-spinning evasion.
+                double tuck = Math.Sin(Math.PI * DMath.Clamp(DodgeProgress.Value, 0, 1));
+                p.BodyPitch += .45 * tuck;
+                p.Crouch += .35 * tuck;
             }
             p.Altitude += _loco.Altitude(ctx) * (1 - ctx.RestWeight);
             p.EyeOpen = DMath.Saturate(p.EyeOpen);
@@ -359,8 +355,22 @@ namespace PixelCreatures.Core.Motion
             sk.Reset();
             _driver.ApplyBody(p, sk);
             sk.Solve();
+            if (exclusiveRoll && DodgeProgress.HasValue)
+            {
+                var support = RollMotion.CorrectGroundContact(ctx, sk, DodgeProgress.Value, ref p);
+                if (Math.Abs(support) > 1e-6)
+                {
+                    sk.Reset();
+                    _driver.ApplyBody(p, sk);
+                    sk.Solve();
+                }
+            }
             _pose.Contacts.Clear();
-            _loco.ApplyLimbs(ctx, p, sk, _pose);
+            if (exclusiveRoll && _loco is LeggedLocomotion rollLegs)
+                rollLegs.ApplyRollLimbs(ctx, p, sk, _pose, DodgeProgress!.Value);
+            else
+                _loco.ApplyLimbs(ctx, p, sk, _pose);
+            _params = p;
             if (initialize) _driver.ResetChains(ctx, p, sk);
             else _driver.StepChains(ctx, p, sk, dt);
             _driver.ApplyChains(ctx, sk);

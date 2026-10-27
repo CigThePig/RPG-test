@@ -88,7 +88,7 @@ namespace PixelCreatures.Core.Motion
             {
                 var b = _skeleton[pelvis];
                 Vec3 restPos = _skeleton.RestWorld(pelvis).Origin;
-                Quat r = Quat.Euler(p.BodyYaw, p.BodyPitch, p.BodyRoll);
+                Quat r = p.OverrideBodyRotation ? p.BodyRotation : Quat.Euler(p.BodyYaw, p.BodyPitch, p.BodyRoll);
                 double crouchDrop = DMath.Saturate(p.Crouch) * Math.Max(0, _bodyHeight - _lieHeight);
                 Vec3 offset = p.BodyOffset + new Vec3(0, -crouchDrop + p.Breath * 0.35, 0);
                 Vec3 desired = _pivot + r.Rotate(restPos - _pivot) + offset;
