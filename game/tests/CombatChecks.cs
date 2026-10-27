@@ -20,11 +20,17 @@ public static class CombatChecks
             w.Items.Equip(p, "iron_sword", "weapon");
             check(w.TryStartPlayerSlash(V.UnitX), "free slash starts in an empty region");
             check(p.Cooldowns.GetValueOrDefault("slash") > 0 && p.FreeSlash, "empty slash commits its normal cooldown");
-            for (int i = 0; i < 8; i++) w.Step(Dt);
+            for (int i = 0; i < 4; i++) w.Step(Dt);
+            check(Math.Abs(p.X - 500) < .001f, "lunge does not start before 0.08 seconds");
+            w.Step(Dt);
+            check(p.X > 500 && p.X < 501, "lunge starts smoothly at the first tick after 0.08 seconds");
+            for (int i = 0; i < 3; i++) { w.PlayerMove(V.UnitY, Dt, 3.2f, true); w.Step(Dt); }
             check(p.State == ActionState.Windup, "slash windup has not resolved before tick nine");
             w.Step(Dt);
             check(p.State == ActionState.Recovery, "empty slash resolves at tick nine into recovery");
-            for (int i = 0; i < 20; i++) w.Step(Dt);
+            for (int i = 0; i < 2; i++) w.Step(Dt);
+            check(Math.Abs(p.X - 512) < .02f && Math.Abs(p.Y - 500) < .02f, "lunge completes by 0.18 seconds and ignores changed movement input");
+            for (int i = 0; i < 18; i++) w.Step(Dt);
             check(p.State == ActionState.Idle && Math.Abs(p.X - 512) < .02f && Math.Abs(p.Y - 500) < .02f, "empty slash completes one twelve-unit forward lunge");
             var enemy = w.Actors.Values.First(a => a.Profile == "beast");
             enemy.Region = r.Id; enemy.X = 540; enemy.Y = 500; enemy.Health = enemy.MaxHealth = 1000;
@@ -33,7 +39,8 @@ public static class CombatChecks
             float health = enemy.Health;
             check(w.TryStartPlayerSlash(V.UnitX), "directional slash starts with enemy ahead");
             for (int i = 0; i < 9; i++) w.Step(Dt);
-            check(enemy.Health < health, "directional slash damages enemy ahead at impact");
+            float expectedDamage = Math.Max(1, w.Content.Abilities.Single(a => a.Id == "slash").Damage + w.Stat(p, "strength") + w.Stat(p, "damage") - w.Stat(enemy, "defence"));
+            check(Math.Abs((health - enemy.Health) - expectedDamage) < .01f, "directional slash uses the existing strength, weapon and defence calculation");
             p.State = ActionState.Idle; p.FreeSlash = false; p.X = 500; p.Y = 500; p.Cooldowns.Clear();
             enemy.X = 470; enemy.Y = 500; enemy.Health = health; enemy.Invulnerable = 0; enemy.State = ActionState.Recovery; enemy.StateRemaining = 100;
             check(w.TryStartPlayerSlash(V.UnitX), "directional slash starts with enemy behind");
@@ -79,7 +86,18 @@ public static class CombatChecks
             for (int y = 0; y < r.Height; y++) r.Tiles[y * r.Width + 21] = Terrain.Rock;
             w.TryStartPlayerSlash(V.UnitX); for (int i = 0; i < 20; i++) w.Step(Dt);
             check(enemy.Health == 1000 && r.CanStand(p.Position, p) && p.X <= 504 - p.Radius + .05f, "wall blocks slash line of sight and lunge collision");
+            ResetFight(); p.X = 490; enemy.X = 700;
+            w.TryStartPlayerSlash(V.Normalize(new V(1,1))); for (int i = 0; i < 15; i++) w.Step(Dt);
+            check(r.CanStand(p.Position,p) && p.X <= 504-p.Radius+.05f && p.Y > 500, "diagonal lunge slides safely along wall");
             for (int y = 0; y < r.Height; y++) r.Tiles[y * r.Width + 21] = Terrain.Grass;
+            ResetFight(); p.X = 490; enemy.X = 700;
+            int door=20*r.Width+21; r.Features[door]="lock";
+            w.TryStartPlayerSlash(V.UnitX); for (int i=0;i<15;i++) w.Step(Dt);
+            check(r.CanStand(p.Position,p) && p.X <= 504-p.Radius+.05f, "locked door blocks lunge");
+            r.Features.Remove(door);
+            ResetFight(); p.X=p.Radius+1; enemy.X=700;
+            w.TryStartPlayerSlash(-V.UnitX); for (int i=0;i<15;i++) w.Step(Dt);
+            check(r.CanStand(p.Position,p) && p.X>=p.Radius-.05f, "map boundary blocks lunge");
             ResetFight(); enemy.X = 700; w.TryStartPlayerSlash(V.UnitX);
             for (int i = 0; i < 6; i++) w.Step(Dt);
             float stopped = p.X; w.Cancel(p);

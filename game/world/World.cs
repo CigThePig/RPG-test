@@ -132,8 +132,8 @@ public sealed class World
     }
 
     public static bool DodgeImmune(ActorState a) => a.State == ActionState.Dodging &&
-        a.ActionElapsed + .000001f >= CombatTuning.DodgeInvulnerableStart &&
-        a.ActionElapsed < CombatTuning.DodgeInvulnerableEnd - .000001f;
+        a.ActionElapsed >= CombatTuning.DodgeInvulnerableStart &&
+        a.ActionElapsed < CombatTuning.DodgeInvulnerableEnd;
 
     public void CancelPlayerDodge()
     {
@@ -343,7 +343,7 @@ public sealed class World
                 continue;
             if (a.FreeSlash && a.State is ActionState.Windup or ActionState.Recovery)
                 AdvanceSlashLunge(a, dt);
-            if (a.State == ActionState.Dodging && a.ActionElapsed >= CombatTuning.DodgeDuration - .000001f)
+            if (a.State == ActionState.Dodging && a.ActionElapsed >= CombatTuning.DodgeDuration)
             {
                 CombatDiagnostic?.Invoke("dodge_completed", new Vector2(a.ActionDirectionX, a.ActionDirectionY), "dodge");
                 a.State = ActionState.Idle;

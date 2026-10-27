@@ -26,10 +26,24 @@ public static class DodgeChecks
             check(World.DodgeImmune(p), "dodge immunity starts on tick six");
             float hp = p.Health; var pos = p.Position;
             check(!w.Damage(enemy, p, 10, "physical") && p.Health == hp && p.Position == pos && p.State == ActionState.Dodging, "immune direct hit causes no damage, knockback or stagger");
+            var bite = w.Content.Abilities.Single(a => a.Id == "bite");
+            float biteWindup = bite.Windup; string biteStatus = bite.Status;
+            try
+            {
+                // Drive the actual targeted non-projectile resolution while immune.
+                bite.Windup = .016f; bite.Status = "burn";
+                enemy.State = ActionState.Idle; enemy.StateRemaining = 0; enemy.Cooldowns.Clear();
+                enemy.X = p.X + 20; enemy.Y = p.Y;
+                check(w.Activate(enemy.Id, "bite", p.Id), "targeted enemy bite starts during dodge");
+                w.Step(Dt);
+                check(p.Health == hp && !p.Statuses.Any(x => x.Id == "burn") && p.State == ActionState.Dodging, "dodged direct ability applies no damage or on-hit status");
+            }
+            finally { bite.Windup = biteWindup; bite.Status = biteStatus; }
+            enemy.State = ActionState.Recovery; enemy.StateRemaining = 100;
             w.Projectiles.Add(new ProjectileState { Source = enemy.Id, Target = p.Id, Ability = "ember", X = p.X, Y = p.Y });
             w.Step(Dt);
             check(p.Health == hp && !p.Statuses.Any(x => x.Id == "burn"), "dodged projectile applies neither damage nor on-hit burn");
-            for (int i = 7; i < 17; i++) w.Step(Dt);
+            for (int i = 8; i < 17; i++) w.Step(Dt);
             check(World.DodgeImmune(p), "dodge immunity remains active through tick seventeen");
             w.Step(Dt);
             check(!World.DodgeImmune(p), "dodge immunity ends on tick eighteen");
