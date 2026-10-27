@@ -113,6 +113,23 @@ public static class VisualChecks
                     throw new InvalidOperationException("Mobile touch targets overlap: "+mobileButtons[i].Text+" / "+mobileButtons[j].Text);
             if(attack.GetGlobalRect().Intersects(dodge.GetGlobalRect())) throw new InvalidOperationException("Attack and Dodge touch targets overlap");
         }
+        if (!app.Ui.MobileLayout)
+        {
+            // Verify the desktop binding via the normal unhandled-input route.
+            string snapshot=Persistence.Capture(app.World,app.Narrative);
+            var p=app.World.Player;
+            p.Cooldowns.Remove("dodge");
+            int starts=0;
+            void OnDodge(string kind, System.Numerics.Vector2 direction, string context) { if(kind=="dodge_started") starts++; }
+            app.World.CombatDiagnostic += OnDodge;
+            Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=true});
+            Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=false});
+            await Frames(app,2);
+            if(starts!=1 || p.State!=ActionState.Dodging) throw new InvalidOperationException("Space did not start exactly one dodge");
+            app.World.CancelPlayerDodge(); app.World.CombatDiagnostic -= OnDodge;
+            Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
+            await Frames(app,2);
+        }
         // Use real GUI dispatch for desktop mice; headless checks exercise raw touch.
         var draught=app.Ui.GetChildren().OfType<Control>().First().FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.Contains("Draught"));
         var point=draught.GetGlobalRect().GetCenter();
