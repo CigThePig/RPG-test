@@ -154,7 +154,7 @@ public partial class RpgUi : CanvasLayer
         // Godot also synthesizes a mouse click for the same finger; consuming that
         // event prevents a second native Button.Pressed without disabling mouse
         // emulation for menus, dialogue, scroll panels or actual desktop mice.
-        if (e is InputEventMouse mouse && mouse.Device == InputEvent.DeviceIdEmulation && hotbar.IsVisibleInTree() && hotbar.GetGlobalRect().HasPoint(mouse.Position))
+        if (e is InputEventMouse mouse && mouse.Device == InputEvent.DeviceIdEmulation && hotbar.IsVisibleInTree() && hotbar.GetChildren().OfType<Button>().Any(b => b.IsVisibleInTree() && b.GetGlobalRect().HasPoint(mouse.Position)))
         { GetViewport().SetInputAsHandled(); return; }
         if (e is not InputEventScreenTouch touch) return;
         if (touch.Canceled)

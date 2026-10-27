@@ -49,6 +49,21 @@ public static class VisualChecks
         }
         app.Ui.Menu();
         await Frames(app,2);
+        if(app.Ui.MobileLayout)
+        {
+            // Menu sits above the primary action cluster. Its upper edge must still
+            // suppress the OS-synthesized mouse pair after the owned touch.
+            var menuButton=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Menu" && b.IsVisibleInTree());
+            var menuPoint=menuButton.GlobalPosition+new Vector2(menuButton.Size.X/2,5);
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=menuPoint});
+            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=menuPoint,GlobalPosition=menuPoint});
+            await Frames(app,1);
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=menuPoint});
+            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=menuPoint,GlobalPosition=menuPoint});
+            await Frames(app,2);
+            if(!app.Ui.MenuOpen)throw new InvalidOperationException("Menu edge touch plus emulated mouse did not open exactly once");
+            app.Ui.Menu();await Frames(app,2);
+        }
         // Use real GUI dispatch for desktop mice; headless checks exercise raw touch.
         var draught=app.Ui.GetChildren().OfType<Control>().First().FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.Contains("Draught"));
         var point=draught.GetGlobalRect().GetCenter();
