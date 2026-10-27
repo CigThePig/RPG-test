@@ -66,6 +66,20 @@ public static class MovementChecks
             check(Math.Abs(motor.Context.Speed-120)<.001,"animation retains measured velocity across motor catch-up steps");
             motor.SetWorldPosition(new Vec3(8,0,0),Vec3.Zero);motor.Step(1.0/60);
             check(motor.Context.Speed==0,"animation velocity stops with external displacement");
+            Persistence.Restore(w,app.Narrative,saved);
+            string beforeCourse=Persistence.Capture(w,app.Narrative);
+            var autosave=File.Exists(Persistence.AutosavePath) ? File.ReadAllBytes(Persistence.AutosavePath) : null;
+            app.BeginFeelCourse();
+            check(app.InFeelCourse && w.Player.Region=="feel-lab" && w.Player.X==300,"phone controlled course uses reproducible production starting state");
+            w.Items.Add("player","potion");w.Player.X=500;
+            app._Notification((int)Node.NotificationApplicationPaused);
+            app._Notification((int)Node.NotificationApplicationResumed);
+            check(autosave==null ? !File.Exists(Persistence.AutosavePath) : File.ReadAllBytes(Persistence.AutosavePath).SequenceEqual(autosave),"controlled course cannot overwrite normal background autosave");
+            app.BeginFeelCourse();
+            check(w.Player.X==300,"course reset restores the comparison start");
+            app.LeaveFeelCourse();
+            check(!app.InFeelCourse && Persistence.Capture(w,app.Narrative)==beforeCourse,"course return restores normal world and inventory exactly");
+            app.Ui.PauseForVerification();
         }
         finally {Persistence.Restore(w,app.Narrative,saved);}
     }

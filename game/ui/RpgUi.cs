@@ -385,7 +385,7 @@ public partial class RpgUi : CanvasLayer
             Button(box, entry.Item1, () => { menu.Hide(); entry.Item2(); });
         Button(box, "Recover background autosave", () =>
         {
-            try { Persistence.LoadAutosave(App.World, App.Narrative); App.RebuildViews(); App.ResumeGame(); Notify("Recovered autosave"); }
+            try { if(App.InFeelCourse)throw new InvalidOperationException("Return from the controlled course before loading"); Persistence.LoadAutosave(App.World, App.Narrative); App.RebuildViews(); App.ResumeGame(); Notify("Recovered autosave"); }
             catch (Exception e) { Notify(e.Message); }
         });
         Button(box, "New game", () =>
@@ -402,6 +402,7 @@ public partial class RpgUi : CanvasLayer
         {
             try
             {
+                if(App.InFeelCourse)throw new InvalidOperationException("Return from the controlled course before saving");
                 Persistence.Save(App.World, App.Narrative, SaveSlot);
                 Notify("Saved slot " + SaveSlot);
             }
@@ -414,6 +415,7 @@ public partial class RpgUi : CanvasLayer
         {
             try
             {
+                if(App.InFeelCourse)throw new InvalidOperationException("Return from the controlled course before loading");
                 Persistence.Load(App.World, App.Narrative, SaveSlot);
                 App.RebuildViews();
                 App.ResumeGame();
@@ -452,6 +454,8 @@ public partial class RpgUi : CanvasLayer
         Open("GAME-FEEL LAB · development tools");
         labVisible=true;
         body.AddChild(new Label { Text=$"Active: {App.Feel.Id} · baseline restores original controls\nCompare the same settlement chest → road → ruin route.\nRecording stays local; use Android Screen recorder for video." });
+        Button(body,"Start / reset controlled obstacle course (normal progress preserved)",App.BeginFeelCourse);
+        if(App.InFeelCourse)Button(body,"Return from course to normal game",App.LeaveFeelCourse);
         foreach(var preset in MovementFeel.Presets)
             Button(body,$"{preset.Id} · speed ×{preset.Scale:0.0} · response {preset.Response*1000:0}ms",()=> { App.SelectFeel(preset); ClosePanels(); Notify("Feel preset: "+preset.Id); });
         void Slider(string label,double min,double max,double step,double value,Action<float> changed)

@@ -6,6 +6,8 @@ See [Android development](ANDROID_DEVELOPMENT.md) for installation, signing and 
 
 Open Menu → Game-feel lab / record playtest. Select baseline, precise, soft or explore. The game resumes and the lab overlay identifies the active preset, actual speed and input magnitude. No reinstall is needed. Repeat the same settlement chest → road → ruin route, trying slow drags, short taps, reversals, wall contact and movement plus actions. Sliders allow speed, response, dead zone, curve, camera follow and zoom; custom configurations are included in telemetry. Release always stops immediately, so a separate deceleration slider is deliberately omitted.
 
+Use Start / reset controlled obstacle course for the same authored wall, gap and feature layout used in replay tests. Each reset returns to the same position; Return from course restores the pre-test world snapshot. Saving/loading is blocked in the course, and background autosave is suppressed there. Ordinary regions and inventory are restored on return.
+
 Baseline restores original input/speed/camera settings, not an older executable; shared bug fixes remain active. Presets are session-local. Actor genetics, inventory and ordinary saves do not store test tuning.
 
 ## Capture and export

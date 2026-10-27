@@ -95,6 +95,9 @@ public static class VisualChecks
         app.Ui.Workshop();
         await Capture(app, "workshop");
         app.Ui.ClosePanels();
+        app.Ui.FeelLab();
+        await Capture(app,"feel-lab");
+        app.Ui.ClosePanels();
         var frames = new List<double>();
         var timer = Stopwatch.StartNew();
         double last = timer.Elapsed.TotalMilliseconds;

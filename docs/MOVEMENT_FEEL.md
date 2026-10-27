@@ -1,6 +1,6 @@
 # Movement feel investigation
 
-The physical report was slow, awkward movement despite passing system tests. PR #2 at `620b50d` was the starting point; 347 assertions were reproduced locally before extending the suite to 372.
+The physical report was slow, awkward movement despite passing system tests. PR #2 at `620b50d` was the starting point; 347 assertions were reproduced locally before extending the suite to 376 (including controlled-course save isolation).
 
 ## Confirmed path and causes
 
@@ -42,3 +42,5 @@ At the initial 40px/s anatomy, a straight 96-ground-pixel chest spacing takes 2.
 The integration suite checks 30/60/120Hz elapsed-time displacement, all eight directions, stale-motion reset in Windup/Recovery/Staggered/Dead, invalid input, immediate release, actual gap traversal at radii 6/9/11, rejection at radius 13, reversal after wall contact, and motor catch-up velocity. Existing multi-seed feature and dungeon routes, anatomy relocation and save roundtrips remain required.
 
 Hosted software-renderer frame times are recorded separately from simulation. Movie clips have imposed timing; their capture wall times do not measure gameplay FPS. Real-time reports contain p50/p95/p99 render intervals. No physical S25 performance measurement or subjective comfort result is available from this environment. Sampled contact sheets were visually inspected; this alone does not certify smooth animation. See the latest Actions evidence for final source-identical clips and logs.
+
+A local **real-time FFmpeg/Xvfb** capture (llvmpipe, instrumented working tree before final packaging) measured render interval p50/p95/p99 **14.88 / 22.16 / 32.98ms**, with 33.32 simulation seconds during 33.74 wall seconds. The real-time trace matched the independent fixed-clock replay after flushing injected batches. These figures are a short desktop software-renderer sample, not an S25 measurement or a sustained 60FPS guarantee. Sampled real-time frames show live world movement, dungeon presentation and combat; the clip includes startup before gameplay, which is explicitly visible in its contact sheet.

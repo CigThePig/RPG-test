@@ -20,9 +20,39 @@ public partial class Foundation : Node2D
     public PlaytestTrace Trace { get; private set; } = null!;
     GameplayReplay? replay;
     public bool VerificationMode => OS.GetCmdlineUserArgs().Any(x => x is "--test" or "--visual-check" or "--gameplay-check");
-    public void SelectFeel(MovementFeel feel) { Feel=feel; ControllerVelocity=Vector2.Zero; camera.PositionSmoothingSpeed=feel.CameraFollow; camera.Zoom=Vector2.One*feel.Zoom; foreach(var v in Views.Values) { v.Creature.UseMeasuredExternalVelocity=feel.Id!="baseline"; v.Creature.AnimationFps=v.State.Id=="player" && feel.Id!="baseline" ? 20 : 10; } Trace?.Marker("preset/"+feel.Id); Trace?.Write(new {kind="configuration", tick=World.Tick, frame=Engine.GetFramesDrawn(), configuration=feel}); }
+    public void SelectFeel(MovementFeel feel)
+    {
+        Feel=feel;
+        ControllerVelocity=Vector2.Zero;
+        camera.PositionSmoothingSpeed=feel.CameraFollow;
+        camera.Zoom=Vector2.One*feel.Zoom;
+        foreach(var view in Views.Values) ConfigureView(view);
+        Trace?.Marker("preset/"+feel.Id);
+        Trace?.Write(new {kind="configuration", tick=World.Tick, frame=Engine.GetFramesDrawn(), configuration=feel});
+    }
+    void ConfigureView(CharacterView view)
+    {
+        view.Creature.UseMeasuredExternalVelocity=Feel.Id!="baseline";
+        view.Creature.AnimationFps=view.State.Id=="player" && Feel.Id!="baseline" ? 20 : 10;
+    }
     public override void _Process(double delta) => Trace?.Frame(delta);
     public override void _ExitTree() => Trace?.Dispose();
+    string? courseSnapshot;
+    public bool InFeelCourse => courseSnapshot != null;
+    public void BeginFeelCourse()
+    {
+        if(courseSnapshot==null)courseSnapshot=Persistence.Capture(World,Narrative);
+        else Persistence.Restore(World,Narrative,courseSnapshot);
+        var map=GameplayReplay.CreateCourse(); World.RegionsById[map.Id]=map;World.InitializeContainers(map);
+        var p=World.Player;p.Region=map.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.State=ActionState.Idle;p.StateRemaining=0;p.PendingAbility="";p.Statuses.Clear();p.Cooldowns.Clear();
+        TouchMovement=ControllerVelocity=Vector2.Zero; Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/start-or-reset");
+    }
+    public void LeaveFeelCourse()
+    {
+        if(courseSnapshot==null)return;
+        Persistence.Restore(World,Narrative,courseSnapshot);courseSnapshot=null;lastRuntimeLog=World.Tick;
+        TouchMovement=ControllerVelocity=Vector2.Zero;Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/return");
+    }
     bool suspended;
     bool sessionEntered;
     // A real simulation tick also establishes a session, regardless of which UI
@@ -185,7 +215,9 @@ public partial class Foundation : Node2D
 
     public void Reset()
     {
+        courseSnapshot=null;
         sessionEntered = false;
+        lastRuntimeLog=0;
         accumulator = 0;
         TouchMovement = Vector2.Zero;
         if (World != null)
@@ -236,8 +268,7 @@ public partial class Foundation : Node2D
             var view = new CharacterView();
             actors.AddChild(view);
             view.Setup(a);
-            view.Creature.UseMeasuredExternalVelocity=Feel.Id!="baseline";
-            view.Creature.AnimationFps=a.Id=="player" && Feel.Id!="baseline" ? 20 : 10;
+            ConfigureView(view);
             Views[a.Id] = view;
             view.Equipment(items.Call("equipment_appearance", a.Id).AsString());
         }
@@ -405,7 +436,7 @@ public partial class Foundation : Node2D
             if (World != null && ui != null)
             {
                 ui.PauseForVerification();
-                try { if (SessionStarted && replay == null) Persistence.SaveAutosave(World, Narrative); }
+                try { if (SessionStarted && replay == null && !InFeelCourse) Persistence.SaveAutosave(World, Narrative); }
                 catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }
             }
         }

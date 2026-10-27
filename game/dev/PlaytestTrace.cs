@@ -30,8 +30,17 @@ public sealed class PlaytestTrace : IDisposable
     {
         if (writer == null) return;
         if (++rows > 120000 || clock.Elapsed.TotalMinutes > 15) { Dispose(); return; }
-        writer.WriteLine(JsonSerializer.Serialize(row));
-        if (rows % 120 == 0) writer.Flush();
+        try
+        {
+            writer.WriteLine(JsonSerializer.Serialize(row));
+            if (rows % 120 == 0) writer.Flush();
+        }
+        catch(IOException e)
+        {
+            try { writer.Dispose(); } catch(IOException) { }
+            writer=null; clock.Stop();
+            app.Ui.Notify("Playtest recording stopped: "+e.Message);
+        }
     }
     public void Marker(string label) { if(Active) Write(new { kind="marker", label, scenario=Scenario, tick=app.World.Tick, frame=Engine.GetFramesDrawn(), wallMs=clock.Elapsed.TotalMilliseconds }); }
     public void Input(InputEvent e)

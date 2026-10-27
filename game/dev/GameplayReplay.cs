@@ -45,13 +45,21 @@ public sealed class GameplayReplay
         app.ResumeGame();
         // Dedicated region with production circular collision, terrain view, PPC, UI and camera.
         // No changes to authored regions or on-disk saves.
+        var r=CreateCourse();
+        app.World.RegionsById[r.Id]=r; app.World.InitializeContainers(r);
+        app.World.Player.Region=r.Id;
+        app.RebuildViews();
+    }
+    public static RegionState CreateCourse()
+    {
         var r=new RegionState {Id="feel-lab",Width=64,Height=48,Tiles=Enumerable.Repeat(Terrain.Grass,64*48).ToArray(),Entrance=12*64+12, ContainersInitialized=false};
         for(int y=0;y<48;y++) for(int x=0;x<64;x++)
             if(x==0||y==0||x==63||y==47||(x==30 && y!=24))r.Tiles[y*64+x]=Terrain.Rock;
         r.Features[12*64+18]="chest";
-        app.World.RegionsById[r.Id]=r; app.World.InitializeContainers(r);
-        app.World.Player.Region=r.Id;
-        app.RebuildViews();
+        r.Features[17*64+16]="herb";
+        r.Features[18*64+18]="ore";
+        r.Features[17*64+20]="wood";
+        return r;
     }
     void Touch(bool pressed) => Input.ParseInputEvent(new InputEventScreenTouch {Index=7,Pressed=pressed,Position=app.Ui.Stick.GlobalPosition+app.Ui.Stick.Size/2});
     void Drag(Vector2 direction) => Input.ParseInputEvent(new InputEventScreenDrag {Index=7,Position=app.Ui.Stick.GlobalPosition+app.Ui.Stick.Size/2+direction*72});
@@ -131,6 +139,10 @@ public sealed class GameplayReplay
             Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.E,Pressed=true});
             Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.E,Pressed=false});
         }
+        // Godot may coalesce drag events until the rendered frame boundary. Flush
+        // the injected batch before this physics step so two catch-up ticks cannot
+        // accidentally reuse the previous tick's thumb direction.
+        Input.FlushBufferedEvents();
         local++;
     }
     V previous;
