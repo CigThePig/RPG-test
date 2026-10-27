@@ -379,6 +379,18 @@ public partial class Foundation : Node2D
         QueueRedraw();
     }
 
+    public override void _Input(InputEvent e)
+    {
+        // Space is also Godot's default UI accept key. Intercept it before a
+        // focused hotbar button can consume it during active gameplay; menus
+        // and other modal UI keep normal keyboard handling.
+        if (e is InputEventKey && e.IsAction("dodge") && !GameplayBlocked)
+        {
+            if (e.IsActionPressed("dodge")) Dodge();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
     public override void _UnhandledInput(InputEvent e)
     {
         if (e.IsActionPressed("menu"))
@@ -411,8 +423,6 @@ public partial class Foundation : Node2D
                 Cast(key);
         if (e.IsActionPressed("potion"))
             UseQuickItem("potion");
-        if (e.IsActionPressed("dodge"))
-            Dodge();
     }
 
     public void Cast(string ability)

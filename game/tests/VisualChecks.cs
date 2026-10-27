@@ -119,13 +119,18 @@ public static class VisualChecks
             string snapshot=Persistence.Capture(app.World,app.Narrative);
             var p=app.World.Player;
             p.Cooldowns.Remove("dodge");
+            var focused=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.IsVisibleInTree() && b.Text.Contains("Draught"));
+            int potionsBefore=app.World.Items.Count("player","potion");
+            focused.GrabFocus();
             int starts=0;
             void OnDodge(string kind, System.Numerics.Vector2 direction, string context) { if(kind=="dodge_started") starts++; }
             app.World.CombatDiagnostic += OnDodge;
             Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=true});
             Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=false});
             await Frames(app,2);
-            if(starts!=1 || p.State!=ActionState.Dodging) throw new InvalidOperationException("Space did not start exactly one dodge");
+            if(starts!=1 || p.State!=ActionState.Dodging || app.World.Items.Count("player","potion")!=potionsBefore)
+                throw new InvalidOperationException("Focused hotbar button consumed Space or Space activated more than one action");
+            focused.ReleaseFocus();
             app.World.CancelPlayerDodge(); app.World.CombatDiagnostic -= OnDodge;
             Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
             await Frames(app,2);
