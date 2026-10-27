@@ -1,0 +1,12 @@
+{
+  "frames": 180,
+  "p50ms": 12.657000000000153,
+  "p95ms": 16.587600000000066,
+  "p99ms": 19.929900000000004,
+  "averageMs": 13.057062222222216,
+  "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+  "actors": 17,
+  "visibleActors": 9,
+  "totalRasterizations": 208,
+  "managedBytes": 53048272
+}

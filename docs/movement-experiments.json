@@ -1,0 +1,585 @@
+{
+  "stage": "Initial four-controller comparison, before subsequent animation/contact refinement; local instrumented working tree, see dirty flags. Re-run CI for exact committed-source evidence.",
+  "results": {
+    "explore": {
+      "source": "e5935fc962c49de997d9747805590c80ab829105",
+      "dirty": true,
+      "movieMode": true,
+      "environment": {
+        "kind": "session",
+        "schema": 1,
+        "utc": "2026-10-27T06:52:55.6899254Z",
+        "engine": "4.6.1-stable (official)",
+        "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+        "platform": "Linux",
+        "source": "local-uncommitted",
+        "units": "ground px, projected canvas px, seconds, milliseconds",
+        "timebase": "tick=simulation 60Hz; frame=Godot drawn frame; wallMs=monotonic session; movieSeconds=frame/60 only in Movie Maker",
+        "preset": "explore"
+      },
+      "metrics": {
+        "free-play": {
+          "projectedSpeed": 0,
+          "blockedSamples": 0,
+          "samples": 30,
+          "wallFrameP50ms": 34.0197,
+          "wallFrameP95ms": 40.6191,
+          "wallFrameP99ms": 56.7953,
+          "maxCameraError": 554.6983178686996
+        },
+        "horizontal": {
+          "projectedSpeed": 127.99438,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 34.61190000000033,
+          "wallFrameP95ms": 46.50579999999991,
+          "wallFrameP99ms": 52.721900000000005,
+          "maxCameraError": 0.0
+        },
+        "vertical": {
+          "projectedSpeed": 127.99621,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 33.205799999999726,
+          "wallFrameP95ms": 47.334499999999935,
+          "wallFrameP99ms": 58.146200000000135,
+          "maxCameraError": 0.0
+        },
+        "diagonal": {
+          "projectedSpeed": 127.99520512697976,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 32.74279999999999,
+          "wallFrameP95ms": 45.03180000000066,
+          "wallFrameP99ms": 52.01579999999922,
+          "maxCameraError": 0.0
+        },
+        "tap-stop": {
+          "projectedSpeed": 48.49365,
+          "blockedSamples": 0,
+          "samples": 50,
+          "wallFrameP50ms": 33.2476000000006,
+          "wallFrameP95ms": 39.524999999999636,
+          "wallFrameP99ms": 42.5091999999986,
+          "maxCameraError": 0.0
+        },
+        "reversal": {
+          "projectedSpeed": 126.9287,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 31.85939999999755,
+          "wallFrameP95ms": 40.6137000000017,
+          "wallFrameP99ms": 61.17550000000119,
+          "maxCameraError": 0.0
+        },
+        "eight-turns": {
+          "projectedSpeed": 123.96992798807608,
+          "blockedSamples": 0,
+          "samples": 160,
+          "wallFrameP50ms": 33.60099999999875,
+          "wallFrameP95ms": 44.50510000000213,
+          "wallFrameP99ms": 52.68830000000162,
+          "maxCameraError": 0.0
+        },
+        "analog-ramp": {
+          "projectedSpeed": 127.454215,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 33.57860000000073,
+          "wallFrameP95ms": 39.585399999999936,
+          "wallFrameP99ms": 40.71050000000105,
+          "maxCameraError": 0.0
+        },
+        "wall-slide": {
+          "projectedSpeed": 125.46526368458935,
+          "blockedSamples": 93,
+          "samples": 140,
+          "wallFrameP50ms": 32.244299999998475,
+          "wallFrameP95ms": 37.92609999999695,
+          "wallFrameP99ms": 39.560600000000704,
+          "maxCameraError": 205.92593
+        },
+        "wall-recover": {
+          "projectedSpeed": 126.64306,
+          "blockedSamples": 48,
+          "samples": 140,
+          "wallFrameP50ms": 32.39329999999609,
+          "wallFrameP95ms": 38.42399999999907,
+          "wallFrameP99ms": 46.58050000000003,
+          "maxCameraError": 75.83965999999998
+        },
+        "narrow-passage": {
+          "projectedSpeed": 127.99804,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 32.43000000000029,
+          "wallFrameP95ms": 37.73359999999957,
+          "wallFrameP99ms": 37.90490000000136,
+          "maxCameraError": 101.69556
+        },
+        "menu-cancel": {
+          "projectedSpeed": 116.16393,
+          "blockedSamples": 0,
+          "samples": 70,
+          "wallFrameP50ms": 32.08620000000519,
+          "wallFrameP95ms": 38.35559999999532,
+          "wallFrameP99ms": 41.07900000000518,
+          "maxCameraError": 399.28896999999995
+        },
+        "multitouch": {
+          "projectedSpeed": 127.83691,
+          "blockedSamples": 0,
+          "samples": 70,
+          "wallFrameP50ms": 31.69210000000021,
+          "wallFrameP95ms": 37.65729999999894,
+          "wallFrameP99ms": 38.69860000000335,
+          "maxCameraError": 2.99999999811007e-05
+        },
+        "chest": {
+          "projectedSpeed": 121.426383,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 31.478100000000268,
+          "wallFrameP95ms": 38.26340000000346,
+          "wallFrameP99ms": 39.98739999999816,
+          "maxCameraError": 2.99999999811007e-05
+        }
+      }
+    },
+    "precise": {
+      "source": "e5935fc962c49de997d9747805590c80ab829105",
+      "dirty": true,
+      "movieMode": true,
+      "environment": {
+        "kind": "session",
+        "schema": 1,
+        "utc": "2026-10-27T06:51:14.009348Z",
+        "engine": "4.6.1-stable (official)",
+        "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+        "platform": "Linux",
+        "source": "local-uncommitted",
+        "units": "ground px, projected canvas px, seconds, milliseconds",
+        "timebase": "tick=simulation 60Hz; frame=Godot drawn frame; wallMs=monotonic session; movieSeconds=frame/60 only in Movie Maker",
+        "preset": "precise"
+      },
+      "metrics": {
+        "free-play": {
+          "projectedSpeed": 0,
+          "blockedSamples": 0,
+          "samples": 30,
+          "wallFrameP50ms": 30.221599999999967,
+          "wallFrameP95ms": 45.5273,
+          "wallFrameP99ms": 66.30109999999996,
+          "maxCameraError": 518.1509806567537
+        },
+        "horizontal": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 28.677599999999984,
+          "wallFrameP95ms": 38.07289999999989,
+          "wallFrameP99ms": 51.73609999999985,
+          "maxCameraError": 27.33334000000002
+        },
+        "vertical": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 28.601200000000063,
+          "wallFrameP95ms": 33.64270000000033,
+          "wallFrameP99ms": 36.55320000000029,
+          "maxCameraError": 9.323940000085793
+        },
+        "diagonal": {
+          "projectedSpeed": 95.99932685168005,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 27.92199999999957,
+          "wallFrameP95ms": 34.451499999999214,
+          "wallFrameP99ms": 37.63250000000062,
+          "maxCameraError": 19.322380000041413
+        },
+        "tap-stop": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 50,
+          "wallFrameP50ms": 27.878200000001016,
+          "wallFrameP95ms": 32.35909999999967,
+          "wallFrameP99ms": 33.81790000000001,
+          "maxCameraError": 5.656854251287943e-05
+        },
+        "reversal": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 28.518700000000536,
+          "wallFrameP95ms": 38.06750000000102,
+          "wallFrameP99ms": 44.14439999999922,
+          "maxCameraError": 5.656854251287943e-05
+        },
+        "eight-turns": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 160,
+          "wallFrameP50ms": 28.225799999998344,
+          "wallFrameP95ms": 33.95650000000023,
+          "wallFrameP99ms": 36.76100000000224,
+          "maxCameraError": 5.656854251287943e-05
+        },
+        "analog-ramp": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 27.48739999999816,
+          "wallFrameP95ms": 31.528299999998126,
+          "wallFrameP99ms": 34.16469999999754,
+          "maxCameraError": 5.656854251287943e-05
+        },
+        "wall-slide": {
+          "projectedSpeed": 95.99932685168005,
+          "blockedSamples": 95,
+          "samples": 140,
+          "wallFrameP50ms": 28.19260000000213,
+          "wallFrameP95ms": 34.44250000000102,
+          "wallFrameP99ms": 40.099600000001374,
+          "maxCameraError": 253.33330000000316
+        },
+        "wall-recover": {
+          "projectedSpeed": 95.99853,
+          "blockedSamples": 45,
+          "samples": 140,
+          "wallFrameP50ms": 27.59140000000116,
+          "wallFrameP95ms": 31.464799999997922,
+          "wallFrameP99ms": 34.52759999999762,
+          "maxCameraError": 42.459201096913034
+        },
+        "narrow-passage": {
+          "projectedSpeed": 95.99853,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 30.27480000000287,
+          "wallFrameP95ms": 38.288000000000466,
+          "wallFrameP99ms": 57.00800000000163,
+          "maxCameraError": 88.32389388212006
+        },
+        "menu-cancel": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 70,
+          "wallFrameP50ms": 27.899899999996705,
+          "wallFrameP95ms": 31.17109999999957,
+          "wallFrameP99ms": 31.84049999999843,
+          "maxCameraError": 410.23194728503495
+        },
+        "multitouch": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 70,
+          "wallFrameP50ms": 27.61460000000079,
+          "wallFrameP95ms": 32.5083999999988,
+          "wallFrameP99ms": 34.20140000000538,
+          "maxCameraError": 5.656854251287943e-05
+        },
+        "chest": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 27.568599999998696,
+          "wallFrameP95ms": 36.20019999999931,
+          "wallFrameP99ms": 42.820499999994354,
+          "maxCameraError": 5.656854251287943e-05
+        }
+      }
+    },
+    "baseline": {
+      "source": "620b50d3b0caa31a56acbab28f2730d5037ae466",
+      "dirty": true,
+      "movieMode": true,
+      "environment": {
+        "kind": "session",
+        "schema": 1,
+        "utc": "2026-10-27T06:50:19.2674592Z",
+        "engine": "4.6.1-stable (official)",
+        "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+        "platform": "Linux",
+        "source": "local-uncommitted",
+        "units": "ground px, projected canvas px, seconds, milliseconds",
+        "timebase": "tick=simulation 60Hz; frame=Godot drawn frame; wallMs=monotonic session; movieSeconds=frame/60 only in Movie Maker",
+        "preset": "baseline"
+      },
+      "metrics": {
+        "free-play": {
+          "projectedSpeed": 0,
+          "blockedSamples": 0,
+          "samples": 30,
+          "wallFrameP50ms": 30.54350000000005,
+          "wallFrameP95ms": 39.29289999999992,
+          "wallFrameP99ms": 39.77820000000003,
+          "maxCameraError": 518.1509806567537
+        },
+        "horizontal": {
+          "projectedSpeed": 39.999386,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 29.682999999999993,
+          "wallFrameP95ms": 39.93450000000007,
+          "wallFrameP99ms": 51.89890000000014,
+          "maxCameraError": 27.33334000000002
+        },
+        "vertical": {
+          "projectedSpeed": 19.999693,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 30.55500000000029,
+          "wallFrameP95ms": 49.00550000000021,
+          "wallFrameP99ms": 69.02840000000015,
+          "maxCameraError": 6.000000001904482e-05
+        },
+        "diagonal": {
+          "projectedSpeed": 25.29879076514008,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 32.92239999999947,
+          "wallFrameP95ms": 44.95960000000014,
+          "wallFrameP99ms": 52.85490000000027,
+          "maxCameraError": 6.000000001904482e-05
+        },
+        "tap-stop": {
+          "projectedSpeed": 39.999386,
+          "blockedSamples": 0,
+          "samples": 50,
+          "wallFrameP50ms": 31.165500000000975,
+          "wallFrameP95ms": 45.522500000000946,
+          "wallFrameP99ms": 64.27800000000025,
+          "maxCameraError": 6.000000001904482e-05
+        },
+        "reversal": {
+          "projectedSpeed": 39.999386,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 30.179400000000896,
+          "wallFrameP95ms": 34.46310000000085,
+          "wallFrameP99ms": 56.148699999999735,
+          "maxCameraError": 6.000000001904482e-05
+        },
+        "eight-turns": {
+          "projectedSpeed": 25.29879076514008,
+          "blockedSamples": 0,
+          "samples": 160,
+          "wallFrameP50ms": 30.2528999999995,
+          "wallFrameP95ms": 37.11620000000039,
+          "wallFrameP99ms": 52.706999999998516,
+          "maxCameraError": 6.000000001904482e-05
+        },
+        "analog-ramp": {
+          "projectedSpeed": 39.999386,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 33.1916999999994,
+          "wallFrameP95ms": 73.81880000000092,
+          "wallFrameP99ms": 137.91430000000037,
+          "maxCameraError": 6.000000001904482e-05
+        },
+        "wall-slide": {
+          "projectedSpeed": 25.29879076514008,
+          "blockedSamples": 17,
+          "samples": 140,
+          "wallFrameP50ms": 29.43249999999898,
+          "wallFrameP95ms": 35.47110000000248,
+          "wallFrameP99ms": 36.93729999999778,
+          "maxCameraError": 253.33334000000713
+        },
+        "wall-recover": {
+          "projectedSpeed": 40.001217,
+          "blockedSamples": 17,
+          "samples": 140,
+          "wallFrameP50ms": 28.41019999999844,
+          "wallFrameP95ms": 35.02410000000236,
+          "wallFrameP99ms": 42.27280000000246,
+          "maxCameraError": 32.19977000005584
+        },
+        "narrow-passage": {
+          "projectedSpeed": 40.001217,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 30.530899999997928,
+          "wallFrameP95ms": 40.03689999999915,
+          "wallFrameP99ms": 54.401700000002165,
+          "maxCameraError": 39.045690939504446
+        },
+        "menu-cancel": {
+          "projectedSpeed": 39.999386,
+          "blockedSamples": 0,
+          "samples": 70,
+          "wallFrameP50ms": 30.464399999997113,
+          "wallFrameP95ms": 42.99789999999484,
+          "wallFrameP99ms": 50.39749999999913,
+          "maxCameraError": 331.0148817646603
+        },
+        "multitouch": {
+          "projectedSpeed": 39.999386,
+          "blockedSamples": 0,
+          "samples": 70,
+          "wallFrameP50ms": 30.89440000000468,
+          "wallFrameP95ms": 41.79729999999836,
+          "wallFrameP99ms": 42.74799999999959,
+          "maxCameraError": 8.485281376931915e-05
+        },
+        "chest": {
+          "projectedSpeed": 39.999386,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 30.292799999995623,
+          "wallFrameP95ms": 41.98720000000321,
+          "wallFrameP99ms": 57.257299999997485,
+          "maxCameraError": 8.485281376931915e-05
+        }
+      }
+    },
+    "soft": {
+      "source": "e5935fc962c49de997d9747805590c80ab829105",
+      "dirty": true,
+      "movieMode": true,
+      "environment": {
+        "kind": "session",
+        "schema": 1,
+        "utc": "2026-10-27T06:52:03.8848898Z",
+        "engine": "4.6.1-stable (official)",
+        "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+        "platform": "Linux",
+        "source": "local-uncommitted",
+        "units": "ground px, projected canvas px, seconds, milliseconds",
+        "timebase": "tick=simulation 60Hz; frame=Godot drawn frame; wallMs=monotonic session; movieSeconds=frame/60 only in Movie Maker",
+        "preset": "soft"
+      },
+      "metrics": {
+        "free-play": {
+          "projectedSpeed": 0,
+          "blockedSamples": 0,
+          "samples": 30,
+          "wallFrameP50ms": 36.28399999999999,
+          "wallFrameP95ms": 45.657700000000204,
+          "wallFrameP99ms": 49.53939999999997,
+          "maxCameraError": 518.1509806567537
+        },
+        "horizontal": {
+          "projectedSpeed": 96.00036,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 32.058899999999994,
+          "wallFrameP95ms": 44.7453000000005,
+          "wallFrameP99ms": 60.40859999999975,
+          "maxCameraError": 27.33334000000002
+        },
+        "vertical": {
+          "projectedSpeed": 95.99853,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 30.54989999999998,
+          "wallFrameP95ms": 37.082800000000134,
+          "wallFrameP99ms": 41.08110000000033,
+          "maxCameraError": 6.354400000283267
+        },
+        "diagonal": {
+          "projectedSpeed": 95.99932685168005,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 31.14520000000084,
+          "wallFrameP95ms": 40.797200000000885,
+          "wallFrameP99ms": 46.623999999999796,
+          "maxCameraError": 15.645810000115087
+        },
+        "tap-stop": {
+          "projectedSpeed": 50.23132,
+          "blockedSamples": 0,
+          "samples": 50,
+          "wallFrameP50ms": 27.413500000000568,
+          "wallFrameP95ms": 31.673799999998664,
+          "wallFrameP99ms": 32.6187000000009,
+          "maxCameraError": 8.485281376931915e-05
+        },
+        "reversal": {
+          "projectedSpeed": 95.960075,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 27.20809999999983,
+          "wallFrameP95ms": 32.83399999999892,
+          "wallFrameP99ms": 35.431800000000294,
+          "maxCameraError": 8.485281376931915e-05
+        },
+        "eight-turns": {
+          "projectedSpeed": 95.31999745017319,
+          "blockedSamples": 0,
+          "samples": 160,
+          "wallFrameP50ms": 26.769900000002963,
+          "wallFrameP95ms": 31.04439999999886,
+          "wallFrameP99ms": 32.886500000000524,
+          "maxCameraError": 8.485281376931915e-05
+        },
+        "analog-ramp": {
+          "projectedSpeed": 95.93535700000001,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 27.10910000000149,
+          "wallFrameP95ms": 31.531800000000658,
+          "wallFrameP99ms": 33.75659999999698,
+          "maxCameraError": 8.485281376931915e-05
+        },
+        "wall-slide": {
+          "projectedSpeed": 95.68405588182208,
+          "blockedSamples": 95,
+          "samples": 140,
+          "wallFrameP50ms": 28.002599999999802,
+          "wallFrameP95ms": 35.847499999999854,
+          "wallFrameP99ms": 39.12879999999859,
+          "maxCameraError": 253.3332800000071
+        },
+        "wall-recover": {
+          "projectedSpeed": 95.94176300000001,
+          "blockedSamples": 43,
+          "samples": 140,
+          "wallFrameP50ms": 27.64680000000226,
+          "wallFrameP95ms": 34.12380000000121,
+          "wallFrameP99ms": 38.868900000001304,
+          "maxCameraError": 39.356732962812075
+        },
+        "narrow-passage": {
+          "projectedSpeed": 95.99853,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 32.06499999999505,
+          "wallFrameP95ms": 59.36130000000048,
+          "wallFrameP99ms": 80.88780000000042,
+          "maxCameraError": 81.80320848303198
+        },
+        "menu-cancel": {
+          "projectedSpeed": 93.634636,
+          "blockedSamples": 0,
+          "samples": 70,
+          "wallFrameP50ms": 30.676899999998568,
+          "wallFrameP95ms": 39.48769999999786,
+          "wallFrameP99ms": 43.186900000000605,
+          "maxCameraError": 406.5552679879064
+        },
+        "multitouch": {
+          "projectedSpeed": 95.9967,
+          "blockedSamples": 0,
+          "samples": 70,
+          "wallFrameP50ms": 29.867599999997765,
+          "wallFrameP95ms": 37.41159999999945,
+          "wallFrameP99ms": 45.30739999999787,
+          "maxCameraError": 8.485281376931915e-05
+        },
+        "chest": {
+          "projectedSpeed": 95.628654,
+          "blockedSamples": 0,
+          "samples": 100,
+          "wallFrameP50ms": 29.81420000000071,
+          "wallFrameP95ms": 37.66779999999562,
+          "wallFrameP99ms": 39.62619999999879,
+          "maxCameraError": 8.485281376931915e-05
+        }
+      }
+    }
+  }
+}

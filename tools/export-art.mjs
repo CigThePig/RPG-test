@@ -42,6 +42,7 @@ const sources = [
     .filter((f) => f.endsWith(".cs"))
     .map((f) => path.join(root, "tools/art", f)),
   path.join(root, "vendor/ppc/EnvironmentArt.cs"),
+  ...fs.readdirSync(path.join(root,"addons/procedural_creatures_plantfolk/Core")).filter(f=>f.endsWith(".cs")).map(f=>path.join(root,"addons/procedural_creatures_plantfolk/Core",f)),
 ];
 try {
   const dll = path.join(temp, "Art.dll");
@@ -74,7 +75,8 @@ try {
       },
     }),
   );
-  execFileSync(dotnet, [dll, path.join(root, "public/art")], {
+  const target=process.argv[2]&&!process.argv[2].startsWith("--")?path.resolve(process.argv[2]):path.join(root,"examples/mosslight/public/art");
+  execFileSync(dotnet, [dll, target, ...process.argv.slice(2).filter(a=>a.startsWith("--"))], {
     stdio: "inherit",
     cwd: root,
   });

@@ -15,6 +15,7 @@ namespace PixelCreatures.Core.Motion
         public FacingMode Facing = FacingMode.Eight;
         /// <summary>Motor integrates the position from DesiredVelocity (true) or follows SetWorldPosition (false).</summary>
         public bool InternalDrive = true;
+        public bool FaceVelocity = true;
         /// <summary>Loopable output for exports: no random gestures, periodic blink/breathing (see MotorContext.ExportLoop).</summary>
         public bool ExportMode;
         public double ExportLoop = 2.0;
@@ -110,6 +111,14 @@ namespace PixelCreatures.Core.Motion
 
         // ------------------------------------------------------------------ commands
 
+        public void TriggerGameplayAction(double windup, double recovery)
+        {
+            _rest.Requested = false;
+            _pendingAction = false;
+            _action.Trigger(_ctx, _ctx.Rig.Action);
+            _action.MatchCombat(windup, recovery);
+        }
+
         public void TriggerAction() => TriggerAction(_ctx.Rig.Action);
 
         public void TriggerAction(ActionStyle style)
@@ -129,6 +138,8 @@ namespace PixelCreatures.Core.Motion
         public void TriggerHit(Vec3 fromDirectionWorld, double strength = 1.0)
         {
             if (_rest.Progress > 0.01) _rest.Requested = false;
+            _pendingAction = false;
+            _action.Cancel();
             _hit.Trigger(_ctx, fromDirectionWorld, strength);
             _driver.Tail?.Impulse(new Vec3(-fromDirectionWorld.X, 0.5, -fromDirectionWorld.Z).NormalizedOr(Vec3.UnitY) * 40, FixedClock.DefaultStep);
         }
@@ -147,8 +158,12 @@ namespace PixelCreatures.Core.Motion
         }
 
         /// <summary>External drive: the game sets the world position every frame; velocity is derived.</summary>
-        public void SetWorldPosition(Vec3 position)
+        // Host-provided measured velocity avoids deriving a spike then zeros when
+        // several motor ticks consume one external physics position after a long frame.
+        private Vec3? _externalVelocity;
+        public void SetWorldPosition(Vec3 position, Vec3? measuredVelocity = null)
         {
+            _externalVelocity = measuredVelocity;
             _externalPos = new Vec3(position.X, 0, position.Z);
             _externalSet = true;
         }
@@ -199,8 +214,8 @@ namespace PixelCreatures.Core.Motion
             }
             else if (_externalSet)
             {
-                Vec3 v = (_externalPos - ctx.Position) / dt;
-                ctx.Velocity = Vec3.Lerp(ctx.Velocity, v, DMath.DampFactor(0.05, dt));
+                Vec3 v = _externalVelocity ?? ((_externalPos - ctx.Position) / dt);
+                ctx.Velocity = _externalVelocity.HasValue ? v : Vec3.Lerp(ctx.Velocity, v, DMath.DampFactor(0.05, dt));
                 ctx.Position = _externalPos;
             }
             ctx.Acceleration = Vec3.Lerp(ctx.Acceleration, (ctx.Velocity - _prevVelocity) / dt, DMath.DampFactor(0.08, dt));
@@ -241,7 +256,7 @@ namespace PixelCreatures.Core.Motion
             var ctx = _ctx;
             double walk = ctx.Traits.WalkSpeed;
             double? desired = null;
-            if (ctx.Speed > walk * 0.15) desired = PixelCamera.GroundVelocityToYaw(ctx.Velocity.X, ctx.Velocity.Z);
+            if (Options.FaceVelocity && ctx.Speed > walk * 0.15) desired = PixelCamera.GroundVelocityToYaw(ctx.Velocity.X, ctx.Velocity.Z);
             else if (FacingOverride.HasValue) desired = FacingOverride.Value;
             if (desired.HasValue && _rest.Progress < 0.01)
             {

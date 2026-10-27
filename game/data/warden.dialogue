@@ -1,0 +1,16 @@
+~ warden
+Warden: The causeway is open, but the old ruin is still dangerous.
+- I can help with the prowlers. [if not flags.get("accepted_1", false) /]
+	do accept_quest(1)
+	Warden: Defeat two. We will hear of it when it is done.
+	=> END
+- Tell me about the buried light. [if completed(1) /]
+	do accept_quest(2)
+	Warden: Follow the causeway east. Keys in the ruin open its sealed passages.
+	=> END
+- I want to learn alchemy.
+	do accept_quest(3)
+	Warden: Two silverleaf sprigs make one restorative draught.
+	=> END
+- Goodbye.
+	=> END

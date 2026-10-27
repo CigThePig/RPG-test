@@ -1,10 +1,15 @@
-# Next experiments, selected by playtesting
+# Next game development
 
-1. **Does tending matter enough?** Observe whether players deliberately redirect foragers. Try competing needs, carrying capacity, or pollination only if this makes decisions clearer; avoid adding a quest checklist to disguise weak interactions.
-2. **More expressive inhabitants.** Export rest/action clips and body-fitted accessories; evaluate live PPC generation against the cost of a larger offline catalog. Test whether functional anatomy makes a better adventure or ecology game.
-3. **A second material property.** Extend the same preconditions/effects model with a small useful property (not a recipe catalog). Every added property should change an available choice.
-4. **Richer geography.** Navigation-aware continuous shore collision, connected waterways, better vegetation composition, and obstruction-aware scenery; preserve accessible starting resources.
-5. **Better observability.** Selected-agent route/decision overlay and controlled scenario comparison before adding planner complexity.
-6. **Real device validation.** Play on Ross's phone, measure sustained frame time, improve touch ergonomics and accessible alternatives, then consider larger populations/maps or WebGL only if profiling supports it.
+The selected engine and source integrations are implemented. Continue by building game content and extending tested production paths:
 
-The project has not selected action RPG, survival, farming, or creature collection as its final genre. This slice should tell us which interactions deserve deeper investment.
+1. Develop encounter pacing, directional targeting, telegraphs, area attacks, projectile behaviours and tactical enemy profiles using the current ability/action definitions.
+2. Add hand-authored points of interest, settlements and region transitions. Expand the region generator's terrain/material constraints and validate collision/accessibility across more layouts.
+3. Author quests and dialogue through the existing resources/events. Add richer objective matchers for particular actor/region/item IDs and quest invalidation rules based on world conditions.
+4. Extend generated equipment with construction components, slot requirements, condition wear and explicit material-dependent interactions. Add matching PPC weapon shapes where originals do not cover the intended silhouette.
+5. Expand NPC goals into multi-action plans, profession activities, trade/rest routines and social consequences. The planner, shared action boundary, memory/relationship data and persistence are present; a simulated political economy is not.
+6. Refine progression/unlock costs, classless skill choices and equipment-derived capabilities. Experience/levels, skill points/ranks, training and ability unlocks are already implemented; balance/content trees remain design work.
+7. Improve creature hit/death presentation, family-specific attack clips, ground contact, palettes, shores, vegetation depth and UI art. Original procedural art/motor APIs are available.
+8. Profile native hardware rendering, GPU/texture memory, transitions and longer sessions. Software-rendered CI measurements are verification evidence, not a 60-FPS promise. Add population/render tiers where measurements justify them.
+9. Add incremental region deltas, explicit save schema migrations and player-authored input/gamepad settings once the v1 content contracts settle. Do not create competing state owners.
+
+The development environment is deliberately compact. There is no finished story, comprehensive economy/crime simulation, multiplayer, planet streaming, class balance, commercial UI/audio polish or mobile/browser export promise. Those are not hidden behind placeholder interfaces.

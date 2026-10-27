@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import fs from "node:fs";
-import { generate, step, save, load } from "../src/world.js";
+import { generate, step, save, load } from "../examples/mosslight/src/world.js";
 const stats = (values) => {
   values.sort((a, b) => a - b);
   return {

@@ -1,30 +1,62 @@
-name: Validate playable world
-on: [push, pull_request]
+name: RPG foundation verification
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 jobs:
-  check:
+  native:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.408
+            9.0.203
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.6.1
+          use-dotnet: true
+          include-templates: false
+      - run: python3 tools/pack-dungeon-rules.py
+      - run: git diff --exit-code -- game/data/dungeon_rules.json
+      - run: dotnet build
+      - name: Import assets before enabling editor plugins
+        run: python3 tools/import-project.py
+      - name: Engine integration and population benchmarks
+        run: python3 tools/verify.py --headless
+      - name: Rendered input, dialogue and UI verification
+        run: xvfb-run -a python3 tools/verify.py --visual
+      - name: Phone layout and touch UI verification
+        run: xvfb-run -a python3 tools/verify.py --visual --mobile
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-rpg-evidence
+          path: |
+            docs/native-screenshots/
+            docs/verification.json
+            docs/render-verification*.json
+            build/verification-*.log
+  preserved-reference:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: examples/mosslight
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: examples/mosslight/package-lock.json
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: |
+            8.0.408
+            9.0.203
       - run: npm ci
       - run: npm run art
       - run: git diff --exit-code -- src/anatomy.json 'public/art/*.json'
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playable-world-evidence
-          path: |
-            docs/screenshots
-            docs/browser-measurements.json

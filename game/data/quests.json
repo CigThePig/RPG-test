@@ -1,0 +1,5 @@
+[
+ {"id":1,"quest_name":"Trouble in the Reach","quest_description":"The wardens need help clearing the causeway.","quest_objective":"Defeat two mire prowlers.","event_kind":"defeated","target_value":"beast","required":2,"reward_item":"coin","reward_count":15},
+ {"id":2,"quest_name":"The buried light","quest_description":"An old light lies beyond the sealed ruin.","quest_objective":"Recover a relic from the ruin.","event_kind":"item_acquired","target_value":"relic","required":1,"reward_item":"potion","reward_count":3,"prerequisite":1},
+ {"id":3,"quest_name":"An apothecary's beginning","quest_description":"Learn a useful local recipe.","quest_objective":"Craft a restorative draught.","event_kind":"crafted","target_value":"draught","required":1,"reward_item":"coin","reward_count":5}
+]
