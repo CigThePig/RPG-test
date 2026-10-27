@@ -14,7 +14,7 @@ xvfb-run -a python3 tools/gameplay-verify.py
 xvfb-run -a python3 tools/gameplay-verify.py --presets precise --realtime --output build/gameplay-realtime
 ```
 
-Routine gameplay CI records baseline and precise; manual extended verification includes baseline/precise/soft/explore plus a real-time desktop recording. Runs have bounded process and job timeouts. The existing Android workflow builds/signs ARM64, installs an x86_64 companion on an emulator and captures OS-touch gameplay video. APK signing remains unchanged.
+Routine gameplay CI records baseline and precise; manual extended verification includes baseline/precise/soft/explore plus a real-time desktop recording. Runs have bounded process and job timeouts. CI installs Pillow 11.3.0 and the imageio-ffmpeg 0.6.0 wheel with bounded pip retries, verifies libx264/X11 support, and uses the runner's existing Xvfb. This avoids an observed stall in unrelated apt repository updates. The binary is a CI utility, not an APK dependency. The existing Android workflow builds/signs ARM64, installs an x86_64 companion on an emulator and captures OS-touch gameplay video. APK signing remains unchanged.
 
 ## Production harness
 

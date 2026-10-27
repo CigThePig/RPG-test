@@ -32,8 +32,9 @@ jobs:
           version: 4.6.1
           use-dotnet: true
           include-templates: false
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
-      - run: python3 -m pip install Pillow==11.3.0
+      - name: Install pinned video tools without distro updates
+        timeout-minutes: 4
+        run: python3 tools/setup-video.py --require-display
       - run: git rev-parse HEAD > game/data/build-source.txt
       - run: dotnet build
       - run: python3 tools/import-project.py

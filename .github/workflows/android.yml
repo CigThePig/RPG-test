@@ -142,10 +142,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install screenshot verification dependency
-        run: |
-          python3 -m pip install Pillow==11.3.0
-          sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install pinned video tools without distro updates
+        timeout-minutes: 4
+        run: python3 tools/setup-video.py
       - name: Install, launch and exercise exported C# application
         run: python3 tools/android-smoke.py build/emulator/Mosslight-emulator.apk
       - uses: actions/upload-artifact@v4

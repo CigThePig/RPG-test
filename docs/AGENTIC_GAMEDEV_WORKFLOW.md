@@ -13,7 +13,7 @@ Investigated 2026-10-27 against Godot 4.6.1 .NET. This is a testing workflow, no
 | [ADB screenrecord](https://developer.android.com/tools/adb#screenrecord) | Actual Android display video, bounded duration; timestamps/logcat available separately. | Chosen for emulator video. Does not certify physical S25 speed or thumb comfort. |
 | [Native FileDialog](https://docs.godotengine.org/en/4.6/classes/class_filedialog.html#class-filedialog-property-use-native-dialog) | Android native Storage Access Framework when access is FILESYSTEM. | Chosen for phone ZIP export, using Godot FileAccess for content URIs; no broad storage permission/native sharing dependency. |
 
-No code was imported from the investigated MCP/QA/benchmark projects. Existing PPC adaptation retains its upstream licence; changes to external-drive velocity are local host integration. FFmpeg and Pillow remain test-host utilities; they are not bundled into the APK.
+No code was imported from the investigated MCP/QA/benchmark projects. Existing PPC adaptation retains its upstream licence; changes to external-drive velocity are local host integration. FFmpeg and Pillow remain test-host utilities; they are not bundled into the APK. CI obtains its FFmpeg executable from pinned imageio-ffmpeg 0.6.0 (BSD-licensed Python wrapper, separately licensed bundled FFmpeg/GPL codec binary). The setup checks actual libx264 and X11 device support before running. No wheel or FFmpeg executable is incorporated into the game.
 
 ## Required loop for future changes
 
