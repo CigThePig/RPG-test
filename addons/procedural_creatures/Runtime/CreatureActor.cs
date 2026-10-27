@@ -252,6 +252,12 @@ namespace PixelCreatures.Runtime
             if (Motor != null) Motor.FacingOverride = yaw;
         }
 
+        public void ClearFacingRequest()
+        {
+            _facingRequest = null;
+            if (Motor != null) Motor.FacingOverride = null;
+        }
+
         public void FaceDirection(int dir8) => FaceYaw(PixelCamera.DirectionYaw(dir8));
 
         public bool Resting
@@ -263,6 +269,8 @@ namespace PixelCreatures.Runtime
                 if (Motor != null) Motor.Resting = value;
             }
         }
+
+        public void TriggerGameplayAction(float windup, float recovery) => Motor?.TriggerGameplayAction(windup, recovery);
 
         public void TriggerAction() => Motor?.TriggerAction();
 

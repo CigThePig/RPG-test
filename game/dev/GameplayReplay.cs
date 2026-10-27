@@ -11,6 +11,7 @@ public sealed class GameplayReplay
     int index=-1;
     V origin;
     float distance;
+    double incomingYaw;
     readonly List<object> results=new();
     Queue<V> route=new();
     public bool Finished { get; private set; }
@@ -33,7 +34,8 @@ public sealed class GameplayReplay
         new("chest",100,new(374,300),Vector2.Right),
         new("settlement-route",240,new(0,0),Vector2.Right,"reach"),
         new("dungeon-route",240,new(0,0),Vector2.Right,"ruin"),
-        new("combat-movement",180,new(0,0),Vector2.Right,"reach")
+        new("combat-movement",180,new(0,0),Vector2.Right,"reach"),
+        new("attack-readability",200,new(300,300),Vector2.Right)
     };
     public GameplayReplay(Foundation owner)
     {
@@ -93,6 +95,15 @@ public sealed class GameplayReplay
                 enemy.X=at.X;enemy.Y=at.Y;
                 app.Views[enemy.Id].SnapPosition();
             }
+            if(s.Id=="attack-readability")
+            {
+                app.World.Events.Recent.Clear();
+                var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
+                enemy.Region=p.Region;enemy.X=344;enemy.Y=300;enemy.Speed=0;
+                enemy.Health=enemy.MaxHealth=10000;enemy.Abilities.Clear();
+                enemy.State=ActionState.Recovery;enemy.StateRemaining=100;
+                app.Views[enemy.Id].SnapPosition();
+            }
             app.ControllerVelocity=Vector2.Zero;
             app.Ui.ClosePanels(); app.ResumeGame();
             app.Views[p.Id].SnapPosition();
@@ -113,6 +124,29 @@ public sealed class GameplayReplay
             direction=Vector2.Right.Rotated(local*Mathf.Pi/90);
             if(local==30 || local==100)app.Cast("ember");
         }
+        if(test.Id=="attack-readability")
+        {
+            if(local>=10)direction=Vector2.Zero;
+            if(local is 25 or 75 or 150)
+            {
+                var button=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.StartsWith("Attack"));
+                var pos=button.GetGlobalRect().GetCenter();
+                Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=pos});
+                Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=pos});
+            }
+            // Explicit NPC combat command: real ability windup/damage/knockback, not player input injection.
+            if(local==110)
+            {
+                var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
+                enemy.X=app.World.Player.X+28;enemy.Y=app.World.Player.Y;app.Views[enemy.Id].SnapPosition();
+                app.Trace.Marker("fixture/npc-reposition-for-bite");
+                enemy.Abilities.Add("bite");enemy.State=ActionState.Idle;enemy.StateRemaining=0;enemy.Cooldowns.Clear();enemy.Mana=enemy.MaxMana;
+                incomingYaw=app.Views["player"].Creature.Motor!.Yaw;
+                if(!app.World.Activate(enemy.Id,"bite","player"))throw new InvalidOperationException("Hit-reaction fixture could not activate bite");
+            }
+        }
+        if(test.Id=="attack-readability" && local==145 && Math.Abs(PixelCreatures.Core.DMath.WrapAngle(app.Views["player"].Creature.Motor!.Yaw-incomingYaw))>.12)
+            throw new InvalidOperationException("Incoming hit changed player facing");
         if(test.Id=="tap-stop" && local>=3) direction=Vector2.Zero;
         if(test.Id=="reversal" && local>=45) direction=Vector2.Left;
         if(test.Id=="eight-turns") direction=Vector2.Right.Rotated((local/20)*Mathf.Pi/4);
@@ -163,6 +197,8 @@ public sealed class GameplayReplay
         bool moved=distance>1;
         results.Add(new {scenario=s.Id,ticks=s.Ticks,groundDistance=distance,projectedDisplacement=GodotConvert.GroundToScreen(p.X-origin.X,p.Y-origin.Y).Length(),x=p.X,y=p.Y,clearance=valid,moved,frame=Engine.GetFramesDrawn(),speed=p.Speed});
         app.Trace.Marker("scenario-end");
+        if(s.Id=="attack-readability" && !app.World.Events.Recent.Any(e=>e.Kind=="damage" && e.Target=="player"))throw new InvalidOperationException("Hit-reaction fixture never hit the player");
+        if(s.Id=="attack-readability" && app.World.Events.Recent.Count(e=>e.Kind=="ability_started" && e.Actor=="player" && e.Value=="slash")!=3)throw new InvalidOperationException("Three Attack touches did not activate exactly three slashes");
         if(s.Id=="chest" && !app.World.RegionsById[p.Region].Depleted.Contains(12*64+18))throw new InvalidOperationException("Chest input interaction failed");
         if(!valid||!moved)throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
     }

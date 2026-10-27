@@ -48,3 +48,7 @@ Samples contain requested/actual velocity, screen/ground input, finger/anchor/di
 ## Environment limits
 
 Headless proves systems, hosted desktop proves a rendered application, emulator proves installed Android rendering/input, and physical S25 testing proves that specific device's experience. Keep those labels in every report. Offline movie smoothness is guaranteed by the capture clock and must never be advertised as stable physical 60FPS. Use the manual real-time capture and phone traces for pacing. No first-party MCP server is required for future coding agents to consume these files.
+
+### Combat and menu follow-up
+
+The core replay now includes an eighteenth scenario, `attack-readability`: three actual Attack-button touches, a labeled NPC reposition/bite command, and an assertion that the incoming hit does not reverse player facing. The fixture uses production ability timing/damage/knockback; its frozen, high-health enemy is explicitly controlled, not a test of autonomous AI. The phone visual suite also swipes over main-menu button rows and requires scrolling without activation. The preserved movement presets remain unchanged.

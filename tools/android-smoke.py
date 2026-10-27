@@ -119,14 +119,14 @@ try:
     else: raise RuntimeError('Touch movement never approached starting chest')
     assert float(positions[-1][0])>220,'Touch input did not change player coordinates'
     capture('chest.png')
-    tap(1145,635)
+    tap(1203,623)
     time.sleep(1)
     logs=adb('logcat','-d')
     assert 'MOSSLIGHT_GAMEPLAY kind=resource_depleted value=chest' in logs,'Touch interaction did not empty authoritative chest inventory'
     interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
     assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
     capture('exploration.png')
-    tap(580,715) # Pack: second row, first button.
+    tap(1098,568) # Pack: utility row above the combat thumb arc.
     time.sleep(1)
     capture('inventory.png')
     pids=adb('shell','pidof','screenrecord').split()

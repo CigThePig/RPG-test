@@ -24,3 +24,5 @@ Native export is implemented against Godot's supported Android Storage Access Fr
 ## What feedback helps
 
 Identify the preset, route/location, finger motion, expected response and observed problem. Share an issue marker time and video time when possible. Distinguish slow travel, slow input response, collision restriction, camera lag and animation stutter. No telemetry score determines whether you enjoy the controls.
+
+The combat follow-up keeps the soft/explore settings unchanged. Attack is now the large lower-right target, with Ember/Mend/Draught/Interact around it and Pack/Menu above. Touch-down highlights the owned action target; release outside it or cancellation does not activate it. Cooldown text occupies a second line. Swipe vertically anywhere over menu button rows to scroll, or drag the wider scrollbar. Receiving knockback should no longer turn your character away from its current facing; deliberate movement still changes facing. Sword attacks now have a stronger rig pose and a brief directional trail synchronized to the combat windup.

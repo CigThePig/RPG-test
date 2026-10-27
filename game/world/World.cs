@@ -27,7 +27,7 @@ public sealed class World
     readonly Dictionary<string, Spell> spells = new();
     public Godot.Node? Planner { get; set; }
 
-    public event Action<string, string>? Presentation;
+    public event Action<string, string, string>? Presentation;
     public World(Content content, Godot.Node itemService, int seed = 42)
     {
         Content = content;
@@ -86,7 +86,7 @@ public sealed class World
         a.StateRemaining = d.Windup;
         a.PendingAbility = d.Id;
         a.Target = b.Id;
-        Presentation?.Invoke(a.Id, d.Damage < 0 ? "cast" : "attack");
+        Presentation?.Invoke(a.Id, d.Damage < 0 ? "cast" : "attack", b.Id);
         Events.Publish(new("ability_started", a.Id, b.Id, d.Id));
     }
 
@@ -111,7 +111,7 @@ public sealed class World
         var away = target.Position - source.Position;
         if (!periodic && away.LengthSquared() > 0)
             Move(target, Vector2.Normalize(away) * 15);
-        Presentation?.Invoke(target.Id, "hit");
+        Presentation?.Invoke(target.Id, "hit", source.Id);
         Events.Publish(new("damage", source.Id, target.Id, type, (int)actual));
         target.Knowledge[source.Id] = "attacker";
         target.Relationships[source.Id] = target.Relationships.GetValueOrDefault(source.Id) - actual;
@@ -119,7 +119,7 @@ public sealed class World
         {
             Items.Service.Call("unequip_all", target.Id);
             target.PendingAbility = "";
-            Presentation?.Invoke(target.Id, "dead");
+            Presentation?.Invoke(target.Id, "dead", source.Id);
             Events.Publish(new("defeated", source.Id, target.Id, target.Profile));
             Progression.Award(this, source, 25);
             var random = new Random(unchecked(Seed + (int)Tick + StableId(target.Id)));

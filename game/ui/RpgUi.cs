@@ -11,7 +11,7 @@ public partial class RpgUi : CanvasLayer
     PanelContainer panel = null !, menu = null !;
     VBoxContainer body = null !;
     Control root = null !;
-    GridContainer hotbar = null !;
+    Control hotbar = null !;
     public TouchStick Stick { get; private set; } = null!;
     Label metrics = null!;
     bool showMetrics;
@@ -71,11 +71,9 @@ public partial class RpgUi : CanvasLayer
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         root.AddChild(message);
-        hotbar = new GridContainer
-        {
-            Columns = 5,
-            Position = new Vector2(500, 640)
-        };
+        hotbar = MobileLayout ? new Control() : new GridContainer { Columns = 5 };
+        hotbar.Position = new Vector2(500, 640);
+
         root.AddChild(hotbar);
         foreach (var(text, action)in new (string, Action)[]
         {
@@ -95,7 +93,17 @@ public partial class RpgUi : CanvasLayer
         {
             if (MobileLayout && (text.StartsWith("J ·") || text.StartsWith("C ·") || text.StartsWith("M ·"))) continue;
             var button = Button(hotbar, MobileLayout ? text.Split(" · ").Last() : text, action);
-            if (MobileLayout) button.CustomMinimumSize = new Vector2(135, 72);
+            if (MobileLayout)
+            {
+                int index = hotbar.GetChildCount() - 1;
+                // A large primary target and a shallow thumb arc. Utilities sit above combat.
+                Vector2[] positions = { new(210,130), new(100,85), new(10,5), new(115,0), new(315,55), new(210,0), new(315,-35) };
+                button.Position = positions[index];
+                button.Size = button.CustomMinimumSize = index == 0 ? new Vector2(112,104) : new Vector2(96,76);
+                button.AddThemeFontSizeOverride("font_size", index == 0 ? 23 : 18);
+                var face = new StyleBoxFlat { BgColor = new Color(index == 0 ? "795433" : "263f43"), BorderColor = new Color("b0af7e"), BorderWidthLeft=2, BorderWidthRight=2, BorderWidthTop=2, BorderWidthBottom=2, CornerRadiusTopLeft=24, CornerRadiusTopRight=24, CornerRadiusBottomLeft=24, CornerRadiusBottomRight=24 };
+                button.AddThemeStyleboxOverride("normal", face);
+            }
             var id = text.StartsWith("1") ? "slash" : text.StartsWith("2") ? "ember" : text.StartsWith("3") ? "mend" : "";
             if (id != "")
             {
@@ -113,9 +121,11 @@ public partial class RpgUi : CanvasLayer
         };
         root.AddChild(panel);
         body = new VBoxContainer();
-        var scroll = new ScrollContainer
+        var scroll = new TouchScroll
         {
-            CustomMinimumSize = new Vector2(690, 440)
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            ScrollDeadzone = 12
         };
         panel.AddChild(scroll);
         scroll.AddChild(body);
@@ -149,7 +159,7 @@ public partial class RpgUi : CanvasLayer
         if (e is not InputEventScreenTouch touch) return;
         if (touch.Canceled)
         {
-            if (touchButtons.Remove(touch.Index)) GetViewport().SetInputAsHandled();
+            if (touchButtons.Remove(touch.Index,out var canceled)) { canceled.Modulate=Colors.White; GetViewport().SetInputAsHandled(); }
             return; // Unowned cancellation must still reach the joystick or native controls.
         }
         if (touch.Pressed)
@@ -157,10 +167,12 @@ public partial class RpgUi : CanvasLayer
             var button = hotbar.GetChildren().OfType<Button>().FirstOrDefault(b => b.IsVisibleInTree() && !b.Disabled && b.GetGlobalRect().HasPoint(touch.Position));
             if (button == null) return;
             touchButtons[touch.Index] = button;
+            button.Modulate=new Color(.7f,.8f,.8f);
             GetViewport().SetInputAsHandled();
         }
         else if (touchButtons.Remove(touch.Index, out var button))
         {
+            button.Modulate=Colors.White;
             if (button.IsVisibleInTree() && !button.Disabled && button.GetGlobalRect().HasPoint(touch.Position))
                 button.EmitSignal(Godot.Button.SignalName.Pressed);
             GetViewport().SetInputAsHandled();
@@ -170,7 +182,8 @@ public partial class RpgUi : CanvasLayer
     void Layout()
     {
         var size = GetViewport().GetVisibleRect().Size;
-        hotbar.Position = new Vector2(size.X - 760, size.Y - (MobileLayout ? 200 : 160));
+        hotbar.Position = MobileLayout ? new Vector2(size.X - 440, size.Y - 270) : new Vector2(size.X - 760, size.Y - 160);
+        if (MobileLayout) hotbar.Size = new Vector2(420,250);
         Stick.Position = new Vector2(40, size.Y - 260);
         message.Position = new Vector2(24, size.Y - 45);
         message.Size = new Vector2(size.X - 48, 40);
@@ -186,6 +199,7 @@ public partial class RpgUi : CanvasLayer
         var b = new Button
         {
             Text = text,
+            MouseFilter = Control.MouseFilterEnum.Pass,
             CustomMinimumSize = new Vector2(0, 56)
         };
         b.Pressed += action;
@@ -222,7 +236,7 @@ public partial class RpgUi : CanvasLayer
     public void Update()
     {
         hotbar.Visible = !BlocksInput && !App.Narrative.Get("speaking").AsBool();
-        if (!hotbar.Visible) touchButtons.Clear();
+        if (!hotbar.Visible) { foreach(var held in touchButtons.Values)held.Modulate=Colors.White; touchButtons.Clear(); }
         Stick.Visible = MobileLayout && !App.GameplayBlocked;
         if (App.GameplayBlocked) Stick.Cancel();
         marker.Visible=App.Trace.Active && !BlocksInput;
@@ -245,7 +259,7 @@ public partial class RpgUi : CanvasLayer
             button.Disabled = cooldown > 0 || a.Mana < def.Cost || !a.Alive;
             string binding = id == "slash" ? "1" : id == "ember" ? "2" : "3";
             string label = MobileLayout ? (id == "slash" ? "Attack" : def.Name.Split(' ')[0]) : $"{binding} · {def.Name}";
-            button.Text = cooldown > 0 ? $"{label} {cooldown:0.0}s" : label;
+            button.Text = cooldown > 0 ? label + (MobileLayout ? "\n" : " ") + $"{cooldown:0.0}s" : label;
         }
     }
 
@@ -375,10 +389,12 @@ public partial class RpgUi : CanvasLayer
     {
         Clear(menu);
         var box = new VBoxContainer();
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(510, 600) };
+        var scroll = new TouchScroll { SizeFlagsVertical = Control.SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, ScrollDeadzone = 12 };
+        scroll.GetVScrollBar().CustomMinimumSize = new Vector2(28,0);
         menu.AddChild(scroll);
         box.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         scroll.AddChild(box);
+        box.AddThemeConstantOverride("separation", 8);
         box.AddChild(new Label { Text = "MOSSLIGHT\nRPG FOUNDATION", HorizontalAlignment = HorizontalAlignment.Center });
         Button(box, "Enter / Resume", App.ResumeGame);
         foreach (var entry in new (string, Action)[] { ("Pack", Inventory), ("Journal", Journal), ("Character", Character), ("Map", Map) })

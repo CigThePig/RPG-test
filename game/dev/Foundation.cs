@@ -241,10 +241,14 @@ public partial class Foundation : Node2D
             if (e.Kind == "item_equipped" && Views.TryGetValue(e.Actor, out var changed))
                 changed.Equipment(items.Call("equipment_appearance", e.Actor).AsString());
         };
-        World.Presentation += (id, cue) =>
+        World.Presentation += (id, cue, targetId) =>
         {
             if (Views.TryGetValue(id, out var view))
-                view.Cue(cue);
+            {
+                World.Actors.TryGetValue(targetId ?? "", out var target);
+                var ability = World.Content.Abilities.FirstOrDefault(a => a.Id == view.State.PendingAbility);
+                view.Cue(cue, target, ability);
+            }
             if (cue is "hit" or "cast")
                 PlayCue(cue);
         };

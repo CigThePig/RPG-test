@@ -223,10 +223,20 @@ namespace PixelCreatures.Core.Motion
         public ActionStyle Style { get; private set; }
         public double Envelope { get; private set; }
         private int _count;
+        private double _impact = .45;
+        private double _amplitude = 1;
+        public void Cancel() { Active=false; Envelope=0; }
+        public void MatchCombat(double windup, double recovery)
+        {
+            Duration = Math.Max(1.0 / 60, windup + recovery);
+            _impact = DMath.Clamp(windup / Duration, .01, .99);
+            _amplitude = 1.6;
+        }
 
         public void Trigger(MotorContext ctx, ActionStyle style)
         {
             Style = style;
+            _impact = .45; _amplitude = 1;
             Active = true;
             Time = 0;
             _count++;
@@ -260,12 +270,20 @@ namespace PixelCreatures.Core.Motion
         public void Evaluate(MotorContext ctx, ref PoseParams p)
         {
             if (!Active) return;
-            double u = DMath.Saturate(Time / Duration);
+            double t = DMath.Saturate(Time / Duration);
+            double u = t <= _impact ? t / _impact * .45 : .45 + (t - _impact) / (1 - _impact) * .55;
             double L = Math.Max(4, ctx.Anatomy.Metrics.BodyLength);
             double leg = Math.Max(3, ctx.Anatomy.Metrics.LegLength);
             double agg = DMath.Lerp(0.75, 1.25, ctx.Traits.Aggression);
             Vec3 offsetBefore = p.BodyOffset;
             EvaluateStyle(ctx, ref p, u, L, leg, agg);
+            if (Style == ActionStyle.Strike)
+            {
+                double swing = Curves.Strike(u, .3, .45, .55, 1, .5);
+                p.BodyYaw += .32 * swing * (p.ArmSide == 0 ? 1 : p.ArmSide) * (_amplitude - 1);
+                p.ArmReach += swing * (_amplitude - 1);
+                p.ArmRaise += .35 * (_amplitude - 1) * Curves.Window(u, .05, .3, .35, .45);
+            }
             // lunges scale with the body length, which includes long tails: keep the horizontal body
             // displacement of an action inside the animation margin of the canvas
             double margin = Math.Max(2.0, ctx.Anatomy.Canvas.Width * 0.5 - 2 - ctx.Anatomy.Metrics.HorizontalRadius);

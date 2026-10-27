@@ -24,6 +24,29 @@ public static class VisualChecks
     {
         await Frames(app, 30);
         await Capture(app, "menu");
+        if (app.Ui.MobileLayout)
+        {
+            var scroller=app.Ui.FindChildren("*","ScrollContainer",true,false).OfType<ScrollContainer>().First(s=>s.IsVisibleInTree());
+            var start=scroller.GetGlobalRect().GetCenter();
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=true,Position=start});
+            await Frames(app,1);
+            for(int i=1;i<=6;i++)
+            {
+                Input.ParseInputEvent(new InputEventScreenDrag {Index=9,Position=start-new Vector2(0,i*30),Relative=new Vector2(0,-30)});
+                await Frames(app,1);
+            }
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=false,Position=start-new Vector2(0,180)});
+            await Frames(app,2);
+            if(scroller.ScrollVertical<60 || !app.Ui.MenuOpen)throw new InvalidOperationException("Menu swipe over button rows did not scroll safely");
+            scroller.ScrollVertical=0;
+            await Frames(app,3);
+            var enter=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Enter / Resume");
+            var enterPoint=enter.GetGlobalRect().GetCenter();
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=true,Position=enterPoint});
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=false,Canceled=true,Position=enterPoint});
+            await Frames(app,2);
+            if(!app.Ui.MenuOpen)throw new InvalidOperationException("Canceled menu touch activated Enter");
+        }
         app.Ui.Menu();
         await Frames(app,2);
         // Use real GUI dispatch for desktop mice; headless checks exercise raw touch.

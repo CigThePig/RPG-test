@@ -66,6 +66,21 @@ public static class MovementChecks
             check(Math.Abs(motor.Context.Speed-120)<.001,"animation retains measured velocity across motor catch-up steps");
             motor.SetWorldPosition(new Vec3(8,0,0),Vec3.Zero);motor.Step(1.0/60);
             check(motor.Context.Speed==0,"animation velocity stops with external displacement");
+            motor.Teleport(Vec3.Zero,0);
+            motor.Options.FaceVelocity=false;
+            for(int i=0;i<15;i++){motor.SetWorldPosition(new Vec3(-15,0,0),new Vec3(-900,0,0));motor.Step(1.0/60);}
+            check(Math.Abs(motor.Yaw)<.001,"forced knockback velocity cannot turn a facing-locked creature");
+            motor.Options.FaceVelocity=true;
+            for(int i=0;i<60;i++){motor.SetWorldPosition(new Vec3(-15,0,0),new Vec3(-100,0,0));motor.Step(1.0/60);}
+            check(Math.Abs(motor.Yaw)>1,"intentional movement restores velocity facing after stagger");
+            motor.TriggerGameplayAction(.14,.24);
+            for(int i=0;i<22;i++)motor.Step(1.0/60);
+            check(motor.ActionActive,"combat pose spans windup and recovery");
+            motor.Step(1.0/60);
+            check(!motor.ActionActive,"combat pose ends with 380ms gameplay action, not species one-second animation");
+            motor.TriggerGameplayAction(.14,.24);
+            motor.TriggerHit(Vec3.UnitX);
+            check(!motor.ActionActive,"incoming hit cancels interrupted attack pose instead of completing a ghost swing");
             Persistence.Restore(w,app.Narrative,saved);
             string beforeCourse=Persistence.Capture(w,app.Narrative);
             var autosave=File.Exists(Persistence.AutosavePath) ? File.ReadAllBytes(Persistence.AutosavePath) : null;

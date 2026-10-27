@@ -11,6 +11,9 @@ public partial class CharacterView : Node2D
 
     public bool HasLoot { get; set; }
     Vector2 previous;
+    float attackTime, attackDuration, impactTime;
+    Vector2 attackDirection = Vector2.Right;
+    bool attackArc;
     public void Setup(ActorState actor)
     {
         State = actor;
@@ -51,7 +54,11 @@ public partial class CharacterView : Node2D
     public void Sync(float dt)
     {
         var now = new Vector2(State.X, State.Y);
-        Creature.MoveVelocity = (now - previous) / Math.Max(dt, .001f);
+        Creature.MoveVelocity = State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
+        if (State.State is ActionState.Idle or ActionState.Moving && Creature.MoveVelocity.LengthSquared() > .25f) Creature.ClearFacingRequest();
+        if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = State.State is ActionState.Idle or ActionState.Moving;
+        if (!Creature.Paused) attackTime += dt;
+        if (State.State is ActionState.Staggered or ActionState.Dead) attackDuration = 0;
         Creature.GroundPosition = now;
         previous = now;
         Position = GodotConvert.GroundToScreen(State.X, State.Y);
@@ -60,16 +67,49 @@ public partial class CharacterView : Node2D
         QueueRedraw();
     }
 
-    public void Cue(string cue)
+    public void Cue(string cue, ActorState? target = null, AbilityDef? ability = null)
     {
-        if (cue == "attack" || cue == "cast")
-            Creature.TriggerAction();
+        if (cue is "attack" or "cast")
+        {
+            if (target != null && target.Id != State.Id)
+            {
+                var delta = target.Position - State.Position;
+                if (delta.LengthSquared() > .001f)
+                {
+                    Creature.FaceYaw(PixelCamera.GroundVelocityToYaw(delta.X, delta.Y));
+                    attackDirection = GodotConvert.GroundToScreen(delta.X, delta.Y).Normalized();
+                }
+            }
+            if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
+            if (ability != null) Creature.TriggerGameplayAction(ability.Windup, ability.Recovery);
+            else Creature.TriggerAction();
+            attackTime = 0;
+            impactTime = ability?.Windup ?? .14f;
+            attackDuration = impactTime + (ability?.Recovery ?? .24f);
+            attackArc = cue == "attack" && ability?.Id == "slash";
+        }
         if (cue == "hit")
-            Creature.TriggerHit(Vector2.Left);
+        {
+            if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
+            Creature.TriggerHit(target == null ? Vector2.Left : new Vector2(target.X - State.X, target.Y - State.Y).Normalized());
+            attackDuration = 0;
+        }
     }
 
     public override void _Draw()
     {
+        if (attackArc && attackTime < attackDuration && State.Alive)
+        {
+            // Presentation only: the authoritative ability still owns range, damage and timing.
+            float t = attackTime - impactTime;
+            if (t >= -.06f && t <= .14f)
+            {
+                float alpha = t < 0 ? (t + .06f) / .06f : 1 - t / .14f;
+                float angle = attackDirection.Angle();
+                DrawArc(new Vector2(0, -14), 30, angle - 1.0f, angle + 1.0f, 20, new Color(1, .87f, .5f, alpha), 4, true);
+                DrawArc(new Vector2(0, -14), 35, angle - .7f, angle + .8f, 16, new Color(1, 1, .85f, alpha * .7f), 2, true);
+            }
+        }
         if (!State.Alive)
         {
             if (HasLoot)
