@@ -24,6 +24,7 @@ public sealed class GameplayReplay
         new("reversal",100,new(300,300),Vector2.Right),
         new("eight-turns",160,new(300,300),Vector2.Right),
         new("analog-ramp",100,new(300,300),Vector2.Right),
+        new("camera-follow",100,new(1050,600),Vector2.Left),
         new("wall-slide",140,new(680,300),new Vector2(1,1).Normalized()),
         new("wall-recover",140,new(680,300),Vector2.Right),
         new("narrow-passage",100,new(700,588),Vector2.Right),

@@ -58,7 +58,9 @@ for preset in a.presets.split(','):
         active=[r for r in values if r['analog']>.95 and not r['blocked'] and r['action']=='Moving']
         speed=[math.hypot(r['vx'],r['vy']*.5) for r in active]
         gaps=[values[i]['wallMs']-values[i-1]['wallMs'] for i in range(1,len(values))]
-        metrics[name]={'projectedSpeed':statistics.median(speed) if speed else 0,'blockedSamples':sum(bool(r['blocked']) for r in values),'samples':len(values),'wallFrameP50ms':percentile(gaps,.5) if gaps else 0,'wallFrameP95ms':percentile(gaps,.95) if gaps else 0,'wallFrameP99ms':percentile(gaps,.99) if gaps else 0,'maxCameraError':max(math.hypot(r['cameraTargetX']-r['cameraX'],r['cameraTargetY']-r['cameraY']) for r in values)}
+        settled=values[30:-15] or values
+        lag=[math.hypot(r['cameraTargetX']-r['cameraX'],r['cameraTargetY']-r['cameraY']) for r in settled]
+        metrics[name]={'settledCameraErrorMedian':statistics.median(lag),'projectedSpeed':statistics.median(speed) if speed else 0,'blockedSamples':sum(bool(r['blocked']) for r in values),'samples':len(values),'wallFrameP50ms':percentile(gaps,.5) if gaps else 0,'wallFrameP95ms':percentile(gaps,.95) if gaps else 0,'wallFrameP99ms':percentile(gaps,.99) if gaps else 0,'maxCameraError':max(math.hypot(r['cameraTargetX']-r['cameraX'],r['cameraTargetY']-r['cameraY']) for r in values)}
     # Verify real dispatch, ownership, displacement, release, authoritative clearance.
     assert any(r['kind']=='touch' and r['finger']==7 for r in rows)
     assert any(r['kind']=='touch' and r['finger']==8 for r in rows)
