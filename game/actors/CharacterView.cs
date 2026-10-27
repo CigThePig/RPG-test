@@ -56,7 +56,20 @@ public partial class CharacterView : Node2D
         var now = new Vector2(State.X, State.Y);
         Creature.MoveVelocity = State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
         if (State.State is ActionState.Idle or ActionState.Moving && Creature.MoveVelocity.LengthSquared() > .25f) Creature.ClearFacingRequest();
-        if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = (State.State is ActionState.Idle or ActionState.Moving) && Creature.MoveVelocity.LengthSquared() > .25f;
+        if (Creature.Motor != null)
+        {
+            var motor = Creature.Motor;
+            motor.Options.FaceVelocity = (State.State is ActionState.Idle or ActionState.Moving) && Creature.MoveVelocity.LengthSquared() > .25f;
+            motor.DodgeProgress = State.State == ActionState.Dodging ? State.ActionElapsed / CombatTuning.DodgeDuration : null;
+            motor.DodgeBiped = State.Appearance.Family == "biped";
+            if (motor.DodgeProgress.HasValue)
+            {
+                var facing = new Vector2((float)Math.Cos(motor.Yaw), (float)-Math.Sin(motor.Yaw));
+                var travel = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
+                motor.DodgeForwardComponent = facing.Dot(travel);
+                motor.DodgeSideComponent = facing.X * travel.Y - facing.Y * travel.X;
+            }
+        }
         if (!Creature.Paused) attackTime += dt;
         if (State.State is ActionState.Staggered or ActionState.Dead) attackDuration = 0;
         Creature.GroundPosition = now;

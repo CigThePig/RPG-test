@@ -86,6 +86,11 @@ namespace PixelCreatures.Core.Motion
         public double? FacingOverride { get; set; }
         // Combat can freeze the exact current yaw, including between quantized directions.
         public bool FacingOverrideExact { get; set; }
+        // Presentation only: host supplies normalized authoritative dodge progress.
+        public double? DodgeProgress { get; set; }
+        public bool DodgeBiped { get; set; }
+        public double DodgeForwardComponent { get; set; } = 1;
+        public double DodgeSideComponent { get; set; }
         public void LockCurrentFacing(double yaw)
         {
             _ctx.Yaw = _ctx.TargetYaw = DMath.WrapAngle(yaw);
@@ -276,14 +281,11 @@ namespace PixelCreatures.Core.Motion
                 ctx.TargetYaw = target;
             }
             double delta = DMath.WrapAngle(ctx.TargetYaw - ctx.Yaw);
-            if (Math.Abs(delta) > 0.9 * DMath.Pi)
-            {
-                // turn around through the front view so the face stays readable
-                double viaSouth = -DMath.HalfPi;
-                double a = DMath.WrapAngle(ctx.Yaw + Math.Abs(delta) * 0.5 - viaSouth);
-                double b = DMath.WrapAngle(ctx.Yaw - Math.Abs(delta) * 0.5 - viaSouth);
-                delta = Math.Abs(a) < Math.Abs(b) ? Math.Abs(delta) : -Math.Abs(delta);
-            }
+            // At the exact antipode either route is equally short. Pick one once;
+            // after the first step the ordinary shortest-angle sign keeps it stable.
+            // Rechoosing a preferred midpoint on every step can steer away from the
+            // target and then flip back, trapping south-to-north turns in oscillation.
+            if (Math.Abs(Math.Abs(delta) - DMath.Pi) < 1e-9) delta = DMath.Pi;
             double size = DMath.Saturate(ctx.Anatomy.Metrics.BodyLength / 120.0);
             double maxRate = DMath.Lerp(9.0, 3.6, size) * DMath.Lerp(0.85, 1.2, ctx.Traits.Energy);
             double desiredRate = DMath.Clamp(delta * 9.0, -maxRate, maxRate);
@@ -323,6 +325,31 @@ namespace PixelCreatures.Core.Motion
             _rest.Evaluate(ctx, ref p);
             _action.Evaluate(ctx, ref p);
             _hit.Evaluate(ctx, ref p);
+            if (DodgeProgress.HasValue)
+            {
+                double u = DMath.Clamp(DodgeProgress.Value, 0, 1);
+                double tuck = Math.Sin(Math.PI * u);
+                if (DodgeBiped)
+                {
+                    // Tuck, rotate through one full turn, then stand. The axis follows
+                    // the locked travel direction relative to the creature's facing.
+                    double turnU = DMath.Clamp((u - .10) / .75, 0, 1);
+                    double rotation = DMath.TwoPi * (turnU * turnU * (3 - 2 * turnU));
+                    if (Math.Abs(DodgeForwardComponent) >= Math.Abs(DodgeSideComponent))
+                        p.BodyPitch += Math.CopySign(rotation, DodgeForwardComponent);
+                    else
+                        p.BodyRoll += Math.CopySign(rotation, DodgeSideComponent);
+                    p.Crouch += .8 * tuck;
+                    p.LegTuck = Math.Max(p.LegTuck, .9 * tuck);
+                    p.ArmRaise += .6 * tuck;
+                }
+                else
+                {
+                    // Other anatomies retain a modest, safe evasive tuck.
+                    p.BodyPitch += .45 * tuck;
+                    p.Crouch += .35 * tuck;
+                }
+            }
             p.Altitude += _loco.Altitude(ctx) * (1 - ctx.RestWeight);
             p.EyeOpen = DMath.Saturate(p.EyeOpen);
             ctx.Altitude = p.Altitude;

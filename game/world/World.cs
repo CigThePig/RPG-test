@@ -113,6 +113,45 @@ public sealed class World
         return true;
     }
 
+    public bool TryStartPlayerDodge(Vector2 direction)
+    {
+        var a = Player;
+        if (!TryDirection(direction, out var facing) || !a.Alive ||
+            a.State is not (ActionState.Idle or ActionState.Moving) || a.Cooldowns.GetValueOrDefault("dodge") > 0) return false;
+        a.MotionX = a.MotionY = 0;
+        a.FreeSlash = false;
+        a.ActionElapsed = 0;
+        a.ActionDirectionX = facing.X; a.ActionDirectionY = facing.Y;
+        a.State = ActionState.Dodging;
+        a.StateRemaining = CombatTuning.DodgeDuration;
+        a.Cooldowns["dodge"] = CombatTuning.DodgeCooldown;
+        ClearPlayerMotion();
+        Presentation?.Invoke(a.Id, "dodge", "");
+        CombatDiagnostic?.Invoke("dodge_started", facing, "dodge");
+        return true;
+    }
+
+    public static bool DodgeImmune(ActorState a) => a.State == ActionState.Dodging &&
+        a.ActionElapsed + .000001f >= CombatTuning.DodgeInvulnerableStart &&
+        a.ActionElapsed < CombatTuning.DodgeInvulnerableEnd - .000001f;
+
+    public void CancelPlayerDodge()
+    {
+        if (Player.State != ActionState.Dodging) return;
+        Cancel(Player);
+        ClearPlayerMotion();
+    }
+
+    void AdvanceDodge(ActorState a, float dt)
+    {
+        float old = Math.Clamp(a.ActionElapsed / CombatTuning.DodgeDuration, 0, 1);
+        a.ActionElapsed = Math.Min(CombatTuning.DodgeDuration, a.ActionElapsed + dt);
+        float now = Math.Clamp(a.ActionElapsed / CombatTuning.DodgeDuration, 0, 1);
+        float distance = CombatTuning.DodgeDistance * ((1 - (1 - now) * (1 - now)) - (1 - (1 - old) * (1 - old)));
+        Move(a, new Vector2(a.ActionDirectionX, a.ActionDirectionY) * distance);
+        a.StateRemaining = Math.Max(0, CombatTuning.DodgeDuration - a.ActionElapsed);
+    }
+
     ActorState? PlayerSlashTarget(ActorState attacker, AbilityDef ability)
     {
         var direction = new Vector2(attacker.ActionDirectionX, attacker.ActionDirectionY);
@@ -123,7 +162,7 @@ public sealed class World
         float bestDistance = float.PositiveInfinity;
         foreach (var candidate in Actors.Values)
         {
-            if (!candidate.Alive || candidate.Region != attacker.Region || !Hostile(attacker, candidate)) continue;
+            if (!candidate.Alive || candidate.Invulnerable > 0 || DodgeImmune(candidate) || candidate.Region != attacker.Region || !Hostile(attacker, candidate)) continue;
             var offset = candidate.Position - attacker.Position;
             float distance = offset.LengthSquared();
             if (distance > maxDistanceSquared || (distance > .000001f && Vector2.Dot(offset / MathF.Sqrt(distance), direction) < minimumDot) || !LineOfSight(attacker, candidate)) continue;
@@ -161,6 +200,11 @@ public sealed class World
 
     public void Cancel(ActorState a)
     {
+        if (a.State == ActionState.Dodging)
+        {
+            CombatDiagnostic?.Invoke("dodge_interrupted", new Vector2(a.ActionDirectionX, a.ActionDirectionY), "cancel");
+            Presentation?.Invoke(a.Id, "dodge_cancel", "");
+        }
         a.PendingAbility = "";
         a.FreeSlash = false;
         a.ActionElapsed = 0;
@@ -173,6 +217,11 @@ public sealed class World
     {
         if (!target.Alive || (!periodic && target.Invulnerable > 0) || (!periodic && source.Region != target.Region) || !Hostile(source, target))
             return false;
+        if (!periodic && DodgeImmune(target))
+        {
+            CombatDiagnostic?.Invoke("direct_hit_dodged", new Vector2(target.ActionDirectionX, target.ActionDirectionY), source.Id);
+            return false;
+        }
         float resistance = type == "physical" ? Stat(target, "defence") : 0;
         float actual = Math.Max(1, amount - resistance);
         target.Health = Math.Max(0, target.Health - actual);
@@ -234,26 +283,27 @@ public sealed class World
         }
     }
 
-    void Resolve(ActorState a, ActorState b, AbilityDef d, bool projectile = false)
+    bool Resolve(ActorState a, ActorState b, AbilityDef d, bool projectile = false)
     {
         if (!a.Alive || !b.Alive || a.Region != b.Region)
-            return;
+            return false;
         if (d.RequiresWeapon && (!a.Grasps || Items.Bonus(a, "damage") <= 0))
-            return;
+            return false;
         if (d.Self)
         {
             a.Health = Math.Min(a.MaxHealth, a.Health - d.Damage);
             if (d.Status != "")
                 ApplyStatus(a, d.Status, a.Id);
-            return;
+            return true;
         }
 
         if (!projectile && (Vector2.Distance(a.Position, b.Position) > d.Range + a.NaturalReach + 8 || !LineOfSight(a, b)))
-            return;
+            return false;
         // Intentionally non-damaging hostile effects retain their status-only behavior.
         bool connected = d.Damage <= 0 ? Hostile(a, b) : Damage(a, b, d.Damage + Stat(a, "strength") + Stat(a, d.Type == "physical" ? "damage" : "power"), d.Type);
         if (connected && b.Alive && d.Status != "")
             ApplyStatus(b, d.Status, a.Id);
+        return connected;
     }
 
     public void Step(float dt)
@@ -263,6 +313,9 @@ public sealed class World
         Tick++;
         Time += dt;
         Spells.Update(dt);
+        // Advance before any actor resolves an attack so protection is independent
+        // of dictionary iteration order at the fixed-step boundary.
+        if (Player.Alive && Player.State == ActionState.Dodging) AdvanceDodge(Player, dt);
         foreach (var a in Actors.Values)
         {
             foreach (var key in a.Cooldowns.Keys.ToArray())
@@ -290,7 +343,15 @@ public sealed class World
                 continue;
             if (a.FreeSlash && a.State is ActionState.Windup or ActionState.Recovery)
                 AdvanceSlashLunge(a, dt);
-            if (a.StateRemaining > 0)
+            if (a.State == ActionState.Dodging && a.ActionElapsed >= CombatTuning.DodgeDuration - .000001f)
+            {
+                CombatDiagnostic?.Invoke("dodge_completed", new Vector2(a.ActionDirectionX, a.ActionDirectionY), "dodge");
+                a.State = ActionState.Idle;
+                a.StateRemaining = 0;
+                a.ActionElapsed = 0;
+                a.ActionDirectionX = a.ActionDirectionY = 0;
+            }
+            if (a.State != ActionState.Dodging && a.StateRemaining > 0)
             {
                 a.StateRemaining -= dt;
                 if (a.StateRemaining <= 0)
@@ -301,8 +362,8 @@ public sealed class World
                         if (a.Id == "player" && a.FreeSlash && d.Id == "slash")
                         {
                             var target = PlayerSlashTarget(a, d);
-                            CombatDiagnostic?.Invoke("attack_impact", new Vector2(a.ActionDirectionX, a.ActionDirectionY), target?.Id ?? "miss");
-                            if (target != null) Resolve(a, target, d);
+                            bool hit = target != null && Resolve(a, target, d);
+                            CombatDiagnostic?.Invoke("attack_impact", new Vector2(a.ActionDirectionX, a.ActionDirectionY), hit ? "hit/" + target!.Id : "miss");
                         }
                         else if (Actors.TryGetValue(a.Target, out var t))
                         {

@@ -73,6 +73,28 @@ public static class MovementChecks
             motor.Options.FaceVelocity=true;
             for(int i=0;i<60;i++){motor.SetWorldPosition(new Vec3(-15,0,0),new Vec3(-100,0,0));motor.Step(1.0/60);}
             check(Math.Abs(motor.Yaw)>1,"intentional movement restores velocity facing after stagger");
+            // Exercise the actual production motor and reject oscillation before arrival.
+            foreach (var pair in new (double from,double to,string label)[] {
+                (-Math.PI/2,Math.PI/2,"south-to-north"), (Math.PI/2,-Math.PI/2,"north-to-south"),
+                (0,Math.PI,"east-to-west"), (Math.PI,0,"west-to-east"),
+                (Math.PI/4,-3*Math.PI/4,"diagonal reversal"), (-Math.PI/2,Math.PI/2-.02,"near reversal"),
+                (Math.PI-.03,-Math.PI+.03,"angle wrap") })
+            {
+                motor.Options.FaceVelocity=false; motor.FacingOverrideExact=false;
+                motor.Teleport(Vec3.Zero,pair.from); motor.FacingOverride=pair.to;
+                double previousYaw=motor.Yaw; int sign=0,changes=0;
+                for(int i=0;i<120;i++)
+                {
+                    motor.SetWorldPosition(Vec3.Zero,Vec3.Zero);motor.Step(1.0/60);
+                    double movement=DMath.WrapAngle(motor.Yaw-previousYaw);
+                    double error=Math.Abs(DMath.WrapAngle(motor.Context.TargetYaw-motor.Yaw));
+                    int next=Math.Abs(movement)>.00001 ? Math.Sign(movement) : 0;
+                    if(error>.12 && next!=0) { if(sign!=0 && next!=sign) changes++; sign=next; }
+                    previousYaw=motor.Yaw;
+                }
+                check(changes==0 && Math.Abs(DMath.WrapAngle(motor.Context.TargetYaw-motor.Yaw))<.03, "motor turns without oscillating: "+pair.label);
+            }
+            motor.FacingOverride=null;
             motor.TriggerGameplayAction(.14,.24);
             for(int i=0;i<22;i++)motor.Step(1.0/60);
             check(motor.ActionActive,"combat pose spans windup and recovery");

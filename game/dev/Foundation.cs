@@ -1,7 +1,7 @@
 using Godot;
 using PixelCreatures.Runtime;
 using PixelCreatures.Core.Genetics;
-using PixelCreatures.Core.Rendering;
+using PixelCreatures.Core;
 using NVector = System.Numerics.Vector2;
 
 namespace Mosslight;
@@ -115,6 +115,10 @@ public partial class Foundation : Node2D
         {
             "potion",
             Key.Key4
+        },
+        {
+            "dodge",
+            Key.Space
         },
         {
             "inventory",
@@ -322,7 +326,8 @@ public partial class Foundation : Node2D
                 var v = (Input.GetVector("west", "east", "north", "south") + TouchMovement).LimitLength();
                 // Input describes screen direction; PPC projects ground south at half height.
                 ScreenInput=v;
-                if (GameplayBlocked || v == Vector2.Zero || Feel.Response <= 0) ControllerVelocity=v;
+                if (World.Player.State == ActionState.Dodging) ControllerVelocity=Vector2.Zero;
+                else if (GameplayBlocked || v == Vector2.Zero || Feel.Response <= 0) ControllerVelocity=v;
                 else ControllerVelocity=ControllerVelocity.Lerp(v,1-MathF.Exp(-(1f/60)/Feel.Response));
                 var groundInput = Feel.Convert(ControllerVelocity);
                 var timer = System.Diagnostics.Stopwatch.StartNew();
@@ -333,7 +338,7 @@ public partial class Foundation : Node2D
             }
         }
         else
-        { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; World.ClearPlayerMotion(); }
+        { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
         var player = World.Player;
         foreach (var(id, view)in Views)
         {
@@ -403,6 +408,8 @@ public partial class Foundation : Node2D
                 Cast(key);
         if (e.IsActionPressed("potion"))
             UseQuickItem("potion");
+        if (e.IsActionPressed("dodge"))
+            Dodge();
     }
 
     public void Cast(string ability)
@@ -418,6 +425,16 @@ public partial class Foundation : Node2D
         }
         var t = d.Self ? a : World.Actors.Values.Where(x => World.CanActivate(a, x, d)).OrderBy(x => NVector.DistanceSquared(a.Position, x.Position)).FirstOrDefault();
         ui.Notify(t != null && World.Activate(a.Id, ability, t.Id) ? d.Name : "No valid target, equipment, mana or cooldown");
+    }
+
+    public void Dodge()
+    {
+        if (GameplayBlocked) return;
+        // TouchMovement is dead-zone processed but has not passed through response smoothing.
+        var intent = (Input.GetVector("west", "east", "north", "south") + TouchMovement).LimitLength();
+        var ground = GodotConvert.ScreenToGround(intent);
+        var direction = intent.LengthSquared() > .000001f ? new NVector(ground.X, ground.Y) : VisualFacing();
+        if (World.TryStartPlayerDodge(direction)) ControllerVelocity = Vector2.Zero;
     }
 
     // PPC yaw maps to east/south ground coordinates; projection to screen is separate.
@@ -458,6 +475,8 @@ public partial class Foundation : Node2D
             suspended = true;
             if (World != null && ui != null)
             {
+                World.CancelPlayerDodge();
+                ControllerVelocity = Vector2.Zero;
                 ui.PauseForVerification();
                 try { if (SessionStarted && replay == null && !InFeelCourse) Persistence.SaveAutosave(World, Narrative); }
                 catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }
