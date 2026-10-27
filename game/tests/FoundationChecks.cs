@@ -125,6 +125,9 @@ public static class FoundationChecks
             await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);
             Check(w.Items.Count("player","potion")==potionCount-1,"one touch plus emulated mouse consumes exactly one hotbar item");
             Check(app.TouchMovement.X>.8f,"simultaneous hotbar action preserves movement finger ownership");
+            app.Ui._Input(new InputEventScreenTouch { Index=8,Pressed=true,Position=touchPoint });
+            app.Ui._Input(new InputEventScreenTouch { Index=8,Canceled=true,Pressed=false,Position=touchPoint });
+            Check(w.Items.Count("player","potion")==potionCount-1,"cancelled action finger never activates its button");
             app.Ui.PauseForVerification();
             app.Ui.Update();
             Check(app.TouchMovement == Vector2.Zero, "modal opening cancels held touch movement");

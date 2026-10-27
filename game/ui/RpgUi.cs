@@ -143,6 +143,7 @@ public partial class RpgUi : CanvasLayer
         if (e is InputEventMouse mouse && mouse.Device == InputEvent.DeviceIdEmulation && hotbar.IsVisibleInTree() && hotbar.GetGlobalRect().HasPoint(mouse.Position))
         { GetViewport().SetInputAsHandled(); return; }
         if (e is not InputEventScreenTouch touch) return;
+        if (touch.Canceled) { touchButtons.Remove(touch.Index); GetViewport().SetInputAsHandled(); return; }
         if (touch.Pressed)
         {
             var button = hotbar.GetChildren().OfType<Button>().FirstOrDefault(b => b.IsVisibleInTree() && !b.Disabled && b.GetGlobalRect().HasPoint(touch.Position));
