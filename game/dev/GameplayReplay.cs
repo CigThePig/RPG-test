@@ -16,6 +16,8 @@ public sealed class GameplayReplay
     int warningImpacts, warningCancellations, warningAvoidances;
     string warningEnemy = "";
     string presentationEnemy = "";
+    // Only used by the opt-in verification trace; gameplay never depends on it.
+    public string ObservedActorId => warningEnemy.Length > 0 ? warningEnemy : presentationEnemy;
     int presentationReleases, presentationCollisions, presentationDeaths;
     readonly HashSet<string> presentationVictims = new();
     readonly Dictionary<string, string> fixtureFactions = new();

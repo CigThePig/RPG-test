@@ -106,7 +106,7 @@ try:
     else: raise RuntimeError('Resume tap never entered a gameplay session')
     # ADB screenrecord captures the actual Android surface, including frame pacing.
     recording_start=time.time()
-    recorder=subprocess.Popen([adb_path,'shell','screenrecord','--bit-rate','4000000','--time-limit','90','/sdcard/mosslight-playtest.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    recorder=subprocess.Popen([adb_path,'shell','screenrecord','--bit-rate','4000000','--time-limit','120','/sdcard/mosslight-playtest.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     # Exercise actual touch ownership, then open the starting Gloot chest.
     # Read release positions from production diagnostics instead of assuming emulator FPS.
     for attempt in range(12):
@@ -143,6 +143,23 @@ try:
     else: raise RuntimeError('Real Android Dodge touch did not complete')
     assert len(re.findall(r'MOSSLIGHT_COMBAT kind=dodge_started',logs))==1, 'Dodge touch activated more than once'
     capture('combat-controls.png')
+    # Repeat real OS touch inputs after the actual cooldowns. Count both
+    # starts and completions, so duplicate dispatch and stuck actions fail.
+    # These attacks are free swings; this does not claim hit-effect coverage.
+    for kind,total,x,y in [('attack',4,1198,712),('dodge',3,1088,714)]:
+        for expected in range(2,total+1):
+            time.sleep(1.1)
+            tap(x,y)
+            deadline=time.monotonic()+15
+            while time.monotonic()<deadline:
+                logs=adb('logcat','-d')
+                starts=len(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_started',logs))
+                completions=len(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_completed',logs))
+                if starts>=expected and completions>=expected: break
+                if not adb('shell','pidof',package): raise RuntimeError(f'Android process exited during repeated {kind}')
+                time.sleep(.5)
+            else: raise RuntimeError(f'Android {kind} touch {expected} did not finish')
+            assert starts==expected and completions==expected, f'{kind}: duplicate or missing touch dispatch'
     tap(1086,564) # Pack: utility row above the combat thumb arc.
     time.sleep(1)
     capture('inventory.png')
@@ -175,7 +192,7 @@ try:
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, one Attack and one Dodge touch, inventory screenshot, gameplay ticks, background input cancellation/resume. ARM64 device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, inventory screenshot, gameplay ticks, background input cancellation/resume. Confirmed-hit effects and an ARM64 device were not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     # Preserve the real surface recording on failure as well as success. ADB

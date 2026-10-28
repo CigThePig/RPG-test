@@ -55,6 +55,21 @@ for preset in a.presets.split(','):
     for r in samples:
         groups.setdefault(r['scenario'],[]).append(r)
         if r['blocked'] and r['analog']>.2:problems.append({'scenario':r['scenario'],'frame':r['frame'],'movieSeconds':r['frame']/60,'reason':r['blocked']})
+    # These hashes identify distinct PPC indexed bitmaps actually uploaded by
+    # the renderer. They include all changes in those frames, not a subjective
+    # judgment that each silhouette reads well at ordinary playback speed.
+    pose_specs={
+        'sword':('combat-ahead','playerPoseHash',lambda r:r['action'] in ('Windup','Recovery')),
+        'bite':('telegraph-bite','observedPoseHash',lambda r:r['observedActionActive'] and r['observedStyle']=='Bite'),
+        'tailSwipe':('telegraph-cone','observedPoseHash',lambda r:r['observedActionActive'] and r['observedStyle']=='TailSwipe'),
+        'hitReaction':('telegraph-bite','playerPoseHash',lambda r:r['action']=='Staggered'),
+        'dodge':('dodge-idle','playerPoseHash',lambda r:r['action']=='Dodging'),
+    }
+    pose_evidence={name:len({r[field] for r in groups[scenario] if predicate(r) and r[field]})
+                   for name,(scenario,field,predicate) in pose_specs.items()}
+    if not a.realtime:
+        for name,count in pose_evidence.items():
+            assert count>=3, f'{name}: only {count} distinct indexed creature frames during the action'
     metrics={}
     for name,values in groups.items():
         active=[r for r in values if r['analog']>.95 and not r['blocked'] and r['action']=='Moving']
@@ -147,10 +162,20 @@ for preset in a.presets.split(','):
         selected=sorted(folder.glob('combat-*.png'))
         assert len(selected)==len(indices), 'Missing requested combat movie frames'
         by_frame=dict(zip(indices,selected))
+        # Verify copied evidence while the original movie frames are still
+        # available; fail rather than publish a truncated or corrupt image.
+        def save_frame(frame,path):
+            for attempt in range(3):
+                with Image.open(by_frame[frame]) as source: source.save(path)
+                try:
+                    with Image.open(path) as copy: copy.verify()
+                    return
+                except (OSError, SyntaxError):
+                    if attempt==2: raise
         for name,phase,frame in warning_requests:
-            Image.open(by_frame[frame]).save(folder/(name+'-'+phase+'.png'))
+            save_frame(frame,folder/(name+'-'+phase+'.png'))
         for name,phase,offset,frame in presentation_requests:
-            Image.open(by_frame[frame]).save(folder/(f'{name}-{phase}-{offset:+03d}.png'))
+            save_frame(frame,folder/(f'{name}-{phase}-{offset:+03d}.png'))
         combat=Image.new('RGB',(1280,math.ceil(len(requests)/4)*220));draw=ImageDraw.Draw(combat)
         close=Image.new('RGB',combat.size); close_draw=ImageDraw.Draw(close)
         for i,(label,frame,row) in enumerate(requests):
@@ -170,6 +195,6 @@ for preset in a.presets.split(','):
     if (folder/'gameplay.avi').exists(): (folder/'gameplay.avi').unlink()
     for f in images:f.unlink()
     status=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],cwd=root,text=True).splitlines()
-    report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(status),'statusEntries':status,'preset':preset,'stateDigest':digest,'deterministicRepeat':True,'movieMode':not a.realtime,'captureStartUnix':capture_utc,'environment':session,'renderWallPacing':pacing,'simulationSeconds':(samples[-1]['tick']-samples[0]['tick'])/60,'wallSeconds':(samples[-1]['wallMs']-samples[0]['wallMs'])/1000,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}
+    report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(status),'statusEntries':status,'preset':preset,'stateDigest':digest,'deterministicRepeat':True,'movieMode':not a.realtime,'captureStartUnix':capture_utc,'environment':session,'renderWallPacing':pacing,'distinctIndexedCreatureFrames':pose_evidence,'simulationSeconds':(samples[-1]['tick']-samples[0]['tick'])/60,'wallSeconds':(samples[-1]['wallMs']-samples[0]['wallMs'])/1000,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}
     (folder/'report.json').write_text(json.dumps(report,indent=2));summary[preset]=metrics
 (out/'comparison.json').write_text(json.dumps(summary,indent=2));print(json.dumps(summary,indent=2))

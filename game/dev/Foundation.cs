@@ -21,6 +21,7 @@ public partial class Foundation : Node2D
     public double DroppedSeconds { get; private set; }
     public PlaytestTrace Trace { get; private set; } = null!;
     GameplayReplay? replay;
+    public CharacterView? ReplayObservedView => replay != null && Views.TryGetValue(replay.ObservedActorId, out var view) ? view : null;
     public bool VerificationMode => OS.GetCmdlineUserArgs().Any(x => x is "--test" or "--visual-check" or "--gameplay-check");
     public void SelectFeel(MovementFeel feel)
     {
