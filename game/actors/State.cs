@@ -4,12 +4,13 @@ using MHLab.Spells;
 namespace Mosslight;
 public enum ActionState
 {
-    Idle,
-    Moving,
-    Windup,
-    Recovery,
-    Staggered,
-    Dead
+    Idle = 0,
+    Moving = 1,
+    Windup = 2,
+    Recovery = 3,
+    Staggered = 4,
+    Dead = 5,
+    Dodging = 6
 }
 
 public sealed class Appearance
@@ -72,6 +73,11 @@ public sealed class ActorState : ISpellCaster, ISpellTarget
     public Dictionary<string, float> Relationships { get; set; } = new();
     public string Target { get; set; } = "";
     public string PendingAbility { get; set; } = "";
+    // Optional schema-1 fields. The locked direction belongs to the authoritative action.
+    public bool FreeSlash { get; set; }
+    public float ActionElapsed { get; set; }
+    public float ActionDirectionX { get; set; }
+    public float ActionDirectionY { get; set; }
     public Vector2 Position => new(X, Y);
     public bool Alive => Health > 0;
 }

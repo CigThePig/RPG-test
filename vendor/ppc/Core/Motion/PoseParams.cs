@@ -14,6 +14,10 @@ namespace PixelCreatures.Core.Motion
         // body (creature space, relative to rest pose)
         public Vec3 BodyOffset;
         public double BodyPitch, BodyRoll, BodyYaw;
+        // Exclusive full-body action rotation, deliberately not blended as Euler angles.
+        public bool OverrideBodyRotation;
+        public Quat BodyRotation;
+        public Vec3 RollDirection;
         /// <summary>Lateral (yaw) and sagittal (pitch) bend distributed along the spine.</summary>
         public double SpineYaw, SpinePitch;
         /// <summary>0..1 lowers the body towards the ground; legs fold accordingly.</summary>

@@ -10,10 +10,14 @@ public partial class CharacterView : Node2D
     public CreatureActor Creature { get; private set; } = null !;
 
     public bool HasLoot { get; set; }
+    public bool PreferMeasuredExternalVelocity { get; set; } = true;
+    public Func<ActorState, Terrain>? GroundTerrain { get; set; }
+    public RollDustOverlay? RollDust { get; private set; }
     Vector2 previous;
     float attackTime, attackDuration, impactTime;
     Vector2 attackDirection = Vector2.Right;
     bool attackArc;
+    bool previousWasDodging;
     public void Setup(ActorState actor)
     {
         State = actor;
@@ -24,10 +28,17 @@ public partial class CharacterView : Node2D
             UseMeasuredExternalVelocity = true,
             SyncNodePosition = false,
             AnimationFps = 10,
+            ActionAnimationFps = 30,
             Quality = 1,
             CullOffscreen = true
         };
         AddChild(Creature);
+        // Render with the player without modifying PPC bones or world state.
+        if (actor.Id == "player")
+        {
+            RollDust = new RollDustOverlay();
+            AddChild(RollDust);
+        }
         var result = actor.Appearance.GenomeJson == "" ? null : CreatureRuntime.Serializer.Deserialize(actor.Appearance.GenomeJson);
         if (result != null && !result.Ok)
             throw new InvalidDataException(result.Describe());
@@ -39,7 +50,7 @@ public partial class CharacterView : Node2D
         Sync(1f / 60);
     }
 
-    public void SnapPosition() { previous=new Vector2(State.X,State.Y); Creature.Teleport(previous); Creature.MoveVelocity=Vector2.Zero; }
+    public void SnapPosition() { previous=new Vector2(State.X,State.Y); Creature.Teleport(previous); Creature.MoveVelocity=Vector2.Zero; RollDust?.Reset(); }
 
     public void Equipment(string json)
     {
@@ -54,13 +65,39 @@ public partial class CharacterView : Node2D
     public void Sync(float dt)
     {
         var now = new Vector2(State.X, State.Y);
-        Creature.MoveVelocity = State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
+        // The last dodge increment can arrive on the same frame as the transition
+        // to Idle. Do not let that displacement masquerade as walking intent.
+        bool dodgeDisplacement = State.State == ActionState.Dodging || previousWasDodging;
+        bool combatDisplacement = dodgeDisplacement || State.FreeSlash;
+        Creature.UseMeasuredExternalVelocity = combatDisplacement || PreferMeasuredExternalVelocity;
+        Creature.MoveVelocity = combatDisplacement || State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
         if (State.State is ActionState.Idle or ActionState.Moving && Creature.MoveVelocity.LengthSquared() > .25f) Creature.ClearFacingRequest();
-        if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = (State.State is ActionState.Idle or ActionState.Moving) && Creature.MoveVelocity.LengthSquared() > .25f;
+        if (Creature.Motor != null)
+        {
+            var motor = Creature.Motor;
+            motor.Options.FaceVelocity = (State.State is ActionState.Idle or ActionState.Moving) && Creature.MoveVelocity.LengthSquared() > .25f;
+            motor.DodgeProgress = State.State == ActionState.Dodging ? State.ActionElapsed / CombatTuning.DodgeDuration :
+                previousWasDodging && State.State == ActionState.Idle ? 1.0 : null;
+            motor.DodgeBiped = State.Appearance.Family == "biped";
+            if (motor.DodgeProgress.HasValue)
+            {
+                var facing = new Vector2((float)Math.Cos(motor.Yaw), (float)-Math.Sin(motor.Yaw));
+                var travel = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
+                motor.DodgeForwardComponent = facing.Dot(travel);
+                motor.DodgeSideComponent = facing.X * travel.Y - facing.Y * travel.X;
+            }
+        }
         if (!Creature.Paused) attackTime += dt;
         if (State.State is ActionState.Staggered or ActionState.Dead) attackDuration = 0;
         Creature.GroundPosition = now;
         previous = now;
+        previousWasDodging = State.State == ActionState.Dodging;
+        // The dust's own lifetime survives the action transition, and each
+        // emitted puff stays at its original ground location as the actor moves.
+        RollDust?.Advance(dt, State.State == ActionState.Dodging,
+            State.ActionElapsed / CombatTuning.DodgeDuration, now,
+            new Vector2(State.ActionDirectionX, State.ActionDirectionY),
+            GroundTerrain?.Invoke(State) ?? Terrain.Grass);
         Position = GodotConvert.GroundToScreen(State.X, State.Y);
         Creature.Resting = State.Activity == "rest" || !State.Alive;
         Modulate = State.Alive ? Colors.White : new Color(.45f, .4f, .4f, .6f);
@@ -71,7 +108,13 @@ public partial class CharacterView : Node2D
     {
         if (cue is "attack" or "cast")
         {
-            if (target != null && target.Id != State.Id)
+            if (State.Id == "player" && State.FreeSlash)
+            {
+                var ground = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
+                Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(ground.X, ground.Y));
+                attackDirection = GodotConvert.GroundToScreen(ground.X, ground.Y).Normalized();
+            }
+            else if (target != null && target.Id != State.Id)
             {
                 var delta = target.Position - State.Position;
                 if (delta.LengthSquared() > .001f)
@@ -87,6 +130,12 @@ public partial class CharacterView : Node2D
             impactTime = ability?.Windup ?? .14f;
             attackDuration = impactTime + (ability?.Recovery ?? .24f);
             attackArc = cue == "attack" && ability?.Id == "slash";
+        }
+        if (cue == "dodge")
+        {
+            // Preserve the initial combat-facing yaw so the roll axis remains stable.
+            Creature.LockFacingYaw(Creature.Motor?.Yaw ?? 0);
+            if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
         }
         if (cue == "hit")
         {

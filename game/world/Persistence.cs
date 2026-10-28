@@ -42,7 +42,18 @@ public static class Persistence
         foreach (var p in s.Projectiles)
             if (!s.Actors.ContainsKey(p.Source) || !s.Actors.ContainsKey(p.Target) || !content.Abilities.Any(a => a.Id == p.Ability) || !float.IsFinite(p.X) || !float.IsFinite(p.Y) || !float.IsFinite(p.Remaining))
                 throw new InvalidDataException("Invalid projectile");
-        foreach (var actor in s.Actors.Values) AnatomyAdapter.Apply(actor);
+        foreach (var actor in s.Actors.Values)
+        {
+            // A half-finished roll must never resume after restoring a save.
+            if (actor.State == ActionState.Dodging)
+            {
+                actor.State = actor.Alive ? ActionState.Idle : ActionState.Dead;
+                actor.StateRemaining = actor.ActionElapsed = 0;
+                actor.ActionDirectionX = actor.ActionDirectionY = 0;
+                actor.MotionX = actor.MotionY = 0;
+            }
+            AnatomyAdapter.Apply(actor);
+        }
         // Schema-1 saves retain their full terrain, feature IDs and Gloot bags.
         // Repair only legacy spawn positions; never regenerate a saved region or loot.
         foreach (var region in s.Regions.Values.Where(r => r.PlacementRevision == 0))

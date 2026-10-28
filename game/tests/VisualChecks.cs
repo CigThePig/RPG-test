@@ -20,6 +20,28 @@ public static class VisualChecks
         image.SavePng("docs/native-screenshots/" + (app.Ui.MobileLayout ? "mobile-" : "") + name + ".png");
     }
 
+    // No 12-frame pre-roll: capture the actual effect phases at gameplay zoom.
+    static async System.Threading.Tasks.Task CaptureRollFrame(Foundation app, string name)
+    {
+        await app.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        var image = app.GetViewport().GetTexture().GetImage();
+        Directory.CreateDirectory("docs/native-screenshots");
+        image.SavePng("docs/native-screenshots/" + (app.Ui.MobileLayout ? "mobile-" : "") + name + ".png");
+    }
+
+    static async System.Threading.Tasks.Task AwaitDodgeProgress(Foundation app, float seconds)
+    {
+        for(int i=0;i<120;i++)
+        {
+            var p=app.World.Player;
+            if(p.State != ActionState.Dodging)
+                throw new InvalidOperationException("Dodge ended before expected dust phase " + seconds);
+            if(p.ActionElapsed >= seconds)return;
+            await Frames(app,1);
+        }
+        throw new InvalidOperationException("Visual dodge did not advance to " + seconds);
+    }
+
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
@@ -64,6 +86,77 @@ public static class VisualChecks
             if(!app.Ui.MenuOpen)throw new InvalidOperationException("Menu edge touch plus emulated mouse did not open exactly once");
             app.Ui.Menu();await Frames(app,2);
         }
+        if (app.Ui.MobileLayout)
+        {
+            // Exercise action ownership through the actual input pipeline while a
+            // different finger owns the stick, including canceled and dragged touches.
+            string snapshot=Persistence.Capture(app.World,app.Narrative);
+            var mobilePlayer=app.World.Player;
+            var dodge=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Dodge" && b.IsVisibleInTree());
+            var attack=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Attack" && b.IsVisibleInTree());
+            var dodgePoint=dodge.GetGlobalRect().GetCenter();
+            var dodgeSize=dodge.Size;
+            int starts=0;
+            void OnCombat(string kind, System.Numerics.Vector2 direction, string context) { if(kind=="dodge_started") starts++; }
+            app.World.CombatDiagnostic += OnCombat;
+            var mobileStick=app.Ui.Stick;
+            var stickPoint=mobileStick.GlobalPosition+mobileStick.Size/2;
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=7,Pressed=true,Position=stickPoint});
+            Input.ParseInputEvent(new InputEventScreenDrag {Index=7,Position=stickPoint+new Vector2(72,0)});
+            await Frames(app,2);
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
+            await Frames(app,1);
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Canceled=true,Position=dodgePoint});
+            await Frames(app,2);
+            if(starts!=0) throw new InvalidOperationException("Canceled Dodge touch activated");
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
+            await Frames(app,1);
+            Input.ParseInputEvent(new InputEventScreenDrag {Index=8,Position=dodgePoint+new Vector2(-180,-180)});
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=dodgePoint+new Vector2(-180,-180)});
+            await Frames(app,2);
+            if(starts!=0) throw new InvalidOperationException("Dodge touch released outside activated");
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
+            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=dodgePoint,GlobalPosition=dodgePoint});
+            await Frames(app,1);
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=dodgePoint});
+            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=dodgePoint,GlobalPosition=dodgePoint});
+            await Frames(app,2);
+            if(starts!=1 || mobilePlayer.State!=ActionState.Dodging || mobilePlayer.ActionDirectionX<.99f || mobileStick.Finger!=7)
+                throw new InvalidOperationException("Dodge multitouch, direction or emulated mouse ownership failed");
+            if(dodge.Size!=dodgeSize) throw new InvalidOperationException("Dodge cooldown changed button dimensions");
+            app.World.CancelPlayerDodge();
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=7,Pressed=false,Position=stickPoint});
+            app.World.CombatDiagnostic -= OnCombat;
+            Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
+            await Frames(app,2);
+            var mobileButtons=dodge.GetParent().GetChildren().OfType<Button>().Where(b=>b.IsVisibleInTree()).ToArray();
+            for(int i=0;i<mobileButtons.Length;i++) for(int j=i+1;j<mobileButtons.Length;j++)
+                if(mobileButtons[i].GetGlobalRect().Intersects(mobileButtons[j].GetGlobalRect()))
+                    throw new InvalidOperationException("Mobile touch targets overlap: "+mobileButtons[i].Text+" / "+mobileButtons[j].Text);
+            if(attack.GetGlobalRect().Intersects(dodge.GetGlobalRect())) throw new InvalidOperationException("Attack and Dodge touch targets overlap");
+        }
+        if (!app.Ui.MobileLayout)
+        {
+            // Verify the desktop binding via the normal unhandled-input route.
+            string snapshot=Persistence.Capture(app.World,app.Narrative);
+            var p=app.World.Player;
+            p.Cooldowns.Remove("dodge");
+            var focused=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.IsVisibleInTree() && b.Text.Contains("Draught"));
+            int potionsBefore=app.World.Items.Count("player","potion");
+            focused.GrabFocus();
+            int starts=0;
+            void OnDodge(string kind, System.Numerics.Vector2 direction, string context) { if(kind=="dodge_started") starts++; }
+            app.World.CombatDiagnostic += OnDodge;
+            Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=true});
+            Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=false});
+            await Frames(app,2);
+            if(starts!=1 || p.State!=ActionState.Dodging || app.World.Items.Count("player","potion")!=potionsBefore)
+                throw new InvalidOperationException("Focused hotbar button consumed Space or Space activated more than one action");
+            focused.ReleaseFocus();
+            app.World.CancelPlayerDodge(); app.World.CombatDiagnostic -= OnDodge;
+            Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
+            await Frames(app,2);
+        }
         // Use real GUI dispatch for desktop mice; headless checks exercise raw touch.
         var draught=app.Ui.GetChildren().OfType<Control>().First().FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.Contains("Draught"));
         var point=draught.GetGlobalRect().GetCenter();
@@ -82,6 +175,37 @@ public static class VisualChecks
         if (app.World.Player.X <= before)
             throw new InvalidOperationException("Visual movement input did not move player");
         await Capture(app, "exploration");
+        // Document takeoff, travel, landing and lingering dust at normal camera
+        // zoom. Previously 'Active' tests passed even when pixels were invisible.
+        var dustSnapshot = Persistence.Capture(app.World, app.Narrative);
+        try
+        {
+            app.World.Player.Cooldowns.Clear();
+            if (!app.World.TryStartPlayerDodge(new System.Numerics.Vector2(1, 0)))
+                throw new InvalidOperationException("Visual roll dust check could not start dodge");
+            await AwaitDodgeProgress(app, .05f);
+            await CaptureRollFrame(app, "roll-dust-takeoff");
+            await AwaitDodgeProgress(app, .19f);
+            await CaptureRollFrame(app, "roll-dust-trail");
+            for(int i=0;i<120 && app.World.Player.State==ActionState.Dodging;i++)
+                await Frames(app,1);
+            if(app.World.Player.State==ActionState.Dodging)
+                throw new InvalidOperationException("Dodge did not reach landing");
+            // Check the real landing cloud exists before claiming visual coverage.
+            if(app.Views["player"].RollDust is not { Active:true, HasLandingCloud:true })
+                throw new InvalidOperationException("Landing dust is not visible after roll completion");
+            await CaptureRollFrame(app, "roll-dust-landing");
+            await Frames(app,2);
+            if(app.Views["player"].RollDust is not { Active:true })
+                throw new InvalidOperationException("Landing cloud did not linger after dodge");
+            await CaptureRollFrame(app, "roll-dust-linger");
+        }
+        finally
+        {
+            Persistence.Restore(app.World, app.Narrative, dustSnapshot);
+            app.RebuildViews();
+            await Frames(app, 2);
+        }
         var player=app.World.Player;
         var region=app.World.RegionsById[player.Region];
         int chest=region.Features.Single(x=>x.Value=="chest").Key;

@@ -36,6 +36,8 @@ namespace PixelCreatures.Runtime
         [Export(PropertyHint.Range, "0,60")] public int AnimationFps { get; set; } = 15;
         /// <summary>Classic stepped look: the node moves only on animation ticks.</summary>
         [Export] public bool SteppedMovement { get; set; }
+        /// <summary>Optional higher pose rasterization frequency only while performing a biped roll.</summary>
+        [Export(PropertyHint.Range, "0,60")] public int ActionAnimationFps { get; set; }
         [Export] public FacingMode Facing { get; set; } = FacingMode.Eight;
         [Export] public bool DrawShadow { get; set; } = true;
         [Export(PropertyHint.Range, "0,2")] public int Quality { get; set; } = 2;
@@ -106,9 +108,11 @@ namespace PixelCreatures.Runtime
         private int _pendingSteps;
         private MotionStateKind _lastState = MotionStateKind.Idle;
         private double? _facingRequest;
+        private bool _exactFacingRequest;
         private bool _restRequest;
         private bool _started;
         private bool _culled;
+        private bool _wasActionRendering;
         private Vector2I _extentMin, _extentMax;
 
         public override void _Ready()
@@ -200,7 +204,11 @@ namespace PixelCreatures.Runtime
             Motor = new CreatureMotor(model, CreatureRuntime.Registry, new MotorOptions { Facing = Facing, InternalDrive = AutoMove });
             double yaw = oldMotor?.Yaw ?? PixelCamera.DirectionYaw(7);
             Motor.Teleport(new Vec3(GroundPosition.X, 0, GroundPosition.Y), yaw);
-            if (_facingRequest.HasValue) Motor.FacingOverride = _facingRequest;
+            if (_facingRequest.HasValue)
+            {
+                if (_exactFacingRequest) Motor.LockCurrentFacing(_facingRequest.Value);
+                else Motor.FacingOverride = _facingRequest;
+            }
             if (oldMotor != null && oldMotor.Resting) Motor.SnapRest(true);
             else if (_restRequest) Motor.SnapRest(true);
             Motor.Resting = _restRequest;
@@ -249,13 +257,22 @@ namespace PixelCreatures.Runtime
         public void FaceYaw(double yaw)
         {
             _facingRequest = yaw;
-            if (Motor != null) Motor.FacingOverride = yaw;
+            _exactFacingRequest = false;
+            if (Motor != null) { Motor.FacingOverrideExact = false; Motor.FacingOverride = yaw; }
+        }
+
+        public void LockFacingYaw(double yaw)
+        {
+            _facingRequest = yaw;
+            _exactFacingRequest = true;
+            Motor?.LockCurrentFacing(yaw);
         }
 
         public void ClearFacingRequest()
         {
             _facingRequest = null;
-            if (Motor != null) Motor.FacingOverride = null;
+            _exactFacingRequest = false;
+            if (Motor != null) { Motor.FacingOverride = null; Motor.FacingOverrideExact = false; }
         }
 
         public void FaceDirection(int dir8) => FaceYaw(PixelCamera.DirectionYaw(dir8));
@@ -347,7 +364,15 @@ namespace PixelCreatures.Runtime
                 EmitSignal(SignalName.MotionStateChanged, state.ToString());
             }
 
-            double frameInterval = AnimationFps > 0 ? 1.0 / AnimationFps : 0;
+            bool actionRendering = Motor.DodgeBiped && Motor.DodgeProgress.HasValue;
+            if (actionRendering != _wasActionRendering)
+            {
+                _dirty = true; // First crouch and final recovery must not wait for the idle-rate tick.
+                _sinceRender = 1e9;
+                _wasActionRendering = actionRendering;
+            }
+            int poseFps = actionRendering ? Math.Max(AnimationFps, ActionAnimationFps) : AnimationFps;
+            double frameInterval = poseFps > 0 ? 1.0 / poseFps : 0;
             bool tick = steps > 0 && _sinceRender + 1e-9 >= frameInterval;
             Vector2 screen = GodotConvert.GroundToScreen(GroundPosition.X, GroundPosition.Y);
             if (SurfaceHeight != null) screen.Y -= SurfaceHeight(GroundPosition);

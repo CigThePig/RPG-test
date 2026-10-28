@@ -41,6 +41,8 @@ namespace PixelCreatures.Core.Motion
         private int _legCount;
 
         public double Phase => _phase;
+        // Walking balance/foot planting is disabled while an exclusive ground-roll owns the limbs.
+        public bool RollActive { get; set; }
 
         public override double CycleFrequency(MotorContext ctx) => _moving ? _freq : 0;
 
@@ -127,6 +129,7 @@ namespace PixelCreatures.Core.Motion
 
         public override void Step(MotorContext ctx, double dt)
         {
+            if (RollActive) { _moving = false; return; }
             var traits = ctx.Traits;
             double speed = ctx.Speed;
             double ts = traits.TimeScale;
@@ -385,6 +388,46 @@ namespace PixelCreatures.Core.Motion
                 Vec3 outward = new Vec3(0, 0, arm.Side == 0 ? 1 : arm.Side);
                 Limbs.Solve(arm, shoulder, target, bodyFwd, outward, 0, _joints);
                 SetLegBones(pose, arm, bodyFwd, 0);
+            }
+        }
+
+        /// <summary>Action-specific IK; never read stale world-space walking foot plants during a tumble.</summary>
+        public void ApplyRollLimbs(MotorContext ctx, in PoseParams p, SkeletonPose pose, CreaturePose output, double progress)
+        {
+            double enter = DMath.SmoothStep(0, .20, progress);
+            double recover = DMath.SmoothStep(.77, .98, progress);
+            double compact = enter * (1 - recover);
+            var rotate = p.BodyRotation;
+            var travel = p.RollDirection.NormalizedOr(Vec3.UnitX);
+            foreach (var s in _legs)
+            {
+                var leg = s.Rig;
+                Vec3 hip = pose.World[leg.RootBone].Origin;
+                double len = leg.TotalLength;
+                double side = leg.Side == 0 ? 1 : leg.Side;
+                // Feet curl in front of the abdomen, not toward a planted world-space target.
+                Vec3 tucked = hip + rotate.Rotate(new Vec3(len * .33, -len * .39, side * len * .20));
+                Vec3 desired = Vec3.Lerp(leg.RestFoot, tucked, compact);
+                double blend = DMath.SmoothStep(.77, .98, progress);
+                desired = Vec3.Lerp(desired, leg.RestFoot, blend);
+                var fwd = new Vec3(travel.X, 0, travel.Z).NormalizedOr(Vec3.UnitX);
+                var outward = new Vec3(0, 0, side);
+                Limbs.Solve(leg, hip, desired, fwd, outward, 0, _joints);
+                SetLegBones(pose, leg, fwd, 0);
+                output.Contacts.Add(new ContactPoint { Position = desired, Planted = progress > .96, Leg = s.Index });
+            }
+            foreach (var a in _arms)
+            {
+                var arm = a.Rig;
+                Vec3 shoulder = pose.World[arm.RootBone].Origin;
+                double len = arm.TotalLength;
+                double side = arm.Side == 0 ? 1 : arm.Side;
+                Vec3 guard = shoulder + rotate.Rotate(new Vec3(len * .40, -len * .13, side * len * .25));
+                Vec3 rest = arm.RestFoot;
+                Vec3 target = Vec3.Lerp(rest, guard, compact);
+                var fwd = new Vec3(travel.X, 0, travel.Z).NormalizedOr(Vec3.UnitX);
+                Limbs.Solve(arm, shoulder, target, fwd, new Vec3(0, 0, side), 0, _joints);
+                SetLegBones(pose, arm, fwd, 0);
             }
         }
 

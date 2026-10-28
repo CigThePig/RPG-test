@@ -78,6 +78,7 @@ public partial class RpgUi : CanvasLayer
         foreach (var(text, action)in new (string, Action)[]
         {
             ("1 · Sword", () => App.Cast("slash")),
+            ("Space · Dodge", App.Dodge),
             ("2 · Ember", () => App.Cast("ember")),
             ("3 · Mend", () => App.Cast("mend")),
             ("4 · Draught", () => App.UseQuickItem("potion")),
@@ -92,18 +93,27 @@ public partial class RpgUi : CanvasLayer
         )
         {
             if (MobileLayout && (text.StartsWith("J ·") || text.StartsWith("C ·") || text.StartsWith("M ·"))) continue;
+            if (!MobileLayout && text.StartsWith("Space ·")) continue;
             var button = Button(hotbar, MobileLayout ? text.Split(" · ").Last() : text, action);
             if (MobileLayout)
             {
-                int index = hotbar.GetChildCount() - 1;
-                // A large primary target and a shallow thumb arc. Utilities sit above combat.
-                Vector2[] positions = { new(210,130), new(100,85), new(10,5), new(115,0), new(315,55), new(210,0), new(315,-35) };
-                button.Position = positions[index];
-                button.Size = button.CustomMinimumSize = index == 0 ? new Vector2(112,104) : new Vector2(96,76);
-                button.AddThemeFontSizeOverride("font_size", index == 0 ? 23 : 18);
-                var face = new StyleBoxFlat { BgColor = new Color(index == 0 ? "795433" : "263f43"), BorderColor = new Color("b0af7e"), BorderWidthLeft=2, BorderWidthRight=2, BorderWidthTop=2, BorderWidthBottom=2, CornerRadiusTopLeft=24, CornerRadiusTopRight=24, CornerRadiusBottomLeft=24, CornerRadiusBottomRight=24 };
+                // Named positions remain stable when actions are added or reordered.
+                string actionName = text.Split(" · ").Last();
+                button.Position = actionName switch
+                {
+                    "Sword" => new Vector2(312, 130), "Dodge" => new Vector2(208, 136),
+                    "Ember" => new Vector2(104, 80), "Mend" => new Vector2(0, 0),
+                    "Draught" => new Vector2(104, 0), "Interact" => new Vector2(0, 80),
+                    "Pack" => new Vector2(208, 0), "Menu" => new Vector2(312, 0),
+                    _ => throw new InvalidOperationException("No mobile position for " + actionName)
+                };
+                bool primary = actionName == "Sword";
+                button.Size = button.CustomMinimumSize = primary ? new Vector2(112,104) : actionName == "Dodge" ? new Vector2(100,96) : new Vector2(96,68);
+                button.AddThemeFontSizeOverride("font_size", primary ? 23 : 18);
+                var face = new StyleBoxFlat { BgColor = new Color(primary ? "795433" : actionName == "Dodge" ? "355b56" : "263f43"), BorderColor = new Color("b0af7e"), BorderWidthLeft=2, BorderWidthRight=2, BorderWidthTop=2, BorderWidthBottom=2, CornerRadiusTopLeft=24, CornerRadiusTopRight=24, CornerRadiusBottomLeft=24, CornerRadiusBottomRight=24 };
                 button.AddThemeStyleboxOverride("normal", face);
             }
+            if (text.StartsWith("Space")) abilityButtons["dodge"] = button;
             var id = text.StartsWith("1") ? "slash" : text.StartsWith("2") ? "ember" : text.StartsWith("3") ? "mend" : "";
             if (id != "")
             {
@@ -182,8 +192,8 @@ public partial class RpgUi : CanvasLayer
     void Layout()
     {
         var size = GetViewport().GetVisibleRect().Size;
-        hotbar.Position = MobileLayout ? new Vector2(size.X - 440, size.Y - 270) : new Vector2(size.X - 760, size.Y - 160);
-        if (MobileLayout) hotbar.Size = new Vector2(420,250);
+        hotbar.Position = MobileLayout ? new Vector2(size.X - 450, size.Y - 270) : new Vector2(size.X - 760, size.Y - 160);
+        if (MobileLayout) hotbar.Size = new Vector2(430,250);
         Stick.Position = new Vector2(40, size.Y - 260);
         message.Position = new Vector2(24, size.Y - 45);
         message.Size = new Vector2(size.X - 48, 40);
@@ -220,6 +230,7 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         App.TouchMovement = Vector2.Zero;
+        App.World.CancelPlayerDodge();
         Clear(body);
         panel.Visible = true;
         body.AddChild(new Label { Text = heading });
@@ -254,8 +265,15 @@ public partial class RpgUi : CanvasLayer
         health.Text = $"{a.Name}   ♥ {a.Health:0}/{a.MaxHealth}    Mana {a.Mana:0}/{a.MaxMana}    Lv {a.Level} · XP {a.Experience}/{a.Level * 100}    {a.State}\n{a.Region} · {(int)(App.World.Time / 60) % 24:00}:{(int)App.World.Time % 60:00}";
         foreach (var(id, button)in abilityButtons)
         {
-            var def = App.World.Content.Abilities.Single(d => d.Id == id);
             float cooldown = a.Cooldowns.GetValueOrDefault(id);
+            if (id == "dodge")
+            {
+                button.Disabled = cooldown > 0 || !a.Alive;
+                string dodgeLabel = MobileLayout ? "Dodge" : "Space · Dodge";
+                button.Text = cooldown > 0 ? dodgeLabel + (MobileLayout ? "\n" : " ") + $"{cooldown:0.0}s" : dodgeLabel;
+                continue;
+            }
+            var def = App.World.Content.Abilities.Single(d => d.Id == id);
             button.Disabled = cooldown > 0 || a.Mana < def.Cost || !a.Alive;
             string binding = id == "slash" ? "1" : id == "ember" ? "2" : "3";
             string label = MobileLayout ? (id == "slash" ? "Attack" : def.Name.Split(' ')[0]) : $"{binding} · {def.Name}";
@@ -379,6 +397,7 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         App.TouchMovement = Vector2.Zero;
+        App.World.CancelPlayerDodge();
         panel.Hide();
         menu.Visible = !menu.Visible;
         if (menu.Visible)

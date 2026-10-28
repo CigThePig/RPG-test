@@ -70,6 +70,7 @@ namespace PixelCreatures.Core.Motion
         private bool _pendingAction;
         private ActionStyle _pendingStyle;
         private long _steps;
+        private bool _wasRolling;
 
         public MotorOptions Options { get; }
         public CreatureModel Model { get; }
@@ -84,6 +85,20 @@ namespace PixelCreatures.Core.Motion
         public Vec3 DesiredVelocity { get; set; }
         /// <summary>Yaw to face while standing (null = keep).</summary>
         public double? FacingOverride { get; set; }
+        // Combat can freeze the exact current yaw, including between quantized directions.
+        public bool FacingOverrideExact { get; set; }
+        // Presentation only: host supplies normalized authoritative dodge progress.
+        public double? DodgeProgress { get; set; }
+        public bool DodgeBiped { get; set; }
+        public double DodgeForwardComponent { get; set; } = 1;
+        public double DodgeSideComponent { get; set; }
+        public void LockCurrentFacing(double yaw)
+        {
+            _ctx.Yaw = _ctx.TargetYaw = DMath.WrapAngle(yaw);
+            _ctx.YawRate = 0;
+            FacingOverride = _ctx.Yaw;
+            FacingOverrideExact = true;
+        }
         public bool Resting { get => _rest.Requested; set => _rest.Requested = value; }
 
         public Vec3 Position => _ctx.Position;
@@ -246,6 +261,13 @@ namespace PixelCreatures.Core.Motion
                 _action.Trigger(ctx, _pendingStyle);
             }
 
+            bool rolling = DodgeProgress.HasValue && DodgeBiped && _loco is LeggedLocomotion;
+            if (_loco is LeggedLocomotion legs)
+            {
+                legs.RollActive = rolling;
+                if (!rolling && _wasRolling) legs.ResetPlants(ctx);
+            }
+            _wasRolling = rolling;
             _loco.Step(ctx, dt);
             ComputePose(dt, initialize: false);
             _ = oldPos;
@@ -260,21 +282,18 @@ namespace PixelCreatures.Core.Motion
             else if (FacingOverride.HasValue) desired = FacingOverride.Value;
             if (desired.HasValue && _rest.Progress < 0.01)
             {
-                double target = Quantize(desired.Value);
+                double target = FacingOverrideExact && !Options.FaceVelocity ? DMath.WrapAngle(desired.Value) : Quantize(desired.Value);
                 // hysteresis: keep the current target unless the new direction is clearly different
                 double step = Options.Facing == FacingMode.Four ? DMath.HalfPi : (Options.Facing == FacingMode.Eight ? DMath.Pi / 4 : 0);
-                if (step > 0 && Math.Abs(DMath.WrapAngle(desired.Value - ctx.TargetYaw)) < step * 0.5 + 0.14) target = ctx.TargetYaw;
+                if (!FacingOverrideExact && step > 0 && Math.Abs(DMath.WrapAngle(desired.Value - ctx.TargetYaw)) < step * 0.5 + 0.14) target = ctx.TargetYaw;
                 ctx.TargetYaw = target;
             }
             double delta = DMath.WrapAngle(ctx.TargetYaw - ctx.Yaw);
-            if (Math.Abs(delta) > 0.9 * DMath.Pi)
-            {
-                // turn around through the front view so the face stays readable
-                double viaSouth = -DMath.HalfPi;
-                double a = DMath.WrapAngle(ctx.Yaw + Math.Abs(delta) * 0.5 - viaSouth);
-                double b = DMath.WrapAngle(ctx.Yaw - Math.Abs(delta) * 0.5 - viaSouth);
-                delta = Math.Abs(a) < Math.Abs(b) ? Math.Abs(delta) : -Math.Abs(delta);
-            }
+            // At the exact antipode either route is equally short. Pick one once;
+            // after the first step the ordinary shortest-angle sign keeps it stable.
+            // Rechoosing a preferred midpoint on every step can steer away from the
+            // target and then flip back, trapping south-to-north turns in oscillation.
+            if (Math.Abs(Math.Abs(delta) - DMath.Pi) < 1e-9) delta = DMath.Pi;
             double size = DMath.Saturate(ctx.Anatomy.Metrics.BodyLength / 120.0);
             double maxRate = DMath.Lerp(9.0, 3.6, size) * DMath.Lerp(0.85, 1.2, ctx.Traits.Energy);
             double desiredRate = DMath.Clamp(delta * 9.0, -maxRate, maxRate);
@@ -314,6 +333,19 @@ namespace PixelCreatures.Core.Motion
             _rest.Evaluate(ctx, ref p);
             _action.Evaluate(ctx, ref p);
             _hit.Evaluate(ctx, ref p);
+            bool exclusiveRoll = DodgeProgress.HasValue && DodgeBiped && _loco is LeggedLocomotion;
+            if (exclusiveRoll)
+            {
+                // Replace locomotion/action pose rather than adding a spin to it.
+                p = RollMotion.Evaluate(ctx, DodgeProgress!.Value, DodgeForwardComponent, DodgeSideComponent);
+            }
+            else if (DodgeProgress.HasValue)
+            {
+                // Families without biped roll anatomy retain a small non-spinning evasion.
+                double tuck = Math.Sin(Math.PI * DMath.Clamp(DodgeProgress.Value, 0, 1));
+                p.BodyPitch += .45 * tuck;
+                p.Crouch += .35 * tuck;
+            }
             p.Altitude += _loco.Altitude(ctx) * (1 - ctx.RestWeight);
             p.EyeOpen = DMath.Saturate(p.EyeOpen);
             ctx.Altitude = p.Altitude;
@@ -323,8 +355,22 @@ namespace PixelCreatures.Core.Motion
             sk.Reset();
             _driver.ApplyBody(p, sk);
             sk.Solve();
+            if (exclusiveRoll && DodgeProgress.HasValue)
+            {
+                var support = RollMotion.CorrectGroundContact(ctx, sk, DodgeProgress.Value, ref p);
+                if (Math.Abs(support) > 1e-6)
+                {
+                    sk.Reset();
+                    _driver.ApplyBody(p, sk);
+                    sk.Solve();
+                }
+            }
             _pose.Contacts.Clear();
-            _loco.ApplyLimbs(ctx, p, sk, _pose);
+            if (exclusiveRoll && _loco is LeggedLocomotion rollLegs)
+                rollLegs.ApplyRollLimbs(ctx, p, sk, _pose, DodgeProgress!.Value);
+            else
+                _loco.ApplyLimbs(ctx, p, sk, _pose);
+            _params = p;
             if (initialize) _driver.ResetChains(ctx, p, sk);
             else _driver.StepChains(ctx, p, sk, dt);
             _driver.ApplyChains(ctx, sk);

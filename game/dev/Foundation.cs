@@ -1,6 +1,7 @@
 using Godot;
 using PixelCreatures.Runtime;
 using PixelCreatures.Core.Genetics;
+using PixelCreatures.Core;
 using NVector = System.Numerics.Vector2;
 
 namespace Mosslight;
@@ -32,8 +33,16 @@ public partial class Foundation : Node2D
     }
     void ConfigureView(CharacterView view)
     {
-        view.Creature.UseMeasuredExternalVelocity=Feel.Id!="baseline";
+        view.PreferMeasuredExternalVelocity=Feel.Id!="baseline";
+        view.Creature.UseMeasuredExternalVelocity=view.PreferMeasuredExternalVelocity;
         view.Creature.AnimationFps=view.State.Id=="player" && Feel.Id!="baseline" ? 20 : 10;
+        if (view.State.Id == "player")
+            view.GroundTerrain = actor =>
+            {
+                if (!World.RegionsById.TryGetValue(actor.Region, out var region)) return Terrain.Grass;
+                int index = region.Index(actor.Position);
+                return index >= 0 && index < region.Tiles.Length ? region.Tiles[index] : Terrain.Grass;
+            };
     }
     public override void _Process(double delta) => Trace?.Frame(delta);
     public override void _ExitTree() => Trace?.Dispose();
@@ -114,6 +123,10 @@ public partial class Foundation : Node2D
         {
             "potion",
             Key.Key4
+        },
+        {
+            "dodge",
+            Key.Space
         },
         {
             "inventory",
@@ -241,6 +254,12 @@ public partial class Foundation : Node2D
             if (e.Kind == "item_equipped" && Views.TryGetValue(e.Actor, out var changed))
                 changed.Equipment(items.Call("equipment_appearance", e.Actor).AsString());
         };
+        World.CombatDiagnostic += (kind, direction, context) =>
+        {
+            if (Trace.Active) Trace.Write(new { kind = "combat", action = kind, tick = World.Tick, x = direction.X, y = direction.Y, context });
+            if (OS.HasFeature("android") && (kind is "attack_started" or "attack_completed" or "dodge_started" or "dodge_completed"))
+                GD.Print($"MOSSLIGHT_COMBAT kind={kind} tick={World.Tick}");
+        };
         World.Presentation += (id, cue, targetId) =>
         {
             if (Views.TryGetValue(id, out var view))
@@ -317,7 +336,8 @@ public partial class Foundation : Node2D
                 var v = (Input.GetVector("west", "east", "north", "south") + TouchMovement).LimitLength();
                 // Input describes screen direction; PPC projects ground south at half height.
                 ScreenInput=v;
-                if (GameplayBlocked || v == Vector2.Zero || Feel.Response <= 0) ControllerVelocity=v;
+                if (World.Player.State == ActionState.Dodging) ControllerVelocity=Vector2.Zero;
+                else if (GameplayBlocked || v == Vector2.Zero || Feel.Response <= 0) ControllerVelocity=v;
                 else ControllerVelocity=ControllerVelocity.Lerp(v,1-MathF.Exp(-(1f/60)/Feel.Response));
                 var groundInput = Feel.Convert(ControllerVelocity);
                 var timer = System.Diagnostics.Stopwatch.StartNew();
@@ -328,7 +348,7 @@ public partial class Foundation : Node2D
             }
         }
         else
-        { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; World.ClearPlayerMotion(); }
+        { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
         var player = World.Player;
         foreach (var(id, view)in Views)
         {
@@ -364,6 +384,18 @@ public partial class Foundation : Node2D
         Trace.Sample(delta);
         replay?.AfterStep();
         QueueRedraw();
+    }
+
+    public override void _Input(InputEvent e)
+    {
+        // Space is also Godot's default UI accept key. Intercept it before a
+        // focused hotbar button can consume it during active gameplay; menus
+        // and other modal UI keep normal keyboard handling.
+        if (e is InputEventKey && e.IsAction("dodge") && !GameplayBlocked)
+        {
+            if (e.IsActionPressed("dodge")) Dodge();
+            GetViewport().SetInputAsHandled();
+        }
     }
 
     public override void _UnhandledInput(InputEvent e)
@@ -406,8 +438,32 @@ public partial class Foundation : Node2D
             return;
         var d = World.Content.Abilities.Single(x => x.Id == ability);
         var a = World.Player;
+        if (ability == "slash")
+        {
+            ui.Notify(World.TryStartPlayerSlash(VisualFacing()) ? d.Name : "Cannot attack: action, equipment, mana or cooldown");
+            return;
+        }
         var t = d.Self ? a : World.Actors.Values.Where(x => World.CanActivate(a, x, d)).OrderBy(x => NVector.DistanceSquared(a.Position, x.Position)).FirstOrDefault();
         ui.Notify(t != null && World.Activate(a.Id, ability, t.Id) ? d.Name : "No valid target, equipment, mana or cooldown");
+    }
+
+    public void Dodge()
+    {
+        if (GameplayBlocked) return;
+        // TouchMovement is dead-zone processed but has not passed through response smoothing.
+        var intent = (Input.GetVector("west", "east", "north", "south") + TouchMovement).LimitLength();
+        var ground = GodotConvert.ScreenToGround(intent);
+        var direction = intent.LengthSquared() > .000001f ? new NVector(ground.X, ground.Y) : VisualFacing();
+        if (World.TryStartPlayerDodge(direction)) ControllerVelocity = Vector2.Zero;
+    }
+
+    // PPC yaw maps to east/south ground coordinates; projection to screen is separate.
+    public NVector VisualFacing()
+    {
+        double yaw = Views.TryGetValue("player", out var view) && view.Creature.Motor != null
+            ? view.Creature.Motor.Yaw : PixelCamera.DirectionYaw(7);
+        if (!double.IsFinite(yaw)) yaw = PixelCamera.DirectionYaw(7);
+        return new NVector((float)Math.Cos(yaw), (float)-Math.Sin(yaw));
     }
 
     public void Interact()
@@ -439,6 +495,8 @@ public partial class Foundation : Node2D
             suspended = true;
             if (World != null && ui != null)
             {
+                World.CancelPlayerDodge();
+                ControllerVelocity = Vector2.Zero;
                 ui.PauseForVerification();
                 try { if (SessionStarted && replay == null && !InFeelCourse) Persistence.SaveAutosave(World, Narrative); }
                 catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }

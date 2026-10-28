@@ -73,6 +73,72 @@ public static class MovementChecks
             motor.Options.FaceVelocity=true;
             for(int i=0;i<60;i++){motor.SetWorldPosition(new Vec3(-15,0,0),new Vec3(-100,0,0));motor.Step(1.0/60);}
             check(Math.Abs(motor.Yaw)>1,"intentional movement restores velocity facing after stagger");
+            // Exercise the actual production motor and reject oscillation before arrival.
+            foreach (var pair in new (double from,double to,string label)[] {
+                (-Math.PI/2,Math.PI/2,"south-to-north"), (Math.PI/2,-Math.PI/2,"north-to-south"),
+                (0,Math.PI,"east-to-west"), (Math.PI,0,"west-to-east"),
+                (Math.PI/4,-3*Math.PI/4,"diagonal reversal"), (-Math.PI/2,Math.PI/2-.02,"near reversal"),
+                (Math.PI-.03,-Math.PI+.03,"angle wrap") })
+            {
+                motor.Options.FaceVelocity=false; motor.FacingOverrideExact=false;
+                motor.Teleport(Vec3.Zero,pair.from); motor.FacingOverride=pair.to;
+                double previousYaw=motor.Yaw; int sign=0,changes=0;
+                for(int i=0;i<120;i++)
+                {
+                    motor.SetWorldPosition(Vec3.Zero,Vec3.Zero);motor.Step(1.0/60);
+                    double movement=DMath.WrapAngle(motor.Yaw-previousYaw);
+                    double error=Math.Abs(DMath.WrapAngle(motor.Context.TargetYaw-motor.Yaw));
+                    int next=Math.Abs(movement)>.00001 ? Math.Sign(movement) : 0;
+                    if(error>.12 && next!=0) { if(sign!=0 && next!=sign) changes++; sign=next; }
+                    previousYaw=motor.Yaw;
+                }
+                check(changes==0 && Math.Abs(DMath.WrapAngle(motor.Context.TargetYaw-motor.Yaw))<.03, "motor turns without oscillating: "+pair.label);
+            }
+            // New input must be able to reverse a turn already in progress.
+            motor.Teleport(Vec3.Zero,0); motor.FacingOverride=Math.PI/2;
+            for(int i=0;i<6;i++) motor.Step(1.0/60);
+            double midYaw=motor.Yaw; motor.FacingOverride=-Math.PI/2;
+            for(int i=0;i<90;i++) motor.Step(1.0/60);
+            check(midYaw>0 && Math.Abs(DMath.WrapAngle(motor.Yaw+Math.PI/2))<.03, "new deliberate direction redirects a turn already in progress");
+            foreach(var family in CreatureRuntime.Registry.Families)
+            {
+                var dodgeModel=CreatureRuntime.Build(CreatureRuntime.Sample(family.Id,42));
+                var dodgeMotor=new CreatureMotor(dodgeModel,CreatureRuntime.Registry,new MotorOptions {InternalDrive=false});
+                dodgeMotor.DodgeBiped=family.Id=="biped";
+                for(int i=0;i<24;i++) { dodgeMotor.DodgeProgress=i/24.0; dodgeMotor.Step(1.0/60); }
+                check(double.IsFinite(dodgeMotor.Params.BodyPitch) && double.IsFinite(dodgeMotor.Params.Crouch), "dodge pose remains safe for family "+family.Id);
+            }
+            // New roll is a separate contact-aware action pose; it must not corrupt
+            // the walking plant solver and must be deterministic for diagonal travel.
+            foreach (ulong seed in new ulong[] { 42, 1337 })
+            {
+                var rm=CreatureRuntime.Build(CreatureRuntime.Sample("biped",seed));
+                foreach(var direction in new[]{(f:1.0,s:0.0),(f:0.0,s:1.0),(f:.70710678,s:.70710678),(f:-1.0,s:0.0)})
+                {
+                    var rollMotor=new CreatureMotor(rm,CreatureRuntime.Registry,new MotorOptions { InternalDrive=false, FaceVelocity=false });
+                    rollMotor.DodgeBiped=true;
+                    rollMotor.DodgeForwardComponent=direction.f; rollMotor.DodgeSideComponent=direction.s;
+                    rollMotor.Teleport(Vec3.Zero,0);
+                    for(int frame=0;frame<=24;frame++)
+                    {
+                        rollMotor.DodgeProgress=frame/24.0;
+                        rollMotor.SetWorldPosition(Vec3.Zero,Vec3.Zero);
+                        rollMotor.Step(1.0/60);
+                        if(frame==0||frame==7||frame==12||frame==18||frame==24)
+                        {
+                            var pose=rollMotor.Pose.Skeleton;
+                            check(rollMotor.Params.OverrideBodyRotation && double.IsFinite(pose.World[rm.Anatomy.Rig.Head].Origin.Y)
+                                && double.IsFinite(pose.World[rm.Anatomy.Rig.Pelvis].Origin.Y),
+                                "contact roll pose finite "+seed+" "+direction+" "+frame);
+                        }
+                    }
+                    rollMotor.DodgeProgress=null;
+                    rollMotor.Step(1.0/60);
+                    check(!rollMotor.Params.OverrideBodyRotation && !((LeggedLocomotion)rollMotor.Locomotion).RollActive,
+                        "roll returns gait ownership "+seed+" "+direction);
+                }
+            }
+            motor.FacingOverride=null;
             motor.TriggerGameplayAction(.14,.24);
             for(int i=0;i<22;i++)motor.Step(1.0/60);
             check(motor.ActionActive,"combat pose spans windup and recovery");
@@ -85,6 +151,45 @@ public static class MovementChecks
             var view=app.Views["player"];
             var viewMotor=view.Creature.Motor!;
             view.SnapPosition();view.Creature.ClearFacingRequest();
+            p.State=ActionState.Idle; p.X=500; p.Y=500; p.Cooldowns.Clear();
+            view.SnapPosition(); viewMotor.Teleport(new Vec3(p.X,0,p.Y),.37);
+            var facing=new V((float)Math.Cos(.37),(float)-Math.Sin(.37));
+            check(w.TryStartPlayerSlash(facing), "view fixture starts a captured-facing slash");
+            for(int i=0;i<15;i++)
+            {
+                w.Step(1f/60); view.Sync(1f/60);
+                viewMotor.SetWorldPosition(new Vec3(p.X,0,p.Y),new Vec3(view.Creature.MoveVelocity.X,0,view.Creature.MoveVelocity.Y));
+                viewMotor.Step(1.0/60);
+            }
+            check(Math.Abs(DMath.WrapAngle(viewMotor.Yaw-.37))<.001 && view.Creature.MoveVelocity==Vector2.Zero, "lunge holds the captured visual yaw without locomotion velocity");
+            w.Cancel(p); p.Cooldowns.Clear();
+            check(w.TryStartPlayerDodge(V.UnitY), "view fixture starts dodge perpendicular to facing");
+            Vector2? anchoredPuff = null;
+            for(int i=0;i<24;i++)
+            {
+                w.Step(1f/60); view.Sync(1f/60);
+                viewMotor.SetWorldPosition(new Vec3(p.X,0,p.Y),new Vec3(view.Creature.MoveVelocity.X,0,view.Creature.MoveVelocity.Y));
+                viewMotor.Step(1.0/60);
+                if(i==4)
+                {
+                    anchoredPuff = view.RollDust?.OldestPuffScreenPosition;
+                    check(view.RollDust is { Active:true, IsRolling:true, Surface:Terrain.Grass }
+                        && view.RollDust.PuffCount >= 7 && anchoredPuff.HasValue,
+                        "takeoff dust generates a visible cluster in the terrain palette");
+                }
+                if(i==13)
+                    check(view.RollDust is { Active:true, IsRolling:true }
+                        && view.RollDust.PuffCount >= 13
+                        && view.RollDust.OldestPuffScreenPosition == anchoredPuff,
+                        "the trail grows while earlier clouds remain world-anchored");
+            }
+            check(view.RollDust is { Active:true, IsRolling:false, HasLandingCloud:true }
+                && view.RollDust.PuffCount > 8, "landing cloud survives the 0.4-second roll");
+            check(Math.Abs(DMath.WrapAngle(viewMotor.Yaw-.37))<.001 && view.Creature.MoveVelocity==Vector2.Zero, "dodge and its final increment do not create a velocity-facing turn");
+            for(int i=0;i<50;i++) view.Sync(1f/60);
+            check(view.RollDust is { Active:false, IsRolling:false, PuffCount:0 },
+                "dust dissipates completely and stops rendering after a bounded lifetime");
+            view.Creature.ClearFacingRequest();
             viewMotor.Teleport(new Vec3(p.X,0,p.Y),0);
             p.State=ActionState.Staggered;p.X-=15;view.Cue("hit");view.Sync(1f/60);
             for(int i=0;i<20;i++)
