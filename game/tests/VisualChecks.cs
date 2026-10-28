@@ -29,6 +29,19 @@ public static class VisualChecks
         image.SavePng("docs/native-screenshots/" + (app.Ui.MobileLayout ? "mobile-" : "") + name + ".png");
     }
 
+    static async System.Threading.Tasks.Task AwaitDodgeProgress(Foundation app, float seconds)
+    {
+        for(int i=0;i<120;i++)
+        {
+            var p=app.World.Player;
+            if(p.State != ActionState.Dodging)
+                throw new InvalidOperationException("Dodge ended before expected dust phase " + seconds);
+            if(p.ActionElapsed >= seconds)return;
+            await Frames(app,1);
+        }
+        throw new InvalidOperationException("Visual dodge did not advance to " + seconds);
+    }
+
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
@@ -170,10 +183,22 @@ public static class VisualChecks
             app.World.Player.Cooldowns.Clear();
             if (!app.World.TryStartPlayerDodge(new System.Numerics.Vector2(1, 0)))
                 throw new InvalidOperationException("Visual roll dust check could not start dodge");
-            await Frames(app, 3); await CaptureRollFrame(app, "roll-dust-takeoff");
-            await Frames(app, 8); await CaptureRollFrame(app, "roll-dust-trail");
-            await Frames(app, 14); await CaptureRollFrame(app, "roll-dust-landing");
-            await Frames(app, 12); await CaptureRollFrame(app, "roll-dust-linger");
+            await AwaitDodgeProgress(app, .05f);
+            await CaptureRollFrame(app, "roll-dust-takeoff");
+            await AwaitDodgeProgress(app, .19f);
+            await CaptureRollFrame(app, "roll-dust-trail");
+            for(int i=0;i<120 && app.World.Player.State==ActionState.Dodging;i++)
+                await Frames(app,1);
+            if(app.World.Player.State==ActionState.Dodging)
+                throw new InvalidOperationException("Dodge did not reach landing");
+            // Check the real landing cloud exists before claiming visual coverage.
+            if(app.Views["player"].RollDust is not { Active:true, HasLandingCloud:true })
+                throw new InvalidOperationException("Landing dust is not visible after roll completion");
+            await CaptureRollFrame(app, "roll-dust-landing");
+            await Frames(app,2);
+            if(app.Views["player"].RollDust is not { Active:true })
+                throw new InvalidOperationException("Landing cloud did not linger after dodge");
+            await CaptureRollFrame(app, "roll-dust-linger");
         }
         finally
         {
