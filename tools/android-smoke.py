@@ -158,6 +158,20 @@ try:
                 time.sleep(.5)
             else: raise RuntimeError(f'Android {kind} touch {expected} did not finish')
             last_started[kind]=int(next(iter(starts)))
+    # Start a fresh real session before the chest route. The long repeated
+    # control phase gives roaming enemies time to approach the original area.
+    # Reset through the same menu a player uses, without altering combat rules.
+    before_reset=len(re.findall(r'MOSSLIGHT_SESSION_STARTED tick=0',logs))
+    tap(1190,564) # Menu
+    time.sleep(1)
+    capture('reset-menu.png')
+    tap(640,566) # New game in the initial menu's visible row.
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        if len(re.findall(r'MOSSLIGHT_SESSION_STARTED tick=0',logs))>before_reset: break
+        time.sleep(.5)
+    else: raise RuntimeError('New-game touch did not reset the gameplay session')
     # Exercise actual touch ownership, then open the starting Gloot chest.
     # Read release positions from production diagnostics instead of assuming emulator FPS.
     for attempt in range(16):
@@ -177,6 +191,21 @@ try:
     interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
     assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
     capture('exploration.png')
+    # Approach the live enemy group and observe real damage events. This also
+    # exercises repeated confirmed-hit effects on the Android renderer.
+    previous_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))
+    deadline=time.monotonic()+45
+    approaches=0
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        observed_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))-previous_hits
+        if len(observed_hits)>=2: break
+        if not adb('shell','pidof',package): raise RuntimeError('Android process exited during real combat damage')
+        if approaches<2:
+            adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(280*w/1280)),str(int(640*h/800)),'600')
+            approaches+=1
+        else: time.sleep(.5)
+    else: raise RuntimeError('Android combat did not produce two real player damage events')
     tap(1086,564) # Pack: utility row above the combat thumb arc.
     time.sleep(1)
     capture('inventory.png')
@@ -209,7 +238,7 @@ try:
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, inventory screenshot, gameplay ticks, background input cancellation/resume. Confirmed-hit effects and an ARM64 device were not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, background input cancellation/resume. ARM64 device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     # Preserve the real surface recording on failure as well as success. ADB

@@ -8,6 +8,7 @@ public static class VisualChecks
 {
     static object? telegraphPerformance;
     static object? combatPerformance;
+    static object? cameraHitch;
     static async System.Threading.Tasks.Task Frames(Foundation app, int count = 12)
     {
         for (int i = 0; i < count; i++)
@@ -265,6 +266,49 @@ public static class VisualChecks
         }
     }
 
+    // Exercise the real camera and damage bridge under severe render stalls.
+    // A variable-delta camera can extrapolate its smoothed center far past the
+    // target when several hits move the player during a slow Android frame.
+    static async System.Threading.Tasks.Task VerifyCameraHitches(Foundation app)
+    {
+        string snapshot=Persistence.Capture(app.World,app.Narrative);
+        try
+        {
+            var w=app.World; var course=GameplayReplay.CreateCourse(); course.Id="camera-hitch-visual";
+            w.RegionsById[course.Id]=course; w.InitializeContainers(course);
+            var p=w.Player; var enemy=w.Actors.Values.First(a=>a.Profile=="beast");
+            foreach(var other in w.Actors.Values.Where(a=>a.Id!=p.Id && a.Id!=enemy.Id)) other.Region="reach";
+            w.Cancel(p); w.Cancel(enemy);
+            // Away from the camera's edge clamps, so knockback moves its target.
+            p.Region=enemy.Region=course.Id; p.X=600; p.Y=570; p.Health=p.MaxHealth=1000;
+            p.Invulnerable=0; p.Statuses.Clear(); p.Cooldowns.Clear();
+            enemy.X=628; enemy.Y=570; enemy.Speed=0; enemy.Abilities.Clear();
+            enemy.State=ActionState.Recovery; enemy.StateRemaining=100;
+            app.RebuildViews(); app.ResumeGame(); await Frames(app, 12);
+            app.Camera.ResetSmoothing(); await Frames(app, 2);
+            float maxError=0;
+            for(int i=0;i<8;i++)
+            {
+                p.Invulnerable=0;
+                if(!w.Damage(enemy,p,2,"physical",ability:"bite")) throw new InvalidOperationException("Camera hitch damage did not resolve");
+                System.Threading.Thread.Sleep(230); // intentional test-only render stall
+                await Frames(app,1);
+                maxError=Math.Max(maxError,app.Camera.GetScreenCenterPosition().DistanceTo(app.Camera.Position));
+            }
+            await Frames(app,60);
+            float settled=app.Camera.GetScreenCenterPosition().DistanceTo(app.Camera.Position);
+            cameraHitch=new { stalledFrames=8, stallMs=230, maxCenterError=maxError, settledCenterError=settled,
+                callback=app.Camera.ProcessCallback.ToString() };
+            if(maxError>120 || settled>3) throw new InvalidOperationException($"Camera smoothing escaped its follow target under hitches: peak {maxError:0.0}, settled {settled:0.0}");
+            await CaptureRollFrame(app,"combat-camera-hitch-recovered");
+        }
+        finally
+        {
+            Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
+            await Frames(app,2);
+        }
+    }
+
     static async System.Threading.Tasks.Task VerifyDefeat(Foundation app)
     {
         string snapshot=Persistence.Capture(app.World,app.Narrative);
@@ -460,6 +504,7 @@ public static class VisualChecks
             await Frames(app, 2);
         }
         await VerifyTelegraphs(app);
+        await VerifyCameraHitches(app);
         await VerifyDefeat(app);
         var player=app.World.Player;
         var region=app.World.RegionsById[player.Region];
@@ -539,6 +584,7 @@ public static class VisualChecks
             visibleActors = app.Views.Values.Count(v => v.Visible),
             totalRasterizations = app.Views.Values.Sum(v => v.Creature.RenderCount),
             managedBytes = GC.GetTotalMemory(false),
+            cameraHitch,
             telegraphPerformance,
             combatPerformance
         };

@@ -188,7 +188,10 @@ public partial class Foundation : Node2D
         {
             Zoom = new Vector2(1.5f, 1.5f),
             PositionSmoothingEnabled = true,
-            PositionSmoothingSpeed = 12
+            PositionSmoothingSpeed = 12,
+            // Godot's idle-frame smoothing can extrapolate on long frames;
+            // fixed physics ticks retain the follow speed without that overshoot.
+            ProcessCallback = Camera2D.Camera2DProcessCallback.Physics
         };
         AddChild(camera);
         audio = ScriptNode("res://game/audio/AudioService.gd");
@@ -258,6 +261,8 @@ public partial class Foundation : Node2D
         {
             if (OS.HasFeature("android") && e.Kind is "resource_depleted" or "region_entered")
                 GD.Print($"MOSSLIGHT_GAMEPLAY kind={e.Kind} value={e.Value} tick={World.Tick}");
+            if (OS.HasFeature("android") && e.Kind == "damage" && e.Target == "player")
+                GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0}");
             if(Trace.Active && e.Kind is "region_entered" or "resource_depleted" or "ability_started" or "defeated")Trace.Marker(e.Kind+"/"+e.Value);
             Narrative.Call("receive", e.Kind, e.Actor, e.Target, e.Value, e.Count);
             if (e.Kind == "region_entered")

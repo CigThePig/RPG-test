@@ -196,6 +196,8 @@ public static class CombatPresentationChecks
             feedback.Strength = 0; feedback.Impact(3, 1);
             feedback.Advance(Dt);
             check(feedback.Offset == Vector2.Zero, "camera feedback can be disabled");
+            check(app.Camera.PositionSmoothingEnabled && app.Camera.ProcessCallback == Camera2D.Camera2DProcessCallback.Physics,
+                "camera follow smoothing uses fixed physics ticks during slow rendered frames");
 
             var stats = app.Audio.Call("debug_state").AsGodotDictionary();
             int resources = stats["resources"].AsInt32();
