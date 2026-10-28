@@ -47,8 +47,8 @@ public static class CombatTelegraphChecks
             float before = p.Health;
             check(w.Activate(enemy.Id, "bite", p.Id) && enemy.Target == p.Id && Warning(enemy, bite), "bite starts as target-locked windup with warning");
             check(events.Select(e => e.Kind).Take(2).SequenceEqual(new[] { CombatPresentationKind.AttackStarted, CombatPresentationKind.AttackCommitted }) && events[0].AbilityId == "bite", "typed start and commitment carry ability identity");
-            float remaining = bite.Windup; int boundary = 0;
-            do { remaining -= Dt; boundary++; } while (remaining > 0);
+            const int boundary = 18;
+            check(Math.Abs(bite.Windup - .30f) < .000001f, "bite retains its authored 0.30-second windup");
             Step(boundary - 1);
             check(p.Health == before && enemy.State == ActionState.Windup && Warning(enemy, bite), "0.30-second bite cannot damage before fixed-step impact");
             var contact = p.Position;
