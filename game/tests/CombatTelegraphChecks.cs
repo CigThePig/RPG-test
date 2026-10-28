@@ -58,6 +58,8 @@ public static class CombatTelegraphChecks
                 events.Any(e => e.Kind == CombatPresentationKind.Hit && e.AbilityId == "bite" && e.Position == contact), "one impact and pre-knockback hit coordinates are observed");
             float hitHealth = p.Health; Step(12);
             check(p.Health == hitHealth && events.Count(e => e.Kind == CombatPresentationKind.AttackImpact && e.AbilityId == "bite") == 1, "recovery cannot repeat impact");
+            Step(18);
+            check(events.Count(e => e.Kind == CombatPresentationKind.ActionCompleted && e.AbilityId == "bite") == 1, "recovery publishes one completed action with its ability ID");
 
             Reset(); check(w.Activate(enemy.Id, "bite", p.Id), "target-locked range fixture starts"); p.X = 700; Step(boundary);
             check(p.Health == p.MaxHealth && events.Any(e => e.Kind == CombatPresentationKind.Miss), "target-locked bite misses after target leaves range");
@@ -69,6 +71,17 @@ public static class CombatTelegraphChecks
             Reset(); check(w.Activate(enemy.Id, "bite", p.Id), "dodge fixture starts"); Step(boundary - 7);
             check(w.TryStartPlayerDodge(V.UnitX), "dodge starts during incoming bite"); Step(7);
             check(p.Health == p.MaxHealth && events.Any(e => e.Kind == CombatPresentationKind.DefensiveAvoidance && e.AbilityId == "bite"), "authoritative dodge immunity avoids bite");
+
+            Reset("ember");
+            check(w.Activate(enemy.Id, "ember", p.Id), "projectile fixture starts through SPELL");
+            float projectileRemaining = w.FindAbility("ember")!.Windup; int projectileBoundary = 0;
+            do { projectileRemaining -= Dt; projectileBoundary++; } while (projectileRemaining > 0);
+            Step(projectileBoundary);
+            check(events.Count(e => e.Kind == CombatPresentationKind.ProjectileReleased && e.AbilityId == "ember") == 1 &&
+                !events.Any(e => e.Kind is CombatPresentationKind.ProjectileImpact or CombatPresentationKind.Hit), "projectile release is not a fabricated impact");
+            Step(12);
+            check(events.Count(e => e.Kind == CombatPresentationKind.ProjectileImpact && e.AbilityId == "ember") == 1 &&
+                events.Any(e => e.Kind == CombatPresentationKind.Hit && e.AbilityId == "ember"), "projectile collision and hit occur after release");
 
             Reset("fixture_sweep");
             check(w.Activate(enemy.Id, "fixture_sweep", p.Id) && Warning(enemy, sweep) && enemy.ActionDirectionX < -.99f, "cone captures direction at initiation");
