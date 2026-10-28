@@ -21,7 +21,23 @@
       "Cooldown": 1.1,
       "Windup": 0.3,
       "Recovery": 0.4,
-      "Type": "physical"
+      "Type": "physical",
+      "Telegraph": { "Style": "target" },
+      "ActionStyle": "Bite"
+    },
+    {
+      "Id": "fixture_sweep",
+      "Name": "Sweeping strike",
+      "Range": 56,
+      "Damage": 9,
+      "Cost": 0,
+      "Cooldown": 1.1,
+      "Windup": 0.3,
+      "Recovery": 0.4,
+      "Type": "physical",
+      "Geometry": { "Shape": "cone", "Range": 56, "HalfAngleDegrees": 45 },
+      "Telegraph": { "Style": "cone" },
+      "ActionStyle": "TailSwipe"
     },
     {
       "Id": "ember",

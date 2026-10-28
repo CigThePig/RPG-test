@@ -18,6 +18,23 @@ public sealed class AbilityDef
     public int UnlockCost { get; set; } = 1;
     public bool Self { get; set; }
     public bool RequiresWeapon { get; set; }
+    // Omitted geometry preserves the original target-locked SPELL behavior.
+    public AttackGeometryDef? Geometry { get; set; }
+    public TelegraphDef? Telegraph { get; set; }
+    // Reserved for the PPC action mapping in Part 2; it does not select an animation yet.
+    public string ActionStyle { get; set; } = "";
+}
+
+public sealed class AttackGeometryDef
+{
+    public string Shape { get; set; } = "target";
+    public float Range { get; set; }
+    public float HalfAngleDegrees { get; set; }
+}
+
+public sealed class TelegraphDef
+{
+    public string Style { get; set; } = "none";
 }
 
 public sealed class StatusDef
@@ -101,8 +118,28 @@ public sealed class Content
         Unique(Recipes.Select(x => x.Id), "recipe");
         Unique(NpcProfiles.Select(x => x.Id), "npc");
         foreach (var a in Abilities)
-            if (a.Range < 0 || a.Cost < 0 || a.Cooldown < 0 || a.Windup < 0 || a.Recovery < 0 || (!string.IsNullOrEmpty(a.Status) && !Statuses.Any(s => s.Id == a.Status)))
-                errors.Add($"ability {a.Id}: invalid timing, cost or status reference");
+        {
+            static bool Nonnegative(float value) => float.IsFinite(value) && value >= 0;
+            if (!Nonnegative(a.Range) || !Nonnegative(a.Cost) || !Nonnegative(a.Cooldown) ||
+                !Nonnegative(a.Windup) || !Nonnegative(a.Recovery) || !Nonnegative(a.ProjectileSpeed) ||
+                !float.IsFinite(a.Damage) || (!string.IsNullOrEmpty(a.Status) && !Statuses.Any(s => s.Id == a.Status)))
+                errors.Add($"ability {a.Id}: invalid timing, cost, damage or status reference");
+            string shape = a.Geometry?.Shape ?? "target";
+            string style = a.Telegraph?.Style ?? "none";
+            if (shape is not ("target" or "cone"))
+                errors.Add($"ability {a.Id}: unsupported attack shape '{shape}'");
+            if (a.Geometry != null && (!Nonnegative(a.Geometry.Range) || !Nonnegative(a.Geometry.HalfAngleDegrees) ||
+                a.Geometry.HalfAngleDegrees > 180 || (shape == "cone" && (a.Geometry.Range <= 0 || a.Geometry.HalfAngleDegrees <= 0)) ||
+                (shape == "target" && (a.Geometry.Range != 0 || a.Geometry.HalfAngleDegrees != 0))))
+                errors.Add($"ability {a.Id}: invalid attack geometry");
+            if (shape == "cone" && (a.Self || a.ProjectileSpeed > 0 || a.Damage <= 0 || a.Id == "slash"))
+                errors.Add($"ability {a.Id}: cone requires a direct hostile damaging ability");
+            if (style is not ("none" or "target" or "cone") ||
+                (style != "none" && (style != shape || a.Self || a.Damage <= 0 || a.ProjectileSpeed > 0)))
+                errors.Add($"ability {a.Id}: telegraph does not match implemented danger");
+            if (a.ActionStyle != "" && (!Enum.TryParse<PixelCreatures.Core.Anatomy.ActionStyle>(a.ActionStyle, out var actionStyle) || !Enum.IsDefined(actionStyle)))
+                errors.Add($"ability {a.Id}: unknown procedural action style");
+        }
         foreach (var s in Statuses)
             if (s.Duration <= 0 || s.Interval <= 0 || s.MaxStacks < 1)
                 errors.Add($"status {s.Id}: invalid stacking/timing");
