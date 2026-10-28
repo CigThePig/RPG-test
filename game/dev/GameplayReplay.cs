@@ -15,6 +15,10 @@ public sealed class GameplayReplay
     int combatHits, combatMisses, dodges, dodgedHits, lungeCollisions;
     int warningImpacts, warningCancellations, warningAvoidances;
     string warningEnemy = "";
+    string presentationEnemy = "";
+    int presentationReleases, presentationCollisions, presentationDeaths;
+    readonly HashSet<string> presentationVictims = new();
+    readonly Dictionary<string, string> fixtureFactions = new();
     int turnSign, turnChanges;
     double turnPrevious;
     readonly List<object> results=new();
@@ -54,6 +58,9 @@ public sealed class GameplayReplay
         new("telegraph-dodge",75,new(300,300),Vector2.Zero),
         new("telegraph-interrupt",75,new(300,300),Vector2.Zero),
         new("telegraph-cone",75,new(300,300),Vector2.Zero),
+        new("presentation-fatal",130,new(300,300),Vector2.Zero),
+        new("presentation-crowd",90,new(300,300),Vector2.Zero),
+        new("presentation-projectile",140,new(300,300),Vector2.Zero),
         new("turn-south-north",100,new(300,300),Vector2.Up)
     };
     public GameplayReplay(Foundation owner)
@@ -72,6 +79,14 @@ public sealed class GameplayReplay
         };
         app.World.Presentation += e =>
         {
+            if (app.Trace.Scenario.StartsWith("presentation-") && (e.ActorId == "player" || e.ActorId == presentationEnemy))
+            {
+                if (e.Kind == CombatPresentationKind.AttackStarted) app.Trace.Marker("presentation/start");
+                if (e.Kind == CombatPresentationKind.ProjectileReleased) { presentationReleases++; app.Trace.Marker("presentation/release"); }
+                if (e.Kind == CombatPresentationKind.ProjectileImpact) { presentationCollisions++; app.Trace.Marker("presentation/collision"); }
+                if (e.Kind == CombatPresentationKind.Hit) { presentationVictims.Add(e.TargetId); app.Trace.Marker("presentation/hit"); }
+                if (e.Kind == CombatPresentationKind.Death) { presentationDeaths++; app.Trace.Marker("presentation/death"); }
+            }
             if (e.ActorId != warningEnemy) return;
             if (e.Kind == CombatPresentationKind.AttackImpact) warningImpacts++;
             if (e.Kind == CombatPresentationKind.AttackCanceled) warningCancellations++;
@@ -185,6 +200,38 @@ public sealed class GameplayReplay
                 app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
             }
             else warningEnemy="";
+            if (s.Id.StartsWith("presentation-"))
+            {
+                var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
+                presentationEnemy=enemy.Id;
+                app.World.Cancel(p); app.World.Cancel(enemy);
+                p.Region=enemy.Region=s.Region; p.X=300; p.Y=300; p.Health=p.MaxHealth=1000; p.Invulnerable=0;
+                p.Cooldowns.Clear(); p.Statuses.Clear(); p.Mana=p.MaxMana;
+                enemy.X=s.Id=="presentation-projectile" ? 440 : s.Id=="presentation-crowd" ? 350 : 328;
+                enemy.Y=s.Id=="presentation-projectile" ? 220 : 300;
+                enemy.Speed=0; enemy.Health=enemy.MaxHealth=s.Id=="presentation-fatal" ? 1 : 1000;
+                enemy.Invulnerable=0; enemy.Statuses.Clear(); enemy.Cooldowns.Clear(); enemy.Abilities.Clear();
+                enemy.State=ActionState.Recovery; enemy.StateRemaining=100;
+                app.Views[enemy.Id].SnapPosition();
+                app.Views[p.Id].Creature.ClearFacingRequest();
+                app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
+                if(s.Id=="presentation-fatal") app.World.Items.Add(enemy.Id,"potion",1);
+                if(s.Id=="presentation-crowd")
+                {
+                    var victims=app.World.Actors.Values.Where(a=>a.Profile=="beast" && a.Id!=enemy.Id).Take(2).ToArray();
+                    if(victims.Length!=2) throw new InvalidOperationException("Missing multi-victim fixture actors");
+                    for(int i=0;i<victims.Length;i++)
+                    {
+                        var victim=victims[i]; fixtureFactions[victim.Id]=victim.Faction; app.World.Cancel(victim);
+                        victim.Faction=p.Faction; victim.Region=p.Region; victim.X=315; victim.Y=300+(i==0 ? -32 : 32);
+                        victim.Health=victim.MaxHealth=1000; victim.Invulnerable=0; victim.Speed=0;
+                        victim.Abilities.Clear(); victim.State=ActionState.Recovery; victim.StateRemaining=100;
+                        app.Views[victim.Id].SnapPosition();
+                    }
+                }
+                presentationReleases=presentationCollisions=presentationDeaths=0; presentationVictims.Clear();
+            }
+            else presentationEnemy="";
             origin=p.Position;
             app.Ui.Notify($"REPLAY · {app.Feel.Id} · {s.Id}");
             app.Trace.Scenario=s.Id; app.Trace.Marker("scenario-start/teleport");
@@ -278,6 +325,23 @@ public sealed class GameplayReplay
             }
             if (local==31) app.Trace.Marker("telegraph/after-impact");
         }
+        if (test.Id.StartsWith("presentation-") && local==10)
+        {
+            var enemy=app.World.Actors[presentationEnemy];
+            if(test.Id=="presentation-fatal") TapAction("Attack");
+            if(test.Id=="presentation-crowd")
+            {
+                enemy.State=ActionState.Idle; enemy.StateRemaining=0; enemy.Abilities.Add("fixture_sweep");
+                if(!app.World.Activate(enemy.Id,"fixture_sweep","player")) throw new InvalidOperationException("Multi-victim sweep failed to start");
+                enemy.Abilities.Clear();
+            }
+            if(test.Id=="presentation-projectile")
+            {
+                var player=app.World.Player;
+                if(!player.Abilities.Contains("ember")) player.Abilities.Add("ember");
+                if(!app.World.Activate(player.Id,"ember",enemy.Id)) throw new InvalidOperationException("Projectile fixture failed to start");
+            }
+        }
         if(test.Id=="tap-stop" && local>=3) direction=Vector2.Zero;
         if(test.Id=="reversal" && local>=45) direction=Vector2.Left;
         if(test.Id=="eight-turns") direction=Vector2.Right.Rotated((local/20)*Mathf.Pi/4);
@@ -356,9 +420,21 @@ public sealed class GameplayReplay
             if(s.Id=="telegraph-cone" && (warningImpacts!=1 || p.Health!=p.MaxHealth)) throw new InvalidOperationException("Committed cone failed to miss outside target");
             if(s.Id=="telegraph-dodge" && (warningImpacts!=1 || warningAvoidances!=1 || p.Health!=p.MaxHealth)) throw new InvalidOperationException("Dodge did not avoid incoming bite");
         }
+        if(s.Id=="presentation-fatal" && (presentationDeaths!=1 || app.World.Actors[presentationEnemy].Alive ||
+            !app.World.Items.HasLoot(presentationEnemy) || app.Views[presentationEnemy].Creature.Motor!.RestProgress<.2))
+            throw new InvalidOperationException("Fatal hit did not leave a recognizable lootable defeated actor");
+        if(s.Id=="presentation-crowd" && (presentationVictims.Count<3 || !presentationVictims.Contains("player")))
+            throw new InvalidOperationException("Cone did not produce separate real hit events for all three victims");
+        if(s.Id=="presentation-projectile" && (presentationReleases!=1 || presentationCollisions!=1 || !presentationVictims.Contains(presentationEnemy)))
+            throw new InvalidOperationException("Projectile did not release, travel and collide exactly once");
+        foreach(var pair in fixtureFactions)
+        {
+            var victim=app.World.Actors[pair.Key]; victim.Faction=pair.Value; victim.Region="reach";
+        }
+        fixtureFactions.Clear();
         if (s.Id=="turn-south-north" && (turnChanges!=0 || Math.Abs(PixelCreatures.Core.DMath.WrapAngle(app.Views["player"].Creature.Motor!.Yaw-Math.PI/2))>.12)) throw new InvalidOperationException("South-to-north facing oscillated or did not complete");
         if(s.Id=="chest" && !app.World.RegionsById[p.Region].Depleted.Contains(12*64+18))throw new InvalidOperationException("Chest input interaction failed");
-        if(!valid||(!moved && !s.Id.StartsWith("telegraph-")))throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
+        if(!valid||(!moved && !s.Id.StartsWith("telegraph-") && !s.Id.StartsWith("presentation-")))throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
     }
     void Finish()
     {

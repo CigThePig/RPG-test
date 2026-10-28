@@ -19,8 +19,9 @@
 | Dungeon mission and layout | Graph Dungeon Generator | Complete graph/layout/grammar source | Tile adapter, key pairing, exhaustive reachability validation |
 | Spawns/region changes | World | Game integration around generated layout | Stable IDs, valid-floor spawn selection, persistent regions |
 | Save/load | `Persistence` | Gloot/QuestSystem native serialization | One schema/coordinator; three atomic file slots |
-| UI/camera/input | Godot + `RpgUi`/`Foundation` | Engine controls; real narrative addon output | Functional commands, panels and fixed tick |
-| Procedural audio | gdfxr | Original SFXR synthesizer/config/editor | Cached presets, cue/ambience/music channels, WAV export |
+| UI/camera/input | Godot + `RpgUi`/`Foundation` | Engine controls; real narrative addon output | Functional commands, panels and fixed tick; `CameraFeedback` adds a bounded presentation offset |
+| Combat presentation | `World.Presentation` | PPC timed actions, hit/rest poses and gdfxr | One controller routes observations to actor views, bounded effects and audio without changing outcomes |
+| Procedural audio | gdfxr | Original SFXR synthesizer/config/editor | Cached presets, bounded effects voices, ambience/music channels, WAV export |
 | Artwork tooling | PPC offline exporter | Original sheet/environment algorithms | Arbitrary family/seed catalogs, matching pixels and metadata |
 
 Custom adapters are explicitly distinguished from imported source. No claim is made that Skelerealms supplies our actor, persistence, inventory or combat implementation. Those conflicting modules were inspected and not imported.

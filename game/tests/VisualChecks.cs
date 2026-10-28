@@ -1,11 +1,13 @@
 using Godot;
 using System.Diagnostics;
 using System.Text.Json;
+using PixelCreatures.Runtime;
 
 namespace Mosslight;
 public static class VisualChecks
 {
     static object? telegraphPerformance;
+    static object? combatPerformance;
     static async System.Threading.Tasks.Task Frames(Foundation app, int count = 12)
     {
         for (int i = 0; i < count; i++)
@@ -173,6 +175,81 @@ public static class VisualChecks
                 idleManagedBytes=baseline.memory, windupManagedBytes=active.memory,
                 note="Same visible actors; active sample includes PPC action animation and four warnings. Software-renderer measurement, not a phone benchmark." };
 
+            // Normal engine time is essential here: at the earlier .001 scale
+            // the PPC fixed clock barely advances, so that sample alone cannot
+            // measure the cost of the adaptive combat pose rate.
+            Engine.TimeScale=1;
+            foreach(var a in attackers) { w.Cancel(a); a.Abilities.Clear(); a.State=ActionState.Recovery; a.StateRemaining=100; }
+            w.Cancel(p); p.X=300; p.Y=300; p.Health=p.MaxHealth=1000; p.Invulnerable=1000;
+            app.RebuildViews(); await Frames(app,20);
+            async System.Threading.Tasks.Task<object> Profile(string label, Action<int> drive)
+            {
+                var times=new List<double>(120); var rasters=new List<double>(120); var uploads=new List<double>(120);
+                long renderStart=CreatureRenderQueue.TotalRenders, uploadStart=CreatureRenderQueue.TotalUploads;
+                long allocated=GC.GetAllocatedBytesForCurrentThread(); long memory=GC.GetTotalMemory(false);
+                int gcStart=GC.CollectionCount(0), growthStart=attackers.Sum(a=>app.Views[a.Id].Creature.CanvasGrowths);
+                var spikes=new List<(double frame, double drive, double raster, double upload, int effects)>(120);
+                int peakEffects=0; var clock=Stopwatch.StartNew(); double last=clock.Elapsed.TotalMilliseconds;
+                long previousRenders=renderStart;
+                for(int i=0;i<120;i++)
+                {
+                    double driveStart=clock.Elapsed.TotalMilliseconds;
+                    drive(i); double driveMs=clock.Elapsed.TotalMilliseconds-driveStart;
+                    await Frames(app,1);
+                    double now=clock.Elapsed.TotalMilliseconds; times.Add(now-last); last=now;
+                    double rasterMs=0, uploadMs=0;
+                    if(CreatureRenderQueue.TotalRenders!=previousRenders)
+                    {
+                        rasters.Add(CreatureRenderQueue.LastRasterMs); uploads.Add(CreatureRenderQueue.LastUploadMs);
+                        rasterMs=CreatureRenderQueue.LastRasterMs; uploadMs=CreatureRenderQueue.LastUploadMs;
+                        previousRenders=CreatureRenderQueue.TotalRenders;
+                    }
+                    peakEffects=Math.Max(peakEffects,app.CombatEffects.ActiveCount);
+                    spikes.Add((times[^1],driveMs,rasterMs,uploadMs,app.CombatEffects.ActiveCount));
+                }
+                times.Sort(); rasters.Sort(); uploads.Sort();
+                double Q(List<double> values,double q) => values.Count==0 ? 0 : values[Math.Min(values.Count-1,(int)(values.Count*q))];
+                return new { scenario=label, frames=times.Count, p50ms=Q(times,.50), p95ms=Q(times,.95), p99ms=Q(times,.99), meanMs=times.Average(),
+                    rasterBatches=rasters.Count, rasterP50Ms=Q(rasters,.5), rasterP95Ms=Q(rasters,.95), uploadP95Ms=Q(uploads,.95),
+                    rasterizations=CreatureRenderQueue.TotalRenders-renderStart, uploads=CreatureRenderQueue.TotalUploads-uploadStart,
+                    allocatedBytes=GC.GetAllocatedBytesForCurrentThread()-allocated, managedStart=memory, managedEnd=GC.GetTotalMemory(false), peakEffects,
+                    gen0Collections=GC.CollectionCount(0)-gcStart, canvasGrowths=attackers.Sum(a=>app.Views[a.Id].Creature.CanvasGrowths)-growthStart,
+                    worstFrames=spikes.OrderByDescending(x=>x.frame).Take(5).Select(x=>new { frameMs=x.frame, driveMs=x.drive, rasterMs=x.raster, uploadMs=x.upload, effects=x.effects }).ToArray() };
+            }
+            void Prepare()
+            {
+                for(int index=0; index<attackers.Length; index++)
+                {
+                    var a=attackers[index];
+                    w.Cancel(a); a.Abilities.Clear(); a.State=ActionState.Recovery; a.StateRemaining=100;
+                    a.Health=a.MaxHealth=1000; a.Invulnerable=0;
+                    a.X=p.X+offsets[index].X; a.Y=p.Y+offsets[index].Y; app.Views[a.Id].SnapPosition();
+                }
+                app.CombatPresentation?.Reset();
+            }
+            void StartBite(ActorState a)
+            {
+                if(a.State is not (ActionState.Idle or ActionState.Moving)) return;
+                a.Cooldowns.Clear(); a.Abilities.Add("bite");
+                if(!w.Activate(a.Id,"bite",p.Id)) throw new InvalidOperationException("Performance bite could not start");
+                a.Abilities.Clear();
+            }
+            void Strike(ActorState a)
+            {
+                a.Health=1000; a.Invulnerable=0;
+                if(!w.Damage(p,a,2,"physical",ability:"slash")) throw new InvalidOperationException("Performance hit could not resolve");
+            }
+            var scenarios=new List<object>();
+            Prepare(); scenarios.Add(await Profile("idle",_=>{}));
+            Prepare(); attackers[0].State=ActionState.Idle;
+            scenarios.Add(await Profile("one attack",_=>StartBite(attackers[0])));
+            Prepare(); scenarios.Add(await Profile("one hit reaction",i=>{ if(i%30==0) Strike(attackers[0]); }));
+            Prepare(); foreach(var a in attackers) a.State=ActionState.Idle;
+            scenarios.Add(await Profile("four attackers",_=>{ foreach(var a in attackers) StartBite(a); }));
+            Prepare(); scenarios.Add(await Profile("four simultaneous hits",i=>{ if(i%30==0) foreach(var a in attackers) Strike(a); }));
+            combatPerformance=new { renderer=RenderingServer.GetVideoAdapterName(), samplesPerScenario=120,
+                note="Normal simulation time, identical four-creature fixture. Wall-frame samples include renderer and host scheduling; not phone performance.", scenarios };
+
             Reset("bite"); Start("bite");
             if(!TelegraphView.IsActive(w, enemy, bite)) throw new InvalidOperationException("Reset fixture has no warning");
             app.Reset();
@@ -185,6 +262,36 @@ public static class VisualChecks
             Engine.TimeScale = oldScale;
             Persistence.Restore(app.World, app.Narrative, snapshot); app.RebuildViews();
             await Frames(app, 2);
+        }
+    }
+
+    static async System.Threading.Tasks.Task VerifyDefeat(Foundation app)
+    {
+        string snapshot=Persistence.Capture(app.World,app.Narrative);
+        try
+        {
+            var w=app.World; var course=GameplayReplay.CreateCourse(); course.Id="defeat-visual";
+            w.RegionsById[course.Id]=course; w.InitializeContainers(course);
+            var p=w.Player; var enemy=w.Actors.Values.First(a=>a.Profile=="beast");
+            foreach(var other in w.Actors.Values.Where(a=>a.Id!=p.Id && a.Id!=enemy.Id)) other.Region="reach";
+            w.Cancel(p); w.Cancel(enemy);
+            p.Region=enemy.Region=course.Id; p.X=300; p.Y=300; p.Health=p.MaxHealth=1000; p.Invulnerable=0; p.Cooldowns.Clear();
+            enemy.X=336; enemy.Y=300; enemy.Health=enemy.MaxHealth=1; enemy.Invulnerable=0; enemy.Speed=0;
+            enemy.Abilities.Clear(); enemy.State=ActionState.Recovery; enemy.StateRemaining=100;
+            w.Items.Equip(p,"iron_sword","weapon"); w.Items.Add(enemy.Id,"potion",1);
+            app.RebuildViews(); app.ResumeGame();
+            app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
+            await Frames(app,12); app.Cast("slash");
+            await Until(app,()=>!enemy.Alive,"Fatal visual strike did not resolve");
+            await CaptureRollFrame(app,"combat-fatal-impact");
+            await Until(app,()=>app.Views[enemy.Id].Creature.Motor!.RestProgress>.45 && app.Views[enemy.Id].LootMarkerVisible,
+                "Defeat posture or loot marker did not appear");
+            await CaptureRollFrame(app,"combat-fatal-corpse");
+        }
+        finally
+        {
+            Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
+            await Frames(app,2);
         }
     }
 
@@ -353,6 +460,7 @@ public static class VisualChecks
             await Frames(app, 2);
         }
         await VerifyTelegraphs(app);
+        await VerifyDefeat(app);
         var player=app.World.Player;
         var region=app.World.RegionsById[player.Region];
         int chest=region.Features.Single(x=>x.Value=="chest").Key;
@@ -431,7 +539,8 @@ public static class VisualChecks
             visibleActors = app.Views.Values.Count(v => v.Visible),
             totalRasterizations = app.Views.Values.Sum(v => v.Creature.RenderCount),
             managedBytes = GC.GetTotalMemory(false),
-            telegraphPerformance
+            telegraphPerformance,
+            combatPerformance
         };
         File.WriteAllText(app.Ui.MobileLayout ? "docs/render-verification-mobile.json" : "docs/render-verification.json", JsonSerializer.Serialize(data, Content.Json));
         GD.Print("VISUAL CHECKS PASSED");

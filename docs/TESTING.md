@@ -45,9 +45,9 @@ The production `game/dev/Foundation.tscn` provides equivalent focused environmen
 ## Known practical limits
 
 - No long-duration soak, native GPU/mobile profiling or packaged export validation has been completed locally.
-- Combat currently uses single-target range/visibility and homing projectiles. Advanced attack arcs, area effects, physical actor-to-actor avoidance and tactical encounter tuning remain gameplay work.
+- Target-locked combat and the existing homing projectile retain their range/visibility rules; the player slash and verification cone have their documented directional geometry. General area effects, physical actor-to-actor avoidance and tactical encounter tuning remain gameplay work.
 - Distant/unloaded NPCs keep coarse schedules, not a detailed simulated economy. AI profiles are small and deterministic; relationships/knowledge have actual encounter state but no conversation-generated intelligence.
-- Incapacitation uses tinted/resting PPC presentation; no bespoke death animation is claimed. Biped sword visuals map to PPC's available short-blade shape.
+- Defeat uses a procedural hit and the rig’s existing rest posture rather than a bespoke animation. Biped sword visuals map to PPC’s available short-blade shape; subjective feel and audio quality remain to be judged on a real device.
 - Saves deliberately store full region arrays in schema 1; generator/schema changes require a future explicit migration or retaining the old executable. This is not an implemented streaming/delta-save system.
 - Dungeon solvability verifies a valid key-spending route; it does not promise every possible key-spending order is recoverable. The adapter retains meaningful key consumption and rejects layouts with no valid route.
 
@@ -60,3 +60,11 @@ The production `game/dev/Foundation.tscn` provides equivalent focused environmen
 The Android workflow additionally exports and structurally validates the signed ARM64 package, including its .NET publish payload. A separate x86_64 export is installed and launched in an Android emulator, with readiness/tick markers from the real C# composition root. The runtime evidence artifact includes install output, emulator log, logcat, screenshot and an explicit result. Read each actual workflow result; no package-only test is described as a runtime pass.
 
 The physical Galaxy S25 checklist, signing limitations and offline phone workflow are in [ANDROID_DEVELOPMENT.md](ANDROID_DEVELOPMENT.md). Full engine diagnostics invoked in the Android development menu write their verification JSON to `user://`, not the read-only exported resource tree.
+
+## Part 2 presentation verification
+
+`CombatPresentationChecks` exercises the production event bridge and PPC motor, including explicit and omitted styles, timing, cancellation, a resumed windup, fatal/restored corpses, captured contact positions, dodge versus invulnerability, release versus collision, bounded effects, camera limits and reusable audio players. Audio tests use the Dummy driver: they check resources and routing, not audible quality. The existing CombatChecks, DodgeChecks and CombatTelegraphChecks remain in the same runner.
+
+The replay adds `presentation-fatal`, `presentation-crowd` and `presentation-projectile` alongside the sword, bite, cone, interruption and dodge scenarios. They initiate real world actions and record actual rendered output; the runner extracts normal-framing sequences around observed events as well as the full movie. It records action state, render counts, active effects and frame timing in the trace. Movie Maker fixes the simulation clock and must not be used as a real-time performance result.
+
+Rendered verification additionally samples 120 normal-time frames each for the same four-creature idle scene, one bite, one repeated hit reaction, four attackers and four simultaneous hits. The report includes wall-frame p50/p95/p99, PPC raster/upload batches, effect peak, main-thread allocations and managed-memory observations. A local comparison against the Part 1 reference is recorded in [PR4_PART2_PERFORMANCE.md](PR4_PART2_PERFORMANCE.md); neither hosted llvmpipe nor the Android emulator establishes physical-phone performance.

@@ -37,7 +37,9 @@ for preset in a.presets.split(','):
     digest=state_digest(rows)
     repeat=folder/'repeat';repeat.mkdir(exist_ok=True)
     repeat_command=[os.environ.get('GODOT','godot'),'--resolution','1280x800','--path',str(root),'--audio-driver','Dummy','--fixed-fps','60','--','--gameplay-check','--mobile-ui',f'--preset={preset}',f'--evidence={repeat}']
-    repeated=subprocess.run(repeat_command,cwd=root,capture_output=True,text=True,timeout=120)
+    # The repeat still renders every frame and can exceed two minutes on a
+    # constrained software renderer as the scenario suite grows.
+    repeated=subprocess.run(repeat_command,cwd=root,capture_output=True,text=True,timeout=300)
     (repeat/'engine.log').write_text(repeated.stdout+repeated.stderr)
     assert repeated.returncode==0 and 'GAMEPLAY REPLAY PASSED' in repeated.stdout and 'ERROR:' not in repeated.stdout+repeated.stderr, 'Replay repetition failed'
     repeat_rows=[json.loads(line) for line in (repeat/'trace.jsonl').read_text(encoding='utf-8-sig').splitlines()]
@@ -121,6 +123,24 @@ for preset in a.presets.split(','):
                 frame=int(marker['frame'])+1
                 row=min(groups[name],key=lambda r:abs(int(r['frame'])-frame))
                 requests.append((name+' interrupted',frame,row));warning_requests.append((name,'interrupted',frame))
+        # Complete unzoomed temporal sequences around real world events.
+        presentation_requests=[]
+        for name,phases in {
+            'presentation-fatal':['start','hit','death'],
+            'presentation-crowd':['start','hit'],
+            'presentation-projectile':['start','release','collision','hit']
+        }.items():
+            for phase in phases:
+                marker=next(r for r in rows if r['kind']=='marker' and r['scenario']==name and r['label']=='presentation/'+phase)
+                for offset in [-3,0,3,12]:
+                    frame=max(0,int(marker['frame'])+offset)
+                    row=min(groups[name],key=lambda r:abs(int(r['frame'])-frame))
+                    label=f'{name} {phase} {offset:+d}'
+                    requests.append((label,frame,row));presentation_requests.append((name,phase,offset,frame))
+        values=groups['combat-ahead']; start=next(i for i,r in enumerate(values) if r['action']=='Windup')
+        for i in range(9):
+            row=values[min(start+i*3,len(values)-1)]; frame=max(0,int(row['frame'])-1)
+            requests.append((f'sword +{i*50}ms',frame,row));presentation_requests.append(('sword','sequence',i,frame))
         indices=sorted(set(frame for _,frame,_ in requests))
         select='+'.join(f'eq(n\\,{frame})' for frame in indices)
         run(['ffmpeg','-v','error','-y','-i',str(folder/'gameplay.mp4'),'-vf',f'select={select}','-vsync','0',str(folder/'combat-%03d.png')])
@@ -129,6 +149,8 @@ for preset in a.presets.split(','):
         by_frame=dict(zip(indices,selected))
         for name,phase,frame in warning_requests:
             Image.open(by_frame[frame]).save(folder/(name+'-'+phase+'.png'))
+        for name,phase,offset,frame in presentation_requests:
+            Image.open(by_frame[frame]).save(folder/(f'{name}-{phase}-{offset:+03d}.png'))
         combat=Image.new('RGB',(1280,math.ceil(len(requests)/4)*220));draw=ImageDraw.Draw(combat)
         close=Image.new('RGB',combat.size); close_draw=ImageDraw.Draw(close)
         for i,(label,frame,row) in enumerate(requests):

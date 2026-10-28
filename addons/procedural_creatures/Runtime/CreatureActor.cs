@@ -36,7 +36,7 @@ namespace PixelCreatures.Runtime
         [Export(PropertyHint.Range, "0,60")] public int AnimationFps { get; set; } = 15;
         /// <summary>Classic stepped look: the node moves only on animation ticks.</summary>
         [Export] public bool SteppedMovement { get; set; }
-        /// <summary>Optional higher pose rasterization frequency only while performing a biped roll.</summary>
+        /// <summary>Optional higher pose rate during attacks, brief hit reactions and biped rolls.</summary>
         [Export(PropertyHint.Range, "0,60")] public int ActionAnimationFps { get; set; }
         [Export] public FacingMode Facing { get; set; } = FacingMode.Eight;
         [Export] public bool DrawShadow { get; set; } = true;
@@ -289,12 +289,25 @@ namespace PixelCreatures.Runtime
 
         public void TriggerGameplayAction(float windup, float recovery) => Motor?.TriggerGameplayAction(windup, recovery);
 
+        public void TriggerGameplayAction(float windup, float recovery, ActionStyle? style, float elapsed = 0)
+        {
+            Motor?.TriggerGameplayAction(windup, recovery, style, elapsed);
+            RequestRender();
+        }
+
+        public void CancelGameplayAction()
+        {
+            Motor?.CancelGameplayAction();
+            RequestRender();
+        }
+
         public void TriggerAction() => Motor?.TriggerAction();
 
         /// <summary>Hit coming from a ground direction (x east, y south) pointing from the creature to the attacker.</summary>
         public void TriggerHit(Vector2 fromDirection, float strength = 1f)
         {
             Motor?.TriggerHit(new Vec3(fromDirection.X, 0, fromDirection.Y), strength);
+            RequestRender();
         }
 
         public void Teleport(Vector2 groundPosition)
@@ -364,14 +377,15 @@ namespace PixelCreatures.Runtime
                 EmitSignal(SignalName.MotionStateChanged, state.ToString());
             }
 
-            bool actionRendering = Motor.DodgeBiped && Motor.DodgeProgress.HasValue;
+            bool actionRendering = Motor.CombatSampling || (Motor.DodgeBiped && Motor.DodgeProgress.HasValue);
             if (actionRendering != _wasActionRendering)
             {
                 _dirty = true; // First crouch and final recovery must not wait for the idle-rate tick.
                 _sinceRender = 1e9;
                 _wasActionRendering = actionRendering;
             }
-            int poseFps = actionRendering ? Math.Max(AnimationFps, ActionAnimationFps) : AnimationFps;
+            int baseFps = AnimationFps > 0 ? Math.Clamp(AnimationFps, 1, 60) : 60;
+            int poseFps = actionRendering && ActionAnimationFps > 0 ? Math.Max(baseFps, Math.Clamp(ActionAnimationFps, 1, 60)) : baseFps;
             double frameInterval = poseFps > 0 ? 1.0 / poseFps : 0;
             bool tick = steps > 0 && _sinceRender + 1e-9 >= frameInterval;
             Vector2 screen = GodotConvert.GroundToScreen(GroundPosition.X, GroundPosition.Y);

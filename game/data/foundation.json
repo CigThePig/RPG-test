@@ -10,7 +10,8 @@
       "Windup": 0.14,
       "Recovery": 0.24,
       "Type": "physical",
-      "RequiresWeapon": true
+      "RequiresWeapon": true,
+      "ActionStyle": "Strike"
     },
     {
       "Id": "bite",

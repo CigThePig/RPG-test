@@ -44,6 +44,7 @@ public static class FoundationChecks
             CombatChecks.Run(app, Check);
             DodgeChecks.Run(app, Check);
             CombatTelegraphChecks.Run(app, Check);
+            CombatPresentationChecks.Run(app, Check);
             // Exercise nonlinear progression using actual world defeat events before acceptance.
             var early = w.Player;
             var victims = w.Actors.Values.Where(a => a.Profile == "beast").Take(2).ToArray();

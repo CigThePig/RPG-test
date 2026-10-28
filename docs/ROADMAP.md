@@ -1,6 +1,6 @@
 # Next game development
 
-PR #4 milestones: Part 1 establishes authored target/cone geometry, typed world presentation events and state-derived enemy warnings; Part 2 will implement procedural attack animation and impact feedback; Part 3 will address enemy intelligence, spacing and projectile behavior; Part 4 will address mobile controls, encounter balance and final verification. Circle damage, full action-style mapping and later-milestone changes are not implemented in Part 1.
+PR #4 milestones: Part 1 establishes authored target/cone geometry, typed world presentation events and state-derived enemy warnings; Part 2 adds procedural attack animation and impact feedback; Part 3 will address enemy intelligence, spacing and projectile behavior; Part 4 will address mobile controls, encounter balance and final verification. Circle damage, tactical enemy behavior, projectile redesign and final mobile balancing remain for later milestones.
 
 The selected engine and source integrations are implemented. Continue by building game content and extending tested production paths:
 

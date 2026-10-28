@@ -74,6 +74,7 @@ public sealed class PlaytestTrace : IDisposable
             renderCount=app.Views[p.Id].Creature.RenderCount, renderError=app.Views[p.Id].Creature.LastError, animation=app.Views[p.Id].Creature.State.ToString(), yaw=app.Views[p.Id].Creature.Motor?.Yaw,
             cameraX=c.GetScreenCenterPosition().X, cameraY=c.GetScreenCenterPosition().Y, cameraTargetX=c.Position.X, cameraTargetY=c.Position.Y, zoom=c.Zoom.X, playerScreenX=screen.X, playerScreenY=screen.Y,
             physicsMs=dt*1000, simulationMs=app.SimulationMs, droppedSeconds=app.DroppedSeconds, fps=Engine.GetFramesPerSecond(), rasterMs=CreatureRenderQueue.LastRasterMs, uploadMs=CreatureRenderQueue.LastUploadMs,
+            activeCombatEffects=app.CombatEffects.ActiveCount, droppedCombatEffects=app.CombatEffects.DroppedCount,
             managedBytes=app.World.Tick%60==0 ? GC.GetTotalMemory(false) : 0 });
     }
     public void Dispose() { try {writer?.Dispose();} catch(IOException) { } finally {writer=null; clock.Stop();} }

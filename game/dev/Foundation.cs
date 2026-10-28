@@ -11,7 +11,8 @@ public partial class Foundation : Node2D
     public Node Narrative { get; private set; } = null !;
     public Dictionary<string, CharacterView> Views { get; } = new();
     public RpgUi Ui => ui;
-    public bool GameplayBlocked => ui == null || suspended || !World.Player.Alive || ui.BlocksInput || Narrative.Get("speaking").AsBool();
+    public bool PresentationBlocked => ui == null || suspended || ui.BlocksInput || Narrative.Get("speaking").AsBool();
+    public bool GameplayBlocked => PresentationBlocked || !World.Player.Alive;
 
     public MovementFeel Feel { get; private set; } = MovementFeel.Presets[1];
     public Camera2D Camera => camera;
@@ -45,7 +46,7 @@ public partial class Foundation : Node2D
             };
     }
     public override void _Process(double delta) => Trace?.Frame(delta);
-    public override void _ExitTree() => Trace?.Dispose();
+    public override void _ExitTree() { presentation?.Dispose(); Trace?.Dispose(); }
     string? courseSnapshot;
     public bool InFeelCourse => courseSnapshot != null;
     public void BeginFeelCourse()
@@ -84,6 +85,11 @@ public partial class Foundation : Node2D
     public double SimulationMs { get; private set; }
     Node2D ground = null !;
     TelegraphView? telegraphs;
+    public CombatEffects CombatEffects { get; private set; } = null!;
+    public CameraFeedback CombatCamera { get; } = new();
+    public CombatPresentationController? CombatPresentation => presentation;
+    public Node Audio => audio;
+    CombatPresentationController? presentation;
     double accumulator;
     long lastRuntimeLog;
     Node audio = null !;
@@ -186,6 +192,8 @@ public partial class Foundation : Node2D
         AddChild(camera);
         audio = ScriptNode("res://game/audio/AudioService.gd");
         AddChild(audio);
+        CombatEffects = new CombatEffects(); // after actors, below the later UI canvas
+        AddChild(CombatEffects);
         foreach (var name in new[]
         {
             "grass",
@@ -240,6 +248,7 @@ public partial class Foundation : Node2D
             Narrative.Call("import_state", "{\"flags\":{},\"pools\":{},\"quests\":{}}");
         }
 
+        presentation?.Dispose();
         World = new(Content.Load(VerificationMode), items)
         {
             Planner = planner
@@ -253,7 +262,10 @@ public partial class Foundation : Node2D
             if (e.Kind == "region_entered")
                 RebuildViews();
             if (e.Kind == "item_equipped" && Views.TryGetValue(e.Actor, out var changed))
+            {
                 changed.Equipment(items.Call("equipment_appearance", e.Actor).AsString());
+                changed.RestoreWindup(World);
+            }
         };
         World.CombatDiagnostic += (kind, direction, context) =>
         {
@@ -261,29 +273,7 @@ public partial class Foundation : Node2D
             if (OS.HasFeature("android") && (kind is "attack_started" or "attack_completed" or "dodge_started" or "dodge_completed"))
                 GD.Print($"MOSSLIGHT_COMBAT kind={kind} tick={World.Tick}");
         };
-        World.Presentation += e =>
-        {
-            string id = e.Kind is CombatPresentationKind.Hit or CombatPresentationKind.Death ? e.TargetId : e.ActorId;
-            string other = e.Kind is CombatPresentationKind.Hit or CombatPresentationKind.Death ? e.ActorId : e.TargetId;
-            string cue = e.Kind switch
-            {
-                CombatPresentationKind.AttackStarted => World.Content.Abilities.Find(a => a.Id == e.AbilityId)?.Damage < 0 ? "cast" : "attack",
-                CombatPresentationKind.DodgeStarted => "dodge",
-                CombatPresentationKind.DodgeCanceled => "dodge_cancel",
-                CombatPresentationKind.Hit => "hit",
-                CombatPresentationKind.Death => "dead",
-                _ => ""
-            };
-            if (cue == "") return;
-            if (Views.TryGetValue(id, out var view))
-            {
-                World.Actors.TryGetValue(other, out var target);
-                var ability = World.Content.Abilities.Find(a => a.Id == e.AbilityId);
-                view.Cue(cue, target, ability);
-            }
-            if (cue is "hit" or "cast")
-                PlayCue(cue);
-        };
+        presentation = new CombatPresentationController(World, Views, CombatEffects, CombatCamera, audio);
         ContentAudit.Validate(World.Content);
         World.NewGame();
         if (telegraphs == null)
@@ -298,6 +288,8 @@ public partial class Foundation : Node2D
 
     public void RebuildViews()
     {
+        presentation?.Reset();
+        if (camera != null) camera.Offset = Vector2.Zero;
         foreach (var view in Views.Values)
         {
             actors.RemoveChild(view);
@@ -314,6 +306,7 @@ public partial class Foundation : Node2D
             Views[a.Id] = view;
             view.Equipment(items.Call("equipment_appearance", a.Id).AsString());
         }
+        foreach (var view in Views.Values) view.RestoreWindup(World);
 
         drawnRegion = "";
     }
@@ -368,11 +361,15 @@ public partial class Foundation : Node2D
         }
         else
         { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
+        presentation?.FlushPending();
         var player = World.Player;
+        if (PresentationBlocked) CombatCamera.Reset();
+        else { CombatEffects.Advance((float)delta); CombatCamera.Advance((float)delta); }
         foreach (var(id, view)in Views)
         {
             view.Visible = World.Actors[id].Region == player.Region;
-            view.Creature.Paused = !view.Visible || GameplayBlocked;
+            // A player death blocks gameplay but must not freeze the defeat pose.
+            view.Creature.Paused = !view.Visible || PresentationBlocked || (!player.Alive && view.State.Alive);
             view.HasLoot = !view.State.Alive && World.Items.HasLoot(id);
             view.SyncCombatFacing(World);
             view.Sync((float)delta);
@@ -383,6 +380,7 @@ public partial class Foundation : Node2D
         var half = GetViewportRect().Size / camera.Zoom / 2;
         var focus = GodotConvert.GroundToScreen(player.X, player.Y);
         camera.Position = new Vector2(bounds.X <= half.X*2 ? bounds.X/2 : Mathf.Clamp(focus.X,half.X,bounds.X-half.X), bounds.Y <= half.Y*2 ? bounds.Y/2 : Mathf.Clamp(focus.Y,half.Y,bounds.Y-half.Y));
+        camera.Offset = CombatCamera.Confine(camera.Position, bounds, half);
         var target = World.InteractionTargets(player).FirstOrDefault();
         foreach (var feature in features)
         {
@@ -617,7 +615,6 @@ public partial class Foundation : Node2D
         }
     }
 
-    void PlayCue(string kind) => audio.Call("cue", kind);
     public async void RunVisualChecks()
     {
         try

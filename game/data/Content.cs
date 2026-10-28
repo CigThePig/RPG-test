@@ -23,7 +23,7 @@ public sealed class AbilityDef
     // Omitted geometry preserves the original target-locked SPELL behavior.
     public AttackGeometryDef? Geometry { get; set; }
     public TelegraphDef? Telegraph { get; set; }
-    // Reserved for the PPC action mapping in Part 2; it does not select an animation yet.
+    // Optional PPC action; an omitted or anatomy-incompatible style uses the rig default.
     public string ActionStyle { get; set; } = "";
 }
 
