@@ -28,6 +28,7 @@
     {
       "Id": "fixture_sweep",
       "Name": "Sweeping strike",
+      "VerificationOnly": true,
       "Range": 56,
       "Damage": 9,
       "Cost": 0,

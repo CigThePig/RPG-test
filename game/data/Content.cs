@@ -18,6 +18,8 @@ public sealed class AbilityDef
     public int UnlockCost { get; set; } = 1;
     public bool Self { get; set; }
     public bool RequiresWeapon { get; set; }
+    // Test fixtures are excluded from normal content, including progression UI.
+    public bool VerificationOnly { get; set; }
     // Omitted geometry preserves the original target-locked SPELL behavior.
     public AttackGeometryDef? Geometry { get; set; }
     public TelegraphDef? Telegraph { get; set; }
@@ -98,7 +100,12 @@ public sealed class Content
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
     };
-    public static Content Load() => JsonSerializer.Deserialize<Content>(Godot.FileAccess.GetFileAsString("res://game/data/foundation.json"), Json)!;
+    public static Content Load(bool includeVerification = false)
+    {
+        var content = JsonSerializer.Deserialize<Content>(Godot.FileAccess.GetFileAsString("res://game/data/foundation.json"), Json)!;
+        if (!includeVerification) content.Abilities.RemoveAll(a => a.VerificationOnly);
+        return content;
+    }
     public List<string> Validate(HashSet<string> items)
     {
         var errors = new List<string>();

@@ -240,7 +240,7 @@ public partial class Foundation : Node2D
             Narrative.Call("import_state", "{\"flags\":{},\"pools\":{},\"quests\":{}}");
         }
 
-        World = new(Content.Load(), items)
+        World = new(Content.Load(VerificationMode), items)
         {
             Planner = planner
         };

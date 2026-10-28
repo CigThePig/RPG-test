@@ -24,6 +24,10 @@ public static class CombatTelegraphChecks
         w.Presentation += Observe;
         var bite = w.Content.Abilities.Single(a => a.Id == "bite");
         var sweep = w.Content.Abilities.Single(a => a.Id == "fixture_sweep");
+        var ordinary = Content.Load();
+        check(sweep.VerificationOnly && !ordinary.Abilities.Any(a => a.Id == sweep.Id) &&
+            new[] { "slash", "bite", "ember", "mend", "ward" }.All(id => ordinary.Abilities.Any(a => a.Id == id)),
+            "directional fixture is excluded from ordinary gameplay while existing abilities remain available");
         float originalWindup = bite.Windup;
         try
         {
