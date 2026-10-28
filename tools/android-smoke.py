@@ -227,18 +227,38 @@ try:
     sheet.save(out/'contact-sheet.jpg')
     for f in frames:f.unlink()
     (out/'recording.json').write_text(json.dumps({'captureStartUnix':recording_start,'source':run('git','rev-parse','HEAD',text=True).strip(),'platform':'hosted x86_64 Android emulator','input':'ADB OS touch events','positions':positions,'fps':'screenrecord variable; inspect video PTS','synchronization':'captureStartUnix anchors screenrecord; logcat timestamps and MOSSLIGHT_TOUCH_RELEASE provide coarse input/displacement correlation, not sub-frame latency'},indent=2))
-    adb('shell','input','keyevent','3') # Background triggers save and cancels held input.
-    time.sleep(2)
-    adb('shell','monkey','-p',package,'-c','android.intent.category.LAUNCHER','1')
-    time.sleep(3)
-    capture('resumed-menu.png',wait=15)
-    assert adb('shell','pidof',package),'Application not running after resume'
-    logs=adb('logcat','-d');(out/'logcat.log').write_text(logs)
-    assert 'MOSSLIGHT_INPUT_CANCELLED' in logs,'Background did not cancel gameplay input'
+    # Repeated background/foreground transitions are intentional: an earlier
+    # Part 2 run resumed to a black Android surface despite a live game process,
+    # and a single successful retry cannot exclude an intermittent regression.
+    # Each cycle checks the actual composed framebuffer, not only CPU markers.
+    lifecycle=[]
+    original_pid=adb('shell','pidof',package)
+    assert original_pid,'Application exited before Android lifecycle verification'
+    for cycle in range(3):
+        prior_logs=adb('logcat','-d')
+        prior_cancels=prior_logs.count('MOSSLIGHT_INPUT_CANCELLED')
+        adb('shell','input','keyevent','3') # Background saves and cancels held input.
+        time.sleep(2)
+        adb('shell','monkey','-p',package,'-c','android.intent.category.LAUNCHER','1')
+        ensure_foreground(timeout=30)
+        image_name='resumed-menu.png' if cycle==0 else f'resumed-menu-{cycle+1}.png'
+        capture(image_name,wait=20)
+        resumed_pid=adb('shell','pidof',package)
+        logs=adb('logcat','-d')
+        (out/f'resume-{cycle+1}.log').write_text(
+            f'initial_pid={original_pid} resumed_pid={resumed_pid} '
+            f'cancel_count_before={prior_cancels} cancel_count_after={logs.count("MOSSLIGHT_INPUT_CANCELLED")}\\n')
+        assert resumed_pid==original_pid, f'Android process restarted on resume cycle {cycle+1}'
+        assert logs.count('MOSSLIGHT_INPUT_CANCELLED')>prior_cancels, (
+            f'Background cycle {cycle+1} never canceled gameplay input')
+        lifecycle.append({'cycle':cycle+1,'pid':resumed_pid,'screenshot':image_name,
+            'inputCancelCount':logs.count('MOSSLIGHT_INPUT_CANCELLED')})
+    (out/'lifecycle.json').write_text(json.dumps(lifecycle,indent=2))
+    (out/'logcat.log').write_text(logs)
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, background input cancellation/resume. ARM64 device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three nonblank background/resume cycles with input cancellation and stable process identity. ARM64 device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     # Preserve the real surface recording on failure as well as success. ADB
