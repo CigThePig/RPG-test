@@ -177,8 +177,9 @@ public sealed class GameplayReplay
                 warningEnemy=enemy.Id;
                 enemy.Region=p.Region; enemy.X=p.X+28; enemy.Y=p.Y; enemy.Speed=0;
                 enemy.Health=enemy.MaxHealth=10000; enemy.Invulnerable=0; enemy.Statuses.Clear();
-                enemy.State=ActionState.Idle; enemy.StateRemaining=0; enemy.Cooldowns.Clear(); enemy.Abilities.Clear();
-                enemy.Abilities.Add(s.Id=="telegraph-cone" ? "fixture_sweep" : "bite");
+                // Hold the actor unavailable until the scripted start; otherwise
+                // the ordinary AI can begin the bite before local tick 10.
+                enemy.State=ActionState.Recovery; enemy.StateRemaining=100; enemy.Cooldowns.Clear(); enemy.Abilities.Clear();
                 app.Views[enemy.Id].SnapPosition();
                 app.Views[p.Id].Creature.ClearFacingRequest();
                 app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
@@ -255,6 +256,8 @@ public sealed class GameplayReplay
             string ability=test.Id=="telegraph-cone" ? "fixture_sweep" : "bite";
             if (local==10)
             {
+                enemy.State=ActionState.Idle; enemy.StateRemaining=0; enemy.Mana=enemy.MaxMana;
+                enemy.Cooldowns.Clear(); enemy.Abilities.Add(ability);
                 if(!app.World.Activate(enemy.Id, ability, "player")) throw new InvalidOperationException("Warning fixture could not activate " + ability);
                 enemy.Abilities.Clear(); // prevent autonomous follow-up attacks in this fixture
                 app.Trace.Marker("telegraph/start");

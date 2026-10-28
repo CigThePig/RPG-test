@@ -290,8 +290,13 @@ public sealed class World
 
     public bool Damage(ActorState source, ActorState target, float amount, string type, bool periodic = false, string ability = "")
     {
-        if (!target.Alive || (!periodic && target.Invulnerable > 0) || (!periodic && source.Region != target.Region) || !Hostile(source, target))
+        if (!target.Alive || (!periodic && source.Region != target.Region) || !Hostile(source, target))
             return false;
+        if (!periodic && target.Invulnerable > 0)
+        {
+            Present(CombatPresentationKind.DefensiveAvoidance, source, target.Id, ability, target.Position, "invulnerability");
+            return false;
+        }
         if (!periodic && DodgeImmune(target))
         {
             CombatDiagnostic?.Invoke("direct_hit_dodged", new Vector2(target.ActionDirectionX, target.ActionDirectionY), source.Id);
@@ -454,10 +459,13 @@ public sealed class World
                             var victims = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) &&
                                 CombatGeometry.InCone(a.Position, b.Position, direction, d.Geometry.Range, d.Geometry.HalfAngleDegrees) && LineOfSight(a, b))
                                 .OrderBy(b => b.Id, StringComparer.Ordinal).ToArray();
-                            bool hit = false;
                             foreach (var victim in victims)
-                                hit |= Resolve(a, victim, d, geometryValidated: true);
-                            if (!hit) Present(CombatPresentationKind.Miss, a, a.Target, d.Id, outcome: "miss");
+                            {
+                                var position = victim.Position;
+                                if (!Resolve(a, victim, d, geometryValidated: true))
+                                    Present(CombatPresentationKind.Miss, a, victim.Id, d.Id, position, "miss");
+                            }
+                            if (victims.Length == 0) Present(CombatPresentationKind.Miss, a, a.Target, d.Id, outcome: "miss");
                         }
                         else if (Actors.TryGetValue(a.Target, out var t))
                         {

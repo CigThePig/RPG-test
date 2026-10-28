@@ -11,6 +11,8 @@ public partial class TelegraphView : Node2D
     public World World { get; set; } = null!;
     readonly Vector2[] sector = new Vector2[26];
     readonly Vector2[] outline = new Vector2[27];
+    readonly Vector2[] ring = new Vector2[33];
+    readonly HashSet<string> markedTargets = new();
     public override void _Process(double delta) => QueueRedraw();
 
     public static bool IsActive(World world, ActorState actor, AbilityDef? ability)
@@ -26,6 +28,7 @@ public partial class TelegraphView : Node2D
     public override void _Draw()
     {
         if (World == null || !World.Actors.ContainsKey("player")) return;
+        markedTargets.Clear();
         foreach (var actor in World.Actors.Values)
         {
             if (actor.Id == "player" || actor.State != ActionState.Windup || actor.PendingAbility == "") continue;
@@ -33,7 +36,7 @@ public partial class TelegraphView : Node2D
             if (!IsActive(World, actor, ability)) continue;
             float progress = Math.Clamp(1 - actor.StateRemaining / ability!.Windup, 0, 1);
             if (ability.Telegraph!.Style == "cone") DrawCone(actor, ability.Geometry!, progress);
-            else DrawTarget(actor, World.Actors[actor.Target], progress);
+            else DrawTarget(actor, World.Actors[actor.Target], progress, markedTargets.Add(actor.Target));
         }
     }
 
@@ -60,33 +63,38 @@ public partial class TelegraphView : Node2D
         DrawLine(Project(origin), Project(tip), new Color(1, .92f, .58f, .9f), 2, true);
     }
 
-    void DrawGroundRing(V center, float radius, Color color, float width)
+    void DrawGroundRing(V center, float radius, Color dark, Color bright)
     {
-        Vector2 last = Project(center + new V(radius, 0));
-        for (int i = 1; i <= 32; i++)
+        for (int i = 0; i <= 32; i++)
         {
             float angle = i * MathF.Tau / 32;
-            var next = Project(center + new V(MathF.Cos(angle), MathF.Sin(angle)) * radius);
-            DrawLine(last, next, color, width, true);
-            last = next;
+            ring[i] = Project(center + new V(MathF.Cos(angle), MathF.Sin(angle)) * radius);
         }
+        DrawPolyline(ring, dark, 4, true);
+        DrawPolyline(ring, bright, 2, true);
     }
 
-    void DrawTarget(ActorState actor, ActorState target, float progress)
+    void DrawTarget(ActorState actor, ActorState target, float progress, bool drawTarget)
     {
         var dark = new Color(.15f, .04f, .03f, .9f);
         var bright = new Color(1f, .65f + .2f * progress, .3f, .8f + .2f * progress);
-        DrawGroundRing(actor.Position, actor.Radius + 8, dark, 4);
-        DrawGroundRing(actor.Position, actor.Radius + 8, bright, 2);
-        DrawGroundRing(target.Position, target.Radius + 8, dark, 4);
-        DrawGroundRing(target.Position, target.Radius + 8, bright, 2);
+        DrawGroundRing(actor.Position, actor.Radius + 8, dark, bright);
+        if (drawTarget) DrawGroundRing(target.Position, target.Radius + 8, dark, bright);
         // A dashed tether and tracking marker communicate a designated target,
         // not a static area that can be escaped merely by crossing a line.
         var a = Project(actor.Position); var b = Project(target.Position);
+        // The overhead accent remains readable when close bodies hide the tether.
+        var alert = a + new Vector2(0, -45);
+        DrawCircle(alert, 6, dark);
+        DrawLine(alert + new Vector2(0, -4), alert + new Vector2(0, 1), bright, 2, true);
+        DrawCircle(alert + new Vector2(0, 4), 1.5f, bright);
         for (int i = 0; i < 6; i += 2)
             DrawLine(a.Lerp(b, i / 6f), a.Lerp(b, (i + 1) / 6f), bright, 2, true);
-        float tick = 3 + 5 * progress;
-        DrawLine(b + new Vector2(-tick, 0), b + new Vector2(tick, 0), bright, 2, true);
-        DrawLine(b + new Vector2(0, -tick * .5f), b + new Vector2(0, tick * .5f), bright, 2, true);
+        if (drawTarget)
+        {
+            float tick = 3 + 5 * progress;
+            DrawLine(b + new Vector2(-tick, 0), b + new Vector2(tick, 0), bright, 2, true);
+            DrawLine(b + new Vector2(0, -tick * .5f), b + new Vector2(0, tick * .5f), bright, 2, true);
+        }
     }
 }

@@ -65,7 +65,7 @@ public static class CombatTelegraphChecks
             r.Tiles[20 * r.Width + 21] = Terrain.Rock; Step(boundary); r.Tiles[20 * r.Width + 21] = Terrain.Grass;
             check(p.Health == p.MaxHealth, "target-locked bite respects impact line of sight");
             Reset(); p.Invulnerable = 2; check(w.Activate(enemy.Id, "bite", p.Id), "invulnerability fixture starts"); Step(boundary);
-            check(p.Health == p.MaxHealth, "target-locked bite respects invulnerability");
+            check(p.Health == p.MaxHealth && events.Any(e => e.Kind == CombatPresentationKind.DefensiveAvoidance && e.Outcome == "invulnerability"), "target-locked bite reports invulnerability without damage");
             Reset(); check(w.Activate(enemy.Id, "bite", p.Id), "dodge fixture starts"); Step(boundary - 7);
             check(w.TryStartPlayerDodge(V.UnitX), "dodge starts during incoming bite"); Step(7);
             check(p.Health == p.MaxHealth && events.Any(e => e.Kind == CombatPresentationKind.DefensiveAvoidance && e.AbilityId == "bite"), "authoritative dodge immunity avoids bite");

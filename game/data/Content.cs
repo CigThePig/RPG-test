@@ -124,8 +124,8 @@ public sealed class Content
                 !Nonnegative(a.Windup) || !Nonnegative(a.Recovery) || !Nonnegative(a.ProjectileSpeed) ||
                 !float.IsFinite(a.Damage) || (!string.IsNullOrEmpty(a.Status) && !Statuses.Any(s => s.Id == a.Status)))
                 errors.Add($"ability {a.Id}: invalid timing, cost, damage or status reference");
-            string shape = a.Geometry?.Shape ?? "target";
-            string style = a.Telegraph?.Style ?? "none";
+            string? shape = a.Geometry == null ? "target" : a.Geometry.Shape;
+            string? style = a.Telegraph == null ? "none" : a.Telegraph.Style;
             if (shape is not ("target" or "cone"))
                 errors.Add($"ability {a.Id}: unsupported attack shape '{shape}'");
             if (a.Geometry != null && (!Nonnegative(a.Geometry.Range) || !Nonnegative(a.Geometry.HalfAngleDegrees) ||
@@ -137,7 +137,7 @@ public sealed class Content
             if (style is not ("none" or "target" or "cone") ||
                 (style != "none" && (style != shape || a.Self || a.Damage <= 0 || a.ProjectileSpeed > 0)))
                 errors.Add($"ability {a.Id}: telegraph does not match implemented danger");
-            if (a.ActionStyle != "" && (!Enum.TryParse<PixelCreatures.Core.Anatomy.ActionStyle>(a.ActionStyle, out var actionStyle) || !Enum.IsDefined(actionStyle)))
+            if (a.ActionStyle != "" && (!Enum.TryParse<PixelCreatures.Core.Anatomy.ActionStyle>(a.ActionStyle, out var actionStyle) || !Enum.IsDefined(actionStyle) || actionStyle.ToString() != a.ActionStyle))
                 errors.Add($"ability {a.Id}: unknown procedural action style");
         }
         foreach (var s in Statuses)

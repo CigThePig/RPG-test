@@ -5,6 +5,7 @@ using System.Text.Json;
 namespace Mosslight;
 public static class VisualChecks
 {
+    static object? telegraphPerformance;
     static async System.Threading.Tasks.Task Frames(Foundation app, int count = 12)
     {
         for (int i = 0; i < count; i++)
@@ -135,6 +136,49 @@ public static class VisualChecks
             await Until(app, () => enemy.State != ActionState.Windup, "Dodge fixture did not reach impact");
             if(p.Health != p.MaxHealth) throw new InvalidOperationException("Incoming bite damaged player during dodge immunity");
             await CaptureRollFrame(app, "telegraph-dodge-avoided");
+
+            // Same four visible creatures and camera, first idle and then in
+            // real bite windups. Slow simulation preserves the short warnings
+            // across the comparable wall-clock frame samples.
+            w.Cancel(p); p.X=300; p.Y=300; p.Health=p.MaxHealth; p.Invulnerable=0;
+            var attackers=w.Actors.Values.Where(a=>a.Profile=="beast").Take(4).ToArray();
+            if(attackers.Length!=4) throw new InvalidOperationException("Missing multiple-warning fixture actors");
+            var offsets=new[] { new System.Numerics.Vector2(28,0), new System.Numerics.Vector2(-28,0), new System.Numerics.Vector2(0,28), new System.Numerics.Vector2(0,-28) };
+            for(int i=0;i<attackers.Length;i++)
+            {
+                var a=attackers[i]; w.Cancel(a); a.Region=course.Id; a.X=p.X+offsets[i].X; a.Y=p.Y+offsets[i].Y;
+                a.Health=a.MaxHealth=1000; a.Invulnerable=0; a.Speed=0; a.Statuses.Clear(); a.Cooldowns.Clear();
+                a.Abilities.Clear(); a.State=ActionState.Recovery; a.StateRemaining=100;
+            }
+            Engine.TimeScale=.001;
+            app.RebuildViews(); await Frames(app,30);
+            async System.Threading.Tasks.Task<(double mean, double p95, long memory)> MeasureFrames()
+            {
+                var samples=new List<double>(); var clock=Stopwatch.StartNew(); double last=clock.Elapsed.TotalMilliseconds;
+                for(int i=0;i<90;i++) { await Frames(app,1); double now=clock.Elapsed.TotalMilliseconds; samples.Add(now-last); last=now; }
+                samples.Sort(); return (samples.Average(),samples[(int)(samples.Count*.95)],GC.GetTotalMemory(false));
+            }
+            var baseline=await MeasureFrames();
+            foreach(var a in attackers)
+            {
+                a.State=ActionState.Idle; a.StateRemaining=0; a.Abilities.Add("bite");
+                if(!w.Activate(a.Id,"bite",p.Id)) throw new InvalidOperationException("Multiple-warning activation failed");
+                a.Abilities.Clear();
+            }
+            await Frames(app,10); await CaptureRollFrame(app,"telegraph-multiple");
+            if(attackers.Count(a=>TelegraphView.IsActive(w,a,bite))!=4) throw new InvalidOperationException("Multiple warnings did not remain active");
+            var active=await MeasureFrames();
+            telegraphPerformance=new { renderer=RenderingServer.GetVideoAdapterName(), actors=4, samples=90,
+                idleMeanMs=baseline.mean, idleP95Ms=baseline.p95, windupMeanMs=active.mean, windupP95Ms=active.p95,
+                idleManagedBytes=baseline.memory, windupManagedBytes=active.memory,
+                note="Same visible actors; active sample includes PPC action animation and four warnings. Software-renderer measurement, not a phone benchmark." };
+
+            Reset("bite"); Start("bite");
+            if(!TelegraphView.IsActive(w, enemy, bite)) throw new InvalidOperationException("Reset fixture has no warning");
+            app.Reset();
+            var layers=app.GetChildren().OfType<TelegraphView>().ToArray();
+            if(layers.Length!=1 || !ReferenceEquals(layers[0].World,app.World))
+                throw new InvalidOperationException("World reset retained a stale telegraph layer");
         }
         finally
         {
@@ -386,7 +430,8 @@ public static class VisualChecks
             actors = app.Views.Count,
             visibleActors = app.Views.Values.Count(v => v.Visible),
             totalRasterizations = app.Views.Values.Sum(v => v.Creature.RenderCount),
-            managedBytes = GC.GetTotalMemory(false)
+            managedBytes = GC.GetTotalMemory(false),
+            telegraphPerformance
         };
         File.WriteAllText(app.Ui.MobileLayout ? "docs/render-verification-mobile.json" : "docs/render-verification.json", JsonSerializer.Serialize(data, Content.Json));
         GD.Print("VISUAL CHECKS PASSED");

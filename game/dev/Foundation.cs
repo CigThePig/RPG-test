@@ -83,6 +83,7 @@ public partial class Foundation : Node2D
     public bool CollisionDebug { get; set; }
     public double SimulationMs { get; private set; }
     Node2D ground = null !;
+    TelegraphView? telegraphs;
     double accumulator;
     long lastRuntimeLog;
     Node audio = null !;
@@ -285,7 +286,12 @@ public partial class Foundation : Node2D
         };
         ContentAudit.Validate(World.Content);
         World.NewGame();
-        AddChild(new TelegraphView { World = World, ZIndex = -1 });
+        if (telegraphs == null)
+        {
+            telegraphs = new TelegraphView { World = World, ZIndex = -1 };
+            AddChild(telegraphs);
+        }
+        else telegraphs.World = World;
         RebuildViews();
         drawnRegion = "";
     }
