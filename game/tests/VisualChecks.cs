@@ -342,6 +342,21 @@ public static class VisualChecks
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
+        if (!app.Ui.MobileLayout)
+        {
+            // The dummy audio driver proves resource construction, not how the
+            // cues sound. Publish actual synthesized WAVs as CI artifacts so
+            // human review can compare bite, whiff, impact and death cues.
+            string audioDirectory = ProjectSettings.GlobalizePath("res://docs/audio-samples");
+            app.Audio.Call("export_effects", audioDirectory);
+            foreach (string cue in new[] { "swing", "bite", "whiff", "hit", "heavy_hit",
+                "player_hit", "dodge", "avoid", "release", "projectile_impact", "death" })
+            {
+                var sample = Path.Combine(audioDirectory, cue + ".wav");
+                if (!File.Exists(sample) || new FileInfo(sample).Length < 256)
+                    throw new InvalidOperationException("Missing synthesized combat audio sample: " + cue);
+            }
+        }
         await Capture(app, "menu");
         if (app.Ui.MobileLayout)
         {
