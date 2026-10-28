@@ -108,7 +108,7 @@ public partial class CharacterView : Node2D
     {
         if (cue is "attack" or "cast")
         {
-            if (State.Id == "player" && State.FreeSlash)
+            if (State.FreeSlash || ability?.Geometry?.Shape == "cone")
             {
                 var ground = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
                 Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(ground.X, ground.Y));
@@ -142,6 +142,24 @@ public partial class CharacterView : Node2D
             if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
             Creature.TriggerHit(target == null ? Vector2.Left : new Vector2(target.X - State.X, target.Y - State.Y).Normalized());
             attackDuration = 0;
+        }
+    }
+
+    // Reconstructed views derive facing from the same state as the warning. A
+    // target-locked strike tracks its target; a cone keeps its committed yaw.
+    public void SyncCombatFacing(World world)
+    {
+        if (State.State != ActionState.Windup || State.PendingAbility == "") return;
+        var ability = world.FindAbility(State.PendingAbility);
+        if (State.FreeSlash || ability?.Geometry?.Shape == "cone")
+        {
+            if (CombatGeometry.TryNormalize(new System.Numerics.Vector2(State.ActionDirectionX, State.ActionDirectionY), out var direction))
+                Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(direction.X, direction.Y));
+        }
+        else if (world.Actors.TryGetValue(State.Target, out var target) && target.Region == State.Region && target.Id != State.Id)
+        {
+            var delta = target.Position - State.Position;
+            if (delta.LengthSquared() > .001f) Creature.FaceYaw(PixelCamera.GroundVelocityToYaw(delta.X, delta.Y));
         }
     }
 

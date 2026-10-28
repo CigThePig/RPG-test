@@ -73,6 +73,8 @@ public sealed class ActorState : ISpellCaster, ISpellTarget
     public Dictionary<string, float> Relationships { get; set; } = new();
     public string Target { get; set; } = "";
     public string PendingAbility { get; set; } = "";
+    // Optional schema-1 field: identifies the action after impact until recovery ends.
+    public string RecoveryAbility { get; set; } = "";
     // Optional schema-1 fields. The locked direction belongs to the authoritative action.
     public bool FreeSlash { get; set; }
     public float ActionElapsed { get; set; }

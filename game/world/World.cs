@@ -25,11 +25,16 @@ public sealed class World
     public SpellsContext Spells { get; private set; } = new();
 
     readonly Dictionary<string, Spell> spells = new();
+    readonly Dictionary<string, AbilityDef> abilityDefinitions = new();
+    public AbilityDef? FindAbility(string id) => abilityDefinitions.GetValueOrDefault(id);
     public Godot.Node? Planner { get; set; }
 
-    public event Action<string, string, string>? Presentation;
+    public event Action<CombatPresentationEvent>? Presentation;
     // Separate from narrative events: opt-in, bounded by the existing trace writer.
     public event Action<string, Vector2, string>? CombatDiagnostic;
+    void Present(CombatPresentationKind kind, ActorState actor, string target = "", string ability = "", Vector2? position = null, string outcome = "") =>
+        Presentation?.Invoke(new(kind, actor.Id, target, ability, Tick, actor.Position, position ?? actor.Position,
+            new Vector2(actor.ActionDirectionX, actor.ActionDirectionY), outcome));
     public World(Content content, Godot.Node itemService, int seed = 42)
     {
         Content = content;
@@ -42,8 +47,12 @@ public sealed class World
     {
         Spells = new();
         spells.Clear();
+        abilityDefinitions.Clear();
         foreach (var d in Content.Abilities)
+        {
             spells[d.Id] = new Spell(new RpgAbility(this, d));
+            abilityDefinitions[d.Id] = d;
+        }
     }
 
     public float Stat(ActorState actor, string stat)
@@ -69,7 +78,7 @@ public sealed class World
     }
 
     public bool Hostile(ActorState a, ActorState b) => a.Id != b.Id && (Content.Factions.GetValueOrDefault(a.Faction + ":" + b.Faction) + a.Reputation.GetValueOrDefault(b.Faction)) < 0;
-    public bool CanActivate(ActorState a, ActorState b, AbilityDef d) => a.Alive && b.Alive && a.Region == b.Region && a.Abilities.Contains(d.Id) && a.State is ActionState.Idle or ActionState.Moving && a.Mana >= d.Cost && a.Cooldowns.GetValueOrDefault(d.Id) <= 0 && (!d.RequiresWeapon || (a.Grasps && Items.Bonus(a, "damage") > 0)) && (d.Self ? a == b : Hostile(a, b)) && (d.Self || Vector2.Distance(a.Position, b.Position) <= d.Range + a.NaturalReach) && LineOfSight(a, b);
+    public bool CanActivate(ActorState a, ActorState b, AbilityDef d) => a.Alive && b.Alive && a.Region == b.Region && a.Abilities.Contains(d.Id) && a.State is ActionState.Idle or ActionState.Moving && a.Mana >= d.Cost && a.Cooldowns.GetValueOrDefault(d.Id) <= 0 && (!d.RequiresWeapon || (a.Grasps && Items.Bonus(a, "damage") > 0)) && (d.Self ? a == b : Hostile(a, b)) && (d.Self || Vector2.Distance(a.Position, b.Position) <= d.Range + a.NaturalReach) && (d.Geometry?.Shape != "cone" || CombatGeometry.TryNormalize(b.Position - a.Position, out _)) && LineOfSight(a, b);
     public bool Activate(string id, string ability, string target)
     {
         if (!Actors.TryGetValue(id, out var actor) || !Actors.TryGetValue(target, out var victim) || !spells.TryGetValue(ability, out var spell))
@@ -154,6 +163,7 @@ public sealed class World
         a.State = ActionState.Windup;
         a.StateRemaining = d.Windup;
         a.PendingAbility = d.Id;
+        a.RecoveryAbility = "";
         a.Target = "";
         a.FreeSlash = true;
         a.ActionElapsed = 0;
@@ -161,7 +171,8 @@ public sealed class World
         // during the windup or change the authoritative 110-degree impact arc.
         Vector2 strike = SoftAimPlayerSlash(a, d, facing);
         a.ActionDirectionX = strike.X; a.ActionDirectionY = strike.Y;
-        Presentation?.Invoke(a.Id, "attack", "");
+        Present(CombatPresentationKind.AttackStarted, a, ability: d.Id);
+        Present(CombatPresentationKind.AttackCommitted, a, ability: d.Id);
         Events.Publish(new("ability_started", a.Id, "", d.Id));
         CombatDiagnostic?.Invoke("attack_started", strike, "slash");
         return true;
@@ -180,7 +191,7 @@ public sealed class World
         a.StateRemaining = CombatTuning.DodgeDuration;
         a.Cooldowns["dodge"] = CombatTuning.DodgeCooldown;
         ClearPlayerMotion();
-        Presentation?.Invoke(a.Id, "dodge", "");
+        Present(CombatPresentationKind.DodgeStarted, a, ability: "dodge");
         CombatDiagnostic?.Invoke("dodge_started", facing, "dodge");
         return true;
     }
@@ -247,8 +258,15 @@ public sealed class World
         a.State = ActionState.Windup;
         a.StateRemaining = d.Windup;
         a.PendingAbility = d.Id;
+        a.RecoveryAbility = "";
         a.Target = b.Id;
-        Presentation?.Invoke(a.Id, d.Damage < 0 ? "cast" : "attack", b.Id);
+        a.FreeSlash = false;
+        a.ActionElapsed = 0;
+        if (d.Geometry?.Shape == "cone" && CombatGeometry.TryNormalize(b.Position - a.Position, out var direction))
+        { a.ActionDirectionX = direction.X; a.ActionDirectionY = direction.Y; }
+        else a.ActionDirectionX = a.ActionDirectionY = 0;
+        Present(CombatPresentationKind.AttackStarted, a, b.Id, d.Id, b.Position);
+        Present(CombatPresentationKind.AttackCommitted, a, b.Id, d.Id, b.Position);
         Events.Publish(new("ability_started", a.Id, b.Id, d.Id));
     }
 
@@ -257,9 +275,12 @@ public sealed class World
         if (a.State == ActionState.Dodging)
         {
             CombatDiagnostic?.Invoke("dodge_interrupted", new Vector2(a.ActionDirectionX, a.ActionDirectionY), "cancel");
-            Presentation?.Invoke(a.Id, "dodge_cancel", "");
+            Present(CombatPresentationKind.DodgeCanceled, a, ability: "dodge");
         }
+        if (a.State == ActionState.Windup && a.PendingAbility != "")
+            Present(CombatPresentationKind.AttackCanceled, a, a.Target, a.PendingAbility);
         a.PendingAbility = "";
+        a.RecoveryAbility = "";
         a.FreeSlash = false;
         a.ActionElapsed = 0;
         a.ActionDirectionX = a.ActionDirectionY = 0;
@@ -267,15 +288,17 @@ public sealed class World
         a.StateRemaining = 0;
     }
 
-    public bool Damage(ActorState source, ActorState target, float amount, string type, bool periodic = false)
+    public bool Damage(ActorState source, ActorState target, float amount, string type, bool periodic = false, string ability = "")
     {
         if (!target.Alive || (!periodic && target.Invulnerable > 0) || (!periodic && source.Region != target.Region) || !Hostile(source, target))
             return false;
         if (!periodic && DodgeImmune(target))
         {
             CombatDiagnostic?.Invoke("direct_hit_dodged", new Vector2(target.ActionDirectionX, target.ActionDirectionY), source.Id);
+            Present(CombatPresentationKind.DefensiveAvoidance, source, target.Id, ability, target.Position, "dodge");
             return false;
         }
+        var impactPosition = target.Position;
         float resistance = type == "physical" ? Stat(target, "defence") : 0;
         float actual = Math.Max(1, amount - resistance);
         target.Health = Math.Max(0, target.Health - actual);
@@ -286,7 +309,7 @@ public sealed class World
         var away = target.Position - source.Position;
         if (!periodic && away.LengthSquared() > 0)
             Move(target, Vector2.Normalize(away) * 15);
-        Presentation?.Invoke(target.Id, "hit", source.Id);
+        Present(CombatPresentationKind.Hit, source, target.Id, ability, impactPosition, periodic ? "periodic" : "hit");
         Events.Publish(new("damage", source.Id, target.Id, type, (int)actual));
         target.Knowledge[source.Id] = "attacker";
         target.Relationships[source.Id] = target.Relationships.GetValueOrDefault(source.Id) - actual;
@@ -294,7 +317,7 @@ public sealed class World
         {
             Items.Service.Call("unequip_all", target.Id);
             target.PendingAbility = "";
-            Presentation?.Invoke(target.Id, "dead", source.Id);
+            Present(CombatPresentationKind.Death, source, target.Id, ability, impactPosition);
             Events.Publish(new("defeated", source.Id, target.Id, target.Profile));
             Progression.Award(this, source, 25);
             var random = new Random(unchecked(Seed + (int)Tick + StableId(target.Id)));
@@ -337,7 +360,7 @@ public sealed class World
         }
     }
 
-    bool Resolve(ActorState a, ActorState b, AbilityDef d, bool projectile = false)
+    bool Resolve(ActorState a, ActorState b, AbilityDef d, bool projectile = false, bool geometryValidated = false)
     {
         if (!a.Alive || !b.Alive || a.Region != b.Region)
             return false;
@@ -351,10 +374,10 @@ public sealed class World
             return true;
         }
 
-        if (!projectile && (Vector2.Distance(a.Position, b.Position) > d.Range + a.NaturalReach + 8 || !LineOfSight(a, b)))
+        if (!projectile && !geometryValidated && (Vector2.Distance(a.Position, b.Position) > d.Range + a.NaturalReach + 8 || !LineOfSight(a, b)))
             return false;
         // Intentionally non-damaging hostile effects retain their status-only behavior.
-        bool connected = d.Damage <= 0 ? Hostile(a, b) && !DodgeImmune(b) : Damage(a, b, d.Damage + Stat(a, "strength") + Stat(a, d.Type == "physical" ? "damage" : "power"), d.Type);
+        bool connected = d.Damage <= 0 ? Hostile(a, b) && !DodgeImmune(b) : Damage(a, b, d.Damage + Stat(a, "strength") + Stat(a, d.Type == "physical" ? "damage" : "power"), d.Type, ability: d.Id);
         if (connected && b.Alive && d.Status != "")
             ApplyStatus(b, d.Status, a.Id);
         return connected;
@@ -405,7 +428,9 @@ public sealed class World
                 a.ActionElapsed = 0;
                 a.ActionDirectionX = a.ActionDirectionY = 0;
             }
-            if (a.State != ActionState.Dodging && a.StateRemaining > 0)
+            // A zero-duration windup/recovery still crosses its boundary exactly once
+            // on the next simulation step; presentation never adds a delay.
+            if (a.State != ActionState.Dodging && (a.StateRemaining > 0 || a.State is ActionState.Windup or ActionState.Recovery))
             {
                 a.StateRemaining -= dt;
                 if (a.StateRemaining <= 0)
@@ -415,28 +440,58 @@ public sealed class World
                         var d = Content.Abilities.Single(x => x.Id == a.PendingAbility);
                         if (a.Id == "player" && a.FreeSlash && d.Id == "slash")
                         {
+                            Present(CombatPresentationKind.AttackImpact, a, ability: d.Id);
                             var target = PlayerSlashTarget(a, d);
                             bool hit = target != null && Resolve(a, target, d);
+                            if (!hit) Present(CombatPresentationKind.Miss, a, target?.Id ?? "", d.Id, target?.Position, "miss");
                             CombatDiagnostic?.Invoke("attack_impact", new Vector2(a.ActionDirectionX, a.ActionDirectionY), hit ? "hit/" + target!.Id : "miss");
+                        }
+                        else if (d.Geometry?.Shape == "cone")
+                        {
+                            Present(CombatPresentationKind.AttackImpact, a, a.Target, d.Id);
+                            var direction = new Vector2(a.ActionDirectionX, a.ActionDirectionY);
+                            // Stable IDs define the order independently of dictionary insertion.
+                            var victims = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) &&
+                                CombatGeometry.InCone(a.Position, b.Position, direction, d.Geometry.Range, d.Geometry.HalfAngleDegrees) && LineOfSight(a, b))
+                                .OrderBy(b => b.Id, StringComparer.Ordinal).ToArray();
+                            bool hit = false;
+                            foreach (var victim in victims)
+                                hit |= Resolve(a, victim, d, geometryValidated: true);
+                            if (!hit) Present(CombatPresentationKind.Miss, a, a.Target, d.Id, outcome: "miss");
                         }
                         else if (Actors.TryGetValue(a.Target, out var t))
                         {
                             if (d.ProjectileSpeed > 0)
+                            {
                                 Projectiles.Add(new() { Source = a.Id, Target = t.Id, Ability = d.Id, X = a.X, Y = a.Y });
+                                Present(CombatPresentationKind.ProjectileReleased, a, t.Id, d.Id, a.Position);
+                            }
                             else
-                                Resolve(a, t, d);
+                            {
+                                Present(CombatPresentationKind.AttackImpact, a, t.Id, d.Id, t.Position);
+                                if (!Resolve(a, t, d)) Present(CombatPresentationKind.Miss, a, t.Id, d.Id, t.Position, "miss");
+                            }
+                        }
+                        else if (d.ProjectileSpeed <= 0)
+                        {
+                            Present(CombatPresentationKind.AttackImpact, a, a.Target, d.Id);
+                            Present(CombatPresentationKind.Miss, a, a.Target, d.Id, outcome: "target unavailable");
                         }
 
                         a.PendingAbility = "";
+                        a.RecoveryAbility = d.Id;
                         a.State = ActionState.Recovery;
                         a.StateRemaining = d.Recovery;
                     }
                     else
                     {
                         if (a.FreeSlash) CombatDiagnostic?.Invoke("attack_completed", new Vector2(a.ActionDirectionX, a.ActionDirectionY), "slash");
+                        if (a.State == ActionState.Recovery && a.RecoveryAbility != "")
+                            Present(CombatPresentationKind.ActionCompleted, a, a.Target, a.RecoveryAbility);
                         a.State = ActionState.Idle;
                         a.FreeSlash = false;
                         a.ActionElapsed = 0;
+                        a.RecoveryAbility = "";
                     }
                 }
             }
@@ -476,7 +531,9 @@ public sealed class World
             float distance = d.ProjectileSpeed * dt;
             if (delta.Length() <= distance + b.Radius)
             {
-                Resolve(a, b, d, projectile: true);
+                Present(CombatPresentationKind.ProjectileImpact, a, b.Id, d.Id, at);
+                if (!Resolve(a, b, d, projectile: true))
+                    Present(CombatPresentationKind.Miss, a, b.Id, d.Id, at, "miss");
                 Projectiles.Remove(p);
                 continue;
             }

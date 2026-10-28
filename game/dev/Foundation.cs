@@ -260,12 +260,24 @@ public partial class Foundation : Node2D
             if (OS.HasFeature("android") && (kind is "attack_started" or "attack_completed" or "dodge_started" or "dodge_completed"))
                 GD.Print($"MOSSLIGHT_COMBAT kind={kind} tick={World.Tick}");
         };
-        World.Presentation += (id, cue, targetId) =>
+        World.Presentation += e =>
         {
+            string id = e.Kind is CombatPresentationKind.Hit or CombatPresentationKind.Death ? e.TargetId : e.ActorId;
+            string other = e.Kind is CombatPresentationKind.Hit or CombatPresentationKind.Death ? e.ActorId : e.TargetId;
+            string cue = e.Kind switch
+            {
+                CombatPresentationKind.AttackStarted => World.Content.Abilities.Find(a => a.Id == e.AbilityId)?.Damage < 0 ? "cast" : "attack",
+                CombatPresentationKind.DodgeStarted => "dodge",
+                CombatPresentationKind.DodgeCanceled => "dodge_cancel",
+                CombatPresentationKind.Hit => "hit",
+                CombatPresentationKind.Death => "dead",
+                _ => ""
+            };
+            if (cue == "") return;
             if (Views.TryGetValue(id, out var view))
             {
-                World.Actors.TryGetValue(targetId ?? "", out var target);
-                var ability = World.Content.Abilities.FirstOrDefault(a => a.Id == view.State.PendingAbility);
+                World.Actors.TryGetValue(other, out var target);
+                var ability = World.Content.Abilities.Find(a => a.Id == e.AbilityId);
                 view.Cue(cue, target, ability);
             }
             if (cue is "hit" or "cast")
@@ -273,6 +285,7 @@ public partial class Foundation : Node2D
         };
         ContentAudit.Validate(World.Content);
         World.NewGame();
+        AddChild(new TelegraphView { World = World, ZIndex = -1 });
         RebuildViews();
         drawnRegion = "";
     }
@@ -355,6 +368,7 @@ public partial class Foundation : Node2D
             view.Visible = World.Actors[id].Region == player.Region;
             view.Creature.Paused = !view.Visible || GameplayBlocked;
             view.HasLoot = !view.State.Alive && World.Items.HasLoot(id);
+            view.SyncCombatFacing(World);
             view.Sync((float)delta);
         }
 
