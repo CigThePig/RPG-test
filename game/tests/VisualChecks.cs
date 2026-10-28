@@ -20,6 +20,15 @@ public static class VisualChecks
         image.SavePng("docs/native-screenshots/" + (app.Ui.MobileLayout ? "mobile-" : "") + name + ".png");
     }
 
+    // No 12-frame pre-roll: capture the actual effect phases at gameplay zoom.
+    static async System.Threading.Tasks.Task CaptureRollFrame(Foundation app, string name)
+    {
+        await app.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        var image = app.GetViewport().GetTexture().GetImage();
+        Directory.CreateDirectory("docs/native-screenshots");
+        image.SavePng("docs/native-screenshots/" + (app.Ui.MobileLayout ? "mobile-" : "") + name + ".png");
+    }
+
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
@@ -153,6 +162,25 @@ public static class VisualChecks
         if (app.World.Player.X <= before)
             throw new InvalidOperationException("Visual movement input did not move player");
         await Capture(app, "exploration");
+        // Document takeoff, travel, landing and lingering dust at normal camera
+        // zoom. Previously 'Active' tests passed even when pixels were invisible.
+        var dustSnapshot = Persistence.Capture(app.World, app.Narrative);
+        try
+        {
+            app.World.Player.Cooldowns.Clear();
+            if (!app.World.TryStartPlayerDodge(new System.Numerics.Vector2(1, 0)))
+                throw new InvalidOperationException("Visual roll dust check could not start dodge");
+            await Frames(app, 3); await CaptureRollFrame(app, "roll-dust-takeoff");
+            await Frames(app, 8); await CaptureRollFrame(app, "roll-dust-trail");
+            await Frames(app, 14); await CaptureRollFrame(app, "roll-dust-landing");
+            await Frames(app, 12); await CaptureRollFrame(app, "roll-dust-linger");
+        }
+        finally
+        {
+            Persistence.Restore(app.World, app.Narrative, dustSnapshot);
+            app.RebuildViews();
+            await Frames(app, 2);
+        }
         var player=app.World.Player;
         var region=app.World.RegionsById[player.Region];
         int chest=region.Features.Single(x=>x.Value=="chest").Key;

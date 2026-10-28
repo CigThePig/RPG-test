@@ -164,16 +164,31 @@ public static class MovementChecks
             check(Math.Abs(DMath.WrapAngle(viewMotor.Yaw-.37))<.001 && view.Creature.MoveVelocity==Vector2.Zero, "lunge holds the captured visual yaw without locomotion velocity");
             w.Cancel(p); p.Cooldowns.Clear();
             check(w.TryStartPlayerDodge(V.UnitY), "view fixture starts dodge perpendicular to facing");
+            Vector2? anchoredPuff = null;
             for(int i=0;i<24;i++)
             {
                 w.Step(1f/60); view.Sync(1f/60);
                 viewMotor.SetWorldPosition(new Vec3(p.X,0,p.Y),new Vec3(view.Creature.MoveVelocity.X,0,view.Creature.MoveVelocity.Y));
                 viewMotor.Step(1.0/60);
-                if(i==8) check(view.RollDust is { Active:true, Surface:Terrain.Grass }
-                    && view.RollDust.Progress > 0, "player-only terrain dust follows dodge progress");
+                if(i==4)
+                {
+                    anchoredPuff = view.RollDust?.OldestPuffScreenPosition;
+                    check(view.RollDust is { Active:true, IsRolling:true, Surface:Terrain.Grass }
+                        && view.RollDust.PuffCount >= 7 && anchoredPuff.HasValue,
+                        "takeoff dust generates a visible cluster in the terrain palette");
+                }
+                if(i==13)
+                    check(view.RollDust is { Active:true, IsRolling:true }
+                        && view.RollDust.PuffCount >= 13
+                        && view.RollDust.OldestPuffScreenPosition == anchoredPuff,
+                        "the trail grows while earlier clouds remain world-anchored");
             }
-            check(view.RollDust is { Active:false }, "dodge dust clears when action ends");
+            check(view.RollDust is { Active:true, IsRolling:false, HasLandingCloud:true }
+                && view.RollDust.PuffCount > 8, "landing cloud survives the 0.4-second roll");
             check(Math.Abs(DMath.WrapAngle(viewMotor.Yaw-.37))<.001 && view.Creature.MoveVelocity==Vector2.Zero, "dodge and its final increment do not create a velocity-facing turn");
+            for(int i=0;i<50;i++) view.Sync(1f/60);
+            check(view.RollDust is { Active:false, IsRolling:false, PuffCount:0 },
+                "dust dissipates completely and stops rendering after a bounded lifetime");
             view.Creature.ClearFacingRequest();
             viewMotor.Teleport(new Vec3(p.X,0,p.Y),0);
             p.State=ActionState.Staggered;p.X-=15;view.Cue("hit");view.Sync(1f/60);

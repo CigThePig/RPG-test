@@ -33,7 +33,7 @@ public partial class CharacterView : Node2D
             CullOffscreen = true
         };
         AddChild(Creature);
-        // Render over the PPC artwork, but never modify its rig or world state.
+        // Render with the player without modifying PPC bones or world state.
         if (actor.Id == "player")
         {
             RollDust = new RollDustOverlay();
@@ -50,7 +50,7 @@ public partial class CharacterView : Node2D
         Sync(1f / 60);
     }
 
-    public void SnapPosition() { previous=new Vector2(State.X,State.Y); Creature.Teleport(previous); Creature.MoveVelocity=Vector2.Zero; }
+    public void SnapPosition() { previous=new Vector2(State.X,State.Y); Creature.Teleport(previous); Creature.MoveVelocity=Vector2.Zero; RollDust?.Reset(); }
 
     public void Equipment(string json)
     {
@@ -92,17 +92,12 @@ public partial class CharacterView : Node2D
         Creature.GroundPosition = now;
         previous = now;
         previousWasDodging = State.State == ActionState.Dodging;
-        if (RollDust != null)
-        {
-            if (State.State == ActionState.Dodging)
-            {
-                var ground = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
-                var projected = GodotConvert.GroundToScreen(ground.X, ground.Y).Normalized();
-                RollDust.SetRoll(State.ActionElapsed / CombatTuning.DodgeDuration,
-                    projected, GroundTerrain?.Invoke(State) ?? Terrain.Grass);
-            }
-            else RollDust.EndRoll();
-        }
+        // The dust's own lifetime survives the action transition, and each
+        // emitted puff stays at its original ground location as the actor moves.
+        RollDust?.Advance(dt, State.State == ActionState.Dodging,
+            State.ActionElapsed / CombatTuning.DodgeDuration, now,
+            new Vector2(State.ActionDirectionX, State.ActionDirectionY),
+            GroundTerrain?.Invoke(State) ?? Terrain.Grass);
         Position = GodotConvert.GroundToScreen(State.X, State.Y);
         Creature.Resting = State.Activity == "rest" || !State.Alive;
         Modulate = State.Alive ? Colors.White : new Color(.45f, .4f, .4f, .6f);
