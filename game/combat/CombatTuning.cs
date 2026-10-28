@@ -3,6 +3,10 @@ namespace Mosslight;
 public static class CombatTuning
 {
     public const float SlashArcHalfDegrees = 55f;
+    // Gentle directional magnetism, not auto-targeting or a guaranteed hit.
+    public const float SlashAssistHalfDegrees = 65f;
+    public const float SlashAssistMaximumDegrees = 15f;
+    public const float SlashAssistStrength = .85f;
     public const float SlashImpactTolerance = 8f;
     public const float SlashLungeDistance = 12f;
     public const float SlashLungeStart = .08f;

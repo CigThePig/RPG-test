@@ -52,6 +52,25 @@ public static class CombatChecks
                 enemy.Region = r.Id; enemy.Health = enemy.MaxHealth = 1000; enemy.Invulnerable = 0;
                 enemy.State = ActionState.Recovery; enemy.StateRemaining = 100; enemy.MotionX = enemy.MotionY = 0;
             }
+            // Soft assist captures a small, signed correction at initiation.
+            ResetFight(); enemy.X = 535; enemy.Y = 535;
+            check(w.TryStartPlayerSlash(V.UnitX), "soft aim starts toward nearby off-axis enemy");
+            float assisted = MathF.Atan2(p.ActionDirectionY, p.ActionDirectionX);
+            check(assisted > 0 && assisted <= CombatTuning.SlashAssistMaximumDegrees * MathF.PI / 180f + .00001f,
+                "soft aim pulls toward enemy without snapping");
+            enemy.X = 500; enemy.Y = 570;
+            for (int i = 0; i < 9; i++) w.Step(Dt);
+            check(Math.Abs(MathF.Atan2(p.ActionDirectionY, p.ActionDirectionX) - assisted) < .00001f
+                && p.Y > 500, "locked assisted direction owns lunge even if enemy moves");
+            ResetFight(); enemy.X = 535; enemy.Y = 465;
+            check(w.TryStartPlayerSlash(V.UnitX) && p.ActionDirectionY < 0,
+                "soft aim bends in the other direction");
+            ResetFight(); enemy.X = 510; enemy.Y = 540;
+            check(w.TryStartPlayerSlash(V.UnitX) && Math.Abs(p.ActionDirectionY) < .000001f,
+                "enemy outside assist cone cannot redirect slash");
+            ResetFight(); enemy.X = 470; enemy.Y = 500;
+            check(w.TryStartPlayerSlash(V.UnitX) && Math.Abs(p.ActionDirectionY) < .000001f,
+                "enemy behind player cannot redirect slash");
             ResetFight(); enemy.X = 700; enemy.Y = 500;
             w.TryStartPlayerSlash(V.UnitX);
             for (int i = 0; i < 8; i++) w.Step(Dt);

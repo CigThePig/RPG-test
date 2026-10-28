@@ -36,6 +36,13 @@ public partial class Foundation : Node2D
         view.PreferMeasuredExternalVelocity=Feel.Id!="baseline";
         view.Creature.UseMeasuredExternalVelocity=view.PreferMeasuredExternalVelocity;
         view.Creature.AnimationFps=view.State.Id=="player" && Feel.Id!="baseline" ? 20 : 10;
+        if (view.State.Id == "player")
+            view.GroundTerrain = actor =>
+            {
+                if (!World.RegionsById.TryGetValue(actor.Region, out var region)) return Terrain.Grass;
+                int index = region.Index(actor.Position);
+                return index >= 0 && index < region.Tiles.Length ? region.Tiles[index] : Terrain.Grass;
+            };
     }
     public override void _Process(double delta) => Trace?.Frame(delta);
     public override void _ExitTree() => Trace?.Dispose();

@@ -11,6 +11,8 @@ public partial class CharacterView : Node2D
 
     public bool HasLoot { get; set; }
     public bool PreferMeasuredExternalVelocity { get; set; } = true;
+    public Func<ActorState, Terrain>? GroundTerrain { get; set; }
+    public RollDustOverlay? RollDust { get; private set; }
     Vector2 previous;
     float attackTime, attackDuration, impactTime;
     Vector2 attackDirection = Vector2.Right;
@@ -31,6 +33,12 @@ public partial class CharacterView : Node2D
             CullOffscreen = true
         };
         AddChild(Creature);
+        // Render over the PPC artwork, but never modify its rig or world state.
+        if (actor.Id == "player")
+        {
+            RollDust = new RollDustOverlay();
+            AddChild(RollDust);
+        }
         var result = actor.Appearance.GenomeJson == "" ? null : CreatureRuntime.Serializer.Deserialize(actor.Appearance.GenomeJson);
         if (result != null && !result.Ok)
             throw new InvalidDataException(result.Describe());
@@ -84,6 +92,17 @@ public partial class CharacterView : Node2D
         Creature.GroundPosition = now;
         previous = now;
         previousWasDodging = State.State == ActionState.Dodging;
+        if (RollDust != null)
+        {
+            if (State.State == ActionState.Dodging)
+            {
+                var ground = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
+                var projected = GodotConvert.GroundToScreen(ground.X, ground.Y).Normalized();
+                RollDust.SetRoll(State.ActionElapsed / CombatTuning.DodgeDuration,
+                    projected, GroundTerrain?.Invoke(State) ?? Terrain.Grass);
+            }
+            else RollDust.EndRoll();
+        }
         Position = GodotConvert.GroundToScreen(State.X, State.Y);
         Creature.Resting = State.Activity == "rest" || !State.Alive;
         Modulate = State.Alive ? Colors.White : new Color(.45f, .4f, .4f, .6f);

@@ -88,6 +88,57 @@ public sealed class World
         return true;
     }
 
+    // Only steer a few degrees toward an already nearby, visible hostile. Never
+    // acquire behind the player, snap directly to a target, or change an attack
+    // once it starts. The returned vector owns lunge, artwork and impact arc.
+    Vector2 SoftAimPlayerSlash(ActorState attacker, AbilityDef ability, Vector2 facing)
+    {
+        float radius = ability.Range + attacker.NaturalReach + CombatTuning.SlashImpactTolerance
+            + CombatTuning.SlashLungeDistance;
+        float radiusSquared = radius * radius;
+        float cone = CombatTuning.SlashAssistHalfDegrees * MathF.PI / 180f;
+        float minimumDot = MathF.Cos(cone);
+        ActorState? best = null;
+        float bestScore = float.PositiveInfinity;
+        float bestAngle = 0;
+        float bestDistance = 0;
+        foreach (var candidate in Actors.Values)
+        {
+            if (!candidate.Alive || candidate.Id == attacker.Id || candidate.Region != attacker.Region
+                || !Hostile(attacker, candidate) || candidate.Invulnerable > 0 || DodgeImmune(candidate))
+                continue;
+            Vector2 offset = candidate.Position - attacker.Position;
+            float squared = offset.LengthSquared();
+            if (squared <= .000001f || squared > radiusSquared) continue;
+            float distance = MathF.Sqrt(squared);
+            Vector2 toward = offset / distance;
+            float dot = Vector2.Dot(facing, toward);
+            if (dot < minimumDot || !LineOfSight(attacker, candidate)) continue;
+            float cross = facing.X * toward.Y - facing.Y * toward.X;
+            float angle = MathF.Atan2(cross, dot);
+            // Prioritize what the player already faces, breaking near-equal
+            // scores by ordinal actor ID regardless of dictionary enumeration.
+            float score = MathF.Abs(angle) / cone + .25f * distance / radius;
+            if (score < bestScore - .000001f ||
+                (MathF.Abs(score - bestScore) <= .000001f && best != null &&
+                 StringComparer.Ordinal.Compare(candidate.Id, best.Id) < 0))
+            {
+                best = candidate;
+                bestScore = score;
+                bestAngle = angle;
+                bestDistance = distance;
+            }
+        }
+        if (best == null) return facing;
+        float angularFalloff = 1f - .55f * MathF.Abs(bestAngle) / cone;
+        float distanceFalloff = 1f - .25f * bestDistance / radius;
+        float maximum = CombatTuning.SlashAssistMaximumDegrees * MathF.PI / 180f;
+        float correction = Math.Clamp(bestAngle * CombatTuning.SlashAssistStrength *
+            angularFalloff * distanceFalloff, -maximum, maximum);
+        float c = MathF.Cos(correction), s = MathF.Sin(correction);
+        return new Vector2(facing.X * c - facing.Y * s, facing.X * s + facing.Y * c);
+    }
+
     /// <summary>Starts only the player sword swing; target selection occurs at impact.</summary>
     public bool TryStartPlayerSlash(Vector2 direction)
     {
@@ -106,10 +157,13 @@ public sealed class World
         a.Target = "";
         a.FreeSlash = true;
         a.ActionElapsed = 0;
-        a.ActionDirectionX = facing.X; a.ActionDirectionY = facing.Y;
+        // Assist once before presentation; do not steer toward target movement
+        // during the windup or change the authoritative 110-degree impact arc.
+        Vector2 strike = SoftAimPlayerSlash(a, d, facing);
+        a.ActionDirectionX = strike.X; a.ActionDirectionY = strike.Y;
         Presentation?.Invoke(a.Id, "attack", "");
         Events.Publish(new("ability_started", a.Id, "", d.Id));
-        CombatDiagnostic?.Invoke("attack_started", facing, "slash");
+        CombatDiagnostic?.Invoke("attack_started", strike, "slash");
         return true;
     }
 

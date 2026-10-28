@@ -169,7 +169,10 @@ public static class MovementChecks
                 w.Step(1f/60); view.Sync(1f/60);
                 viewMotor.SetWorldPosition(new Vec3(p.X,0,p.Y),new Vec3(view.Creature.MoveVelocity.X,0,view.Creature.MoveVelocity.Y));
                 viewMotor.Step(1.0/60);
+                if(i==8) check(view.RollDust is { Active:true, Surface:Terrain.Grass }
+                    && view.RollDust.Progress > 0, "player-only terrain dust follows dodge progress");
             }
+            check(view.RollDust is { Active:false }, "dodge dust clears when action ends");
             check(Math.Abs(DMath.WrapAngle(viewMotor.Yaw-.37))<.001 && view.Creature.MoveVelocity==Vector2.Zero, "dodge and its final increment do not create a velocity-facing turn");
             view.Creature.ClearFacingRequest();
             viewMotor.Teleport(new Vec3(p.X,0,p.Y),0);
