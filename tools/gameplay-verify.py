@@ -147,6 +147,7 @@ for preset in a.presets.split(','):
         for f in selected:f.unlink()
     if (folder/'gameplay.avi').exists(): (folder/'gameplay.avi').unlink()
     for f in images:f.unlink()
-    report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(subprocess.check_output(['git','status','--porcelain'],cwd=root,text=True)),'preset':preset,'stateDigest':digest,'deterministicRepeat':True,'movieMode':not a.realtime,'captureStartUnix':capture_utc,'environment':session,'renderWallPacing':pacing,'simulationSeconds':(samples[-1]['tick']-samples[0]['tick'])/60,'wallSeconds':(samples[-1]['wallMs']-samples[0]['wallMs'])/1000,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}
+    status=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],cwd=root,text=True).splitlines()
+    report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(status),'statusEntries':status,'preset':preset,'stateDigest':digest,'deterministicRepeat':True,'movieMode':not a.realtime,'captureStartUnix':capture_utc,'environment':session,'renderWallPacing':pacing,'simulationSeconds':(samples[-1]['tick']-samples[0]['tick'])/60,'wallSeconds':(samples[-1]['wallMs']-samples[0]['wallMs'])/1000,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}
     (folder/'report.json').write_text(json.dumps(report,indent=2));summary[preset]=metrics
 (out/'comparison.json').write_text(json.dumps(summary,indent=2));print(json.dumps(summary,indent=2))
