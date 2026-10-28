@@ -106,26 +106,12 @@ try:
     else: raise RuntimeError('Resume tap never entered a gameplay session')
     # ADB screenrecord captures the actual Android surface, including frame pacing.
     recording_start=time.time()
-    recorder=subprocess.Popen([adb_path,'shell','screenrecord','--bit-rate','4000000','--time-limit','120','/sdcard/mosslight-playtest.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    # Exercise actual touch ownership, then open the starting Gloot chest.
-    # Read release positions from production diagnostics instead of assuming emulator FPS.
-    for attempt in range(12):
-        adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(280*w/1280)),str(int(640*h/800)),'600')
-        time.sleep(.4)
-        ensure_foreground(timeout=10)
-        logs=adb('logcat','-d')
-        positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
-        if positions and float(positions[-1][0])>=265: break
-    else: raise RuntimeError('Touch movement never approached starting chest')
-    assert float(positions[-1][0])>220,'Touch input did not change player coordinates'
-    capture('chest.png')
-    tap(878,644) # Interact: left side of the named action cluster.
-    time.sleep(1)
-    logs=adb('logcat','-d')
-    assert 'MOSSLIGHT_GAMEPLAY kind=resource_depleted value=chest' in logs,'Touch interaction did not empty authoritative chest inventory'
-    interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
-    assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
-    capture('exploration.png')
+    recorder=subprocess.Popen([adb_path,'shell','screenrecord','--bit-rate','4000000','--time-limit','180','/sdcard/mosslight-playtest.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    # Set a westward facing and leave the nearby enemy group alone while
+    # checking repeated controls. The earlier chest-first ordering let active
+    # enemies kill the player mid-test; it did not expose an input failure.
+    adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(30*w/1280)),str(int(640*h/800)),'600')
+    time.sleep(.4)
     tap(1198,712) # Attack: the large primary button.
     deadline=time.monotonic()+15
     while time.monotonic()<deadline:
@@ -143,23 +129,54 @@ try:
     else: raise RuntimeError('Real Android Dodge touch did not complete')
     assert len(re.findall(r'MOSSLIGHT_COMBAT kind=dodge_started',logs))==1, 'Dodge touch activated more than once'
     capture('combat-controls.png')
-    # Repeat real OS touch inputs after the actual cooldowns. Count both
-    # starts and completions, so duplicate dispatch and stuck actions fail.
-    # These attacks are free swings; this does not claim hit-effect coverage.
+    # Wait for game-tick checkpoints, not assumed emulator wall-clock speed.
+    # Count both starts and completions, so duplicate dispatch and stuck
+    # actions fail. These swings do not claim confirmed-hit coverage.
+    last_started={kind:int(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_started tick=(\d+)',logs)[-1]) for kind in ('attack','dodge')}
     for kind,total,x,y in [('attack',4,1198,712),('dodge',3,1088,714)]:
         for expected in range(2,total+1):
-            time.sleep(1.1)
+            ready_tick=last_started[kind]+(41 if kind=='attack' else 44)
+            deadline=time.monotonic()+60
+            while time.monotonic()<deadline:
+                logs=adb('logcat','-d')
+                checkpoints=[int(n) for n in re.findall(r'MOSSLIGHT_RUNTIME tick=(\d+)',logs)]
+                if checkpoints and checkpoints[-1]>=ready_tick: break
+                if not adb('shell','pidof',package): raise RuntimeError(f'Android process exited while waiting for {kind} cooldown')
+                time.sleep(.5)
+            else: raise RuntimeError(f'Android simulation did not reach {kind} cooldown tick {ready_tick}')
+            prior_starts=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_started tick=(\d+)',logs))
+            prior_completions=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_completed tick=(\d+)',logs))
             tap(x,y)
             deadline=time.monotonic()+15
             while time.monotonic()<deadline:
                 logs=adb('logcat','-d')
-                starts=len(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_started',logs))
-                completions=len(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_completed',logs))
-                if starts>=expected and completions>=expected: break
+                starts=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_started tick=(\d+)',logs))-prior_starts
+                completions=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_completed tick=(\d+)',logs))-prior_completions
+                assert len(starts)<=1 and len(completions)<=1, f'{kind}: duplicate touch dispatch'
+                if len(starts)==1 and len(completions)==1: break
                 if not adb('shell','pidof',package): raise RuntimeError(f'Android process exited during repeated {kind}')
                 time.sleep(.5)
             else: raise RuntimeError(f'Android {kind} touch {expected} did not finish')
-            assert starts==expected and completions==expected, f'{kind}: duplicate or missing touch dispatch'
+            last_started[kind]=int(next(iter(starts)))
+    # Exercise actual touch ownership, then open the starting Gloot chest.
+    # Read release positions from production diagnostics instead of assuming emulator FPS.
+    for attempt in range(16):
+        adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(280*w/1280)),str(int(640*h/800)),'600')
+        time.sleep(.4)
+        ensure_foreground(timeout=10)
+        logs=adb('logcat','-d')
+        positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
+        if positions and float(positions[-1][0])>=265: break
+    else: raise RuntimeError('Touch movement never approached starting chest')
+    assert float(positions[-1][0])>220,'Touch input did not change player coordinates'
+    capture('chest.png')
+    tap(878,644) # Interact: left side of the named action cluster.
+    time.sleep(1)
+    logs=adb('logcat','-d')
+    assert 'MOSSLIGHT_GAMEPLAY kind=resource_depleted value=chest' in logs,'Touch interaction did not empty authoritative chest inventory'
+    interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
+    assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
+    capture('exploration.png')
     tap(1086,564) # Pack: utility row above the combat thumb arc.
     time.sleep(1)
     capture('inventory.png')
