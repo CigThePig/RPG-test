@@ -9,7 +9,9 @@ python3 tools/verify.py --headless
 python3 tools/verify.py --visual
 ```
 
-Use Godot **4.6.1 .NET**, SDK **8.0.408**, and Python 3. Visual verification needs a display; CI runs it under Xvfb. `tools/verify.py` requires the success marker, successful process exit and absence of engine/script errors. Native export presets are present; export templates and exported Linux/Windows packages were not locally exercised.
+Use Godot **4.6.1 .NET**, SDK **9.0.203** (with the .NET 8 runtime/targeting pack for desktop), and Python 3. Visual verification needs a display; CI runs it under Xvfb. `tools/verify.py` requires the success marker, successful process exit and absence of engine/script errors. Native export presets are present; export templates and exported Linux/Windows packages were not locally exercised.
+
+PR #4 Part 1 adds `CombatTelegraphChecks` to the existing integration runner, plus desktop and `--mobile` viewport captures and four production replay scenarios (`telegraph-bite`, `telegraph-dodge`, `telegraph-interrupt`, and `telegraph-cone`). Run `xvfb-run -a python3 tools/gameplay-verify.py --presets baseline,precise` to record the actual renderer and extract labelled early, middle and post-impact frames. The visual screenshot fixture slows engine time for reliable capture; the fixed-clock gameplay movies exercise the normal simulation cadence. Inspect the resulting images and movies as well as the assertions. Hosted workflows upload exact-head artifacts; neither software rendering nor an emulator establishes physical phone performance or feel.
 
 ## Executed evidence
 

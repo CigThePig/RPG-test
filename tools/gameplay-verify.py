@@ -107,12 +107,28 @@ for preset in a.presets.split(','):
         for i in range(8):
             row=values[min(i*7,len(values)-1)]
             requests.append((f'south to north {i}',max(0,int(row['frame'])-1),row))
+        warning_requests=[]
+        for name in ['telegraph-bite','telegraph-dodge','telegraph-interrupt','telegraph-cone']:
+            for phase in ['early','middle','after-impact']:
+                marker=next(r for r in rows if r['kind']=='marker' and r['scenario']==name and r['label']=='telegraph/'+phase)
+                # Markers are emitted before the physics step; inspect the next rendered frame.
+                frame=int(marker['frame'])
+                row=min(groups[name],key=lambda r:abs(int(r['frame'])-frame))
+                label=name+' '+phase
+                requests.append((label,frame,row));warning_requests.append((name,phase,frame))
+            if name=='telegraph-interrupt':
+                marker=next(r for r in rows if r['kind']=='marker' and r['scenario']==name and r['label']=='telegraph/interrupted')
+                frame=int(marker['frame'])+1
+                row=min(groups[name],key=lambda r:abs(int(r['frame'])-frame))
+                requests.append((name+' interrupted',frame,row));warning_requests.append((name,'interrupted',frame))
         indices=sorted(set(frame for _,frame,_ in requests))
         select='+'.join(f'eq(n\\,{frame})' for frame in indices)
         run(['ffmpeg','-v','error','-y','-i',str(folder/'gameplay.mp4'),'-vf',f'select={select}','-vsync','0',str(folder/'combat-%03d.png')])
         selected=sorted(folder.glob('combat-*.png'))
         assert len(selected)==len(indices), 'Missing requested combat movie frames'
         by_frame=dict(zip(indices,selected))
+        for name,phase,frame in warning_requests:
+            Image.open(by_frame[frame]).save(folder/(name+'-'+phase+'.png'))
         combat=Image.new('RGB',(1280,math.ceil(len(requests)/4)*220));draw=ImageDraw.Draw(combat)
         close=Image.new('RGB',combat.size); close_draw=ImageDraw.Draw(close)
         for i,(label,frame,row) in enumerate(requests):

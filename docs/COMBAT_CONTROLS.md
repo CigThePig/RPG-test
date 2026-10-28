@@ -6,6 +6,10 @@ Soft aim assist is evaluated once, when the player initiates a sword swing. It c
 
 The 12-unit lunge is world movement over 0.08–0.18 seconds and is clipped by existing terrain/door collision. The sword's existing pose, trail, windup, and recovery have not been retimed or replaced.
 
+Enemy bite windups show rings around the attacker and its designated target, connected by a dashed tracking line. The mark follows the target: the bite still checks the target's actual range, line of sight and defenses at impact. Moving away, using terrain, interrupting the enemy, or dodging during the established immunity interval can prevent damage. The warning ends on release or interruption.
+
+The verification-only `fixture_sweep` demonstrates a different rule: its outlined ground sector is a directional cone committed when the attack starts. Moving outside that sector before impact avoids it; moving the target does not rotate it. Both shapes are projected from ground space onto the same camera plane as the creatures. Neither warning controls damage or adds windup time.
+
 Dodge has its own action state and 0.70-second initiation cooldown. It covers up to 90 ground units over 0.40 seconds with ease-out, subject to collision. The direction is the current unsmoothed movement intent, or visual facing if neutral, and is locked for the roll. Direct hits are rejected from 0.10 seconds through just before 0.30 seconds; existing periodic damage retains its normal rules. An early or late hit interrupts the roll. Opening a modal, backgrounding, or loading a saved roll clears its transient motion but retains a valid cooldown. Space dodges on desktop; the separate mobile button is beside Attack. Release inside the original button to activate it.
 
 `game/combat/CombatTuning.cs` contains the new arc, lunge, and dodge constants; existing slash timing, base range, cost, cooldown, and damage remain in `game/data/foundation.json`. Dodge presentation uses the authoritative action progress, with a biped tuck and rotation and a limited fallback for other families. It does not drive world position or damage.

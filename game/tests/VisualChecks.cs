@@ -42,6 +42,108 @@ public static class VisualChecks
         throw new InvalidOperationException("Visual dodge did not advance to " + seconds);
     }
 
+    static async System.Threading.Tasks.Task Until(Foundation app, Func<bool> predicate, string message)
+    {
+        for (int i = 0; i < 360; i++) { if (predicate()) return; await Frames(app, 1); }
+        throw new InvalidOperationException(message);
+    }
+
+    // The captured pixels come from the actual viewport. Time scale is reduced
+    // here only to make screenshots reproducible on slow CI renderers; the movie
+    // replay separately exercises the normal fixed-step timing and input path.
+    static async System.Threading.Tasks.Task VerifyTelegraphs(Foundation app)
+    {
+        string snapshot = Persistence.Capture(app.World, app.Narrative);
+        double oldScale = Engine.TimeScale;
+        try
+        {
+            Engine.TimeScale = .3;
+            var w = app.World;
+            var course = GameplayReplay.CreateCourse(); course.Id = "telegraph-visual";
+            w.RegionsById[course.Id] = course; w.InitializeContainers(course);
+            var p = w.Player;
+            var enemy = w.Actors.Values.First(a => a.Profile == "beast");
+            p.Region = enemy.Region = course.Id;
+            foreach (var other in w.Actors.Values.Where(a => a.Id != p.Id && a.Id != enemy.Id && a.Region == course.Id)) other.Region = "reach";
+            enemy.Speed = 0; enemy.Health = enemy.MaxHealth = 1000;
+            enemy.State = ActionState.Recovery; enemy.StateRemaining = 100; enemy.Abilities.Clear();
+            p.X = 300; p.Y = 300; enemy.X = 328; enemy.Y = 300;
+            p.Health = p.MaxHealth = 1000; p.State = ActionState.Idle; p.Statuses.Clear(); p.Cooldowns.Clear(); p.Invulnerable = 0;
+            app.RebuildViews(); app.ResumeGame(); await Frames(app, 12);
+            var bite = w.FindAbility("bite")!; var cone = w.FindAbility("fixture_sweep")!;
+            void Reset(string ability)
+            {
+                w.Cancel(p); w.Cancel(enemy);
+                p.X=300; p.Y=300; p.Health=p.MaxHealth; p.Invulnerable=0; p.Statuses.Clear(); p.Cooldowns.Clear();
+                enemy.X=328; enemy.Y=300; enemy.Health=enemy.MaxHealth; enemy.Invulnerable=0; enemy.Statuses.Clear(); enemy.Cooldowns.Clear();
+                enemy.Abilities.Clear(); enemy.Abilities.Add(ability);
+                app.Views[p.Id].SnapPosition(); app.Views[enemy.Id].SnapPosition();
+                app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
+            }
+            void Start(string ability)
+            {
+                if(!w.Activate(enemy.Id, ability, p.Id)) throw new InvalidOperationException("Visual warning failed to activate " + ability);
+                enemy.Abilities.Clear();
+            }
+            Reset("bite"); Start("bite");
+            await CaptureRollFrame(app, "telegraph-bite-early");
+            await Until(app, () => enemy.State != ActionState.Windup || enemy.StateRemaining <= bite.Windup * .55f, "Bite did not reach mid windup");
+            if(!TelegraphView.IsActive(w, enemy, bite)) throw new InvalidOperationException("Bite warning disappeared before impact");
+            await CaptureRollFrame(app, "telegraph-bite-middle");
+            app.RebuildViews();
+            if(!TelegraphView.IsActive(w, enemy, bite)) throw new InvalidOperationException("View rebuild lost live warning");
+            await Until(app, () => enemy.State != ActionState.Windup, "Bite did not reach impact");
+            if(TelegraphView.IsActive(w, enemy, bite) || p.Health == p.MaxHealth) throw new InvalidOperationException("Bite impact or warning removal failed");
+            await CaptureRollFrame(app, "telegraph-bite-impact");
+
+            Reset("bite"); Start("bite");
+            await Until(app, () => enemy.StateRemaining <= bite.Windup * .7f, "Interrupt fixture did not wind up");
+            await CaptureRollFrame(app, "telegraph-interrupt-before");
+            w.Damage(p, enemy, 5, "physical");
+            if(TelegraphView.IsActive(w, enemy, bite)) throw new InvalidOperationException("Interrupted warning persisted");
+            await Frames(app, 2); await CaptureRollFrame(app, "telegraph-interrupt-after");
+            await Frames(app, 90);
+            if(p.Health != p.MaxHealth) throw new InvalidOperationException("Interrupted visual bite hit late");
+
+            Reset("fixture_sweep"); Start("fixture_sweep");
+            await Until(app, () => enemy.StateRemaining <= cone.Windup * .6f, "Cone did not reach mid windup");
+            if(!TelegraphView.IsActive(w, enemy, cone)) throw new InvalidOperationException("Cone warning missing");
+            await CaptureRollFrame(app, "telegraph-cone-middle");
+            p.X=enemy.X; p.Y=enemy.Y+45; app.Views[p.Id].SnapPosition();
+            await CaptureRollFrame(app, "telegraph-cone-outside");
+            await Until(app, () => enemy.State != ActionState.Windup, "Cone did not reach impact");
+            if(p.Health != p.MaxHealth || TelegraphView.IsActive(w, enemy, cone)) throw new InvalidOperationException("Cone hit outside its committed geometry");
+            await CaptureRollFrame(app, "telegraph-cone-impact");
+
+            Reset("bite"); Start("bite");
+            await Until(app, () => enemy.StateRemaining <= bite.Windup * .45f, "Dodge fixture did not reach input boundary");
+            if(app.Ui.MobileLayout)
+            {
+                var button=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.StartsWith("Dodge") && b.IsVisibleInTree());
+                var point=button.GetGlobalRect().GetCenter();
+                Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=point});
+                Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=point});
+            }
+            else
+            {
+                Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=true});
+                Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=false});
+            }
+            Input.FlushBufferedEvents();
+            await Until(app, () => p.State == ActionState.Dodging && p.ActionElapsed >= .08f, "Production dodge input did not start");
+            await CaptureRollFrame(app, "telegraph-dodge-approach");
+            await Until(app, () => enemy.State != ActionState.Windup, "Dodge fixture did not reach impact");
+            if(p.Health != p.MaxHealth) throw new InvalidOperationException("Incoming bite damaged player during dodge immunity");
+            await CaptureRollFrame(app, "telegraph-dodge-avoided");
+        }
+        finally
+        {
+            Engine.TimeScale = oldScale;
+            Persistence.Restore(app.World, app.Narrative, snapshot); app.RebuildViews();
+            await Frames(app, 2);
+        }
+    }
+
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
@@ -206,6 +308,7 @@ public static class VisualChecks
             app.RebuildViews();
             await Frames(app, 2);
         }
+        await VerifyTelegraphs(app);
         var player=app.World.Player;
         var region=app.World.RegionsById[player.Region];
         int chest=region.Features.Single(x=>x.Value=="chest").Key;

@@ -13,6 +13,8 @@ public sealed class GameplayReplay
     float distance;
     double incomingYaw;
     int combatHits, combatMisses, dodges, dodgedHits, lungeCollisions;
+    int warningImpacts, warningCancellations, warningAvoidances;
+    string warningEnemy = "";
     int turnSign, turnChanges;
     double turnPrevious;
     readonly List<object> results=new();
@@ -48,6 +50,10 @@ public sealed class GameplayReplay
         new("dodge-held",75,new(300,300),Vector2.Right),
         new("dodge-wall",75,new(700,300),Vector2.Zero),
         new("dodge-evasion",75,new(300,300),Vector2.Zero),
+        new("telegraph-bite",75,new(300,300),Vector2.Zero),
+        new("telegraph-dodge",75,new(300,300),Vector2.Zero),
+        new("telegraph-interrupt",75,new(300,300),Vector2.Zero),
+        new("telegraph-cone",75,new(300,300),Vector2.Zero),
         new("turn-south-north",100,new(300,300),Vector2.Up)
     };
     public GameplayReplay(Foundation owner)
@@ -63,6 +69,13 @@ public sealed class GameplayReplay
             if (kind == "dodge_started") dodges++;
             if (kind == "direct_hit_dodged") dodgedHits++;
             if (kind == "attack_lunge_collision") lungeCollisions++;
+        };
+        app.World.Presentation += e =>
+        {
+            if (e.ActorId != warningEnemy) return;
+            if (e.Kind == CombatPresentationKind.AttackImpact) warningImpacts++;
+            if (e.Kind == CombatPresentationKind.AttackCanceled) warningCancellations++;
+            if (e.Kind == CombatPresentationKind.DefensiveAvoidance) warningAvoidances++;
         };
         app.Trace.Marker("replay-warmup");
         app.ResumeGame();
@@ -157,6 +170,20 @@ public sealed class GameplayReplay
                 app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),yaw);
                 turnPrevious=yaw;
             }
+            if (s.Id.StartsWith("telegraph-"))
+            {
+                warningImpacts=warningCancellations=warningAvoidances=0;
+                var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
+                warningEnemy=enemy.Id;
+                enemy.Region=p.Region; enemy.X=p.X+28; enemy.Y=p.Y; enemy.Speed=0;
+                enemy.Health=enemy.MaxHealth=10000; enemy.Invulnerable=0; enemy.Statuses.Clear();
+                enemy.State=ActionState.Idle; enemy.StateRemaining=0; enemy.Cooldowns.Clear(); enemy.Abilities.Clear();
+                enemy.Abilities.Add(s.Id=="telegraph-cone" ? "fixture_sweep" : "bite");
+                app.Views[enemy.Id].SnapPosition();
+                app.Views[p.Id].Creature.ClearFacingRequest();
+                app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
+            }
+            else warningEnemy="";
             origin=p.Position;
             app.Ui.Notify($"REPLAY · {app.Feel.Id} · {s.Id}");
             app.Trace.Scenario=s.Id; app.Trace.Marker("scenario-start/teleport");
@@ -222,6 +249,32 @@ public sealed class GameplayReplay
             }
         }
         if (test.Id == "turn-south-north" && local >= 70) direction=Vector2.Zero;
+        if (test.Id.StartsWith("telegraph-"))
+        {
+            var enemy=app.World.Actors[warningEnemy];
+            string ability=test.Id=="telegraph-cone" ? "fixture_sweep" : "bite";
+            if (local==10)
+            {
+                if(!app.World.Activate(enemy.Id, ability, "player")) throw new InvalidOperationException("Warning fixture could not activate " + ability);
+                enemy.Abilities.Clear(); // prevent autonomous follow-up attacks in this fixture
+                app.Trace.Marker("telegraph/start");
+            }
+            if (local==12) app.Trace.Marker("telegraph/early");
+            if (local==19) app.Trace.Marker("telegraph/middle");
+            if (test.Id=="telegraph-interrupt" && local==20)
+            {
+                app.World.Damage(app.World.Player, enemy, 5, "physical");
+                app.Trace.Marker("telegraph/interrupted");
+            }
+            if (test.Id=="telegraph-dodge" && local==22) TapAction("Dodge");
+            if (test.Id=="telegraph-cone" && local==21)
+            {
+                app.World.Player.X=enemy.X; app.World.Player.Y=enemy.Y+45;
+                app.Views["player"].SnapPosition();
+                app.Trace.Marker("telegraph/moved-outside-cone");
+            }
+            if (local==31) app.Trace.Marker("telegraph/after-impact");
+        }
         if(test.Id=="tap-stop" && local>=3) direction=Vector2.Zero;
         if(test.Id=="reversal" && local>=45) direction=Vector2.Left;
         if(test.Id=="eight-turns") direction=Vector2.Right.Rotated((local/20)*Mathf.Pi/4);
@@ -290,9 +343,19 @@ public sealed class GameplayReplay
         if (s.Id=="dodge-wall" && (distance>5 || !valid)) throw new InvalidOperationException("Wall did not block the dodge");
         if (s.Id.StartsWith("dodge-") && dodges!=1) throw new InvalidOperationException("Dodge touch did not start exactly one dodge: "+s.Id);
         if (s.Id=="dodge-evasion" && dodgedHits!=1) throw new InvalidOperationException("Dodge did not reject the incoming projectile");
+        if (s.Id.StartsWith("telegraph-"))
+        {
+            var enemy=app.World.Actors[warningEnemy];
+            var ability=app.World.FindAbility(s.Id=="telegraph-cone" ? "fixture_sweep" : "bite");
+            if(TelegraphView.IsActive(app.World,enemy,ability)) throw new InvalidOperationException("Warning persisted after action: "+s.Id);
+            if(s.Id=="telegraph-interrupt" && (warningCancellations!=1 || warningImpacts!=0 || p.Health!=p.MaxHealth)) throw new InvalidOperationException("Interrupted attack resolved or damaged player");
+            if(s.Id=="telegraph-bite" && (warningImpacts!=1 || p.Health>=p.MaxHealth)) throw new InvalidOperationException("Targeted bite did not resolve exactly once");
+            if(s.Id=="telegraph-cone" && (warningImpacts!=1 || p.Health!=p.MaxHealth)) throw new InvalidOperationException("Committed cone failed to miss outside target");
+            if(s.Id=="telegraph-dodge" && (warningImpacts!=1 || warningAvoidances!=1 || p.Health!=p.MaxHealth)) throw new InvalidOperationException("Dodge did not avoid incoming bite");
+        }
         if (s.Id=="turn-south-north" && (turnChanges!=0 || Math.Abs(PixelCreatures.Core.DMath.WrapAngle(app.Views["player"].Creature.Motor!.Yaw-Math.PI/2))>.12)) throw new InvalidOperationException("South-to-north facing oscillated or did not complete");
         if(s.Id=="chest" && !app.World.RegionsById[p.Region].Depleted.Contains(12*64+18))throw new InvalidOperationException("Chest input interaction failed");
-        if(!valid||!moved)throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
+        if(!valid||(!moved && !s.Id.StartsWith("telegraph-")))throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
     }
     void Finish()
     {
