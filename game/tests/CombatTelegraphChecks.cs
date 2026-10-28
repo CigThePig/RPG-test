@@ -138,6 +138,26 @@ public static class CombatTelegraphChecks
             enemy.Abilities.Clear(); events.Clear(); Step(boundary + 2);
             check(!Warning(enemy, bite) && !events.Any(e => e.Kind == CombatPresentationKind.AttackImpact), "interrupted schema-1 save cannot restore a warning or impact");
 
+            Reset(); check(w.Activate(enemy.Id, "bite", p.Id), "blocked saved windup fixture starts");
+            // Simulate inconsistent legacy/external state without invoking the
+            // normal status hook, which would already cancel the attack.
+            enemy.Statuses.Add(new StatusState { Id="stagger", Source=p.Id, Remaining=.5f, UntilTick=1, Stacks=1 });
+            string blocked = Persistence.Capture(w, app.Narrative);
+            Persistence.Restore(w, app.Narrative, blocked); p=w.Player; enemy=w.Actors[enemy.Id];
+            check(enemy.State == ActionState.Staggered && enemy.StateRemaining > 0 && enemy.PendingAbility == "" && !Warning(enemy,bite), "restore cancels blocked windup and preserves action-blocking status");
+
+            Reset("fixture_sweep"); check(w.Activate(enemy.Id, "fixture_sweep", p.Id), "invalid direction save fixture starts");
+            enemy.ActionDirectionX = enemy.ActionDirectionY = 0;
+            string noDirection = Persistence.Capture(w, app.Narrative);
+            Persistence.Restore(w, app.Narrative, noDirection); p=w.Player; enemy=w.Actors[enemy.Id];
+            check(enemy.State == ActionState.Idle && enemy.PendingAbility == "" && !Warning(enemy,sweep), "restore cancels a cone with no committed direction");
+
+            Reset(); check(w.Activate(enemy.Id, "bite", p.Id), "legacy schema-1 fixture starts");
+            var legacy = System.Text.Json.Nodes.JsonNode.Parse(Persistence.Capture(w, app.Narrative))!;
+            foreach (var entry in legacy["Actors"]!.AsObject()) entry.Value!.AsObject().Remove("RecoveryAbility");
+            Persistence.Restore(w, app.Narrative, legacy.ToJsonString()); p=w.Player; enemy=w.Actors[enemy.Id];
+            check(Warning(enemy,bite) && enemy.RecoveryAbility == "", "schema-1 save without new field restores target windup");
+
             var invalid = new Content { Abilities = new() { new AbilityDef { Id = "invalid", Damage = 5, Geometry = new() { Shape = "circle", Range = 10 }, Telegraph = new() { Style = "cone" }, ActionStyle = "NotAStyle", Windup = float.NaN } } };
             check(invalid.Validate(new HashSet<string>()).Count >= 3, "validation rejects unsupported geometry, mismatched telegraph, action style and nonfinite timing");
         }

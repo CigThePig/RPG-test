@@ -51,12 +51,14 @@ public static class Persistence
             if (actor.State == ActionState.Windup && actor.PendingAbility != "")
             {
                 var ability = content.Abilities.Single(d => d.Id == actor.PendingAbility);
-                bool invalid = !actor.Alive || actor.Statuses.Any(st => content.Statuses.Any(def => def.Id == st.Id && def.BlocksActions)) ||
+                float blockedFor = actor.Statuses.Where(st => st.Remaining > 0 && content.Statuses.Any(def => def.Id == st.Id && def.BlocksActions))
+                    .Select(st => st.Remaining).DefaultIfEmpty(0).Max();
+                bool invalid = !actor.Alive || blockedFor > 0 ||
                     (ability.Geometry?.Shape == "cone" && !CombatGeometry.TryNormalize(new System.Numerics.Vector2(actor.ActionDirectionX, actor.ActionDirectionY), out _));
                 if (invalid)
                 {
-                    actor.State = actor.Alive ? ActionState.Idle : ActionState.Dead;
-                    actor.StateRemaining = 0;
+                    actor.State = !actor.Alive ? ActionState.Dead : blockedFor > 0 ? ActionState.Staggered : ActionState.Idle;
+                    actor.StateRemaining = actor.Alive ? blockedFor : 0;
                     actor.PendingAbility = "";
                     actor.FreeSlash = false;
                     actor.ActionDirectionX = actor.ActionDirectionY = 0;
