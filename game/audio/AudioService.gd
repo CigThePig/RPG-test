@@ -7,6 +7,8 @@ var effects: Dictionary = {}
 var voices: Array[AudioStreamPlayer] = []
 var voice_kinds: Array[String] = []
 var voice_priorities: Array[int] = []
+# Bounded debug-only counters verify what actually reaches the audio mixer.
+var cue_counts: Dictionary = {}
 var ambience := AudioStreamPlayer.new()
 var music := AudioStreamPlayer.new()
 
@@ -22,7 +24,8 @@ func _ready() -> void:
 		voice_kinds.append("")
 		voice_priorities.append(0)
 	var specs := {
-		"swing": [Config.WaveType.NOISE, .36, -.45, .04, .20, .70],
+		# Short, soft air-slice; no percussive punch or low-frequency hit tail.
+		"swing": [Config.WaveType.NOISE, .26, -.13, .012, .13, .48],
 		"whiff": [Config.WaveType.NOISE, .23, -.32, .03, .18, .60],
 		"attack": [Config.WaveType.SAWTOOTH, .18, -.22, .03, .16, .35],
 		"bite": [Config.WaveType.NOISE, .27, -.65, .03, .14, .25],
@@ -71,10 +74,16 @@ func cue(kind: String) -> void:
 	if slot < 0: slot = replace
 	if slot < 0: return
 	voices[slot].stop()
+	# The air-only sword whoosh sits below actual contact impacts.
+	voices[slot].volume_db = -15 if kind == "swing" else -8
 	voices[slot].stream = effects[kind]
 	voice_kinds[slot] = kind
 	voice_priorities[slot] = importance
 	voices[slot].play()
+	cue_counts[kind] = int(cue_counts.get(kind, 0)) + 1
+
+func debug_cue_count(kind: String) -> int:
+	return int(cue_counts.get(kind, 0))
 
 func play_ambience(stream: AudioStream) -> void:
 	ambience.stream = stream
