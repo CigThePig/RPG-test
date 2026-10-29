@@ -813,7 +813,8 @@ public sealed class World
         // The entrance tile also owns the return marker. Arrive on nearby
         // reachable floor, clear of that feature and surviving inhabitants.
         // Loading a snapshot never enters here or relocates saved actors.
-        if (region == "ruin") pos = r.FindPlacement(pos, a, Actors.Values);
+        if (region == "ruin")
+            pos = r.FindPlacement(pos + new Vector2(RegionState.Tile * 2, RegionState.Tile), a, Actors.Values);
         a.X = pos.X;
         a.Y = pos.Y;
         InitializeContainers(r);
