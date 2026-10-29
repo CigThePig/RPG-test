@@ -239,14 +239,17 @@ public partial class CharacterView : Node2D
     {
         if (attackArc && attackTime < attackDuration && State.Alive)
         {
-            // Presentation only: the authoritative ability still owns range, damage and timing.
+            // Air movement only. Sweep a short, translucent blade streak
+            // instead of the broad gold burst that resembled a hit on empty air.
+            // A confirmed World.Hit owns impact flashes independently.
             float t = attackTime - impactTime;
-            if (t >= -.06f && t <= .14f)
+            if (t >= -.055f && t <= .115f)
             {
-                float alpha = t < 0 ? (t + .06f) / .06f : 1 - t / .14f;
-                float angle = attackDirection.Angle();
-                DrawArc(new Vector2(0, -14), 30, angle - 1.0f, angle + 1.0f, 20, new Color(1, .87f, .5f, alpha), 4, true);
-                DrawArc(new Vector2(0, -14), 35, angle - .7f, angle + .8f, 16, new Color(1, 1, .85f, alpha * .7f), 2, true);
+                float phase = Math.Clamp((t + .055f) / .17f, 0, 1);
+                float alpha = MathF.Sin(phase * MathF.PI) * .42f;
+                float angle = attackDirection.Angle() - .8f + phase * 1.6f;
+                DrawArc(new Vector2(0, -14), 31, angle - .28f, angle + .28f, 8,
+                    new Color(.78f, .9f, 1f, alpha), 2.2f, true);
             }
         }
         if (!State.Alive)
