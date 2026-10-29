@@ -41,9 +41,9 @@ Local build uses SDK 9.0.203, Godot 4.6.1 .NET and .NET 8.0.15 host. `dotnet bui
 - `python3 tools/verify.py --visual --mobile`: passed; actual mobile-layout images inspected.
 - Geometry seeds: **0–63 plus 1337** (includes 1 and 42), repeated generation, exact PR4 logical topology/mission-role comparison, bounds, cross-sections, determinism, solvability and physical player routes. All five representative footprints on 1/42/1337. Failed seeds raise with dimensions/features/groups and reason.
 - Required-gate runtime progression: seeds 1 and 1337; seed 42 validates its legitimate alternate route. No failed seed is suppressed.
-- Baseline movie and independent deterministic repeat: passed. Precise replay is completing. Focused seed-1 touch expedition movie, independent rendered repeat and matching authoritative digest: passed and contact sheet inspected.
+- Local baseline and precise: all 45 production scenarios and independent authoritative repeat digests passed. The precise local MP4 was incomplete during post-processing; re-encoding the retained original AVI and rerunning artifact checks succeeded. No gameplay checks were loosened. Focused seed-1 touch expedition movie, independent rendered repeat and matching authoritative digest also passed, and contact sheets were inspected. Final exact-source CI results are recorded below.
 - Live generated-doorway encounter checks exercise both cardinal orientations: Prowler crosses and bites, Brute repositions and commits its cone, Spitter maintains range and releases a projectile. These use production seeded inhabitants, World AI and 480 simulation steps per observation.
-- CI, tested runtime SHA and ARM64 APK: pending publication/build; no Android success claimed yet.
+- **Final tested runtime:** `c949175fd6e6144bb3d04a52824d647e26890d9e`. Native CI and ARM64 package build/validation have succeeded; final emulator and movie workflow status will be appended below.
 
 ## Actual rendered evidence
 
@@ -61,6 +61,8 @@ All comparisons use logical seed 42, 1.5× gameplay zoom and the actual viewport
 | Enemy doorway | [View](native-screenshots/dungeon-enemy-doorway.png) | [View](native-screenshots/mobile-dungeon-enemy-doorway.png) |
 | Mixed room | [View](native-screenshots/dungeon-mixed-room.png) | [View](native-screenshots/mobile-dungeon-mixed-room.png) |
 
+[Side-by-side mobile doorway comparison](native-screenshots/dungeon-comparison.png). [Actual corrected ruin arrival](native-screenshots/mobile-dungeon-arrival.png).
+
 The player has visible breathing room at the opening centerline. Some silhouette/wall depth overlap near walls remains possible under the existing projection; collision authority and visual sprite bounds are distinct. The frozen mixed/enemy screenshots use production dungeon inhabitants and establish composition/placement. Separate live generated-doorway integration checks verify tactical behaviour.
 
 ## Performance and memory
@@ -77,9 +79,11 @@ The cell tile budget rises by 121/49 ≈ 2.47×. Exact tile arrays use four byte
 
 Seed-42 terrain command construction: desktop **0.708 → 3.308 ms**, mobile-layout **0.731 → 1.802 ms**. Static-room 90-frame desktop p50/p95: **7.99/13.12 → 11.83/18.53 ms**; mobile layout **7.88/15.11 → 10.79/17.58 ms**. Both use llvmpipe, a frozen no-enemy room and the same process/zoom; legacy runs first, and these samples do not establish live combat performance or sustained FPS. Terrain construction is measured inside `_Draw`, not GPU upload/completion. Complete dungeon-entry wall-clock cost, retained region heap size and sustained ARM64 GPU/frame measurements remain unavailable.
 
+Final-source hosted native measurements are retained separately in [CI expanded](dungeon-evidence/ci-expanded.json), [CI desktop](dungeon-evidence/ci-render-desktop.json) and [CI mobile layout](dungeon-evidence/ci-render-mobile.json). These must not be mixed with the local old-generator generation baseline. In the same CI rendering process, old/new terrain construction was **0.832 → 1.487 ms desktop** and **1.113 → 1.696 ms mobile layout**. Static-room p95 frame intervals were **13.53 → 20.92 ms desktop** and **14.07 → 21.34 ms mobile layout**. This is a measurable software-renderer regression, not a 60-FPS result. The expanded absolute tile counts remain below the existing 64×48 overworld, but real Android entry/live encounter timing still needs device profiling. Final committed screenshots come from the exact `c949175fd6e6` native CI artifact, downloaded and visually inspected.
+
 ## Android and phone acceptance
 
-The established GitHub Actions Android pipeline will export ARM64 and its matching x86_64 emulator package, validate source/package/resources/signature and run the existing installed-emulator gameplay/lifecycle checks. Exact run/artifact links will be appended after successful completion. Desktop/mobile-layout rendering is not Android runtime evidence.
+The established GitHub Actions Android pipeline exported ARM64 and its matching x86_64 emulator package and passed source/package/resources/signature validation. Native CI independently passed the full build/import/4,521-assertion/desktop/mobile suites. Installed Android emulator verification also passed: launch/rendering, measured OS-touch movement, chest/inventory, four Attack and three Dodge touches, real damage, all three archetypes/Spit, and three nonblank same-process mixed-combat resumes with canceled input. The final Android screenshots/contact sheet were downloaded and inspected. This smoke covers ordinary gameplay and the tactical fixture; it does not time a complete generated-dungeon expedition on Android. Exact-source movie results are recorded below. Desktop/mobile-layout rendering alone is not Android runtime evidence.
 
 For the phone: use **Menu → New game** to start a fresh world (do not load a slot containing a generated ruin), then enter the ruin from the overworld portal. If retaining progress, load a save from before its first ruin visit. Existing generated dungeons intentionally retain their original layout. Back up valuable saves before replacing a development build: the established ephemeral debug signature can require uninstalling the prior APK, deleting its private data.
 
@@ -92,3 +96,27 @@ Part 1 changes space, not environmental artistry. Floors and walls remain visual
 Later authored rooms must preserve reciprocal boundary semantics and sufficient practical/visual clearance. Connected lock cells mean one logical gate; independent gates must stay disconnected or receive explicit compatible IDs later. Keep feature interaction stands, entrance separation, eight production inhabitants, collision radii, deterministic RNG ordering and saved region authority. Do not regenerate old ruins to apply future templates.
 
 Parts 2–4 remain unimplemented. The draft PR must remain unmerged.
+
+## Package identity
+
+ARM64 APK source: `c949175fd6e6144bb3d04a52824d647e26890d9e`. APK SHA-256: `b0f5d1c0fca4e0cb43efddee4bf7e13f7879de78966fe4f0e7044968554a0b2d`. Signing mode reported by package validation: `ephemeral-debug-key-uninstall-required-between-runs`. Preserve/export valuable progress before uninstalling a differently signed prior build; format compatibility does not preserve Android private storage across uninstall.
+
+## Final exact-source CI and downloads
+
+All runtime verification and the APK below use **`c949175fd6e6144bb3d04a52824d647e26890d9e`**. The final handoff/screenshot update changes documentation and evidence only; it does not change that tested runtime.
+
+| Verification | Final result | Evidence |
+|---|---|---|
+| Build, import, grammar packaging, production integration | Passed, 4,521 assertions | [Native CI](https://github.com/CigThePig/RPG-test/actions/runs/40950726079) |
+| Desktop and mobile-layout rendered suites | Both passed; exact-source screenshots inspected | [Native artifact](https://github.com/CigThePig/RPG-test/actions/runs/40950726079/artifacts/12930358763) |
+| Preserved reference generation/tests/build | Passed | Same native workflow |
+| Baseline touch movie + independent rendered repeat | All 45 production scenarios passed | [Baseline artifact](https://github.com/CigThePig/RPG-test/actions/runs/40950726085/artifacts/12930769074) |
+| Precise touch movie + independent rendered repeat | All 45 production scenarios passed | [Precise artifact](https://github.com/CigThePig/RPG-test/actions/runs/40950726085/artifacts/12930494945) |
+| Focused dungeon expedition movie + independent repeat | Passed, identical authoritative digest; seed 1, real Dodge/Interact/joystick, key/gate/relic/return | Included in precise artifact, `dungeon-expedition/`; [inspected frame sheet](native-screenshots/dungeon-expedition-contact-sheet.jpg) |
+| ARM64 export, SDK/ABI/runtime/resources/source/signature | Passed | [Android workflow](https://github.com/CigThePig/RPG-test/actions/runs/40950726160) |
+| Installed x86_64 Android gameplay and three mixed-combat lifecycle cycles | Passed; actual captures inspected | [Android runtime evidence](https://github.com/CigThePig/RPG-test/actions/runs/40950726160/artifacts/12930479375) |
+| Physical Galaxy S25 ruin comfort, audio and sustained performance | **Not performed: no physical device connected to this environment** | User playtest required |
+
+**Download:** [Verified ARM64 development APK ZIP — c949175fd6e6](https://github.com/CigThePig/RPG-test/actions/runs/40950726160/artifacts/12932066317). Extract and install the `.apk`, not the x86_64 emulator package. The artifact also includes metadata/checksums and is retained until November 28, 2026.
+
+[Draft PR #5](https://github.com/CigThePig/RPG-test/pull/5) targets main on `feat/dungeon-exploration`. Parts 2–4 remain future work; do not merge. No outstanding inline review threads were present at the final review check.
