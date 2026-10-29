@@ -58,19 +58,39 @@ public partial class Foundation : Node2D
         var p=World.Player;p.Region=map.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.State=ActionState.Idle;p.StateRemaining=0;p.PendingAbility="";p.Statuses.Clear();p.Cooldowns.Clear();
         TouchMovement=ControllerVelocity=Vector2.Zero; Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/start-or-reset");
     }
-    public void BeginCombatCourse()
+    public string CombatCourseId { get; private set; } = "";
+    public void BeginCombatCourse() => BeginCombatCourse("mixed", true);
+    public void BeginCombatCourse(string encounter, bool protectedPlayer, ulong seed=42)
     {
         BeginFeelCourse();
-        var p=World.Player;p.Health=p.MaxHealth=10000;
+        CombatCourseId=encounter;
+        World.Seed=checked((int)seed);
+        var p=World.Player;
+        if(protectedPlayer)p.Health=p.MaxHealth=10000;
+        p.Invulnerable=protectedPlayer ? 10000 : 0;
         World.RegionsById[p.Region].Features.Clear();
         foreach(var other in World.Actors.Values.Where(a=>a.Id!="player"))other.Region="reach";
-        foreach(var entry in new[]{("prowler","quadruped",88f,380f,275f),("brute","reptile",46f,390f,330f),("spitter","amorphous",62f,445f,300f)})
+        string[] profiles=encounter switch {
+            "prowler" => new[]{"prowler"}, "brute" => new[]{"brute"},
+            "spitter" or "projectiles" => new[]{"spitter"},
+            "two melee" => new[]{"prowler","brute"},
+            "four mixed" => new[]{"prowler","brute","spitter","prowler"},
+            "crowd" => Enumerable.Range(0,8).Select(i=>new[]{"prowler","brute","spitter"}[i%3]).ToArray(),
+            _ => new[]{"prowler","brute","spitter"}
+        };
+        for(int i=0;i<profiles.Length;i++)
         {
-            var a=new ActorState{Id="lab:"+entry.Item1,Name=entry.Item1,Region=p.Region,Faction="beasts",Profile="beast",CombatProfile=entry.Item1,
-                Appearance=new(){Family=entry.Item2,Seed=42},X=entry.Item4,Y=entry.Item5,HomeX=entry.Item4,HomeY=entry.Item5,
-                Abilities=World.Content.CombatProfiles.Single(c=>c.Id==entry.Item1).Priorities.Keys.ToList()};
-            AnatomyAdapter.Apply(a);a.Speed=entry.Item3;World.Actors[a.Id]=a;
+            string id=profiles[i];
+            float x=380+(i/3)*42,y=275+(i%3)*30;
+            if(id=="spitter")x+=65;
+            var a=new ActorState{Id="lab:"+id+(i<3 ? "" : ":"+i),Name=id,Region=p.Region,Faction="beasts",Profile="beast",CombatProfile=id,
+                Appearance=new(){Family=id=="prowler" ? "quadruped" : id=="brute" ? "reptile" : "amorphous",Seed=seed+(ulong)i},
+                X=x,Y=y,HomeX=x,HomeY=y,Health=id=="prowler"?65:id=="brute"?120:55,MaxHealth=id=="prowler"?65:id=="brute"?120:55,
+                Abilities=World.Content.CombatProfiles.Single(c=>c.Id==id).Priorities.Keys.ToList()};
+            AnatomyAdapter.Apply(a);a.Speed=id=="prowler"?88:id=="brute"?46:62;World.Actors[a.Id]=a;
         }
+        Trace.Marker($"combat-course/{encounter}/seed-{seed}/{(protectedPlayer ? "protected" : "normal")}");
+        Ui.Notify($"Combat lab: {encounter} · {(protectedPlayer ? "protected observation" : "normal health")} · reset / return through Feel lab");
         RebuildViews();
         if(OS.HasFeature("android"))GD.Print("MOSSLIGHT_TACTICAL_LAB profiles=prowler,brute,spitter");
     }
@@ -195,6 +215,7 @@ public partial class Foundation : Node2D
             YSortEnabled = true
         };
         AddChild(actors);
+        AddChild(new PlayerLocator { App=this,ZIndex=50 });
         ground = new Node2D
         {
             ZIndex = -10
@@ -277,6 +298,8 @@ public partial class Foundation : Node2D
         {
             if (OS.HasFeature("android") && e.Kind is "resource_depleted" or "region_entered")
                 GD.Print($"MOSSLIGHT_GAMEPLAY kind={e.Kind} value={e.Value} tick={World.Tick}");
+            if(OS.HasFeature("android") && e.Kind=="ability_started" && e.Actor=="player")
+                GD.Print($"MOSSLIGHT_PLAYER_ABILITY id={e.Value} tick={World.Tick}");
             if (OS.HasFeature("android") && e.Kind == "damage" && e.Target == "player")
                 GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0}");
             if(Trace.Active && e.Kind is "region_entered" or "resource_depleted" or "ability_started" or "defeated")Trace.Marker(e.Kind+"/"+e.Value);
@@ -514,13 +537,16 @@ public partial class Foundation : Node2D
         return new NVector((float)Math.Cos(yaw), (float)-Math.Sin(yaw));
     }
 
+    ActorState? NearbyMerchant() => World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == World.Player.Region && NVector.Distance(x.Position, World.Player.Position) < 65 && !World.Hostile(World.Player, x) && World.LineOfSight(World.Player, x));
+    public bool HasInteraction() => World.InteractionTargets(World.Player).Any() || World.LootTargets(World.Player).Any() || NearbyMerchant() != null;
+
     public void Interact()
     {
         if (GameplayBlocked)
             return;
         var a = World.Player;
-        var npc = World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == a.Region && NVector.Distance(x.Position, a.Position) < 65 && !World.Hostile(a, x) && World.LineOfSight(a, x));
-        if (npc != null && !World.InteractionTargets(a).Any() && !World.Actors.Values.Any(x => !x.Alive && x.Region == a.Region && NVector.Distance(x.Position,a.Position) < 48 && World.Items.HasLoot(x.Id)))
+        var npc = NearbyMerchant();
+        if (npc != null && !World.InteractionTargets(a).Any() && !World.LootTargets(a).Any())
         {
             Narrative.Call("talk");
             return;
@@ -539,6 +565,7 @@ public partial class Foundation : Node2D
             Trace?.Marker("lifecycle/pause"); Trace?.Flush();
             TouchMovement = Vector2.Zero;
             ui?.Stick.Cancel();
+            ui?.CancelActionTouches();
             if (OS.HasFeature("android")) GD.Print("MOSSLIGHT_INPUT_CANCELLED");
             suspended = true;
             if (World != null && ui != null)
@@ -647,6 +674,7 @@ public partial class Foundation : Node2D
             var color = organic ? new Color(.45f, 1, .25f) : new Color(1, .48f, .12f);
             // A bounded velocity-aligned streak reads authoritative flight; it owns no timer.
             DrawLine(at - heading * 15, at, new Color(color, .35f), organic ? 5 : 3);
+            if(organic)DrawCircle(at,5.5f,new Color(.9f,.88f,.63f,.9f));
             DrawCircle(at, organic ? 4 : 3.5f, new Color(.08f, .12f, .06f));
             DrawCircle(at, organic ? 3 : 2.5f, color);
             DrawCircle(at + heading, 1.3f, organic ? Colors.LightYellow : Colors.White);

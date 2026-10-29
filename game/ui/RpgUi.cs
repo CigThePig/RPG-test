@@ -7,6 +7,10 @@ public partial class RpgUi : CanvasLayer
     public Foundation App { get; set; } = null !;
 
     readonly Dictionary<string, Button> abilityButtons = new();
+    readonly Dictionary<string, Button> actions = new();
+    public Button ActionControl(string id) => actions[id];
+    internal Rect2? VerificationSafeArea { get; set; }
+    public MobileCombatControls? CombatControls => hotbar as MobileCombatControls;
     Label health = null !, message = null !, title = null !;
     PanelContainer panel = null !, menu = null !;
     VBoxContainer body = null !;
@@ -71,50 +75,35 @@ public partial class RpgUi : CanvasLayer
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         root.AddChild(message);
-        hotbar = MobileLayout ? new Control() : new GridContainer { Columns = 5 };
+        hotbar = MobileLayout ? new MobileCombatControls() : new GridContainer { Columns = 5 };
         hotbar.Position = new Vector2(500, 640);
 
         root.AddChild(hotbar);
-        foreach (var(text, action)in new (string, Action)[]
+        foreach (var(actionId, text, action)in new (string, string, Action)[]
         {
-            ("1 · Sword", () => App.Cast("slash")),
-            ("Space · Dodge", App.Dodge),
-            ("2 · Ember", () => App.Cast("ember")),
-            ("3 · Mend", () => App.Cast("mend")),
-            ("4 · Draught", () => App.UseQuickItem("potion")),
-            ("E · Interact", App.Interact),
-            ("I · Pack", Inventory),
-            ("J · Journal", Journal),
-            ("C · Character", Character),
-            ("M · Map", Map),
-            ("Esc · Menu", Menu)
+            ("attack", "1 · Sword", () => App.Cast("slash")),
+            ("dodge", "Space · Dodge", App.Dodge),
+            ("ember", "2 · Ember", () => App.Cast("ember")),
+            ("mend", "3 · Mend", () => App.Cast("mend")),
+            ("potion", "4 · Draught", () => App.UseQuickItem("potion")),
+            ("interact", "E · Interact", App.Interact),
+            ("inventory", "I · Pack", Inventory),
+            ("journal", "J · Journal", Journal),
+            ("character", "C · Character", Character),
+            ("map", "M · Map", Map),
+            ("menu", "Esc · Menu", Menu)
         }
 
         )
         {
-            if (MobileLayout && (text.StartsWith("J ·") || text.StartsWith("C ·") || text.StartsWith("M ·"))) continue;
-            if (!MobileLayout && text.StartsWith("Space ·")) continue;
+            if (MobileLayout && actionId is "journal" or "character" or "map") continue;
+            if (!MobileLayout && actionId == "dodge") continue;
             var button = Button(hotbar, MobileLayout ? text.Split(" · ").Last() : text, action);
-            if (MobileLayout)
-            {
-                // Named positions remain stable when actions are added or reordered.
-                string actionName = text.Split(" · ").Last();
-                button.Position = actionName switch
-                {
-                    "Sword" => new Vector2(312, 130), "Dodge" => new Vector2(208, 136),
-                    "Ember" => new Vector2(104, 80), "Mend" => new Vector2(0, 0),
-                    "Draught" => new Vector2(104, 0), "Interact" => new Vector2(0, 80),
-                    "Pack" => new Vector2(208, 0), "Menu" => new Vector2(312, 0),
-                    _ => throw new InvalidOperationException("No mobile position for " + actionName)
-                };
-                bool primary = actionName == "Sword";
-                button.Size = button.CustomMinimumSize = primary ? new Vector2(112,104) : actionName == "Dodge" ? new Vector2(100,96) : new Vector2(96,68);
-                button.AddThemeFontSizeOverride("font_size", primary ? 23 : 18);
-                var face = new StyleBoxFlat { BgColor = new Color(primary ? "795433" : actionName == "Dodge" ? "355b56" : "263f43"), BorderColor = new Color("b0af7e"), BorderWidthLeft=2, BorderWidthRight=2, BorderWidthTop=2, BorderWidthBottom=2, CornerRadiusTopLeft=24, CornerRadiusTopRight=24, CornerRadiusBottomLeft=24, CornerRadiusBottomRight=24 };
-                button.AddThemeStyleboxOverride("normal", face);
-            }
-            if (text.StartsWith("Space")) abilityButtons["dodge"] = button;
-            var id = text.StartsWith("1") ? "slash" : text.StartsWith("2") ? "ember" : text.StartsWith("3") ? "mend" : "";
+            actions[actionId] = button;
+            button.Name = "action_" + actionId;
+            if (hotbar is MobileCombatControls mobile) mobile.Register(actionId, button);
+            if (actionId == "dodge") abilityButtons["dodge"] = button;
+            var id = actionId switch { "attack" => "slash", "ember" => "ember", "mend" => "mend", _ => "" };
             if (id != "")
             {
                 abilityButtons[id] = button;
@@ -166,7 +155,10 @@ public partial class RpgUi : CanvasLayer
         // emulation for menus, dialogue, scroll panels or actual desktop mice.
         if (e is InputEventMouse mouse && mouse.Device == InputEvent.DeviceIdEmulation && hotbar.IsVisibleInTree() && hotbar.GetChildren().OfType<Button>().Any(b => b.IsVisibleInTree() && b.GetGlobalRect().HasPoint(mouse.Position)))
         { GetViewport().SetInputAsHandled(); return; }
+        if (e is InputEventScreenDrag drag && touchButtons.ContainsKey(drag.Index))
+        { GetViewport().SetInputAsHandled(); return; }
         if (e is not InputEventScreenTouch touch) return;
+        if (App.GameplayBlocked) { CancelActionTouches(); return; }
         if (touch.Canceled)
         {
             if (touchButtons.Remove(touch.Index,out var canceled)) { canceled.Modulate=Colors.White; GetViewport().SetInputAsHandled(); }
@@ -187,13 +179,26 @@ public partial class RpgUi : CanvasLayer
                 button.EmitSignal(Godot.Button.SignalName.Pressed);
             GetViewport().SetInputAsHandled();
         }
+        else if (!touch.Pressed && hotbar.IsVisibleInTree() && actions.Values.Any(b => b.IsVisibleInTree() && b.GetGlobalRect().HasPoint(touch.Position)))
+        {
+            // A canceled owner may release after focus/modal restoration. Never let
+            // that orphaned release reach Button's native touchscreen GUI path.
+            GetViewport().SetInputAsHandled();
+        }
     }
 
-    void Layout()
+    public void CancelActionTouches()
+    {
+        foreach (var held in touchButtons.Values) held.Modulate = Colors.White;
+        touchButtons.Clear();
+    }
+    public void Layout()
     {
         var size = GetViewport().GetVisibleRect().Size;
-        hotbar.Position = MobileLayout ? new Vector2(size.X - 450, size.Y - 270) : new Vector2(size.X - 760, size.Y - 160);
-        if (MobileLayout) hotbar.Size = new Vector2(430,250);
+        CancelActionTouches();
+        Stick.Cancel();
+        hotbar.Position = MobileLayout ? Vector2.Zero : new Vector2(size.X - 760, size.Y - 160);
+        if (MobileLayout) hotbar.Size = size;
         Stick.Position = new Vector2(40, size.Y - 260);
         message.Position = new Vector2(24, size.Y - 45);
         message.Size = new Vector2(size.X - 48, 40);
@@ -201,7 +206,33 @@ public partial class RpgUi : CanvasLayer
         panel.Size = panel.CustomMinimumSize = new Vector2(740, size.Y - 290);
         menu.Position = new Vector2((size.X - 560) / 2, 70);
         menu.Size = new Vector2(560, size.Y - 140);
-        metrics.Position = new Vector2(size.X - 480, 20);
+        metrics.Position = new Vector2(size.X - 480, 100);
+        if (hotbar is MobileCombatControls mobile)
+        {
+            var safe = new Rect2(Vector2.Zero, size);
+            if (OS.HasFeature("android"))
+                safe = MobileCombatControls.ToLogicalSafeArea(safe, DisplayServer.GetDisplaySafeArea(), GetViewport().GetScreenTransform());
+            safe=VerificationSafeArea ?? safe;
+            mobile.Arrange(safe);
+            float panelWidth=Math.Min(740,safe.Size.X-48);
+            panel.Position=new Vector2(safe.Position.X+(safe.Size.X-panelWidth)/2,safe.Position.Y+90);
+            panel.Size=panel.CustomMinimumSize=new Vector2(panelWidth,Math.Max(200,safe.Size.Y-160));
+            float menuWidth=Math.Min(560,safe.Size.X-48);
+            menu.Position=new Vector2(safe.Position.X+(safe.Size.X-menuWidth)/2,safe.Position.Y+70);
+            menu.Size=menu.CustomMinimumSize=new Vector2(menuWidth,Math.Max(200,safe.Size.Y-140));
+            var pad = MobileCombatControls.Geometry(safe)["stick"];
+            Stick.Position=pad.Position; Stick.Size=pad.Size;
+            title.Position=safe.Position+new Vector2(24,18);
+            health.Position=safe.Position+new Vector2(24,48);
+            message.Position=new Vector2(safe.Position.X+24,safe.End.Y-42);
+            message.Size=new Vector2(safe.Size.X-48,40);
+            if(OS.HasFeature("android"))
+                foreach(var (id, button) in actions)
+                {
+                    var center=GetViewport().GetScreenTransform()*button.GetGlobalRect().GetCenter();
+                    GD.Print($"MOSSLIGHT_CONTROL version={MobileCombatControls.LayoutVersion} id={id} x={center.X:0} y={center.Y:0}");
+                }
+        }
     }
 
     static Button Button(Node parent, string text, Action action)
@@ -229,6 +260,8 @@ public partial class RpgUi : CanvasLayer
     void Open(string heading)
     {
         if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
+        CancelActionTouches();
+        Stick.Cancel();
         App.TouchMovement = Vector2.Zero;
         App.World.CancelPlayerDodge();
         Clear(body);
@@ -243,11 +276,13 @@ public partial class RpgUi : CanvasLayer
         while (frames.Count > 600) frames.Dequeue();
     }
 
+    double interactionEmphasisUntil;
+    long interactionCheckTick = -1;
     public void Notify(string text) => message.Text = text;
     public void Update()
     {
         hotbar.Visible = !BlocksInput && !App.Narrative.Get("speaking").AsBool();
-        if (!hotbar.Visible) { foreach(var held in touchButtons.Values)held.Modulate=Colors.White; touchButtons.Clear(); }
+        if (!hotbar.Visible || App.GameplayBlocked) CancelActionTouches();
         Stick.Visible = MobileLayout && !App.GameplayBlocked;
         if (App.GameplayBlocked) Stick.Cancel();
         marker.Visible=App.Trace.Active && !BlocksInput;
@@ -262,6 +297,12 @@ public partial class RpgUi : CanvasLayer
             metrics.Text = $"Target {nearby}\nXY {App.World.Player.X:0},{App.World.Player.Y:0} · tile {App.World.RegionsById[App.World.Player.Region].Index(App.World.Player.Position)} · stand {App.World.RegionsById[App.World.Player.Region].CanStand(App.World.Player.Position,App.World.Player)}\nInput {App.World.LastInput.Length():0.00} · velocity {App.World.ActualVelocity.Length():0.0} · sim {App.SimulationMs:0.00}ms\nBlocked {App.World.LastBlockedReason}\nFPS {Engine.GetFramesPerSecond()} · p50/p95/p99 {sorted[(int)((sorted.Length - 1) * .5)]:0.0}/{sorted[(int)((sorted.Length - 1) * .95)]:0.0}/{sorted[(int)((sorted.Length - 1) * .99)]:0.0} ms\nActors {App.Views.Values.Count(v => v.Visible)}/{App.World.Actors.Count} · managed {GC.GetTotalMemory(false)/1048576.0:0} MB\nRaster {PixelCreatures.Runtime.CreatureRenderQueue.LastRasterMs:0.0} ms · upload {PixelCreatures.Runtime.CreatureRenderQueue.LastUploadMs:0.0} ms · save {Persistence.LastSaveMilliseconds:0.0} ms";
         }
         var a = App.World.Player;
+        if (MobileLayout && App.World.Tick != interactionCheckTick && App.World.Tick % 6 == 0)
+        {
+            interactionCheckTick=App.World.Tick;
+            if(App.HasInteraction()) interactionEmphasisUntil=Time.GetTicksMsec()+350;
+            actions["interact"].SelfModulate=Time.GetTicksMsec()<interactionEmphasisUntil ? new Color(1.3f,1.3f,1.05f) : new Color(.75f,.8f,.8f);
+        }
         health.Text = $"{a.Name}   ♥ {a.Health:0}/{a.MaxHealth}    Mana {a.Mana:0}/{a.MaxMana}    Lv {a.Level} · XP {a.Experience}/{a.Level * 100}    {a.State}\n{a.Region} · {(int)(App.World.Time / 60) % 24:00}:{(int)App.World.Time % 60:00}";
         foreach (var(id, button)in abilityButtons)
         {
@@ -277,12 +318,14 @@ public partial class RpgUi : CanvasLayer
             button.Disabled = cooldown > 0 || a.Mana < def.Cost || !a.Alive;
             string binding = id == "slash" ? "1" : id == "ember" ? "2" : "3";
             string label = MobileLayout ? (id == "slash" ? "Attack" : def.Name.Split(' ')[0]) : $"{binding} · {def.Name}";
-            button.Text = cooldown > 0 ? label + (MobileLayout ? "\n" : " ") + $"{cooldown:0.0}s" : label;
+            button.Text = cooldown > 0 ? label + (MobileLayout ? "\n" : " ") + $"{cooldown:0.0}s" : MobileLayout && id != "slash" ? label + $"\n{def.Cost:0} mana" : label;
         }
     }
 
     public void PauseForVerification()
     {
+        CancelActionTouches();
+        Stick.Cancel();
         panel.Hide();
         menu.Show();
     }
@@ -396,6 +439,8 @@ public partial class RpgUi : CanvasLayer
     public void Menu()
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
+        CancelActionTouches();
+        Stick.Cancel();
         App.TouchMovement = Vector2.Zero;
         App.World.CancelPlayerDodge();
         panel.Hide();
@@ -561,6 +606,13 @@ public partial class RpgUi : CanvasLayer
             panel.Hide();
         });
         Button(body, "Combat archetypes test encounter (F9)", App.BeginCombatCourse);
+        foreach(var encounter in new[]{"prowler","brute","spitter","two melee","mixed","four mixed","projectiles","crowd"})
+        {
+            string selected=encounter;
+            Button(body, "Combat · " + selected + " · normal health", () => App.BeginCombatCourse(selected,false));
+            Button(body, "Combat · " + selected + " · protected observation", () => App.BeginCombatCourse(selected,true));
+        }
+        if(App.InFeelCourse)Button(body,"Return from combat lab",App.LeaveFeelCourse);
         Button(body, "Complete integration checks", () =>
         {
             App.RunChecks();

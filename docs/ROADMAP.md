@@ -24,3 +24,5 @@ The development environment is deliberately compact. There is no finished story,
 - [ ] Part 4: Mobile controls, encounter balancing and final verification.
 
 Part 3 code was verified on `681d15851c02a55b7dc27419f434dfa4498ee766`. See PR4_PART4_HANDOFF.md and PR4_PART3_PERFORMANCE.md for continuation contracts and actual evidence.
+
+Part 4 implementation adds separated mobile combat/utility zones, stable control IDs, safe-area/resize checks, expanded real input regression tests, normal-health combat fixtures, a conditional crowd locator and higher-contrast Spit. Completion/readiness is gated by the final exact-source verification ledger in PR4_PART4_VERIFICATION.md. Phone-only acceptance remains separate from code review readiness.

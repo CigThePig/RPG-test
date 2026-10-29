@@ -122,7 +122,17 @@ try:
     # enemies kill the player mid-test; it did not expose an input failure.
     adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(30*w/1280)),str(int(640*h/800)),'600')
     time.sleep(.4)
-    tap(1198,712) # Attack: the large primary button.
+    def action_target(action):
+        rows=re.findall(fr'MOSSLIGHT_CONTROL version=1 id={action} x=([0-9]+) y=([0-9]+)',adb('logcat','-d'))
+        assert rows, f'Missing production layout diagnostic for {action}'
+        x,y=map(int,rows[-1])
+        assert 0<=x<w and 0<=y<h, f'Invalid control center: {action} {x},{y}'
+        return x,y
+    def tap_action(action):
+        x,y=action_target(action)
+        adb('shell','input','tap',str(x),str(y))
+    (out/'control-layout.json').write_text(json.dumps({a:action_target(a) for a in ('attack','dodge','ember','mend','potion','interact','inventory','menu')},indent=2))
+    tap_action('attack')
     deadline=time.monotonic()+15
     while time.monotonic()<deadline:
         logs=adb('logcat','-d')
@@ -130,7 +140,7 @@ try:
         time.sleep(.5)
     else: raise RuntimeError('Real Android Attack touch did not finish a free swing')
     assert len(re.findall(r'MOSSLIGHT_COMBAT kind=attack_started',logs))==1, 'Attack touch activated more than once'
-    tap(1088,714) # Dodge: beside the primary attack.
+    tap_action('dodge')
     deadline=time.monotonic()+15
     while time.monotonic()<deadline:
         logs=adb('logcat','-d')
@@ -156,7 +166,7 @@ try:
             else: raise RuntimeError(f'Android simulation did not reach {kind} cooldown tick {ready_tick}')
             prior_starts=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_started tick=(\d+)',logs))
             prior_completions=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_completed tick=(\d+)',logs))
-            tap(x,y)
+            tap_action(kind)
             deadline=time.monotonic()+15
             while time.monotonic()<deadline:
                 logs=adb('logcat','-d')
@@ -172,7 +182,7 @@ try:
     # control phase gives roaming enemies time to approach the original area.
     # Reset through the same menu a player uses, without altering combat rules.
     before_reset=len(re.findall(r'MOSSLIGHT_SESSION_STARTED tick=0',logs))
-    tap(1190,564) # Menu
+    tap_action('menu')
     time.sleep(1)
     capture('reset-menu.png')
     tap(640,566) # New game in the initial menu's visible row.
@@ -194,7 +204,7 @@ try:
     else: raise RuntimeError('Touch movement never approached starting chest')
     assert float(positions[-1][0])>220,'Touch input did not change player coordinates'
     capture('chest.png')
-    tap(878,644) # Interact: left side of the named action cluster.
+    tap_action('interact')
     time.sleep(1)
     logs=adb('logcat','-d')
     assert 'MOSSLIGHT_GAMEPLAY kind=resource_depleted value=chest' in logs,'Touch interaction did not empty authoritative chest inventory'
@@ -216,7 +226,7 @@ try:
             approaches+=1
         else: time.sleep(.5)
     else: raise RuntimeError('Android combat did not produce two real player damage events')
-    tap(1086,564) # Pack: utility row above the combat thumb arc.
+    tap_action('inventory')
     time.sleep(1)
     capture('inventory.png')
     pids=adb('shell','pidof','screenrecord').split()
@@ -251,6 +261,16 @@ try:
         time.sleep(.5)
     else: raise RuntimeError('Android mixed archetype fixture did not enter and release a real spit projectile')
     capture('mixed-archetypes.png',wait=20)
+    spell_before=adb('logcat','-d').count('MOSSLIGHT_PLAYER_ABILITY id=ember ')
+    tap_action('ember')
+    deadline=time.monotonic()+15
+    while time.monotonic()<deadline:
+        count=adb('logcat','-d').count('MOSSLIGHT_PLAYER_ABILITY id=ember ')-spell_before
+        assert count<=1, 'One spell tap double-dispatched'
+        if count==1: break
+        time.sleep(.25)
+    else: raise RuntimeError('Android Ember action did not activate')
+    capture('spell-cooldown.png',wait=10)
     lifecycle=[]
     original_pid=adb('shell','pidof',package)
     assert original_pid,'Application exited before Android lifecycle verification'

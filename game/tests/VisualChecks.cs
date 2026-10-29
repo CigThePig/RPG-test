@@ -174,7 +174,7 @@ public static class VisualChecks
             await Until(app, () => enemy.StateRemaining <= bite.Windup * .45f, "Dodge fixture did not reach input boundary");
             if(app.Ui.MobileLayout)
             {
-                var button=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.StartsWith("Dodge") && b.IsVisibleInTree());
+                var button=app.Ui.ActionControl("dodge");
                 var point=button.GetGlobalRect().GetCenter();
                 Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=point});
                 Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=point});
@@ -393,6 +393,13 @@ public static class VisualChecks
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
+        if(OS.GetCmdlineUserArgs().Contains("--controls-only"))
+        {
+            await MobileCombatControlsChecks.Rendered(app);
+            await MobileCombatControlsChecks.InputPipeline(app);
+            GD.Print("MOBILE CONTROLS CHECKS PASSED");
+            return;
+        }
         if (!app.Ui.MobileLayout)
         {
             // The dummy audio driver proves resource construction, not how the
@@ -408,6 +415,8 @@ public static class VisualChecks
                     throw new InvalidOperationException("Missing synthesized combat audio sample: " + cue);
             }
         }
+        await MobileCombatControlsChecks.Rendered(app);
+        await MobileCombatControlsChecks.InputPipeline(app);
         await Capture(app, "menu");
         if (app.Ui.MobileLayout)
         {
@@ -438,7 +447,7 @@ public static class VisualChecks
         {
             // Menu sits above the primary action cluster. Its upper edge must still
             // suppress the OS-synthesized mouse pair after the owned touch.
-            var menuButton=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Menu" && b.IsVisibleInTree());
+            var menuButton=app.Ui.ActionControl("menu");
             var menuPoint=menuButton.GlobalPosition+new Vector2(menuButton.Size.X/2,5);
             Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=menuPoint});
             Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=menuPoint,GlobalPosition=menuPoint});
@@ -455,8 +464,8 @@ public static class VisualChecks
             // different finger owns the stick, including canceled and dragged touches.
             string snapshot=Persistence.Capture(app.World,app.Narrative);
             var mobilePlayer=app.World.Player;
-            var dodge=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Dodge" && b.IsVisibleInTree());
-            var attack=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Attack" && b.IsVisibleInTree());
+            var dodge=app.Ui.ActionControl("dodge");
+            var attack=app.Ui.ActionControl("attack");
             var dodgePoint=dodge.GetGlobalRect().GetCenter();
             var dodgeSize=dodge.Size;
             int starts=0;
@@ -521,7 +530,7 @@ public static class VisualChecks
             await Frames(app,2);
         }
         // Use real GUI dispatch for desktop mice; headless checks exercise raw touch.
-        var draught=app.Ui.GetChildren().OfType<Control>().First().FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.Contains("Draught"));
+        var draught=app.Ui.ActionControl("potion");
         var point=draught.GetGlobalRect().GetCenter();
         int potions=app.World.Items.Count("player","potion");
         Input.ParseInputEvent(new InputEventMouseButton { Device=0,ButtonIndex=MouseButton.Left,Pressed=true,Position=point,GlobalPosition=point });

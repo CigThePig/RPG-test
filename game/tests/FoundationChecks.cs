@@ -38,6 +38,8 @@ public static class FoundationChecks
         var watch = Stopwatch.StartNew();
         try
         {
+            MobileCombatControlsChecks.Run(Check);
+            EncounterChecks.Run(app,Check);
             ReviewChecks.Run(app, Check);
             PlayabilityChecks.Run(app, Check);
             MovementChecks.Run(app, Check);
@@ -136,7 +138,7 @@ public static class FoundationChecks
             app.Ui.Update();
             await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);
             await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);
-            var draught=app.Ui.GetChildren().OfType<Control>().First().FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.Contains("Draught"));
+            var draught=app.Ui.ActionControl("potion");
             var touchPoint=draught.GetGlobalRect().GetCenter();
             int potionCount=w.Items.Count("player","potion");
             w.Player.Health=20;

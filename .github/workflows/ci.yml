@@ -42,6 +42,7 @@ jobs:
             docs/audio-samples/
             docs/verification.json
             docs/render-verification*.json
+            build/encounter-measurements.json
             build/verification-*.log
   preserved-reference:
     runs-on: ubuntu-24.04

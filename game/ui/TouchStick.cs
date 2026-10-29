@@ -21,6 +21,7 @@ public partial class TouchStick : Control
         if (App.GameplayBlocked) { Cancel(); return; }
         if (e is InputEventScreenTouch touch)
         {
+            if (touch.Canceled && touch.Index != finger)return;
             if ((touch.Canceled || !touch.Pressed) && touch.Index == finger) { Cancel(); return; }
             if (touch.Pressed && finger == -1 && new Rect2(GlobalPosition, Size).HasPoint(touch.Position))
             {
@@ -41,7 +42,8 @@ public partial class TouchStick : Control
     }
     public override void _Draw()
     {
-        DrawCircle(Size / 2, 94, new Color(.08f,.14f,.14f,.65f));
-        DrawCircle((finger < 0 ? Size / 2 : anchor) + offset, 30, new Color(.65f,.73f,.5f,.8f));
+        float scale = Math.Min(Size.X,Size.Y)/200;
+        DrawCircle(Size / 2, 94*scale, new Color(.08f,.14f,.14f,.65f));
+        DrawCircle((finger < 0 ? Size / 2 : anchor) + offset, 30*scale, new Color(.65f,.73f,.5f,.8f));
     }
 }

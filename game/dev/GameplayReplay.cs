@@ -137,7 +137,7 @@ public sealed class GameplayReplay
     }
     void TapAction(string label)
     {
-        var button=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.StartsWith(label));
+        var button=app.Ui.ActionControl(label == "Attack" ? "attack" : label.ToLowerInvariant());
         var at=button.GetGlobalRect().GetCenter();
         Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=at});
         Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=at});
@@ -338,7 +338,7 @@ public sealed class GameplayReplay
                 var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
                 enemy.X=app.World.Player.X+28;enemy.Y=app.World.Player.Y;app.Views[enemy.Id].SnapPosition();
                 app.Trace.Marker("fixture/target-range-reset-for-slash");
-                var button=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.StartsWith("Attack"));
+                var button=app.Ui.ActionControl("attack");
                 var pos=button.GetGlobalRect().GetCenter();
                 Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=pos});
                 Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=pos});
@@ -435,7 +435,7 @@ public sealed class GameplayReplay
         }
         if(test.Id=="multitouch" && local==30)
         {
-            var b=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(x=>x.Text.Contains("Draught"));
+            var b=app.Ui.ActionControl("potion");
             var pos=b.GetGlobalRect().GetCenter();
             Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=pos});
             Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=pos});

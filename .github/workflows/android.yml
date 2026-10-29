@@ -110,6 +110,7 @@ jobs:
           name: android-diagnostics-${{ github.run_id }}
           path: |
             build/android/*.log
+            build/encounter-measurements.json
             build/verification-*.log
             build/android/*manifest*
             build/android/*signature*
