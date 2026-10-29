@@ -356,7 +356,7 @@ public partial class RpgUi : CanvasLayer
         var actor = App.World.Player;
         Open("WAYFARER");
         body.AddChild(new Label { Text = $"Level {actor.Level} · skill points {actor.SkillPoints}\nStrength {App.World.Stat(actor, "strength")}\nDefence {App.World.Stat(actor, "defence")}\nWeapon damage {App.World.Items.Bonus(actor, "damage")}\nFamily {actor.Appearance.Family} · seed {actor.Appearance.Seed}\nFlight {actor.Flies} · Swimming {actor.Swims} · Grasping {actor.Grasps}\nWarden reputation {actor.Reputation.GetValueOrDefault("wardens")}" });
-        foreach (var ability in App.World.Content.Abilities)
+        foreach (var ability in App.World.Content.Abilities.Where(a => a.PlayerLearnable || actor.Abilities.Contains(a.Id)))
         {
             if (actor.Abilities.Contains(ability.Id))
                 Button(body, "Use · " + ability.Name, () =>

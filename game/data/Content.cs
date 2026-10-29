@@ -21,6 +21,7 @@ public sealed class AbilityDef
     public bool RequiresWeapon { get; set; }
     // Test fixtures are excluded from normal content, including progression UI.
     public bool VerificationOnly { get; set; }
+    public bool PlayerLearnable { get; set; } = true;
     // Omitted geometry preserves the original target-locked SPELL behavior.
     public AttackGeometryDef? Geometry { get; set; }
     public TelegraphDef? Telegraph { get; set; }

@@ -107,7 +107,8 @@
       "Telegraph": {
         "Style": "cone"
       },
-      "ActionStyle": "Slam"
+      "ActionStyle": "Slam",
+      "PlayerLearnable": false
     },
     {
       "Id": "spit",
@@ -127,7 +128,8 @@
         "Radius": 3,
         "Visual": "spit",
         "InterceptHostiles": true
-      }
+      },
+      "PlayerLearnable": false
     },
     {
       "Id": "fixture_homing",

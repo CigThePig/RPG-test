@@ -16,6 +16,8 @@ Part 3 adds combat profiles, tactical intentions beneath Skelerealms, soft NPC a
 | Brute | reptile / 46 | slam, bite fallback | 30 preferred, 42 approach; Slam 0.80 s windup, 0.85 s recovery, 2.40 s cooldown; committed 52-unit, 55-degree half-angle cone |
 | Spitter | amorphous / 62 | spit, bite fallback | 72 minimum, 110 preferred, 140 approach; Spit 0.48 s windup, 0.50 s recovery, 1.80 s cooldown; 135 units/s straight droplet |
 
+Enemy Slam/Spit set `PlayerLearnable: false`, so the content additions do not add player progression actions. Existing abilities retain their default learning behaviour.
+
 These values are starting points. Balance health (65/120/55), damage (bite 9, slam 14, spit 7 plus existing actor stats), pressure/recovery, projectile readability, retreat distances and mixed-room pacing against real phone play. Do not infer that a renderer or emulator pass establishes enjoyable difficulty.
 
 Approach/retreat use hysteresis. Equal attack priorities and target distances break by ordinal ID. The selector reuses `CanActivate`, including cooldown, mana, equipment, state, range and sight. Retreat tries six ordered local directions with clearance; a cornered enemy may attack or hold. Repositioning is occasional and actor-ID phased. No wall tracking, global knowledge, squad turn-taking or frame-perfect dodge prediction was added. Missing/unknown saved profile IDs use safe legacy tactics.

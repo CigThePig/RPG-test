@@ -70,6 +70,8 @@ public static class CombatAiChecks
             }
             var invalid=Content.Load(true);invalid.CombatProfiles[0].MinimumDistance=1000;
             check(invalid.Validate(new(){"potion","iron_sword","oak_staff","coin","herb","ore","wood"}).Any(e=>e.Contains("combat profile")),"contradictory combat distances rejected");
+            w.Player.Level=100;w.Player.SkillPoints=20;
+            check(!Progression.Unlock(w,w.Player,"slam") && !Progression.Unlock(w,w.Player,"spit") && w.Player.SkillPoints==20,"enemy-only content does not introduce player unlocks/actions");
             foreach (int seed in new[] { 1, 42, 1337 })
             {
                 Persistence.Restore(w, app.Narrative, saved);

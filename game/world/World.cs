@@ -410,7 +410,7 @@ public sealed class World
         long avoidanceStart = ProfileCombat ? Stamp() : 0;
         separation.Rebuild(Actors.Values);
         if(ProfileCombat) AvoidanceMilliseconds += Milliseconds(avoidanceStart);
-        foreach (var a in Actors.Values.OrderBy(a => a.Id, StringComparer.Ordinal))
+        foreach (var a in Actors.Values.OrderBy(a => a.Id == "player" ? 0 : 1).ThenBy(a => a.Id, StringComparer.Ordinal))
         {
             foreach (var key in a.Cooldowns.Keys.ToArray())
                 a.Cooldowns[key] = Math.Max(0, a.Cooldowns[key] - dt);
