@@ -1,6 +1,6 @@
 # Next game development
 
-PR #4 milestones: Part 1 establishes authored target/cone geometry, typed world presentation events and state-derived enemy warnings; Part 2 adds procedural attack animation and impact feedback; Part 3 implements authored enemy tactics, spacing and swept projectile flight; Part 4 will address mobile controls, encounter balance and final verification. Circle damage and final mobile balancing remain future work; Part 3 verification status is recorded in PR4_PART3_PERFORMANCE.md.
+PR #4 milestones: Part 1 establishes authored target/cone geometry, typed world presentation events and state-derived enemy warnings; Part 2 adds procedural attack animation and impact feedback; Part 3 implements authored enemy tactics, spacing and swept projectile flight; Part 4 completes mobile controls, normal-health encounter audits, integration and executable verification. Circle damage remains future work; physical S25 acceptance remains pending. Final results are recorded in PR4_PART4_VERIFICATION.md.
 
 The selected engine and source integrations are implemented. Continue by building game content and extending tested production paths:
 
@@ -21,8 +21,8 @@ The development environment is deliberately compact. There is no finished story,
 - [x] Part 1: Combat architecture, shared geometry and telegraphs.
 - [x] Part 2: Procedural combat animation and impact feedback.
 - [x] Part 3: Enemy intelligence, spacing and projectiles.
-- [ ] Part 4: Mobile controls, encounter balancing and final verification.
+- [x] Part 4: Mobile controls, encounter balancing and final verification.
 
 Part 3 code was verified on `681d15851c02a55b7dc27419f434dfa4498ee766`. See PR4_PART4_HANDOFF.md and PR4_PART3_PERFORMANCE.md for continuation contracts and actual evidence.
 
-Part 4 implementation adds separated mobile combat/utility zones, stable control IDs, safe-area/resize checks, expanded real input regression tests, normal-health combat fixtures, a conditional crowd locator and higher-contrast Spit. Completion/readiness is gated by the final exact-source verification ledger in PR4_PART4_VERIFICATION.md. Phone-only acceptance remains separate from code review readiness.
+Part 4 implementation adds separated mobile combat/utility zones, stable control IDs, safe-area/resize checks, expanded real input regression tests, normal-health combat fixtures, a conditional crowd locator and higher-contrast Spit. Final source c7c4d3293f5008312e30353d0199e5df34d8582a passed all executable checks; see PR4_PART4_VERIFICATION.md. Phone-only acceptance remains separate from code review readiness.

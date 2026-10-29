@@ -1,12 +1,462 @@
 {
   "frames": 180,
-  "p50ms": 12.657000000000153,
-  "p95ms": 16.587600000000066,
-  "p99ms": 19.929900000000004,
-  "averageMs": 13.057062222222216,
+  "p50ms": 27.79639999999995,
+  "p95ms": 32.38549999999998,
+  "p99ms": 35.290100000000166,
+  "averageMs": 28.62461611111111,
   "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
   "actors": 17,
   "visibleActors": 9,
-  "totalRasterizations": 208,
-  "managedBytes": 53048272
+  "totalRasterizations": 504,
+  "managedBytes": 28523384,
+  "cameraHitch": {
+    "stalledFrames": 8,
+    "stallMs": 230,
+    "maxCenterError": 0.8382211,
+    "settledCenterError": 3.0517578E-05,
+    "callback": "Physics"
+  },
+  "telegraphPerformance": {
+    "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "actors": 4,
+    "samples": 90,
+    "idleMeanMs": 22.699402222222222,
+    "idleP95Ms": 23.645700000000033,
+    "windupMeanMs": 23.566036666666665,
+    "windupP95Ms": 24.52909999999997,
+    "idleManagedBytes": 24686496,
+    "windupManagedBytes": 25114144,
+    "note": "Same visible actors; active sample includes PPC action animation and four warnings. Software-renderer measurement, not a phone benchmark."
+  },
+  "combatPerformance": {
+    "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "samplesPerScenario": 120,
+    "note": "Normal simulation time, identical four-creature fixture. Wall-frame samples include renderer and host scheduling; not phone performance.",
+    "scenarios": [
+      {
+        "scenario": "idle",
+        "frames": 120,
+        "p50ms": 23.5309000000002,
+        "p95ms": 26.902699999999868,
+        "p99ms": 29.3079,
+        "meanMs": 24.01183749999999,
+        "rasterBatches": 54,
+        "rasterP50Ms": 2.5276,
+        "rasterP95Ms": 3.1752,
+        "uploadP95Ms": 0.3934,
+        "rasterizations": 162,
+        "uploads": 162,
+        "allocatedBytes": 1072240,
+        "managedStart": 17252872,
+        "managedEnd": 18402944,
+        "peakEffects": 0,
+        "gen0Collections": 0,
+        "canvasGrowths": 0,
+        "worstFrames": [
+          {
+            "frameMs": 30.271499999999946,
+            "driveMs": 0.0017000000000280124,
+            "rasterMs": 2.7552,
+            "uploadMs": 0.3462,
+            "effects": 0
+          },
+          {
+            "frameMs": 29.3079,
+            "driveMs": 0.016499999999999997,
+            "rasterMs": 3.2751,
+            "uploadMs": 0.4019,
+            "effects": 0
+          },
+          {
+            "frameMs": 27.63259999999991,
+            "driveMs": 0.0027999999999792635,
+            "rasterMs": 3.082,
+            "uploadMs": 0.327,
+            "effects": 0
+          },
+          {
+            "frameMs": 27.04599999999982,
+            "driveMs": 0.00010000000020227162,
+            "rasterMs": 3.0908,
+            "uploadMs": 0.3042,
+            "effects": 0
+          },
+          {
+            "frameMs": 26.963500000000067,
+            "driveMs": 0.002199999999902502,
+            "rasterMs": 3.0656,
+            "uploadMs": 0.3934,
+            "effects": 0
+          }
+        ]
+      },
+      {
+        "scenario": "one attack",
+        "frames": 120,
+        "p50ms": 24.471599999999853,
+        "p95ms": 26.906900000000178,
+        "p99ms": 27.56100000000015,
+        "meanMs": 24.458620833333335,
+        "rasterBatches": 65,
+        "rasterP50Ms": 1.5768,
+        "rasterP95Ms": 3.0541,
+        "uploadP95Ms": 0.3578,
+        "rasterizations": 205,
+        "uploads": 205,
+        "allocatedBytes": 1159960,
+        "managedStart": 18419392,
+        "managedEnd": 19634920,
+        "peakEffects": 0,
+        "gen0Collections": 0,
+        "canvasGrowths": 0,
+        "worstFrames": [
+          {
+            "frameMs": 30.270300000000134,
+            "driveMs": 0.23070000000006985,
+            "rasterMs": 3.1733,
+            "uploadMs": 0.4234,
+            "effects": 0
+          },
+          {
+            "frameMs": 27.56100000000015,
+            "driveMs": 0.0005999999998493877,
+            "rasterMs": 3.0196,
+            "uploadMs": 0.3578,
+            "effects": 0
+          },
+          {
+            "frameMs": 27.522500000000036,
+            "driveMs": 0.001099999999951251,
+            "rasterMs": 3.0828,
+            "uploadMs": 0.3525,
+            "effects": 0
+          },
+          {
+            "frameMs": 27.43950000000018,
+            "driveMs": 0.00029999999992469384,
+            "rasterMs": 3.1551,
+            "uploadMs": 0.3188,
+            "effects": 0
+          },
+          {
+            "frameMs": 27.2229,
+            "driveMs": 0.33899999999999997,
+            "rasterMs": 2.9834,
+            "uploadMs": 0.3086,
+            "effects": 0
+          }
+        ]
+      },
+      {
+        "scenario": "one hit reaction",
+        "frames": 120,
+        "p50ms": 24.326000000000022,
+        "p95ms": 26.773400000000038,
+        "p99ms": 27.211799999999997,
+        "meanMs": 24.418239166666673,
+        "rasterBatches": 67,
+        "rasterP50Ms": 1.6105,
+        "rasterP95Ms": 3.0726,
+        "uploadP95Ms": 0.342,
+        "rasterizations": 195,
+        "uploads": 195,
+        "allocatedBytes": 1251200,
+        "managedStart": 19648176,
+        "managedEnd": 20961088,
+        "peakEffects": 1,
+        "gen0Collections": 0,
+        "canvasGrowths": 0,
+        "worstFrames": [
+          {
+            "frameMs": 27.23090000000002,
+            "driveMs": 0.12350000000014916,
+            "rasterMs": 2.5133,
+            "uploadMs": 0.3985,
+            "effects": 1
+          },
+          {
+            "frameMs": 27.211799999999997,
+            "driveMs": 0.00019999999999242846,
+            "rasterMs": 2.9839,
+            "uploadMs": 0.3049,
+            "effects": 1
+          },
+          {
+            "frameMs": 26.980000000000018,
+            "driveMs": 0.0008000000000265572,
+            "rasterMs": 3.2132,
+            "uploadMs": 0.2825,
+            "effects": 0
+          },
+          {
+            "frameMs": 26.97380000000021,
+            "driveMs": 0.0003999999998995918,
+            "rasterMs": 3.0954,
+            "uploadMs": 0.2975,
+            "effects": 1
+          },
+          {
+            "frameMs": 26.825999999999993,
+            "driveMs": 0.0009000000000014552,
+            "rasterMs": 3.0895,
+            "uploadMs": 0.3751,
+            "effects": 1
+          }
+        ]
+      },
+      {
+        "scenario": "four attackers",
+        "frames": 120,
+        "p50ms": 25.75999999999999,
+        "p95ms": 28.26130000000012,
+        "p99ms": 29.549099999999726,
+        "meanMs": 25.499055833333333,
+        "rasterBatches": 87,
+        "rasterP50Ms": 2.4474,
+        "rasterP95Ms": 3.2632,
+        "uploadP95Ms": 0.4182,
+        "rasterizations": 324,
+        "uploads": 324,
+        "allocatedBytes": 2277320,
+        "managedStart": 20977536,
+        "managedEnd": 18919128,
+        "peakEffects": 0,
+        "gen0Collections": 1,
+        "canvasGrowths": 0,
+        "worstFrames": [
+          {
+            "frameMs": 38.3154,
+            "driveMs": 0.49829999999999997,
+            "rasterMs": 12.1417,
+            "uploadMs": 0.8592,
+            "effects": 0
+          },
+          {
+            "frameMs": 29.549099999999726,
+            "driveMs": 0.34920000000010987,
+            "rasterMs": 3.293,
+            "uploadMs": 1.4945,
+            "effects": 0
+          },
+          {
+            "frameMs": 28.86420000000004,
+            "driveMs": 0.0013999999999896318,
+            "rasterMs": 2.9204,
+            "uploadMs": 0.4182,
+            "effects": 0
+          },
+          {
+            "frameMs": 28.691299999999956,
+            "driveMs": 0.26139999999986685,
+            "rasterMs": 3.5783,
+            "uploadMs": 0.6832,
+            "effects": 0
+          },
+          {
+            "frameMs": 28.486699999999928,
+            "driveMs": 0.0008000000002539309,
+            "rasterMs": 2.7476,
+            "uploadMs": 0.372,
+            "effects": 0
+          }
+        ]
+      },
+      {
+        "scenario": "four simultaneous hits",
+        "frames": 120,
+        "p50ms": 24.893899999999803,
+        "p95ms": 28.018599999999992,
+        "p99ms": 29.396799999999985,
+        "meanMs": 25.09175,
+        "rasterBatches": 80,
+        "rasterP50Ms": 2.3762,
+        "rasterP95Ms": 2.8072,
+        "uploadP95Ms": 0.453,
+        "rasterizations": 284,
+        "uploads": 284,
+        "allocatedBytes": 1661752,
+        "managedStart": 18935576,
+        "managedEnd": 20661760,
+        "peakEffects": 4,
+        "gen0Collections": 0,
+        "canvasGrowths": 0,
+        "worstFrames": [
+          {
+            "frameMs": 29.8442,
+            "driveMs": 0.0007999999999981355,
+            "rasterMs": 2.8072,
+            "uploadMs": 0.453,
+            "effects": 4
+          },
+          {
+            "frameMs": 29.396799999999985,
+            "driveMs": 0.0006000000000767614,
+            "rasterMs": 2.8542,
+            "uploadMs": 0.4272,
+            "effects": 0
+          },
+          {
+            "frameMs": 28.788800000000037,
+            "driveMs": 0.0006999999999948159,
+            "rasterMs": 2.3588,
+            "uploadMs": 0.3392,
+            "effects": 4
+          },
+          {
+            "frameMs": 28.565000000000055,
+            "driveMs": 0.0008000000002539309,
+            "rasterMs": 2.4353,
+            "uploadMs": 0.3341,
+            "effects": 4
+          },
+          {
+            "frameMs": 28.21859999999998,
+            "driveMs": 0.0007000000000516593,
+            "rasterMs": 2.5841,
+            "uploadMs": 0.3109,
+            "effects": 0
+          }
+        ]
+      }
+    ]
+  },
+  "tacticalPerformance": {
+    "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "note": "120 normal-time rendered frames per workload; subsystem timings are last simulation tick per frame, AI includes navigation. Software GPU, not physical-phone certification.",
+    "samples": [
+      {
+        "scenario": "idle",
+        "frames": 120,
+        "p50ms": 22.1261999999997,
+        "p95ms": 23.17549999999983,
+        "p99ms": 24.07230000000004,
+        "aiP95ms": 0,
+        "avoidanceP95ms": 0.01095,
+        "navigationP95ms": 0,
+        "projectileP95ms": 6E-05,
+        "simulationP95ms": 0.0808,
+        "rasterizations": 44,
+        "uploads": 44,
+        "allocatedBytes": 847640,
+        "managedStart": 17303976,
+        "managedEnd": 18150704,
+        "effectPeak": 0,
+        "projectilePeak": 0
+      },
+      {
+        "scenario": "one engaged",
+        "frames": 120,
+        "p50ms": 22.740300000000047,
+        "p95ms": 24.716599999999744,
+        "p99ms": 28.691400000000158,
+        "aiP95ms": 1.372351,
+        "avoidanceP95ms": 0.027901000000000002,
+        "navigationP95ms": 0,
+        "projectileP95ms": 0.00014,
+        "simulationP95ms": 1.4407,
+        "rasterizations": 100,
+        "uploads": 100,
+        "allocatedBytes": 1031336,
+        "managedStart": 19946264,
+        "managedEnd": 20998768,
+        "effectPeak": 0,
+        "projectilePeak": 0
+      },
+      {
+        "scenario": "three archetypes",
+        "frames": 120,
+        "p50ms": 24.364500000000135,
+        "p95ms": 27.021499999999833,
+        "p99ms": 28.07549999999992,
+        "aiP95ms": 1.410112,
+        "avoidanceP95ms": 0.047369,
+        "navigationP95ms": 0.001022,
+        "projectileP95ms": 0.026539,
+        "simulationP95ms": 1.4958,
+        "rasterizations": 178,
+        "uploads": 178,
+        "allocatedBytes": 1397344,
+        "managedStart": 17133968,
+        "managedEnd": 18581672,
+        "effectPeak": 1,
+        "projectilePeak": 1
+      },
+      {
+        "scenario": "four enemies",
+        "frames": 120,
+        "p50ms": 24.794200000000046,
+        "p95ms": 27.230099999999993,
+        "p99ms": 28.150900000000036,
+        "aiP95ms": 1.362713,
+        "avoidanceP95ms": 0.047499,
+        "navigationP95ms": 0.000882,
+        "projectileP95ms": 0.005901,
+        "simulationP95ms": 1.4356,
+        "rasterizations": 231,
+        "uploads": 231,
+        "allocatedBytes": 1574040,
+        "managedStart": 24060952,
+        "managedEnd": 25696832,
+        "effectPeak": 1,
+        "projectilePeak": 1
+      },
+      {
+        "scenario": "eight enemies",
+        "frames": 120,
+        "p50ms": 26.94640000000001,
+        "p95ms": 30.34349999999995,
+        "p99ms": 35.077999999999975,
+        "aiP95ms": 1.331966,
+        "avoidanceP95ms": 0.06755499999999999,
+        "navigationP95ms": 0.001723,
+        "projectileP95ms": 0.006492,
+        "simulationP95ms": 1.4712,
+        "rasterizations": 430,
+        "uploads": 430,
+        "allocatedBytes": 3809568,
+        "managedStart": 31312704,
+        "managedEnd": 35230472,
+        "effectPeak": 2,
+        "projectilePeak": 2
+      },
+      {
+        "scenario": "projectiles",
+        "frames": 120,
+        "p50ms": 23.97069999999985,
+        "p95ms": 26.812800000000152,
+        "p99ms": 27.74369999999999,
+        "aiP95ms": 1.381789,
+        "avoidanceP95ms": 0.043772,
+        "navigationP95ms": 0.000952,
+        "projectileP95ms": 0.057357,
+        "simulationP95ms": 1.4658,
+        "rasterizations": 176,
+        "uploads": 176,
+        "allocatedBytes": 1500176,
+        "managedStart": 19995720,
+        "managedEnd": 21541480,
+        "effectPeak": 1,
+        "projectilePeak": 5
+      },
+      {
+        "scenario": "projectiles and effects",
+        "frames": 120,
+        "p50ms": 25.194099999999935,
+        "p95ms": 27.31219999999996,
+        "p99ms": 28.8116,
+        "aiP95ms": 1.369477,
+        "avoidanceP95ms": 0.044282,
+        "navigationP95ms": 0.001773,
+        "projectileP95ms": 0.044743,
+        "simulationP95ms": 1.4703,
+        "rasterizations": 293,
+        "uploads": 293,
+        "allocatedBytes": 1737984,
+        "managedStart": 15743256,
+        "managedEnd": 17549536,
+        "effectPeak": 5,
+        "projectilePeak": 5
+      }
+    ]
+  }
 }

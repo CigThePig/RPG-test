@@ -28,7 +28,7 @@ Bites and the verification cone use their authored PPC action styles. Successful
 
 Ruin Prowlers pressure close range with bites and occasional lateral movement. Brutes close slowly and commit a readable Slam cone, then recover. Spitters preserve moderate range and release straight droplets; movement can evade their actual flight. NPC avoidance gently separates living bodies without making them solid obstacles for the player. The approved sword, aim assist, lunge, movement and roll constants are unchanged.
 
-Developer diagnostics provides a reversible **Combat archetypes test encounter (F9)**. Normal progress is preserved by the existing feel-course snapshot; return through the feel lab. This developer shortcut is separate from player controls. Part 4 owns layout and final balance.
+Developer diagnostics provides a reversible **Combat archetypes test encounter (F9)**. Normal progress is preserved by the existing feel-course snapshot; return through the feel lab. This developer shortcut is separate from player controls. The Part 4 layout and normal/protected test options are documented below.
 
 ## Part 4 mobile layout
 
