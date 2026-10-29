@@ -82,6 +82,12 @@ public static class ProjectileChecks
             w.Projectiles.Add(Make(straight)); w.Projectiles.Add(Make(homing));
             var parsed = Persistence.Parse(Persistence.Capture(w, app.Narrative), w.Content);
             check(parsed.Schema == 1 && parsed.Projectiles.Count == 3 && parsed.Projectiles.All(p => float.IsFinite(p.HeadingX) && p.HeadingX > .99f), "schema-1 migrates legacy heading and preserves mixed projectile modes");
+            w.Projectiles.Clear();
+            var bending=Make(homing);bending.HeadingX=MathF.BitDecrement(1f);bending.HeadingY=0;w.Projectiles.Add(bending);
+            var restoredHeading=Persistence.Parse(Persistence.Capture(w,app.Narrative),w.Content).Projectiles.Single();
+            check(restoredHeading.HeadingX==bending.HeadingX && restoredHeading.HeadingY==bending.HeadingY,"restoring a valid rounded unit heading preserves authoritative bits");
+            ProjectileFlight.Advance(w,bending,homing,r,1f/60);ProjectileFlight.Advance(w,restoredHeading,homing,r,1f/60);
+            check(bending.X==restoredHeading.X && bending.Y==restoredHeading.Y && bending.HeadingX==restoredHeading.HeadingX && bending.HeadingY==restoredHeading.HeadingY,"restored bounded flight continues identically without an extra normalization");
             var invalid = Content.Load(true); invalid.Abilities.Single(a => a.Id == "spit").Projectile!.TurnDegrees = float.NaN;
             check(invalid.Validate(new() { "potion", "iron_sword", "oak_staff", "coin", "herb", "ore", "wood" }).Any(e => e.Contains("projectile")), "content rejects nonfinite projectile configuration");
         }

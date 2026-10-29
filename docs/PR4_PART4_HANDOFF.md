@@ -34,7 +34,7 @@ Approach/retreat use hysteresis. Equal attack priorities and target distances br
 
 Actual collision emits `ProjectileImpact` with `actor`, `terrain` or `boundary` outcome. The existing controller coalesces actor collision with Hit/Miss/avoidance and flushes terrain contact to one subdued terrain effect. Release never implies a hit. Flight bodies read authoritative position/heading; Ember uses a warm core/streak and Spit a larger green organic core/streak. Streaks are bounded draw commands, not autonomous simulated particles.
 
-Schema 1 remains unchanged. Heading and region are optional saved projectile fields. Legacy records derive region from source and normalize heading toward the retained target (unit X only if neither a valid heading nor target direction exists). Remaining lifetime is retained. Saves never regenerate actors/loot. Trails/effects reconstruct cleanly and do not execute damage. Tactical cadence/intent are optional actor fields.
+Schema 1 remains unchanged. Heading and region are optional saved projectile fields. Legacy records derive region from source and normalize heading toward the retained target (unit X only if neither a valid heading nor target direction exists). Remaining lifetime is retained. Existing nearly unit headings retain their saved float bits; only absent/invalid/non-unit headings need migration, avoiding a second normalization during restore. Saves never regenerate actors/loot. Trails/effects reconstruct cleanly and do not execute damage. Tactical cadence/intent are optional actor fields.
 
 ## Reproduce encounters
 

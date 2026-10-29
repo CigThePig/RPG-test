@@ -48,10 +48,13 @@ public static class Persistence
             if (!s.Regions.TryGetValue(p.Region, out var region) || region.Index(new(p.X, p.Y)) < 0)
                 throw new InvalidDataException("Invalid projectile region/position");
             var heading = new System.Numerics.Vector2(p.HeadingX, p.HeadingY);
-            if (!CombatGeometry.TryNormalize(heading, out heading))
+            if (!CombatGeometry.TryNormalize(heading, out var normalized))
             {
                 if (!s.Actors.TryGetValue(p.Target, out var target) || !CombatGeometry.TryNormalize(target.Position - new System.Numerics.Vector2(p.X, p.Y), out heading)) heading = System.Numerics.Vector2.UnitX;
             }
+            else if (MathF.Abs(heading.LengthSquared()-1) > .0001f) heading = normalized;
+            // Preserve ordinary unit headings bit-for-bit: an extra normalization
+            // at restore can introduce a different rounding cycle than live flight.
             p.HeadingX = heading.X; p.HeadingY = heading.Y;
         }
         foreach (var actor in s.Actors.Values)

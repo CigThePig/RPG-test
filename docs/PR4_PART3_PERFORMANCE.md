@@ -32,7 +32,7 @@ The existing 5-Hz planning opportunities and slower profile cadence remain. Loca
 
 ## Verification ledger
 
-Native build and 3,244 production assertions passed locally after extended deterministic-restore checks. Import succeeded; its editor shutdown emitted the previously observed EditorSettings diagnostic, which was not counted as a runtime pass. Local rendered attempts could not connect to an X display; desktop/mobile rendering ran on GitHub Actions. A headless touch replay was also unsuitable (no viewport touch dispatch) and is not represented as gameplay evidence.
+Native build and 3,246 production assertions passed locally after extended deterministic-restore checks. Import succeeded; its editor shutdown emitted the previously observed EditorSettings diagnostic, which was not counted as a runtime pass. Local rendered attempts could not connect to an X display; desktop/mobile rendering ran on GitHub Actions. A headless touch replay was also unsuitable (no viewport touch dispatch) and is not represented as gameplay evidence.
 
 Final exact-head CI, replay, Android, screenshot review and lifecycle results will be appended after completion. The historical intermittent resume-to-black issue and unavailable physical ARM64/S25 testing remain limitations.
 
