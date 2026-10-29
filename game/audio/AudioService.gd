@@ -25,7 +25,7 @@ func _ready() -> void:
 		voice_priorities.append(0)
 	var specs := {
 		# Short, soft air-slice; no percussive punch or low-frequency hit tail.
-		"swing": [Config.WaveType.NOISE, .26, -.13, .012, .13, .48],
+		"swing": [Config.WaveType.NOISE, .26, -.13, .03, .23, .48],
 		"whiff": [Config.WaveType.NOISE, .23, -.32, .03, .18, .60],
 		"attack": [Config.WaveType.SAWTOOTH, .18, -.22, .03, .16, .35],
 		"bite": [Config.WaveType.NOISE, .27, -.65, .03, .14, .25],
