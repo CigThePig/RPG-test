@@ -628,6 +628,7 @@ public static class VisualChecks
         app.Ui.ClosePanels();
         app.World.Enter(app.World.Player, "ruin");
         await Capture(app, "dungeon");
+        await DungeonVisualChecks.Run(app);
         app.World.Enter(app.World.Player, "reach");
         if (app.Ui.MobileLayout) await Capture(app, "controls");
         app.Ui.Workshop();

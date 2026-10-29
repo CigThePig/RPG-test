@@ -434,7 +434,10 @@ public partial class Foundation : Node2D
         var target = World.InteractionTargets(player).FirstOrDefault();
         foreach (var feature in features)
         {
-            bool selected = target.Value != null && feature.GetMeta("tile").AsInt32() == target.Key;
+            int at = feature.GetMeta("tile").AsInt32();
+            bool selected = target.Value != null && (at == target.Key || feature.GateCells.Contains(target.Key));
+            bool spent = region.Depleted.Contains(at) || (feature.GateCells.Length > 0 ? feature.GateCells.All(region.OpenDoors.Contains) : region.OpenDoors.Contains(at));
+            if (feature.Spent != spent) { feature.Spent = spent; feature.QueueRedraw(); }
             if (feature.Selected != selected) { feature.Selected = selected; feature.QueueRedraw(); }
         }
         if (drawnRegion != player.Region)
@@ -603,10 +606,15 @@ public partial class Foundation : Node2D
         ground.AddChild(tilemap);
         foreach (var feature in features) { actors.RemoveChild(feature); feature.QueueFree(); }
         features.Clear();
+        var gates = r.GateGroups();
         foreach (var (at, kind) in r.Features)
         {
+            int[] gate = kind == "lock" ? gates.Single(g => Array.BinarySearch(g, at) >= 0) : Array.Empty<int>();
+            if (gate.Length > 0 && gate[0] != at) continue;
             var pos = r.Center(at);
-            var feature = new FeatureView { Kind = kind, Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
+            var feature = new FeatureView { Kind = kind, GateCells = gate,
+                GateOffsets = gate.Select(cell => GodotConvert.GroundToScreen(r.Center(cell).X-pos.X, r.Center(cell).Y-pos.Y)).ToArray(),
+                Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
             feature.SetMeta("tile",at);
             actors.AddChild(feature); features.Add(feature);
         }
@@ -716,12 +724,14 @@ public partial class Foundation : Node2D
 
 public partial class TerrainView : Node2D
 {
+    public static double LastBuildMilliseconds { get; private set; }
     readonly List<TerrainBatch> batches=new();
     public RegionState Region { get; set; } = null !;
     public Dictionary<string, Texture2D> Art { get; set; } = null !;
 
     public override void _Draw()
     {
+        var buildTimer = System.Diagnostics.Stopwatch.StartNew();
         batches.Clear();
         var batch=new TerrainBatch();batches.Add(batch);
         // Ground layers do not overlap: group by texture so the engine can batch them.
@@ -781,5 +791,6 @@ public partial class TerrainView : Node2D
                 }
             }
         batch.Draw(this);
+        LastBuildMilliseconds = buildTimer.Elapsed.TotalMilliseconds;
     }
 }

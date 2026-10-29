@@ -4,6 +4,8 @@ namespace Mosslight;
 public partial class FeatureView : Node2D
 {
     public string Kind { get; set; } = "";
+    public int[] GateCells { get; set; } = Array.Empty<int>();
+    public Vector2[] GateOffsets { get; set; } = Array.Empty<Vector2>();
     public bool Spent { get; set; }
     public bool Selected { get; set; }
     static readonly Color Ink = new("263333"), Gold = new("d4b66b"), Wood = new("896448");
@@ -48,8 +50,21 @@ public partial class FeatureView : Node2D
             case "relic":
                 Box(-14,-6,28,9,new Color("677274")); Gem(new Vector2(0,-20),12,Gold); Gem(new Vector2(0,-22),6,new Color("b7eee0")); break;
             case "lock":
-                if(!Spent) { Box(-12,-32,24,33,Wood); Box(-12,-26,24,4,Gold); Box(-12,-7,24,4,Gold); Box(-3,-19,6,8,Gold); }
-                else { Box(-12,-3,24,4,Wood); } break;
+                // One connected barrier spanning every blocking cell, with one
+                // central lock plate rather than six unrelated lock glyphs.
+                var offsets = GateOffsets.Length > 0 ? GateOffsets : new[] { Vector2.Zero };
+                foreach (var offset in offsets)
+                {
+                    var foot = offset + new Vector2(0, 2);
+                    DrawLine(foot, foot + new Vector2(0, Spent ? -3 : -29), Wood, 4);
+                    if (!Spent) DrawLine(foot + new Vector2(-12,-12), foot + new Vector2(12,-12), Gold, 3);
+                }
+                if (!Spent)
+                {
+                    var middle = offsets.Aggregate(Vector2.Zero, (sum,p) => sum+p) / offsets.Length;
+                    DrawRect(new Rect2(middle+new Vector2(-4,-22),new Vector2(8,9)),Gold);
+                }
+                break;
         }
         if (Selected) DrawString(ThemeDB.FallbackFont,new Vector2(-25,-55),Spent ? "Empty chest" : Kind,HorizontalAlignment.Left,-1,13,Gold);
     }

@@ -761,10 +761,7 @@ public sealed class World
                 if (!Items.Take(a.Id, "dungeon_key", 1))
                 { InteractionFeedback = "A ruin key is required"; return false; }
                 InteractionFeedback = "Door unlocked";
-                r.OpenDoors.Add(at);
-                foreach (var adjacent in r.Neighbours(at))
-                    if (r.Features.GetValueOrDefault(adjacent) == "lock")
-                        r.OpenDoors.Add(adjacent);
+                foreach (int cell in r.GateAt(at)) r.OpenDoors.Add(cell);
                 Events.Publish(new("door_unlocked", a.Id, a.Region, at.ToString()));
                 return true;
             }

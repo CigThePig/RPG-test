@@ -52,3 +52,19 @@ Headless proves systems, hosted desktop proves a rendered application, emulator 
 ### Combat and menu follow-up
 
 The core replay now includes an eighteenth scenario, `attack-readability`: three actual Attack-button touches, a labeled NPC reposition/bite command, and an assertion that the incoming hit does not reverse player facing. The fixture uses production ability timing/damage/knockback; its frozen, high-health enemy is explicitly controlled, not a test of autonomous AI. The phone visual suite also swipes over main-menu button rows and requires scrolling without activation. The preserved movement presets remain unchanged.
+
+## PR5 Part 1 dungeon checks
+
+`DungeonChecks` runs within `tools/verify.py --headless`: seeds 0–63 plus 1337, exact PR4 topology signatures, deterministic terrain/features/gates, 9×9 interiors, all boundary cross-sections, isolated 2×3 gate groups, player physical reachability and canonical-seed player/NPC/prowler/brute/spitter clearance. Canonical progression uses `World.Move` and `World.Interact` through keys, required gates, relic and exit; these checks do not teleport through gates. The suite also checks generated-room rolls, enclosing-wall roll/lunge collision, gate projectile collision, eight production spawns, exact legacy/new save roundtrips and deterministic continuation. Tests capture/restore in memory and do not write user slots.
+
+The default 45-scenario replay remains compatible. `--replay-only=dungeon-expedition` selects an additional focused production-touch fixture (precise preset): seed 1, room dodge, corner waypoint, key, required gate, objective and return. Other actors are isolated in the existing feel-lab during this traversal fixture; normal combat and tactical replays remain separate. Example after build/import:
+
+```sh
+godot --path . --audio-driver Dummy --resolution 1280x800 --fixed-fps 60 -- \
+  --gameplay-check --mobile-ui --preset=precise --replay-only=dungeon-expedition \
+  --evidence=build/dungeon-expedition
+```
+
+The existing `tools/gameplay-verify.py --presets baseline,precise` command also records this focused precise expedition, repeats it independently, compares authoritative digests, transcodes the actual movie and produces a contact sheet. CI runs it through the unchanged gameplay workflow. A fixture reset is explicit and occurs before traversal, never beyond a locked gate. Seed 42 legitimately allows an alternate route, so it is retained for the visual comparison but is not a mandatory-gate replay fixture.
+
+`DungeonVisualChecks` extends desktop/mobile viewport capture with seed-42 old/new rooms and doorways at unchanged 1.5× zoom, adjacent-room movement, closed/open production gate interaction, enemy doorway placement and a mixed room. These composed screenshot fixtures freeze time for comparable captures; they are not a recording of live enemy navigation. Full gameplay replays and collision tests supply temporal evidence. Rendering reports record initial terrain draw cost and 90-frame static-room intervals on the current renderer; software results are not physical-device FPS claims.

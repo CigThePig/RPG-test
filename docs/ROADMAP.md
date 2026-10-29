@@ -26,3 +26,15 @@ The development environment is deliberately compact. There is no finished story,
 Part 3 code was verified on `681d15851c02a55b7dc27419f434dfa4498ee766`. See PR4_PART4_HANDOFF.md and PR4_PART3_PERFORMANCE.md for continuation contracts and actual evidence.
 
 Part 4 implementation adds separated mobile combat/utility zones, stable control IDs, safe-area/resize checks, expanded real input regression tests, normal-health combat fixtures, a conditional crowd locator and higher-contrast Spit. Final source c7c4d3293f5008312e30353d0199e5df34d8582a passed all executable checks; see PR4_PART4_VERIFICATION.md. Phone-only acceptance remains separate from code review readiness.
+
+## PR #5 — Dungeon scale, exploration spaces & landmark foundations
+
+Part 1 implements the procedural spatial foundation: 11×11 logical cells, 9×9 interiors, three-tile connectors, shared logical gates, physical-clearance and legacy-save coverage, deterministic seed/topology checks and actual viewport comparisons. See `PR5_PART1_HANDOFF.md` for exact verification and phone-only acceptance status.
+
+Remaining milestones on the same draft PR:
+
+2. Dungeon readability and spatial presentation: floor/wall depth, composition, interaction readability and residual wall/sprite occlusion.
+3. Handcrafted landmarks: curated chambers and special locations integrated with procedural geography.
+4. Compact RPG adventure: connect exploration, quests, NPCs, equipment and rewards.
+
+Mosslight is a traditional fantasy action RPG; the flexible approximately 50/50 procedural/authored direction is a creative goal, not a numeric quota or a creature-collection system.

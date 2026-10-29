@@ -42,6 +42,7 @@ jobs:
             docs/audio-samples/
             docs/verification.json
             docs/render-verification*.json
+            build/dungeon/
             build/encounter-measurements.json
             build/verification-*.log
   preserved-reference:
