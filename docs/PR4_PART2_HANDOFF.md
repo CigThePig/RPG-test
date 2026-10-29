@@ -1,0 +1,11 @@
+# PR #4 Part 2 handoff
+
+`World.Presentation` emits `CombatPresentationEvent` (`game/combat/CombatPresentation.cs`). Subscribe once, and use its kind, actor ID, target ID, ability ID, tick, ground-space origin/position, committed direction and outcome directly. `AttackImpact` is a direct release boundary, `ProjectileReleased` is not a collision, and `ProjectileImpact` is a later collision. `Hit`, `Miss`, `DefensiveAvoidance`, `Death`, `AttackCanceled` and `ActionCompleted` are observations, not commands. The hit position precedes knockback. Narrative and quest progression continue to use `World.Events`; never award gameplay effects from this cosmetic stream.
+
+`AbilityDef.Geometry` is optional: absent or `target` keeps the existing target-locked behavior; `cone` supplies impact range and half-angle, with direction committed at activation and processed deterministically by `World`. `Telegraph.Style` is optional and must match the implemented danger. `CombatGeometry.InCircle` is only a primitive; circle abilities and their warnings are deliberately rejected until authoritative area handling exists. The player slash retains its own established geometry and soft aim.
+
+`AbilityDef.ActionStyle` now selects an existing PPC `ActionStyle` through the timed `CreatureActor`/`CreatureMotor` action; omitted or anatomy-incompatible styles use the rig default. Part 2 preserves facing locks and world timing, cancels interrupted actions, and routes hit, miss, death, defensive, projectile release and projectile collision observations through one presentation controller. The current `TelegraphView` is a single projected layer derived from actor state and may be extended without becoming a second combat executor.
+
+The fixture sweep is loaded only for verification and is absent from ordinary gameplay and progression; production cone abilities can use the same geometry contract without the `VerificationOnly` flag. Later milestones retain ownership of tactical AI, enemy spacing, projectile redesign, any further family-specific motion, mobile layout and balance. Consult the PR for rendered and Android results at the exact tested commit; physical-device feel remains a separate observation.
+
+The continuation contract and performance limits are in [PR4_PART3_HANDOFF.md](PR4_PART3_HANDOFF.md).

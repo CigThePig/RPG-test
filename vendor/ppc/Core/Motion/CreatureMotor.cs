@@ -71,6 +71,8 @@ namespace PixelCreatures.Core.Motion
         private ActionStyle _pendingStyle;
         private long _steps;
         private bool _wasRolling;
+        private double _hitSamplingUntil;
+        private double? _gameplayActionTime;
 
         public MotorOptions Options { get; }
         public CreatureModel Model { get; }
@@ -109,6 +111,12 @@ namespace PixelCreatures.Core.Motion
         public double HitFlash => _hit.Flash;
         public double RestProgress => _rest.Progress;
         public bool ActionActive => _action.Active;
+        public ActionStyle CurrentActionStyle => _action.Style;
+        public double ActionDuration => _action.Duration;
+        public double ActionTime => _action.Time;
+        public int ActionTriggerCount => _action.TriggerCount;
+        // Do not keep a crowd at the combat rate for the whole spring tail.
+        public bool CombatSampling => _action.Active || _ctx.Time < _hitSamplingUntil;
 
         public CreatureMotor(CreatureModel model, CreatureRegistry registry, MotorOptions? options = null)
         {
@@ -126,18 +134,55 @@ namespace PixelCreatures.Core.Motion
 
         // ------------------------------------------------------------------ commands
 
-        public void TriggerGameplayAction(double windup, double recovery)
+        public void TriggerGameplayAction(double windup, double recovery) =>
+            TriggerGameplayAction(windup, recovery, null);
+
+        /// <summary>Starts immediately on the world's timeline, even when waking from rest.</summary>
+        public void TriggerGameplayAction(double windup, double recovery, ActionStyle? style, double elapsed = 0)
         {
             _rest.Requested = false;
             _pendingAction = false;
-            _action.Trigger(_ctx, _ctx.Rig.Action);
+            _gameplayActionTime = null;
+            _action.Trigger(_ctx, ResolveActionStyle(style));
             _action.MatchCombat(windup, recovery);
+            if (elapsed > 0) _action.Seek(elapsed);
+        }
+
+        /// <summary>Unsupported appendage-specific actions fall back to this rig's own action.</summary>
+        public ActionStyle ResolveActionStyle(ActionStyle? requested)
+        {
+            if (!requested.HasValue || !Enum.IsDefined(typeof(ActionStyle), requested.Value)) return _ctx.Rig.Action;
+            var rig = _ctx.Rig;
+            bool supported = requested.Value switch
+            {
+                ActionStyle.TailSwipe or ActionStyle.Sting => rig.Tail != null,
+                ActionStyle.WingBuffet => rig.Wings.Count > 0,
+                ActionStyle.TentacleLash => rig.Tentacles.Count > 0,
+                ActionStyle.PincerSnap => rig.Grippers.Count > 0,
+                _ => true
+            };
+            return supported ? requested.Value : rig.Action;
+        }
+
+        public void CancelGameplayAction()
+        {
+            _pendingAction = false;
+            _gameplayActionTime = null;
+            _action.Cancel();
+        }
+
+        /// <summary>Optional host timeline: pose progress follows the authoritative action state.</summary>
+        public void SynchronizeGameplayAction(double elapsed)
+        {
+            if (_action.Active && double.IsFinite(elapsed))
+                _gameplayActionTime = DMath.Clamp(elapsed, 0, _action.Duration);
         }
 
         public void TriggerAction() => TriggerAction(_ctx.Rig.Action);
 
         public void TriggerAction(ActionStyle style)
         {
+            _gameplayActionTime = null;
             if (_rest.Progress > 0.01)
             {
                 // wake up first, then act
@@ -154,7 +199,9 @@ namespace PixelCreatures.Core.Motion
         {
             if (_rest.Progress > 0.01) _rest.Requested = false;
             _pendingAction = false;
+            _gameplayActionTime = null;
             _action.Cancel();
+            _hitSamplingUntil = _ctx.Time + .38;
             _hit.Trigger(_ctx, fromDirectionWorld, strength);
             _driver.Tail?.Impulse(new Vec3(-fromDirectionWorld.X, 0.5, -fromDirectionWorld.Z).NormalizedOr(Vec3.UnitY) * 40, FixedClock.DefaultStep);
         }
@@ -249,7 +296,8 @@ namespace PixelCreatures.Core.Motion
             ctx.RunBlend = _runW.X;
 
             _rest.Step(ctx, dt);
-            _action.Step(dt);
+            if (_gameplayActionTime.HasValue && _action.Active) _action.Seek(_gameplayActionTime.Value);
+            else _action.Step(dt);
             _hit.Step(ctx, dt);
             _idle.Step(ctx, dt);
             ctx.RestWeight = _rest.Progress;

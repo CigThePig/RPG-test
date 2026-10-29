@@ -5,6 +5,13 @@ using MHLab.Spells.Definitions;
 namespace Mosslight;
 public sealed class World
 {
+    public bool ProfileCombat { get; set; }
+    public double TacticalMilliseconds { get; private set; }
+    public double AvoidanceMilliseconds { get; private set; }
+    public double ProjectileMilliseconds { get; private set; }
+    public double NavigationMilliseconds { get; private set; }
+    static long Stamp() => System.Diagnostics.Stopwatch.GetTimestamp();
+    static double Milliseconds(long start) => (Stamp() - start) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
     public int Seed { get; set; }
     public long Tick { get; set; }
     public double Time { get; set; }
@@ -24,12 +31,18 @@ public sealed class World
     public ActorState Player => Actors["player"];
     public SpellsContext Spells { get; private set; } = new();
 
+    readonly ActorSeparation separation = new();
     readonly Dictionary<string, Spell> spells = new();
+    readonly Dictionary<string, AbilityDef> abilityDefinitions = new();
+    public AbilityDef? FindAbility(string id) => abilityDefinitions.GetValueOrDefault(id);
     public Godot.Node? Planner { get; set; }
 
-    public event Action<string, string, string>? Presentation;
+    public event Action<CombatPresentationEvent>? Presentation;
     // Separate from narrative events: opt-in, bounded by the existing trace writer.
     public event Action<string, Vector2, string>? CombatDiagnostic;
+    void Present(CombatPresentationKind kind, ActorState actor, string target = "", string ability = "", Vector2? position = null, string outcome = "") =>
+        Presentation?.Invoke(new(kind, actor.Id, target, ability, Tick, actor.Position, position ?? actor.Position,
+            new Vector2(actor.ActionDirectionX, actor.ActionDirectionY), outcome));
     public World(Content content, Godot.Node itemService, int seed = 42)
     {
         Content = content;
@@ -42,8 +55,12 @@ public sealed class World
     {
         Spells = new();
         spells.Clear();
+        abilityDefinitions.Clear();
         foreach (var d in Content.Abilities)
+        {
             spells[d.Id] = new Spell(new RpgAbility(this, d));
+            abilityDefinitions[d.Id] = d;
+        }
     }
 
     public float Stat(ActorState actor, string stat)
@@ -69,7 +86,7 @@ public sealed class World
     }
 
     public bool Hostile(ActorState a, ActorState b) => a.Id != b.Id && (Content.Factions.GetValueOrDefault(a.Faction + ":" + b.Faction) + a.Reputation.GetValueOrDefault(b.Faction)) < 0;
-    public bool CanActivate(ActorState a, ActorState b, AbilityDef d) => a.Alive && b.Alive && a.Region == b.Region && a.Abilities.Contains(d.Id) && a.State is ActionState.Idle or ActionState.Moving && a.Mana >= d.Cost && a.Cooldowns.GetValueOrDefault(d.Id) <= 0 && (!d.RequiresWeapon || (a.Grasps && Items.Bonus(a, "damage") > 0)) && (d.Self ? a == b : Hostile(a, b)) && (d.Self || Vector2.Distance(a.Position, b.Position) <= d.Range + a.NaturalReach) && LineOfSight(a, b);
+    public bool CanActivate(ActorState a, ActorState b, AbilityDef d) => a.Alive && b.Alive && a.Region == b.Region && a.Abilities.Contains(d.Id) && a.State is ActionState.Idle or ActionState.Moving && a.Mana >= d.Cost && a.Cooldowns.GetValueOrDefault(d.Id) <= 0 && (!d.RequiresWeapon || (a.Grasps && Items.Bonus(a, "damage") > 0)) && (d.Self ? a == b : Hostile(a, b)) && (d.Self || Vector2.Distance(a.Position, b.Position) <= d.Range + a.NaturalReach) && (d.Geometry?.Shape != "cone" || CombatGeometry.TryNormalize(b.Position - a.Position, out _)) && LineOfSight(a, b);
     public bool Activate(string id, string ability, string target)
     {
         if (!Actors.TryGetValue(id, out var actor) || !Actors.TryGetValue(target, out var victim) || !spells.TryGetValue(ability, out var spell))
@@ -154,6 +171,7 @@ public sealed class World
         a.State = ActionState.Windup;
         a.StateRemaining = d.Windup;
         a.PendingAbility = d.Id;
+        a.RecoveryAbility = "";
         a.Target = "";
         a.FreeSlash = true;
         a.ActionElapsed = 0;
@@ -161,7 +179,8 @@ public sealed class World
         // during the windup or change the authoritative 110-degree impact arc.
         Vector2 strike = SoftAimPlayerSlash(a, d, facing);
         a.ActionDirectionX = strike.X; a.ActionDirectionY = strike.Y;
-        Presentation?.Invoke(a.Id, "attack", "");
+        Present(CombatPresentationKind.AttackStarted, a, ability: d.Id);
+        Present(CombatPresentationKind.AttackCommitted, a, ability: d.Id);
         Events.Publish(new("ability_started", a.Id, "", d.Id));
         CombatDiagnostic?.Invoke("attack_started", strike, "slash");
         return true;
@@ -180,7 +199,7 @@ public sealed class World
         a.StateRemaining = CombatTuning.DodgeDuration;
         a.Cooldowns["dodge"] = CombatTuning.DodgeCooldown;
         ClearPlayerMotion();
-        Presentation?.Invoke(a.Id, "dodge", "");
+        Present(CombatPresentationKind.DodgeStarted, a, ability: "dodge");
         CombatDiagnostic?.Invoke("dodge_started", facing, "dodge");
         return true;
     }
@@ -247,8 +266,15 @@ public sealed class World
         a.State = ActionState.Windup;
         a.StateRemaining = d.Windup;
         a.PendingAbility = d.Id;
+        a.RecoveryAbility = "";
         a.Target = b.Id;
-        Presentation?.Invoke(a.Id, d.Damage < 0 ? "cast" : "attack", b.Id);
+        a.FreeSlash = false;
+        a.ActionElapsed = 0;
+        if (d.Geometry?.Shape == "cone" && CombatGeometry.TryNormalize(b.Position - a.Position, out var direction))
+        { a.ActionDirectionX = direction.X; a.ActionDirectionY = direction.Y; }
+        else a.ActionDirectionX = a.ActionDirectionY = 0;
+        Present(CombatPresentationKind.AttackStarted, a, b.Id, d.Id, b.Position);
+        Present(CombatPresentationKind.AttackCommitted, a, b.Id, d.Id, b.Position);
         Events.Publish(new("ability_started", a.Id, b.Id, d.Id));
     }
 
@@ -257,9 +283,12 @@ public sealed class World
         if (a.State == ActionState.Dodging)
         {
             CombatDiagnostic?.Invoke("dodge_interrupted", new Vector2(a.ActionDirectionX, a.ActionDirectionY), "cancel");
-            Presentation?.Invoke(a.Id, "dodge_cancel", "");
+            Present(CombatPresentationKind.DodgeCanceled, a, ability: "dodge");
         }
+        if (a.State == ActionState.Windup && a.PendingAbility != "")
+            Present(CombatPresentationKind.AttackCanceled, a, a.Target, a.PendingAbility);
         a.PendingAbility = "";
+        a.RecoveryAbility = "";
         a.FreeSlash = false;
         a.ActionElapsed = 0;
         a.ActionDirectionX = a.ActionDirectionY = 0;
@@ -267,15 +296,22 @@ public sealed class World
         a.StateRemaining = 0;
     }
 
-    public bool Damage(ActorState source, ActorState target, float amount, string type, bool periodic = false)
+    public bool Damage(ActorState source, ActorState target, float amount, string type, bool periodic = false, string ability = "")
     {
-        if (!target.Alive || (!periodic && target.Invulnerable > 0) || (!periodic && source.Region != target.Region) || !Hostile(source, target))
+        if (!target.Alive || (!periodic && source.Region != target.Region) || !Hostile(source, target))
             return false;
+        if (!periodic && target.Invulnerable > 0)
+        {
+            Present(CombatPresentationKind.DefensiveAvoidance, source, target.Id, ability, target.Position, "invulnerability");
+            return false;
+        }
         if (!periodic && DodgeImmune(target))
         {
             CombatDiagnostic?.Invoke("direct_hit_dodged", new Vector2(target.ActionDirectionX, target.ActionDirectionY), source.Id);
+            Present(CombatPresentationKind.DefensiveAvoidance, source, target.Id, ability, target.Position, "dodge");
             return false;
         }
+        var impactPosition = target.Position;
         float resistance = type == "physical" ? Stat(target, "defence") : 0;
         float actual = Math.Max(1, amount - resistance);
         target.Health = Math.Max(0, target.Health - actual);
@@ -286,7 +322,7 @@ public sealed class World
         var away = target.Position - source.Position;
         if (!periodic && away.LengthSquared() > 0)
             Move(target, Vector2.Normalize(away) * 15);
-        Presentation?.Invoke(target.Id, "hit", source.Id);
+        Present(CombatPresentationKind.Hit, source, target.Id, ability, impactPosition, periodic ? "periodic" : "hit");
         Events.Publish(new("damage", source.Id, target.Id, type, (int)actual));
         target.Knowledge[source.Id] = "attacker";
         target.Relationships[source.Id] = target.Relationships.GetValueOrDefault(source.Id) - actual;
@@ -294,7 +330,7 @@ public sealed class World
         {
             Items.Service.Call("unequip_all", target.Id);
             target.PendingAbility = "";
-            Presentation?.Invoke(target.Id, "dead", source.Id);
+            Present(CombatPresentationKind.Death, source, target.Id, ability, impactPosition);
             Events.Publish(new("defeated", source.Id, target.Id, target.Profile));
             Progression.Award(this, source, 25);
             var random = new Random(unchecked(Seed + (int)Tick + StableId(target.Id)));
@@ -337,7 +373,7 @@ public sealed class World
         }
     }
 
-    bool Resolve(ActorState a, ActorState b, AbilityDef d, bool projectile = false)
+    bool Resolve(ActorState a, ActorState b, AbilityDef d, bool projectile = false, bool geometryValidated = false)
     {
         if (!a.Alive || !b.Alive || a.Region != b.Region)
             return false;
@@ -351,10 +387,10 @@ public sealed class World
             return true;
         }
 
-        if (!projectile && (Vector2.Distance(a.Position, b.Position) > d.Range + a.NaturalReach + 8 || !LineOfSight(a, b)))
+        if (!projectile && !geometryValidated && (Vector2.Distance(a.Position, b.Position) > d.Range + a.NaturalReach + 8 || !LineOfSight(a, b)))
             return false;
         // Intentionally non-damaging hostile effects retain their status-only behavior.
-        bool connected = d.Damage <= 0 ? Hostile(a, b) && !DodgeImmune(b) : Damage(a, b, d.Damage + Stat(a, "strength") + Stat(a, d.Type == "physical" ? "damage" : "power"), d.Type);
+        bool connected = d.Damage <= 0 ? Hostile(a, b) && !DodgeImmune(b) : Damage(a, b, d.Damage + Stat(a, "strength") + Stat(a, d.Type == "physical" ? "damage" : "power"), d.Type, ability: d.Id);
         if (connected && b.Alive && d.Status != "")
             ApplyStatus(b, d.Status, a.Id);
         return connected;
@@ -370,7 +406,11 @@ public sealed class World
         // Advance before any actor resolves an attack so protection is independent
         // of dictionary iteration order at the fixed-step boundary.
         if (Player.Alive && Player.State == ActionState.Dodging) AdvanceDodge(Player, dt);
-        foreach (var a in Actors.Values)
+        TacticalMilliseconds = AvoidanceMilliseconds = ProjectileMilliseconds = NavigationMilliseconds = 0;
+        long avoidanceStart = ProfileCombat ? Stamp() : 0;
+        separation.Rebuild(Actors.Values);
+        if(ProfileCombat) AvoidanceMilliseconds += Milliseconds(avoidanceStart);
+        foreach (var a in Actors.Values.OrderBy(a => a.Id == "player" ? 0 : 1).ThenBy(a => a.Id, StringComparer.Ordinal))
         {
             foreach (var key in a.Cooldowns.Keys.ToArray())
                 a.Cooldowns[key] = Math.Max(0, a.Cooldowns[key] - dt);
@@ -405,7 +445,9 @@ public sealed class World
                 a.ActionElapsed = 0;
                 a.ActionDirectionX = a.ActionDirectionY = 0;
             }
-            if (a.State != ActionState.Dodging && a.StateRemaining > 0)
+            // A zero-duration windup/recovery still crosses its boundary exactly once
+            // on the next simulation step; presentation never adds a delay.
+            if (a.State != ActionState.Dodging && (a.StateRemaining > 0 || a.State is ActionState.Windup or ActionState.Recovery))
             {
                 a.StateRemaining -= dt;
                 if (a.StateRemaining <= 0)
@@ -415,28 +457,61 @@ public sealed class World
                         var d = Content.Abilities.Single(x => x.Id == a.PendingAbility);
                         if (a.Id == "player" && a.FreeSlash && d.Id == "slash")
                         {
+                            Present(CombatPresentationKind.AttackImpact, a, ability: d.Id);
                             var target = PlayerSlashTarget(a, d);
                             bool hit = target != null && Resolve(a, target, d);
+                            if (!hit) Present(CombatPresentationKind.Miss, a, target?.Id ?? "", d.Id, target?.Position, "miss");
                             CombatDiagnostic?.Invoke("attack_impact", new Vector2(a.ActionDirectionX, a.ActionDirectionY), hit ? "hit/" + target!.Id : "miss");
+                        }
+                        else if (d.Geometry?.Shape == "cone")
+                        {
+                            Present(CombatPresentationKind.AttackImpact, a, a.Target, d.Id);
+                            var direction = new Vector2(a.ActionDirectionX, a.ActionDirectionY);
+                            // Stable IDs define the order independently of dictionary insertion.
+                            var victims = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) &&
+                                CombatGeometry.InCone(a.Position, b.Position, direction, d.Geometry.Range, d.Geometry.HalfAngleDegrees) && LineOfSight(a, b))
+                                .OrderBy(b => b.Id, StringComparer.Ordinal).ToArray();
+                            foreach (var victim in victims)
+                            {
+                                var position = victim.Position;
+                                if (!Resolve(a, victim, d, geometryValidated: true))
+                                    Present(CombatPresentationKind.Miss, a, victim.Id, d.Id, position, "miss");
+                            }
+                            if (victims.Length == 0) Present(CombatPresentationKind.Miss, a, a.Target, d.Id, outcome: "miss");
                         }
                         else if (Actors.TryGetValue(a.Target, out var t))
                         {
                             if (d.ProjectileSpeed > 0)
-                                Projectiles.Add(new() { Source = a.Id, Target = t.Id, Ability = d.Id, X = a.X, Y = a.Y });
+                            {
+                                Projectiles.Add(ProjectileFlight.Release(a, t, d));
+                                Present(CombatPresentationKind.ProjectileReleased, a, t.Id, d.Id, a.Position);
+                            }
                             else
-                                Resolve(a, t, d);
+                            {
+                                Present(CombatPresentationKind.AttackImpact, a, t.Id, d.Id, t.Position);
+                                if (!Resolve(a, t, d)) Present(CombatPresentationKind.Miss, a, t.Id, d.Id, t.Position, "miss");
+                            }
+                        }
+                        else if (d.ProjectileSpeed <= 0)
+                        {
+                            Present(CombatPresentationKind.AttackImpact, a, a.Target, d.Id);
+                            Present(CombatPresentationKind.Miss, a, a.Target, d.Id, outcome: "target unavailable");
                         }
 
                         a.PendingAbility = "";
+                        a.RecoveryAbility = d.Id;
                         a.State = ActionState.Recovery;
                         a.StateRemaining = d.Recovery;
                     }
                     else
                     {
                         if (a.FreeSlash) CombatDiagnostic?.Invoke("attack_completed", new Vector2(a.ActionDirectionX, a.ActionDirectionY), "slash");
+                        if (a.State == ActionState.Recovery && a.RecoveryAbility != "")
+                            Present(CombatPresentationKind.ActionCompleted, a, a.Target, a.RecoveryAbility);
                         a.State = ActionState.Idle;
                         a.FreeSlash = false;
                         a.ActionElapsed = 0;
+                        a.RecoveryAbility = "";
                     }
                 }
             }
@@ -446,10 +521,25 @@ public sealed class World
                 bool near = a.Region == Player.Region && Vector2.DistanceSquared(a.Position, Player.Position) < 800 * 800;
                 if (near)
                 {
-                    if (Tick % 12 == 0)
+                    if ((Tick + ((uint)StableId(a.Id) % 12)) % 12 == 0)
+                    {
+                        long start = ProfileCombat ? Stamp() : 0;
                         Think(a, .2f);
+                        if(ProfileCombat) TacticalMilliseconds += Milliseconds(start);
+                    }
                     if (a.State is ActionState.Idle or ActionState.Moving)
-                        Move(a, new Vector2(a.MotionX, a.MotionY) * dt);
+                    {
+                        long start = ProfileCombat ? Stamp() : 0;
+                        // Avoidance is for combatants, not passive friendly NPCs. Otherwise
+                        // a nearby player produces movement even when a merchant's planner
+                        // requested zero velocity, making them appear pushable.
+                        var desired = new Vector2(a.MotionX, a.MotionY);
+                        var velocity = a.CombatProfile != "" || Hostile(a, Player)
+                            ? separation.Velocity(a, RegionsById[a.Region], desired, Math.Max(0, Stat(a, "speed")), dt)
+                            : desired;
+                        if(ProfileCombat) AvoidanceMilliseconds += Milliseconds(start);
+                        Move(a, velocity * dt);
+                    }
                 }
                 else
                 {
@@ -461,36 +551,28 @@ public sealed class World
             }
         }
 
-        foreach (var p in Projectiles.ToArray())
+        long projectileStart = ProfileCombat ? Stamp() : 0;
+        for (int i = Projectiles.Count - 1; i >= 0; i--)
         {
-            var d = Content.Abilities.Single(x => x.Id == p.Ability);
-            p.Remaining -= dt;
-            if (!Actors.TryGetValue(p.Source, out var a) || !Actors.TryGetValue(p.Target, out var b) || !a.Alive || !b.Alive || a.Region != b.Region || p.Remaining <= 0)
+            var p = Projectiles[i];
+            var d = FindAbility(p.Ability);
+            if (d == null || !Actors.TryGetValue(p.Source, out var source) || !RegionsById.TryGetValue(p.Region == "" ? source.Region : p.Region, out var region) || source.Region != region.Id)
+            { CombatDiagnostic?.Invoke("projectile_terminal", new Vector2(p.X,p.Y), p.Ability+"/source or region unavailable"); Projectiles.RemoveAt(i); continue; }
+            var hit = ProjectileFlight.Advance(this, p, d, region, dt);
+            if (hit.Outcome == "") continue;
+            CombatDiagnostic?.Invoke("projectile_terminal", new Vector2(p.X, p.Y), d.Id + "/" + hit.Outcome);
+            if (hit.Actor != null)
             {
-                Projectiles.Remove(p);
-                continue;
+                Present(CombatPresentationKind.ProjectileImpact, source, hit.Actor.Id, d.Id, new Vector2(p.X, p.Y), "actor");
+                if (!Resolve(source, hit.Actor, d, projectile: true))
+                    Present(CombatPresentationKind.Miss, source, hit.Actor.Id, d.Id, new Vector2(p.X, p.Y), "miss");
             }
-
-            var at = new Vector2(p.X, p.Y);
-            var delta = b.Position - at;
-            float distance = d.ProjectileSpeed * dt;
-            if (delta.Length() <= distance + b.Radius)
-            {
-                Resolve(a, b, d, projectile: true);
-                Projectiles.Remove(p);
-                continue;
-            }
-
-            at += Vector2.Normalize(delta) * distance;
-            if (RegionsById[a.Region].BlocksSight(RegionsById[a.Region].Index(at)))
-            {
-                Projectiles.Remove(p);
-                continue;
-            }
-
-            p.X = at.X;
-            p.Y = at.Y;
+            else if (hit.Outcome is "terrain" or "boundary")
+                Present(CombatPresentationKind.ProjectileImpact, source, ability: d.Id, position: new Vector2(p.X, p.Y), outcome: hit.Outcome);
+            // Expiration/target loss is diagnostic only, never a fabricated impact.
+            Projectiles.RemoveAt(i);
         }
+        if(ProfileCombat) ProjectileMilliseconds = Milliseconds(projectileStart);
     }
 
     public bool VisibleTo(ActorState actor, Vector2 point, bool allowBlockedTarget = false)
@@ -597,28 +679,29 @@ public sealed class World
     {
         if (a.State is not (ActionState.Idle or ActionState.Moving))
             return;
-        a.MotionX = 0;
-        a.MotionY = 0;
         UpdateSchedule(a);
-        var target = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) && Vector2.Distance(a.Position, b.Position) < 180 && LineOfSight(a, b)).OrderBy(b => Vector2.DistanceSquared(a.Position, b.Position)).FirstOrDefault();
-        string goal = target != null ? (a.Health < a.MaxHealth * .2 ? "safe" : "defeated") : a.Activity;
-        string action = Planner?.Call("choose", goal, target != null).AsString() ?? (target != null ? "attack" : a.Activity);
+        if (Time + .00001 < a.NextTacticalTime) return;
+        a.MotionX = a.MotionY = 0;
+        var profile = Content.CombatProfiles.FirstOrDefault(p => p.Id == a.CombatProfile);
+        a.NextTacticalTime = Time + (profile?.DecisionSeconds ?? .2f);
+        var target = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) && Vector2.Distance(a.Position, b.Position) < (profile?.PursuitDistance ?? 180) && LineOfSight(a, b))
+            .OrderBy(b => b.Id == a.Target ? 0 : 1).ThenBy(b => Vector2.DistanceSquared(a.Position, b.Position)).ThenBy(b => b.Id, StringComparer.Ordinal).FirstOrDefault();
+        string goal = target != null ? (a.Health < a.MaxHealth * (profile?.RetreatThreshold ?? .2f) ? "safe" : "defeated") : a.Activity;
+        string action = Planner?.Call("choose", goal, target != null).AsString() ?? (target != null ? goal == "safe" ? "retreat" : "attack" : a.Activity);
         if (target != null)
         {
             a.Knowledge[target.Id] = "seen";
             a.Target = target.Id;
-            if (action == "retreat")
+            var intent = CombatBrain.Select(this, a, target, profile, action == "retreat");
+            a.TacticalIntent = intent.Kind;
+            CombatDiagnostic?.Invoke("ai_intent", a.Position, a.Id + "/" + a.CombatProfile + "/" + intent.Kind + "/" + intent.Ability);
+            if (intent.Kind == "ability") Activate(a.Id, intent.Ability, target.Id);
+            else if (intent.Kind is "approach" or "circle" or "retreat")
             {
-                var away = Vector2.Normalize(a.Position - target.Position) * a.Speed;
-                a.MotionX = away.X;
-                a.MotionY = away.Y;
-                return;
+                Follow(a, intent.Destination, profile?.DecisionSeconds ?? dt);
+                if(intent.Kind=="approach" && a.MotionX==0 && a.MotionY==0)
+                    Follow(a, target.Position, profile?.DecisionSeconds ?? dt);
             }
-
-            var ability = Content.Abilities.Where(d => a.Abilities.Contains(d.Id) && !d.Self).OrderByDescending(d => d.Range).FirstOrDefault();
-            if (ability != null && Activate(a.Id, ability.Id, target.Id))
-                return;
-            Follow(a, target.Position, dt);
         }
         else if (action == "patrol")
         {
@@ -634,12 +717,14 @@ public sealed class World
         a.MotionX = a.MotionY = 0;
         var r = RegionsById[a.Region];
         Vector2 waypoint = target;
+        long navigationStart = ProfileCombat ? Stamp() : 0;
         if (!r.CanTravel(a.Position, target, a))
         {
             var path = r.Path(a.Position, target, a);
-            if (path.Count == 0) return;
+            if (path.Count == 0) { if(ProfileCombat) NavigationMilliseconds += Milliseconds(navigationStart); return; }
             waypoint = r.Center(path[0]);
         }
+        if(ProfileCombat) NavigationMilliseconds += Milliseconds(navigationStart);
         var delta = waypoint - a.Position;
         if (delta.Length() <= .1f) return;
         // Planning happens every .2s. Stop exactly at the waypoint instead of
@@ -655,6 +740,10 @@ public sealed class World
         return r.Features.Where(x => !r.Depleted.Contains(x.Key) && !r.OpenDoors.Contains(x.Key) && Vector2.Distance(r.Center(x.Key), a.Position) < 48 && VisibleTo(a, r.Center(x.Key), allowBlockedTarget: x.Value == "lock"))
             .OrderBy(x => Vector2.DistanceSquared(r.Center(x.Key), a.Position)).ThenBy(x => x.Key);
     }
+
+    public IEnumerable<ActorState> LootTargets(ActorState a) =>
+        Actors.Values.Where(b => !b.Alive && b.Region == a.Region && Vector2.Distance(a.Position, b.Position) < 48 && LineOfSight(a, b) && Items.HasLoot(b.Id))
+            .OrderBy(b => Vector2.DistanceSquared(a.Position, b.Position)).ThenBy(b => b.Id, StringComparer.Ordinal);
 
     public bool Interact(ActorState a)
     {
@@ -708,7 +797,7 @@ public sealed class World
             return true;
         }
 
-        var corpses = Actors.Values.Where(b => !b.Alive && b.Region == a.Region && Vector2.Distance(a.Position, b.Position) < 48 && LineOfSight(a, b) && Items.HasLoot(b.Id)).OrderBy(b => Vector2.DistanceSquared(a.Position, b.Position)).ThenBy(b => b.Id, StringComparer.Ordinal);
+        var corpses = LootTargets(a);
         foreach (var corpse in corpses)
             if (Items.LootAll(corpse.Id, a.Id)) { InteractionFeedback = "Loot collected"; return true; }
         if (r.Features.Any(x => x.Value == "chest" && r.Depleted.Contains(x.Key) && Vector2.Distance(a.Position,r.Center(x.Key)) < 48 && VisibleTo(a,r.Center(x.Key))))
@@ -738,23 +827,27 @@ public sealed class World
         using var json = System.Text.Json.JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://game/data/spawns.json"));
         var def = json.RootElement.GetProperty(region);
         int count = def.GetProperty("count").GetInt32();
-        var families = def.GetProperty("families").EnumerateArray().Select(x => x.GetString()!).ToArray();
+        var archetypes = def.GetProperty("archetypes").EnumerateArray().ToArray();
         var r = RegionsById[region];
         var random = new Random(Seed ^ 773);
         var valid = Enumerable.Range(0, r.Tiles.Length).Where(at => r.Tiles[at] == Terrain.Floor && !r.Features.ContainsKey(at) && Vector2.Distance(r.Center(at), r.Center(r.Entrance)) > 100).OrderBy(_ => random.Next()).Take(count).ToArray();
         for (int i = 0; i < valid.Length; i++)
         {
             var pos = r.Center(valid[i]);
+            var archetype = archetypes[i % archetypes.Length];
+            string combatId = archetype.GetProperty("profile").GetString()!;
+            var combat = Content.CombatProfiles.Single(p => p.Id == combatId);
             var actor = new ActorState
             {
                 Id = "ruin:spawn:" + i,
-                Name = "Ruin dweller",
+                Name = archetype.GetProperty("name").GetString()!,
+                CombatProfile = combatId,
                 Region = region,
                 Profile = "beast",
                 Faction = def.GetProperty("faction").GetString()!,
                 Appearance = new()
                 {
-                    Family = families[i % families.Length],
+                    Family = archetype.GetProperty("family").GetString()!,
                     Seed = (ulong)(uint)(Seed + i * 271)
                 },
                 X = pos.X,
@@ -762,12 +855,11 @@ public sealed class World
                 HomeX = pos.X,
                 HomeY = pos.Y,
                 Grasps = false,
-                Abilities = new()
-                {
-                    def.GetProperty("ability").GetString()!
-                }
+                Abilities = combat.Priorities.Keys.OrderBy(x => x, StringComparer.Ordinal).ToList()
             };
             AnatomyAdapter.Apply(actor);
+            actor.Speed = archetype.GetProperty("speed").GetSingle();
+            actor.Health = actor.MaxHealth = archetype.GetProperty("health").GetSingle();
             var placed = r.FindPlacement(actor.Position, actor, Actors.Values);
             actor.X = actor.HomeX = placed.X; actor.Y = actor.HomeY = placed.Y;
             Actors[actor.Id] = actor;

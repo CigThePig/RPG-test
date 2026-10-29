@@ -35,15 +35,50 @@ public static class Persistence
         {
             if (a.Id != id || !s.Regions.TryGetValue(a.Region, out var r) || !float.IsFinite(a.X) || !float.IsFinite(a.Y) || a.X < 0 || a.Y < 0 || a.X >= r.Width * 24 || a.Y >= r.Height * 24 || a.Health < 0 || a.Health > a.MaxHealth || !float.IsFinite(a.Health) || !float.IsFinite(a.Mana) || !float.IsFinite(a.MaxMana) || !float.IsFinite(a.MaxHealth) || !float.IsFinite(a.Strength) || !float.IsFinite(a.Defence) || !float.IsFinite(a.Speed) || !float.IsFinite(a.Radius) || !float.IsFinite(a.MotionX) || !float.IsFinite(a.MotionY) || !float.IsFinite(a.StateRemaining) || a.MaxHealth <= 0 || a.Radius <= 0 || a.Speed < 0 || !Enum.IsDefined(a.State) || a.Mana < 0 || a.Mana > a.MaxMana || a.Level < 1 || a.Experience < 0 || a.SkillPoints < 0 || a.SkillRanks.Any(x => !content.Skills.Any(d => d.Id == x.Key) || x.Value < 0) || a.Abilities.Any(k => !content.Abilities.Any(d => d.Id == k)) || a.Statuses.Any(x => !content.Statuses.Any(d => d.Id == x.Id) || x.Stacks < 1 || !float.IsFinite(x.Remaining)) || a.Cooldowns.Any(x => !float.IsFinite(x.Value) || x.Value < 0))
                 throw new InvalidDataException($"Invalid actor {id}");
-            if (a.Appearance.Generator != "ppc-a2207c4" || !CreatureRuntime.Registry.TryGetFamily(a.Appearance.Family, out _) || (a.Appearance.GenomeJson != "" && !CreatureRuntime.Serializer.Deserialize(a.Appearance.GenomeJson).Ok) || a.PendingAbility != "" && !content.Abilities.Any(d => d.Id == a.PendingAbility))
+            if (a.Appearance.Generator != "ppc-a2207c4" || !CreatureRuntime.Registry.TryGetFamily(a.Appearance.Family, out _) || (a.Appearance.GenomeJson != "" && !CreatureRuntime.Serializer.Deserialize(a.Appearance.GenomeJson).Ok) || a.PendingAbility != "" && !content.Abilities.Any(d => d.Id == a.PendingAbility) || a.RecoveryAbility != "" && !content.Abilities.Any(d => d.Id == a.RecoveryAbility) || !float.IsFinite(a.ActionElapsed) || !float.IsFinite(a.ActionDirectionX) || !float.IsFinite(a.ActionDirectionY))
                 throw new InvalidDataException($"Invalid appearance or pending action {id}");
         }
 
         foreach (var p in s.Projectiles)
-            if (!s.Actors.ContainsKey(p.Source) || !s.Actors.ContainsKey(p.Target) || !content.Abilities.Any(a => a.Id == p.Ability) || !float.IsFinite(p.X) || !float.IsFinite(p.Y) || !float.IsFinite(p.Remaining))
+        {
+            var ability = content.Abilities.FirstOrDefault(a => a.Id == p.Ability);
+            if (!s.Actors.TryGetValue(p.Source, out var source) || ability == null || ability.ProjectileSpeed <= 0 || !float.IsFinite(p.X) || !float.IsFinite(p.Y) || !float.IsFinite(p.Remaining) || p.Remaining < 0 || p.Remaining > 30 || !float.IsFinite(p.HeadingX) || !float.IsFinite(p.HeadingY))
                 throw new InvalidDataException("Invalid projectile");
+            if (p.Region == "") p.Region = source.Region;
+            if (!s.Regions.TryGetValue(p.Region, out var region) || region.Index(new(p.X, p.Y)) < 0)
+                throw new InvalidDataException("Invalid projectile region/position");
+            var heading = new System.Numerics.Vector2(p.HeadingX, p.HeadingY);
+            if (!CombatGeometry.TryNormalize(heading, out var normalized))
+            {
+                if (!s.Actors.TryGetValue(p.Target, out var target) || !CombatGeometry.TryNormalize(target.Position - new System.Numerics.Vector2(p.X, p.Y), out heading)) heading = System.Numerics.Vector2.UnitX;
+            }
+            else if (MathF.Abs(heading.LengthSquared()-1) > .0001f) heading = normalized;
+            // Preserve ordinary unit headings bit-for-bit: an extra normalization
+            // at restore can introduce a different rounding cycle than live flight.
+            p.HeadingX = heading.X; p.HeadingY = heading.Y;
+        }
         foreach (var actor in s.Actors.Values)
         {
+            // No detached pending action may reappear after loading. Old schema-1
+            // saves have default empty recovery IDs and zero direction fields.
+            if (actor.State != ActionState.Windup) actor.PendingAbility = "";
+            if (actor.State != ActionState.Recovery) actor.RecoveryAbility = "";
+            if (actor.State == ActionState.Windup && actor.PendingAbility != "")
+            {
+                var ability = content.Abilities.Single(d => d.Id == actor.PendingAbility);
+                float blockedFor = actor.Statuses.Where(st => st.Remaining > 0 && content.Statuses.Any(def => def.Id == st.Id && def.BlocksActions))
+                    .Select(st => st.Remaining).DefaultIfEmpty(0).Max();
+                bool invalid = !actor.Alive || blockedFor > 0 ||
+                    (ability.Geometry?.Shape == "cone" && !CombatGeometry.TryNormalize(new System.Numerics.Vector2(actor.ActionDirectionX, actor.ActionDirectionY), out _));
+                if (invalid)
+                {
+                    actor.State = !actor.Alive ? ActionState.Dead : blockedFor > 0 ? ActionState.Staggered : ActionState.Idle;
+                    actor.StateRemaining = actor.Alive ? blockedFor : 0;
+                    actor.PendingAbility = "";
+                    actor.FreeSlash = false;
+                    actor.ActionDirectionX = actor.ActionDirectionY = 0;
+                }
+            }
             // A half-finished roll must never resume after restoring a save.
             if (actor.State == ActionState.Dodging)
             {
@@ -52,6 +87,10 @@ public static class Persistence
                 actor.ActionDirectionX = actor.ActionDirectionY = 0;
                 actor.MotionX = actor.MotionY = 0;
             }
+            if (!double.IsFinite(actor.NextTacticalTime) || actor.NextTacticalTime < 0 || actor.NextTacticalTime > s.Time + 2)
+                throw new InvalidDataException("Invalid tactical cadence");
+            // Unknown optional profiles fall back to legacy tactics, preserving old actors.
+            if (!content.CombatProfiles.Any(p => p.Id == actor.CombatProfile)) actor.CombatProfile = "";
             AnatomyAdapter.Apply(actor);
         }
         // Schema-1 saves retain their full terrain, feature IDs and Gloot bags.

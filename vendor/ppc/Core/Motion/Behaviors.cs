@@ -223,6 +223,7 @@ namespace PixelCreatures.Core.Motion
         public ActionStyle Style { get; private set; }
         public double Envelope { get; private set; }
         private int _count;
+        public int TriggerCount => _count;
         private double _impact = .45;
         private double _amplitude = 1;
         public void Cancel() { Active=false; Envelope=0; }
@@ -231,6 +232,13 @@ namespace PixelCreatures.Core.Motion
             Duration = Math.Max(1.0 / 60, windup + recovery);
             _impact = DMath.Clamp(windup / Duration, .01, .99);
             _amplitude = 1.6;
+        }
+
+        // Reconstruct a live authoritative windup without replaying its start.
+        public void Seek(double elapsed)
+        {
+            Time = DMath.Clamp(elapsed, 0, Duration);
+            Step(0);
         }
 
         public void Trigger(MotorContext ctx, ActionStyle style)

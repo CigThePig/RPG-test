@@ -25,6 +25,11 @@ public partial class TouchScroll : ScrollContainer
         }
         if(e is InputEventScreenTouch touch)
         {
+            if(touch.Canceled)
+            {
+                if(touch.Index==finger){Cancel();GetViewport().SetInputAsHandled();}
+                return;
+            }
             if(touch.Pressed && finger<0 && GetGlobalRect().HasPoint(touch.Position))
             {
                 // The scrollbar remains directly draggable. Range controls and popup selectors
@@ -56,6 +61,6 @@ public partial class TouchScroll : ScrollContainer
     }
     public override void _Notification(int what)
     {
-        if(what==(int)NotificationApplicationPaused || what==NotificationExitTree) {Cancel();suppressMouse=false;}
+        if(what==(int)NotificationApplicationPaused || what==(int)NotificationApplicationFocusOut || what==NotificationExitTree) {Cancel();suppressMouse=false;}
     }
 }

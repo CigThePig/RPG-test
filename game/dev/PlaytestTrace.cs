@@ -13,6 +13,9 @@ public sealed class PlaytestTrace : IDisposable
     long rows;
     string lastBlocked="";
     ActionState lastAction;
+    CreatureActor? lastPlayerCreature, lastObservedCreature;
+    long lastPlayerRender = -1, lastObservedRender = -1;
+    ulong lastPlayerHash, lastObservedHash;
     public bool Active => writer != null;
     public string LastPath { get; private set; } = "";
     public string Scenario { get; set; } = "free-play";
@@ -58,6 +61,17 @@ public sealed class PlaytestTrace : IDisposable
     {
         if(Active)Write(new {kind="render-frame", frame=Engine.GetFramesDrawn(), tick=app.World.Tick, wallMs=clock.Elapsed.TotalMilliseconds, engineDeltaMs=delta*1000});
     }
+    // Hash the renderer's indexed frame only after an upload. This is tracing
+    // evidence, not gameplay state, and avoids GPU readback or per-tick scans.
+    static ulong PoseHash(CreatureActor? creature, ref CreatureActor? previous, ref long render, ref ulong hash)
+    {
+        if (creature?.Frame == null) { previous=null; render=-1; hash=0; return 0; }
+        if (!ReferenceEquals(previous, creature) || render != creature.RenderCount)
+        {
+            previous=creature; render=creature.RenderCount; hash=creature.Frame.ContentHash();
+        }
+        return hash;
+    }
     public void Sample(double dt)
     {
         if(!Active) return;
@@ -65,15 +79,22 @@ public sealed class PlaytestTrace : IDisposable
         if(lastBlocked!=app.World.LastBlockedReason){lastBlocked=app.World.LastBlockedReason;Marker("collision/"+lastBlocked);}
         if(lastAction!=p.State){lastAction=p.State;Marker("action/"+p.State);}
         var stick=app.Ui.Stick; var c=app.Camera;
+        var playerCreature=app.Views[p.Id].Creature;
+        var observed=app.ReplayObservedView?.Creature;
+        var playerHash=PoseHash(playerCreature, ref lastPlayerCreature, ref lastPlayerRender, ref lastPlayerHash);
+        var observedHash=PoseHash(observed, ref lastObservedCreature, ref lastObservedRender, ref lastObservedHash);
         var screen=app.GetViewport().GetCanvasTransform()*GodotConvert.GroundToScreen(p.X,p.Y);
         Write(new { kind="sample", scenario=Scenario, preset=app.Feel.Id, tick=app.World.Tick, frame=Engine.GetFramesDrawn(), wallMs=clock.Elapsed.TotalMilliseconds,
             x=p.X, y=p.Y, vx=app.World.ActualVelocity.X, vy=app.World.ActualVelocity.Y, requestedX=app.World.RequestedVelocity.X, requestedY=app.World.RequestedVelocity.Y,
             screenInputX=app.ScreenInput.X, screenInputY=app.ScreenInput.Y, groundInputX=app.World.LastInput.X, groundInputY=app.World.LastInput.Y,
             finger=stick.Finger, anchorX=stick.Anchor.X, anchorY=stick.Anchor.Y, displacementX=stick.Displacement.X, displacementY=stick.Displacement.Y, analog=app.TouchMovement.Length(),
             speed=app.World.Stat(p,"speed"), radius=p.Radius, flies=p.Flies, swims=p.Swims, action=p.State.ToString(), blocked=app.World.LastBlockedReason, attempts=app.World.CollisionAttempts, slides=app.World.CollisionSlides,
-            renderCount=app.Views[p.Id].Creature.RenderCount, renderError=app.Views[p.Id].Creature.LastError, animation=app.Views[p.Id].Creature.State.ToString(), yaw=app.Views[p.Id].Creature.Motor?.Yaw,
+            renderCount=playerCreature.RenderCount, renderError=playerCreature.LastError, animation=playerCreature.State.ToString(), yaw=playerCreature.Motor?.Yaw,
+            playerPoseHash=playerHash, observedPoseHash=observedHash, observedRenderCount=observed?.RenderCount ?? 0,
+            observedActionActive=observed?.Motor?.ActionActive ?? false, observedStyle=observed?.Motor?.CurrentActionStyle.ToString(),
             cameraX=c.GetScreenCenterPosition().X, cameraY=c.GetScreenCenterPosition().Y, cameraTargetX=c.Position.X, cameraTargetY=c.Position.Y, zoom=c.Zoom.X, playerScreenX=screen.X, playerScreenY=screen.Y,
             physicsMs=dt*1000, simulationMs=app.SimulationMs, droppedSeconds=app.DroppedSeconds, fps=Engine.GetFramesPerSecond(), rasterMs=CreatureRenderQueue.LastRasterMs, uploadMs=CreatureRenderQueue.LastUploadMs,
+            activeCombatEffects=app.CombatEffects.ActiveCount, droppedCombatEffects=app.CombatEffects.DroppedCount,
             managedBytes=app.World.Tick%60==0 ? GC.GetTotalMemory(false) : 0 });
     }
     public void Dispose() { try {writer?.Dispose();} catch(IOException) { } finally {writer=null; clock.Stop();} }

@@ -20,7 +20,7 @@ public static class Progression
     public static bool Unlock(World world, ActorState actor, string id)
     {
         var definition = world.Content.Abilities.Find(a => a.Id == id);
-        if (definition == null || actor.Abilities.Contains(id) || actor.Level < definition.UnlockLevel || actor.SkillPoints < definition.UnlockCost)
+        if (definition == null || (actor.Id == "player" && !definition.PlayerLearnable) || actor.Abilities.Contains(id) || actor.Level < definition.UnlockLevel || actor.SkillPoints < definition.UnlockCost)
             return false;
         actor.SkillPoints -= definition.UnlockCost;
         actor.Abilities.Add(id);

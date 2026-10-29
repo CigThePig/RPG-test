@@ -1,10 +1,15 @@
 using Godot;
 using System.Diagnostics;
 using System.Text.Json;
+using PixelCreatures.Runtime;
 
 namespace Mosslight;
 public static class VisualChecks
 {
+    static object? telegraphPerformance;
+    static object? combatPerformance;
+    static object? cameraHitch;
+    static object? tacticalPerformance;
     static async System.Threading.Tasks.Task Frames(Foundation app, int count = 12)
     {
         for (int i = 0; i < count; i++)
@@ -42,9 +47,376 @@ public static class VisualChecks
         throw new InvalidOperationException("Visual dodge did not advance to " + seconds);
     }
 
+    static async System.Threading.Tasks.Task Until(Foundation app, Func<bool> predicate, string message)
+    {
+        for (int i = 0; i < 360; i++) { if (predicate()) return; await Frames(app, 1); }
+        throw new InvalidOperationException(message);
+    }
+
+    // The captured pixels come from the actual viewport. Time scale is reduced
+    // here only to make screenshots reproducible on slow CI renderers; the movie
+    // replay separately exercises the normal fixed-step timing and input path.
+    static async System.Threading.Tasks.Task VerifyTactics(Foundation app)
+    {
+        var w=app.World; string snapshot=Persistence.Capture(w,app.Narrative);
+        double oldScale=Engine.TimeScale;
+        try
+        {
+            Engine.TimeScale=1;w.ProfileCombat=true;
+            var course=GameplayReplay.CreateCourse();course.Id="tactical-visual";course.Features.Clear();
+            w.RegionsById[course.Id]=course;
+            var p=w.Player;p.Region=course.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth=10000;p.Invulnerable=1000;
+            var enemies=w.Actors.Values.Where(a=>a.Id!="player").OrderBy(a=>a.Id,StringComparer.Ordinal).Take(8).ToArray();
+            var samples=new List<object>();
+            foreach(var workload in new[]{("idle",0), ("one engaged",1), ("three archetypes",3), ("four enemies",4), ("eight enemies",8), ("projectiles",3), ("projectiles and effects",4)})
+            {
+                w.Projectiles.Clear();
+                foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
+                for(int i=0;i<Math.Min(workload.Item2,enemies.Length);i++)
+                {
+                    var a=enemies[i];w.Cancel(a);
+                    string id=new[]{"prowler","brute","spitter"}[i%3];
+                    a.CombatProfile=id;a.Region=course.Id;a.Faction="beasts";
+                    a.Abilities=w.Content.CombatProfiles.Single(c=>c.Id==id).Priorities.Keys.ToList();
+                    a.X=370+(i%3)*38;a.Y=255+(i/3)*32;
+                    a.Health=a.MaxHealth=1000;a.Speed=id=="brute"?46:72;a.Invulnerable=0;a.Cooldowns.Clear();a.Statuses.Clear();a.NextTacticalTime=0;
+                }
+                app.RebuildViews();app.ResumeGame();await Frames(app,20);
+                var times=new List<double>();var ai=new List<double>();var avoidance=new List<double>();var navigation=new List<double>();var projectiles=new List<double>();var simulation=new List<double>();
+                long rasters=CreatureRenderQueue.TotalRenders,uploads=CreatureRenderQueue.TotalUploads,allocation=GC.GetAllocatedBytesForCurrentThread(),memory=GC.GetTotalMemory(false);
+                int effectPeak=0,projectilePeak=0;
+                var clock=Stopwatch.StartNew();double last=clock.Elapsed.TotalMilliseconds;
+                for(int frame=0;frame<120;frame++)
+                {
+                    if(workload.Item1.StartsWith("projectiles") && frame%15==0)
+                        for(int j=0;j<4;j++)w.Projectiles.Add(ProjectileFlight.Release(enemies[0],p,w.FindAbility(j%2==0?"spit":"ember")!));
+                    if(workload.Item1=="projectiles and effects" && frame%30==0)
+                        foreach(var a in enemies.Take(4)){a.Invulnerable=0;w.Damage(p,a,1,"physical",ability:"slash");}
+                    await Frames(app,1);
+                    double now=clock.Elapsed.TotalMilliseconds;times.Add(now-last);last=now;
+                    ai.Add(w.TacticalMilliseconds);avoidance.Add(w.AvoidanceMilliseconds);navigation.Add(w.NavigationMilliseconds);projectiles.Add(w.ProjectileMilliseconds);simulation.Add(app.SimulationMs);
+                    effectPeak=Math.Max(effectPeak,app.CombatEffects.ActiveCount);projectilePeak=Math.Max(projectilePeak,w.Projectiles.Count);
+                    if(frame==60)await CaptureRollFrame(app,"tactical-"+workload.Item1.Replace(' ','-'));
+                }
+                double Q(List<double> values,double fraction){values.Sort();return values[Math.Min(values.Count-1,(int)(values.Count*fraction))];}
+                samples.Add(new {scenario=workload.Item1,frames=times.Count,p50ms=Q(times,.5),p95ms=Q(times,.95),p99ms=Q(times,.99),aiP95ms=Q(ai,.95),avoidanceP95ms=Q(avoidance,.95),navigationP95ms=Q(navigation,.95),projectileP95ms=Q(projectiles,.95),simulationP95ms=Q(simulation,.95),rasterizations=CreatureRenderQueue.TotalRenders-rasters,uploads=CreatureRenderQueue.TotalUploads-uploads,allocatedBytes=GC.GetAllocatedBytesForCurrentThread()-allocation,managedStart=memory,managedEnd=GC.GetTotalMemory(false),effectPeak,projectilePeak});
+            }
+            tacticalPerformance=new{renderer=RenderingServer.GetVideoAdapterName(),note="120 normal-time rendered frames per workload; subsystem timings are last simulation tick per frame, AI includes navigation. Software GPU, not physical-phone certification.",samples};
+        }
+        finally{w.ProfileCombat=false;Engine.TimeScale=oldScale;Persistence.Restore(w,app.Narrative,snapshot);app.RebuildViews();await Frames(app,2);}
+    }
+
+    static async System.Threading.Tasks.Task VerifyTelegraphs(Foundation app)
+    {
+        string snapshot = Persistence.Capture(app.World, app.Narrative);
+        double oldScale = Engine.TimeScale;
+        try
+        {
+            Engine.TimeScale = .3;
+            var w = app.World;
+            var course = GameplayReplay.CreateCourse(); course.Id = "telegraph-visual";
+            w.RegionsById[course.Id] = course; w.InitializeContainers(course);
+            var p = w.Player;
+            var enemy = w.Actors.Values.First(a => a.Profile == "beast");
+            p.Region = enemy.Region = course.Id;
+            foreach (var other in w.Actors.Values.Where(a => a.Id != p.Id && a.Id != enemy.Id && a.Region == course.Id)) other.Region = "reach";
+            enemy.Speed = 0; enemy.Health = enemy.MaxHealth = 1000;
+            enemy.State = ActionState.Recovery; enemy.StateRemaining = 100; enemy.Abilities.Clear();
+            p.X = 300; p.Y = 300; enemy.X = 328; enemy.Y = 300;
+            p.Health = p.MaxHealth = 1000; p.State = ActionState.Idle; p.Statuses.Clear(); p.Cooldowns.Clear(); p.Invulnerable = 0;
+            app.RebuildViews(); app.ResumeGame(); await Frames(app, 12);
+            var bite = w.FindAbility("bite")!; var cone = w.FindAbility("fixture_sweep")!;
+            void Reset(string ability)
+            {
+                w.Cancel(p); w.Cancel(enemy);
+                p.X=300; p.Y=300; p.Health=p.MaxHealth; p.Invulnerable=0; p.Statuses.Clear(); p.Cooldowns.Clear();
+                enemy.X=328; enemy.Y=300; enemy.Health=enemy.MaxHealth; enemy.Invulnerable=0; enemy.Statuses.Clear(); enemy.Cooldowns.Clear();
+                enemy.Abilities.Clear(); enemy.Abilities.Add(ability);
+                app.Views[p.Id].SnapPosition(); app.Views[enemy.Id].SnapPosition();
+                app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
+            }
+            void Start(string ability)
+            {
+                if(!w.Activate(enemy.Id, ability, p.Id)) throw new InvalidOperationException("Visual warning failed to activate " + ability);
+                enemy.Abilities.Clear();
+            }
+            Reset("bite"); Start("bite");
+            await CaptureRollFrame(app, "telegraph-bite-early");
+            await Until(app, () => enemy.State != ActionState.Windup || enemy.StateRemaining <= bite.Windup * .55f, "Bite did not reach mid windup");
+            if(!TelegraphView.IsActive(w, enemy, bite)) throw new InvalidOperationException("Bite warning disappeared before impact");
+            await CaptureRollFrame(app, "telegraph-bite-middle");
+            app.RebuildViews();
+            if(!TelegraphView.IsActive(w, enemy, bite)) throw new InvalidOperationException("View rebuild lost live warning");
+            await Until(app, () => enemy.State != ActionState.Windup, "Bite did not reach impact");
+            if(TelegraphView.IsActive(w, enemy, bite) || p.Health == p.MaxHealth) throw new InvalidOperationException("Bite impact or warning removal failed");
+            await CaptureRollFrame(app, "telegraph-bite-impact");
+
+            Reset("bite"); Start("bite");
+            await Until(app, () => enemy.StateRemaining <= bite.Windup * .7f, "Interrupt fixture did not wind up");
+            await CaptureRollFrame(app, "telegraph-interrupt-before");
+            w.Damage(p, enemy, 5, "physical");
+            if(TelegraphView.IsActive(w, enemy, bite)) throw new InvalidOperationException("Interrupted warning persisted");
+            await Frames(app, 2); await CaptureRollFrame(app, "telegraph-interrupt-after");
+            await Frames(app, 90);
+            if(p.Health != p.MaxHealth) throw new InvalidOperationException("Interrupted visual bite hit late");
+
+            Reset("fixture_sweep"); Start("fixture_sweep");
+            await Until(app, () => enemy.StateRemaining <= cone.Windup * .6f, "Cone did not reach mid windup");
+            if(!TelegraphView.IsActive(w, enemy, cone)) throw new InvalidOperationException("Cone warning missing");
+            await CaptureRollFrame(app, "telegraph-cone-middle");
+            p.X=enemy.X; p.Y=enemy.Y+45; app.Views[p.Id].SnapPosition();
+            await CaptureRollFrame(app, "telegraph-cone-outside");
+            await Until(app, () => enemy.State != ActionState.Windup, "Cone did not reach impact");
+            if(p.Health != p.MaxHealth || TelegraphView.IsActive(w, enemy, cone)) throw new InvalidOperationException("Cone hit outside its committed geometry");
+            await CaptureRollFrame(app, "telegraph-cone-impact");
+
+            Reset("bite"); Start("bite");
+            await Until(app, () => enemy.StateRemaining <= bite.Windup * .45f, "Dodge fixture did not reach input boundary");
+            if(app.Ui.MobileLayout)
+            {
+                var button=app.Ui.ActionControl("dodge");
+                var point=button.GetGlobalRect().GetCenter();
+                Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=point});
+                Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=point});
+            }
+            else
+            {
+                Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=true});
+                Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=false});
+            }
+            Input.FlushBufferedEvents();
+            await Until(app, () => p.State == ActionState.Dodging && p.ActionElapsed >= .08f, "Production dodge input did not start");
+            await CaptureRollFrame(app, "telegraph-dodge-approach");
+            await Until(app, () => enemy.State != ActionState.Windup, "Dodge fixture did not reach impact");
+            if(p.Health != p.MaxHealth) throw new InvalidOperationException("Incoming bite damaged player during dodge immunity");
+            await CaptureRollFrame(app, "telegraph-dodge-avoided");
+
+            // Same four visible creatures and camera, first idle and then in
+            // real bite windups. Slow simulation preserves the short warnings
+            // across the comparable wall-clock frame samples.
+            w.Cancel(p); p.X=300; p.Y=300; p.Health=p.MaxHealth; p.Invulnerable=0;
+            var attackers=w.Actors.Values.Where(a=>a.Profile=="beast").Take(4).ToArray();
+            if(attackers.Length!=4) throw new InvalidOperationException("Missing multiple-warning fixture actors");
+            var offsets=new[] { new System.Numerics.Vector2(28,0), new System.Numerics.Vector2(-28,0), new System.Numerics.Vector2(0,28), new System.Numerics.Vector2(0,-28) };
+            for(int i=0;i<attackers.Length;i++)
+            {
+                var a=attackers[i]; w.Cancel(a); a.Region=course.Id; a.X=p.X+offsets[i].X; a.Y=p.Y+offsets[i].Y;
+                a.Health=a.MaxHealth=1000; a.Invulnerable=0; a.Speed=0; a.Statuses.Clear(); a.Cooldowns.Clear();
+                a.Abilities.Clear(); a.State=ActionState.Recovery; a.StateRemaining=100;
+            }
+            Engine.TimeScale=.001;
+            app.RebuildViews(); await Frames(app,30);
+            async System.Threading.Tasks.Task<(double mean, double p95, long memory)> MeasureFrames()
+            {
+                var samples=new List<double>(); var clock=Stopwatch.StartNew(); double last=clock.Elapsed.TotalMilliseconds;
+                for(int i=0;i<90;i++) { await Frames(app,1); double now=clock.Elapsed.TotalMilliseconds; samples.Add(now-last); last=now; }
+                samples.Sort(); return (samples.Average(),samples[(int)(samples.Count*.95)],GC.GetTotalMemory(false));
+            }
+            var baseline=await MeasureFrames();
+            foreach(var a in attackers)
+            {
+                a.State=ActionState.Idle; a.StateRemaining=0; a.Abilities.Add("bite");
+                if(!w.Activate(a.Id,"bite",p.Id)) throw new InvalidOperationException("Multiple-warning activation failed");
+                a.Abilities.Clear();
+            }
+            await Frames(app,10); await CaptureRollFrame(app,"telegraph-multiple");
+            if(attackers.Count(a=>TelegraphView.IsActive(w,a,bite))!=4) throw new InvalidOperationException("Multiple warnings did not remain active");
+            var active=await MeasureFrames();
+            telegraphPerformance=new { renderer=RenderingServer.GetVideoAdapterName(), actors=4, samples=90,
+                idleMeanMs=baseline.mean, idleP95Ms=baseline.p95, windupMeanMs=active.mean, windupP95Ms=active.p95,
+                idleManagedBytes=baseline.memory, windupManagedBytes=active.memory,
+                note="Same visible actors; active sample includes PPC action animation and four warnings. Software-renderer measurement, not a phone benchmark." };
+
+            // Normal engine time is essential here: at the earlier .001 scale
+            // the PPC fixed clock barely advances, so that sample alone cannot
+            // measure the cost of the adaptive combat pose rate.
+            Engine.TimeScale=1;
+            foreach(var a in attackers) { w.Cancel(a); a.Abilities.Clear(); a.State=ActionState.Recovery; a.StateRemaining=100; }
+            w.Cancel(p); p.X=300; p.Y=300; p.Health=p.MaxHealth=1000; p.Invulnerable=1000;
+            app.RebuildViews(); await Frames(app,20);
+            async System.Threading.Tasks.Task<object> Profile(string label, Action<int> drive)
+            {
+                var times=new List<double>(120); var rasters=new List<double>(120); var uploads=new List<double>(120);
+                long renderStart=CreatureRenderQueue.TotalRenders, uploadStart=CreatureRenderQueue.TotalUploads;
+                long allocated=GC.GetAllocatedBytesForCurrentThread(); long memory=GC.GetTotalMemory(false);
+                int gcStart=GC.CollectionCount(0), growthStart=attackers.Sum(a=>app.Views[a.Id].Creature.CanvasGrowths);
+                var spikes=new List<(double frame, double drive, double raster, double upload, int effects)>(120);
+                int peakEffects=0; var clock=Stopwatch.StartNew(); double last=clock.Elapsed.TotalMilliseconds;
+                long previousRenders=renderStart;
+                for(int i=0;i<120;i++)
+                {
+                    double driveStart=clock.Elapsed.TotalMilliseconds;
+                    drive(i); double driveMs=clock.Elapsed.TotalMilliseconds-driveStart;
+                    await Frames(app,1);
+                    double now=clock.Elapsed.TotalMilliseconds; times.Add(now-last); last=now;
+                    double rasterMs=0, uploadMs=0;
+                    if(CreatureRenderQueue.TotalRenders!=previousRenders)
+                    {
+                        rasters.Add(CreatureRenderQueue.LastRasterMs); uploads.Add(CreatureRenderQueue.LastUploadMs);
+                        rasterMs=CreatureRenderQueue.LastRasterMs; uploadMs=CreatureRenderQueue.LastUploadMs;
+                        previousRenders=CreatureRenderQueue.TotalRenders;
+                    }
+                    peakEffects=Math.Max(peakEffects,app.CombatEffects.ActiveCount);
+                    spikes.Add((times[^1],driveMs,rasterMs,uploadMs,app.CombatEffects.ActiveCount));
+                }
+                times.Sort(); rasters.Sort(); uploads.Sort();
+                double Q(List<double> values,double q) => values.Count==0 ? 0 : values[Math.Min(values.Count-1,(int)(values.Count*q))];
+                return new { scenario=label, frames=times.Count, p50ms=Q(times,.50), p95ms=Q(times,.95), p99ms=Q(times,.99), meanMs=times.Average(),
+                    rasterBatches=rasters.Count, rasterP50Ms=Q(rasters,.5), rasterP95Ms=Q(rasters,.95), uploadP95Ms=Q(uploads,.95),
+                    rasterizations=CreatureRenderQueue.TotalRenders-renderStart, uploads=CreatureRenderQueue.TotalUploads-uploadStart,
+                    allocatedBytes=GC.GetAllocatedBytesForCurrentThread()-allocated, managedStart=memory, managedEnd=GC.GetTotalMemory(false), peakEffects,
+                    gen0Collections=GC.CollectionCount(0)-gcStart, canvasGrowths=attackers.Sum(a=>app.Views[a.Id].Creature.CanvasGrowths)-growthStart,
+                    worstFrames=spikes.OrderByDescending(x=>x.frame).Take(5).Select(x=>new { frameMs=x.frame, driveMs=x.drive, rasterMs=x.raster, uploadMs=x.upload, effects=x.effects }).ToArray() };
+            }
+            void Prepare()
+            {
+                for(int index=0; index<attackers.Length; index++)
+                {
+                    var a=attackers[index];
+                    w.Cancel(a); a.Abilities.Clear(); a.State=ActionState.Recovery; a.StateRemaining=100;
+                    a.Health=a.MaxHealth=1000; a.Invulnerable=0;
+                    a.X=p.X+offsets[index].X; a.Y=p.Y+offsets[index].Y; app.Views[a.Id].SnapPosition();
+                }
+                app.CombatPresentation?.Reset();
+            }
+            void StartBite(ActorState a)
+            {
+                if(a.State is not (ActionState.Idle or ActionState.Moving)) return;
+                a.Cooldowns.Clear(); a.Abilities.Add("bite");
+                if(!w.Activate(a.Id,"bite",p.Id)) throw new InvalidOperationException("Performance bite could not start");
+                a.Abilities.Clear();
+            }
+            void Strike(ActorState a)
+            {
+                a.Health=1000; a.Invulnerable=0;
+                if(!w.Damage(p,a,2,"physical",ability:"slash")) throw new InvalidOperationException("Performance hit could not resolve");
+            }
+            var scenarios=new List<object>();
+            Prepare(); scenarios.Add(await Profile("idle",_=>{}));
+            Prepare(); attackers[0].State=ActionState.Idle;
+            scenarios.Add(await Profile("one attack",_=>StartBite(attackers[0])));
+            Prepare(); scenarios.Add(await Profile("one hit reaction",i=>{ if(i%30==0) Strike(attackers[0]); }));
+            Prepare(); foreach(var a in attackers) a.State=ActionState.Idle;
+            scenarios.Add(await Profile("four attackers",_=>{ foreach(var a in attackers) StartBite(a); }));
+            Prepare(); scenarios.Add(await Profile("four simultaneous hits",i=>{ if(i%30==0) foreach(var a in attackers) Strike(a); }));
+            combatPerformance=new { renderer=RenderingServer.GetVideoAdapterName(), samplesPerScenario=120,
+                note="Normal simulation time, identical four-creature fixture. Wall-frame samples include renderer and host scheduling; not phone performance.", scenarios };
+
+            Reset("bite"); Start("bite");
+            if(!TelegraphView.IsActive(w, enemy, bite)) throw new InvalidOperationException("Reset fixture has no warning");
+            app.Reset();
+            var layers=app.GetChildren().OfType<TelegraphView>().ToArray();
+            if(layers.Length!=1 || !ReferenceEquals(layers[0].World,app.World))
+                throw new InvalidOperationException("World reset retained a stale telegraph layer");
+        }
+        finally
+        {
+            Engine.TimeScale = oldScale;
+            Persistence.Restore(app.World, app.Narrative, snapshot); app.RebuildViews();
+            await Frames(app, 2);
+        }
+    }
+
+    // Exercise the real camera and damage bridge under severe render stalls.
+    // A variable-delta camera can extrapolate its smoothed center far past the
+    // target when several hits move the player during a slow Android frame.
+    static async System.Threading.Tasks.Task VerifyCameraHitches(Foundation app)
+    {
+        string snapshot=Persistence.Capture(app.World,app.Narrative);
+        try
+        {
+            var w=app.World; var course=GameplayReplay.CreateCourse(); course.Id="camera-hitch-visual";
+            w.RegionsById[course.Id]=course; w.InitializeContainers(course);
+            var p=w.Player; var enemy=w.Actors.Values.First(a=>a.Profile=="beast");
+            foreach(var other in w.Actors.Values.Where(a=>a.Id!=p.Id && a.Id!=enemy.Id)) other.Region="reach";
+            w.Cancel(p); w.Cancel(enemy);
+            // Away from the camera's edge clamps, so knockback moves its target.
+            p.Region=enemy.Region=course.Id; p.X=600; p.Y=570; p.Health=p.MaxHealth=1000;
+            p.Invulnerable=0; p.Statuses.Clear(); p.Cooldowns.Clear();
+            enemy.X=628; enemy.Y=570; enemy.Speed=0; enemy.Abilities.Clear();
+            enemy.State=ActionState.Recovery; enemy.StateRemaining=100;
+            app.RebuildViews(); app.ResumeGame(); await Frames(app, 12);
+            app.Camera.ResetSmoothing(); await Frames(app, 2);
+            float maxError=0;
+            for(int i=0;i<8;i++)
+            {
+                p.Invulnerable=0;
+                if(!w.Damage(enemy,p,2,"physical",ability:"bite")) throw new InvalidOperationException("Camera hitch damage did not resolve");
+                System.Threading.Thread.Sleep(230); // intentional test-only render stall
+                await Frames(app,1);
+                maxError=Math.Max(maxError,app.Camera.GetScreenCenterPosition().DistanceTo(app.Camera.Position));
+            }
+            await Frames(app,60);
+            float settled=app.Camera.GetScreenCenterPosition().DistanceTo(app.Camera.Position);
+            cameraHitch=new { stalledFrames=8, stallMs=230, maxCenterError=maxError, settledCenterError=settled,
+                callback=app.Camera.ProcessCallback.ToString() };
+            if(maxError>120 || settled>3) throw new InvalidOperationException($"Camera smoothing escaped its follow target under hitches: peak {maxError:0.0}, settled {settled:0.0}");
+            await CaptureRollFrame(app,"combat-camera-hitch-recovered");
+        }
+        finally
+        {
+            Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
+            await Frames(app,2);
+        }
+    }
+
+    static async System.Threading.Tasks.Task VerifyDefeat(Foundation app)
+    {
+        string snapshot=Persistence.Capture(app.World,app.Narrative);
+        try
+        {
+            var w=app.World; var course=GameplayReplay.CreateCourse(); course.Id="defeat-visual";
+            w.RegionsById[course.Id]=course; w.InitializeContainers(course);
+            var p=w.Player; var enemy=w.Actors.Values.First(a=>a.Profile=="beast");
+            foreach(var other in w.Actors.Values.Where(a=>a.Id!=p.Id && a.Id!=enemy.Id)) other.Region="reach";
+            w.Cancel(p); w.Cancel(enemy);
+            p.Region=enemy.Region=course.Id; p.X=300; p.Y=300; p.Health=p.MaxHealth=1000; p.Invulnerable=0; p.Cooldowns.Clear();
+            enemy.X=336; enemy.Y=300; enemy.Health=enemy.MaxHealth=1; enemy.Invulnerable=0; enemy.Speed=0;
+            enemy.Abilities.Clear(); enemy.State=ActionState.Recovery; enemy.StateRemaining=100;
+            w.Items.Equip(p,"iron_sword","weapon"); w.Items.Add(enemy.Id,"potion",1);
+            app.RebuildViews(); app.ResumeGame();
+            app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
+            await Frames(app,12); app.Cast("slash");
+            await Until(app,()=>!enemy.Alive,"Fatal visual strike did not resolve");
+            await CaptureRollFrame(app,"combat-fatal-impact");
+            await Until(app,()=>app.Views[enemy.Id].Creature.Motor!.RestProgress>.45 && app.Views[enemy.Id].LootMarkerVisible,
+                "Defeat posture or loot marker did not appear");
+            await CaptureRollFrame(app,"combat-fatal-corpse");
+        }
+        finally
+        {
+            Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
+            await Frames(app,2);
+        }
+    }
+
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
+        if(OS.GetCmdlineUserArgs().Contains("--controls-only"))
+        {
+            await MobileCombatControlsChecks.Rendered(app);
+            await MobileCombatControlsChecks.InputPipeline(app);
+            GD.Print("MOBILE CONTROLS CHECKS PASSED");
+            return;
+        }
+        if (!app.Ui.MobileLayout)
+        {
+            // The dummy audio driver proves resource construction, not how the
+            // cues sound. Publish actual synthesized WAVs as CI artifacts so
+            // human review can compare bite, whiff, impact and death cues.
+            string audioDirectory = ProjectSettings.GlobalizePath("res://docs/audio-samples");
+            app.Audio.Call("export_effects", audioDirectory);
+            foreach (string cue in new[] { "swing", "bite", "whiff", "hit", "heavy_hit",
+                "player_hit", "dodge", "avoid", "release", "projectile_impact", "death" })
+            {
+                var sample = Path.Combine(audioDirectory, cue + ".wav");
+                if (!File.Exists(sample) || new FileInfo(sample).Length < 256)
+                    throw new InvalidOperationException("Missing synthesized combat audio sample: " + cue);
+            }
+        }
+        await MobileCombatControlsChecks.Rendered(app);
+        await MobileCombatControlsChecks.InputPipeline(app);
         await Capture(app, "menu");
         if (app.Ui.MobileLayout)
         {
@@ -75,7 +447,7 @@ public static class VisualChecks
         {
             // Menu sits above the primary action cluster. Its upper edge must still
             // suppress the OS-synthesized mouse pair after the owned touch.
-            var menuButton=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Menu" && b.IsVisibleInTree());
+            var menuButton=app.Ui.ActionControl("menu");
             var menuPoint=menuButton.GlobalPosition+new Vector2(menuButton.Size.X/2,5);
             Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=menuPoint});
             Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=menuPoint,GlobalPosition=menuPoint});
@@ -92,8 +464,8 @@ public static class VisualChecks
             // different finger owns the stick, including canceled and dragged touches.
             string snapshot=Persistence.Capture(app.World,app.Narrative);
             var mobilePlayer=app.World.Player;
-            var dodge=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Dodge" && b.IsVisibleInTree());
-            var attack=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Attack" && b.IsVisibleInTree());
+            var dodge=app.Ui.ActionControl("dodge");
+            var attack=app.Ui.ActionControl("attack");
             var dodgePoint=dodge.GetGlobalRect().GetCenter();
             var dodgeSize=dodge.Size;
             int starts=0;
@@ -141,7 +513,7 @@ public static class VisualChecks
             string snapshot=Persistence.Capture(app.World,app.Narrative);
             var p=app.World.Player;
             p.Cooldowns.Remove("dodge");
-            var focused=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.IsVisibleInTree() && b.Text.Contains("Draught"));
+            var focused=app.Ui.ActionControl("potion");
             int potionsBefore=app.World.Items.Count("player","potion");
             focused.GrabFocus();
             int starts=0;
@@ -158,7 +530,7 @@ public static class VisualChecks
             await Frames(app,2);
         }
         // Use real GUI dispatch for desktop mice; headless checks exercise raw touch.
-        var draught=app.Ui.GetChildren().OfType<Control>().First().FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.Contains("Draught"));
+        var draught=app.Ui.ActionControl("potion");
         var point=draught.GetGlobalRect().GetCenter();
         int potions=app.World.Items.Count("player","potion");
         Input.ParseInputEvent(new InputEventMouseButton { Device=0,ButtonIndex=MouseButton.Left,Pressed=true,Position=point,GlobalPosition=point });
@@ -206,6 +578,10 @@ public static class VisualChecks
             app.RebuildViews();
             await Frames(app, 2);
         }
+        await VerifyTelegraphs(app);
+        await VerifyTactics(app);
+        await VerifyCameraHitches(app);
+        await VerifyDefeat(app);
         var player=app.World.Player;
         var region=app.World.RegionsById[player.Region];
         int chest=region.Features.Single(x=>x.Value=="chest").Key;
@@ -283,7 +659,11 @@ public static class VisualChecks
             actors = app.Views.Count,
             visibleActors = app.Views.Values.Count(v => v.Visible),
             totalRasterizations = app.Views.Values.Sum(v => v.Creature.RenderCount),
-            managedBytes = GC.GetTotalMemory(false)
+            managedBytes = GC.GetTotalMemory(false),
+            cameraHitch,
+            telegraphPerformance,
+            combatPerformance,
+            tacticalPerformance
         };
         File.WriteAllText(app.Ui.MobileLayout ? "docs/render-verification-mobile.json" : "docs/render-verification.json", JsonSerializer.Serialize(data, Content.Json));
         GD.Print("VISUAL CHECKS PASSED");

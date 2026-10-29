@@ -1,6 +1,7 @@
 using Godot;
 using PixelCreatures.Runtime;
 using PixelCreatures.Core;
+using PixelCreatures.Core.Anatomy;
 
 namespace Mosslight;
 /// <summary>Presentation consumes actor state; the PPC genome never owns health, quests or inventory.</summary>
@@ -13,11 +14,15 @@ public partial class CharacterView : Node2D
     public bool PreferMeasuredExternalVelocity { get; set; } = true;
     public Func<ActorState, Terrain>? GroundTerrain { get; set; }
     public RollDustOverlay? RollDust { get; private set; }
+    LootMarker? lootMarker;
+    public bool LootMarkerVisible => lootMarker?.Visible ?? false;
     Vector2 previous;
     float attackTime, attackDuration, impactTime;
     Vector2 attackDirection = Vector2.Right;
     bool attackArc;
+    bool attackTimeSynchronized;
     bool previousWasDodging;
+    float defeatDelay;
     public void Setup(ActorState actor)
     {
         State = actor;
@@ -47,6 +52,12 @@ public partial class CharacterView : Node2D
         float body = (float)Creature.Model!.Anatomy.Metrics.BodyLength;
         Creature.Scale = Vector2.One * Math.Clamp(actor.Radius / Math.Max(1, body * .2f), .25f, 1);
         previous = new(actor.X, actor.Y);
+        if (!actor.Alive)
+        {
+            Creature.Resting = true;
+            Creature.Motor?.SnapRest(true);
+            Creature.RequestRender();
+        }
         Sync(1f / 60);
     }
 
@@ -87,7 +98,8 @@ public partial class CharacterView : Node2D
                 motor.DodgeSideComponent = facing.X * travel.Y - facing.Y * travel.X;
             }
         }
-        if (!Creature.Paused) attackTime += dt;
+        if (!Creature.Paused && !attackTimeSynchronized) attackTime += dt;
+        attackTimeSynchronized = false;
         if (State.State is ActionState.Staggered or ActionState.Dead) attackDuration = 0;
         Creature.GroundPosition = now;
         previous = now;
@@ -99,16 +111,36 @@ public partial class CharacterView : Node2D
             new Vector2(State.ActionDirectionX, State.ActionDirectionY),
             GroundTerrain?.Invoke(State) ?? Terrain.Grass);
         Position = GodotConvert.GroundToScreen(State.X, State.Y);
-        Creature.Resting = State.Activity == "rest" || !State.Alive;
-        Modulate = State.Alive ? Colors.White : new Color(.45f, .4f, .4f, .6f);
+        if (!Creature.Paused && defeatDelay > 0) defeatDelay = Math.Max(0, defeatDelay - dt);
+        // A merchant's "rest" schedule means off-duty, not physically slumped
+        // or asleep on the path. Reserve the PPC rest pose for other creatures
+        // and for the death collapse, so starting Reach wardens stand upright.
+        bool visualRest = State.Activity == "rest" && State.Profession != "merchant";
+        Creature.Resting = State.Alive ? visualRest && (State.State is ActionState.Idle or ActionState.Moving) : defeatDelay <= 0;
+        if (State.Alive) { defeatDelay = 0; Creature.Modulate = Colors.White; }
+        else
+        {
+            float collapse = (float)(Creature.Motor?.RestProgress ?? 1);
+            Creature.Modulate = Colors.White.Lerp(new Color(.45f, .4f, .4f, .72f), collapse);
+        }
+        if (!State.Alive && HasLoot && lootMarker == null)
+        {
+            // Create at most one marker per lootable corpse, above actor art.
+            lootMarker = new LootMarker { ZIndex = 1 };
+            AddChild(lootMarker);
+        }
+        if (lootMarker != null) lootMarker.Visible = !State.Alive && HasLoot;
         QueueRedraw();
     }
 
-    public void Cue(string cue, ActorState? target = null, AbilityDef? ability = null)
+    static ActionStyle? Style(AbilityDef? ability) => ability != null &&
+        Enum.TryParse<ActionStyle>(ability.ActionStyle, out var style) && Enum.IsDefined(style) ? style : null;
+
+    public void Cue(string cue, ActorState? target = null, AbilityDef? ability = null, float elapsed = 0)
     {
         if (cue is "attack" or "cast")
         {
-            if (State.Id == "player" && State.FreeSlash)
+            if (State.FreeSlash || ability?.Geometry?.Shape == "cone")
             {
                 var ground = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
                 Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(ground.X, ground.Y));
@@ -124,9 +156,9 @@ public partial class CharacterView : Node2D
                 }
             }
             if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
-            if (ability != null) Creature.TriggerGameplayAction(ability.Windup, ability.Recovery);
+            if (ability != null) Creature.TriggerGameplayAction(ability.Windup, ability.Recovery, Style(ability), elapsed);
             else Creature.TriggerAction();
-            attackTime = 0;
+            attackTime = elapsed;
             impactTime = ability?.Windup ?? .14f;
             attackDuration = impactTime + (ability?.Recovery ?? .24f);
             attackArc = cue == "attack" && ability?.Id == "slash";
@@ -143,30 +175,89 @@ public partial class CharacterView : Node2D
             Creature.TriggerHit(target == null ? Vector2.Left : new Vector2(target.X - State.X, target.Y - State.Y).Normalized());
             attackDuration = 0;
         }
+        if (cue is "cancel" or "completed")
+        {
+            Creature.CancelGameplayAction();
+            attackDuration = 0;
+        }
+    }
+
+    /// <summary>Use captured pre-knockback positions; never rotate the victim to face the source.</summary>
+    public void ReactToHit(System.Numerics.Vector2 origin, System.Numerics.Vector2 impact, float strength)
+    {
+        if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
+        var from = new Vector2(origin.X - impact.X, origin.Y - impact.Y);
+        Creature.TriggerHit(from.LengthSquared() > .001f ? from.Normalized() : Vector2.Left, strength);
+        attackDuration = 0;
+    }
+
+    public void BeginDefeat() => defeatDelay = .20f;
+
+    /// <summary>Resume only a live windup, without dispatching another start or sound.</summary>
+    public void RestoreWindup(World world)
+    {
+        if (!State.Alive || State.State != ActionState.Windup) return;
+        var ability = world.FindAbility(State.PendingAbility);
+        if (ability == null) return;
+        world.Actors.TryGetValue(State.Target, out var target);
+        Cue(ability.Damage < 0 ? "cast" : "attack", target, ability,
+            Math.Clamp(ability.Windup - State.StateRemaining, 0, ability.Windup));
+    }
+
+    // Reconstructed views derive facing from the same state as the warning. A
+    // target-locked strike tracks its target; a cone keeps its committed yaw.
+    public void SyncCombatFacing(World world)
+    {
+        if (State.State == ActionState.Recovery && State.RecoveryAbility != "")
+        {
+            var recovery = world.FindAbility(State.RecoveryAbility);
+            if (recovery != null)
+            {
+                attackTime = Math.Clamp(recovery.Windup + recovery.Recovery - State.StateRemaining, 0, recovery.Windup + recovery.Recovery);
+                attackTimeSynchronized = true;
+                Creature.Motor?.SynchronizeGameplayAction(attackTime);
+            }
+            return;
+        }
+        if (State.State != ActionState.Windup || State.PendingAbility == "") return;
+        var ability = world.FindAbility(State.PendingAbility);
+        if (ability != null)
+        {
+            attackTime = Math.Clamp(ability.Windup - State.StateRemaining, 0, ability.Windup);
+            attackTimeSynchronized = true;
+            Creature.Motor?.SynchronizeGameplayAction(attackTime);
+        }
+        if (State.FreeSlash || ability?.Geometry?.Shape == "cone")
+        {
+            if (CombatGeometry.TryNormalize(new System.Numerics.Vector2(State.ActionDirectionX, State.ActionDirectionY), out var direction))
+                Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(direction.X, direction.Y));
+        }
+        else if (world.Actors.TryGetValue(State.Target, out var target) && target.Region == State.Region && target.Id != State.Id)
+        {
+            var delta = target.Position - State.Position;
+            if (delta.LengthSquared() > .001f) Creature.FaceYaw(PixelCamera.GroundVelocityToYaw(delta.X, delta.Y));
+        }
     }
 
     public override void _Draw()
     {
         if (attackArc && attackTime < attackDuration && State.Alive)
         {
-            // Presentation only: the authoritative ability still owns range, damage and timing.
+            // Air movement only. Sweep a short, translucent blade streak
+            // instead of the broad gold burst that resembled a hit on empty air.
+            // A confirmed World.Hit owns impact flashes independently.
             float t = attackTime - impactTime;
-            if (t >= -.06f && t <= .14f)
+            if (t >= -.055f && t <= .115f)
             {
-                float alpha = t < 0 ? (t + .06f) / .06f : 1 - t / .14f;
-                float angle = attackDirection.Angle();
-                DrawArc(new Vector2(0, -14), 30, angle - 1.0f, angle + 1.0f, 20, new Color(1, .87f, .5f, alpha), 4, true);
-                DrawArc(new Vector2(0, -14), 35, angle - .7f, angle + .8f, 16, new Color(1, 1, .85f, alpha * .7f), 2, true);
+                float phase = Math.Clamp((t + .055f) / .17f, 0, 1);
+                float alpha = MathF.Sin(phase * MathF.PI) * .42f;
+                float angle = attackDirection.Angle() - .8f + phase * 1.6f;
+                DrawArc(new Vector2(0, -14), 31, angle - .28f, angle + .28f, 8,
+                    new Color(.78f, .9f, 1f, alpha), 2.2f, true);
             }
         }
         if (!State.Alive)
         {
-            if (HasLoot)
-            {
-                DrawRect(new Rect2(-7,-15,14,12),new Color("b49364"));
-                DrawRect(new Rect2(-4,-18,8,4),new Color("d5bd85"));
-                DrawLine(new Vector2(-5,-12),new Vector2(5,-12),new Color("5b4936"),2);
-            }
             return;
         }
         if (State.Health < State.MaxHealth)

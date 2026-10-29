@@ -13,11 +13,56 @@ public sealed class AbilityDef
     public float Cooldown { get; set; }
     public float Windup { get; set; }
     public float Recovery { get; set; }
+    public ProjectileDef? Projectile { get; set; }
     public float ProjectileSpeed { get; set; }
     public int UnlockLevel { get; set; } = 1;
     public int UnlockCost { get; set; } = 1;
     public bool Self { get; set; }
     public bool RequiresWeapon { get; set; }
+    // Test fixtures are excluded from normal content, including progression UI.
+    public bool VerificationOnly { get; set; }
+    public bool PlayerLearnable { get; set; } = true;
+    // Omitted geometry preserves the original target-locked SPELL behavior.
+    public AttackGeometryDef? Geometry { get; set; }
+    public TelegraphDef? Telegraph { get; set; }
+    // Optional PPC action; an omitted or anatomy-incompatible style uses the rig default.
+    public string ActionStyle { get; set; } = "";
+}
+
+public sealed class ProjectileDef
+{
+    public string Mode { get; set; } = "legacy";
+    public float TurnDegrees { get; set; } = 60;
+    public float Lifetime { get; set; } = 4;
+    public float Radius { get; set; } = 2;
+    public string Visual { get; set; } = "ember";
+    public bool InterceptHostiles { get; set; }
+}
+
+public sealed class CombatProfileDef
+{
+    public string Id { get; set; } = "";
+    public float MinimumDistance { get; set; }
+    public float PreferredDistance { get; set; } = 28;
+    public float ApproachDistance { get; set; } = 38;
+    public float PursuitDistance { get; set; } = 180;
+    public float RetreatThreshold { get; set; } = .2f;
+    public float DecisionSeconds { get; set; } = .2f;
+    public float Reposition { get; set; }
+    public string Behaviour { get; set; } = "melee";
+    public Dictionary<string, float> Priorities { get; set; } = new();
+}
+
+public sealed class AttackGeometryDef
+{
+    public string Shape { get; set; } = "target";
+    public float Range { get; set; }
+    public float HalfAngleDegrees { get; set; }
+}
+
+public sealed class TelegraphDef
+{
+    public string Style { get; set; } = "none";
 }
 
 public sealed class StatusDef
@@ -68,6 +113,7 @@ public sealed class NpcProfile
 
 public sealed class Content
 {
+    public List<CombatProfileDef> CombatProfiles { get; set; } = new();
     public List<SkillDef> Skills { get; set; } = new();
     public List<AbilityDef> Abilities { get; set; } = new();
     public List<StatusDef> Statuses { get; set; } = new();
@@ -81,7 +127,12 @@ public sealed class Content
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
     };
-    public static Content Load() => JsonSerializer.Deserialize<Content>(Godot.FileAccess.GetFileAsString("res://game/data/foundation.json"), Json)!;
+    public static Content Load(bool includeVerification = false)
+    {
+        var content = JsonSerializer.Deserialize<Content>(Godot.FileAccess.GetFileAsString("res://game/data/foundation.json"), Json)!;
+        if (!includeVerification) content.Abilities.RemoveAll(a => a.VerificationOnly);
+        return content;
+    }
     public List<string> Validate(HashSet<string> items)
     {
         var errors = new List<string>();
@@ -92,6 +143,13 @@ public sealed class Content
                     errors.Add($"{domain}: invalid/duplicate id '{g.Key}'");
         }
 
+        Unique(CombatProfiles.Select(x => x.Id), "combat profile");
+        foreach (var p in CombatProfiles)
+        {
+            var values = new[] { p.MinimumDistance, p.PreferredDistance, p.ApproachDistance, p.PursuitDistance, p.RetreatThreshold, p.DecisionSeconds, p.Reposition };
+            if (values.Any(v => !float.IsFinite(v) || v < 0) || p.MinimumDistance > p.PreferredDistance || p.PreferredDistance > p.ApproachDistance || p.ApproachDistance > p.PursuitDistance || p.PursuitDistance > 360 || p.RetreatThreshold > 1 || p.DecisionSeconds < .2f || p.DecisionSeconds > 2 || p.Reposition > 1 || p.Behaviour is not ("melee" or "ranged") || p.Priorities.Count == 0 || p.Priorities.Any(x => !Abilities.Any(a => a.Id == x.Key && !a.Self) || !float.IsFinite(x.Value) || x.Value <= 0))
+                errors.Add($"combat profile {p.Id}: invalid distances, cadence, behaviour or abilities");
+        }
         Unique(Skills.Select(x => x.Id), "skill");
         foreach (var skill in Skills)
             if (skill.MaxRank < 1 || !float.IsFinite(skill.PerRank))
@@ -101,8 +159,30 @@ public sealed class Content
         Unique(Recipes.Select(x => x.Id), "recipe");
         Unique(NpcProfiles.Select(x => x.Id), "npc");
         foreach (var a in Abilities)
-            if (a.Range < 0 || a.Cost < 0 || a.Cooldown < 0 || a.Windup < 0 || a.Recovery < 0 || (!string.IsNullOrEmpty(a.Status) && !Statuses.Any(s => s.Id == a.Status)))
-                errors.Add($"ability {a.Id}: invalid timing, cost or status reference");
+        {
+            static bool Nonnegative(float value) => float.IsFinite(value) && value >= 0;
+            if (!Nonnegative(a.Range) || !Nonnegative(a.Cost) || !Nonnegative(a.Cooldown) ||
+                !Nonnegative(a.Windup) || !Nonnegative(a.Recovery) || !Nonnegative(a.ProjectileSpeed) ||
+                !float.IsFinite(a.Damage) || (!string.IsNullOrEmpty(a.Status) && !Statuses.Any(s => s.Id == a.Status)))
+                errors.Add($"ability {a.Id}: invalid timing, cost, damage or status reference");
+            if (a.Projectile is { } p && (a.ProjectileSpeed <= 0 || p.Mode is not ("legacy" or "straight" or "bounded_homing") || !Nonnegative(p.TurnDegrees) || p.TurnDegrees > 720 || !Nonnegative(p.Radius) || p.Radius > 12 || !Nonnegative(p.Lifetime) || p.Lifetime <= 0 || p.Lifetime > 30 || p.Visual is not ("ember" or "spit")))
+                errors.Add($"ability {a.Id}: invalid projectile configuration");
+            string? shape = a.Geometry == null ? "target" : a.Geometry.Shape;
+            string? style = a.Telegraph == null ? "none" : a.Telegraph.Style;
+            if (shape is not ("target" or "cone"))
+                errors.Add($"ability {a.Id}: unsupported attack shape '{shape}'");
+            if (a.Geometry != null && (!Nonnegative(a.Geometry.Range) || !Nonnegative(a.Geometry.HalfAngleDegrees) ||
+                a.Geometry.HalfAngleDegrees > 180 || (shape == "cone" && (a.Geometry.Range <= 0 || a.Geometry.HalfAngleDegrees <= 0)) ||
+                (shape == "target" && (a.Geometry.Range != 0 || a.Geometry.HalfAngleDegrees != 0))))
+                errors.Add($"ability {a.Id}: invalid attack geometry");
+            if (shape == "cone" && (a.Self || a.ProjectileSpeed > 0 || a.Damage <= 0 || a.Id == "slash"))
+                errors.Add($"ability {a.Id}: cone requires a direct hostile damaging ability");
+            if (style is not ("none" or "target" or "cone") ||
+                (style != "none" && (style != shape || a.Self || a.Damage <= 0 || a.ProjectileSpeed > 0)))
+                errors.Add($"ability {a.Id}: telegraph does not match implemented danger");
+            if (a.ActionStyle != "" && (!Enum.TryParse<PixelCreatures.Core.Anatomy.ActionStyle>(a.ActionStyle, out var actionStyle) || !Enum.IsDefined(actionStyle) || actionStyle.ToString() != a.ActionStyle))
+                errors.Add($"ability {a.Id}: unknown procedural action style");
+        }
         foreach (var s in Statuses)
             if (s.Duration <= 0 || s.Interval <= 0 || s.MaxStacks < 1)
                 errors.Add($"status {s.Id}: invalid stacking/timing");

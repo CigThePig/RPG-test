@@ -13,7 +13,17 @@ def run(*args, **kwargs):
     # Never let a disconnected ADB daemon strand the workflow indefinitely.
     kwargs.setdefault('timeout', 20)
     return subprocess.check_output(args, stderr=subprocess.STDOUT, **kwargs)
-def adb(*args): return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True).strip()
+def adb(*args):
+    # A hosted emulator can close a logcat dump mid-stream with exit 255 while
+    # the game keeps running. Retry this read only; never repeat touch/install mutations.
+    attempts=3 if args==('logcat','-d') else 1
+    for attempt in range(attempts):
+        try: return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True).strip()
+        except subprocess.CalledProcessError as error:
+            if attempts==1: raise
+            (out/f'adb-logcat-read-{time.monotonic_ns()}.log').write_text(str(error)+"\n"+str(error.output))
+            if attempt==attempts-1: raise
+            time.sleep(.5)
 log=(out/'emulator.log').open('w')
 emulator=subprocess.Popen([os.environ['ANDROID_HOME']+'/emulator/emulator','-avd','mosslight',
     '-no-window','-no-audio','-no-boot-anim','-no-snapshot','-gpu','swangle','-skin','1280x800'],stdout=log,stderr=log)
@@ -106,10 +116,85 @@ try:
     else: raise RuntimeError('Resume tap never entered a gameplay session')
     # ADB screenrecord captures the actual Android surface, including frame pacing.
     recording_start=time.time()
-    recorder=subprocess.Popen([adb_path,'shell','screenrecord','--bit-rate','4000000','--time-limit','90','/sdcard/mosslight-playtest.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    recorder=subprocess.Popen([adb_path,'shell','screenrecord','--bit-rate','4000000','--time-limit','180','/sdcard/mosslight-playtest.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    # Set a westward facing and leave the nearby enemy group alone while
+    # checking repeated controls. The earlier chest-first ordering let active
+    # enemies kill the player mid-test; it did not expose an input failure.
+    adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(30*w/1280)),str(int(640*h/800)),'600')
+    time.sleep(.4)
+    def action_target(action):
+        rows=re.findall(fr'MOSSLIGHT_CONTROL version=1 id={action} x=([0-9]+) y=([0-9]+)',adb('logcat','-d'))
+        assert rows, f'Missing production layout diagnostic for {action}'
+        x,y=map(int,rows[-1])
+        assert 0<=x<w and 0<=y<h, f'Invalid control center: {action} {x},{y}'
+        return x,y
+    def tap_action(action):
+        x,y=action_target(action)
+        adb('shell','input','tap',str(x),str(y))
+    (out/'control-layout.json').write_text(json.dumps({a:action_target(a) for a in ('attack','dodge','ember','mend','potion','interact','inventory','menu')},indent=2))
+    tap_action('attack')
+    deadline=time.monotonic()+15
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        if 'MOSSLIGHT_COMBAT kind=attack_completed' in logs: break
+        time.sleep(.5)
+    else: raise RuntimeError('Real Android Attack touch did not finish a free swing')
+    assert len(re.findall(r'MOSSLIGHT_COMBAT kind=attack_started',logs))==1, 'Attack touch activated more than once'
+    tap_action('dodge')
+    deadline=time.monotonic()+15
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        if 'MOSSLIGHT_COMBAT kind=dodge_completed' in logs: break
+        time.sleep(.5)
+    else: raise RuntimeError('Real Android Dodge touch did not complete')
+    assert len(re.findall(r'MOSSLIGHT_COMBAT kind=dodge_started',logs))==1, 'Dodge touch activated more than once'
+    capture('combat-controls.png')
+    # Wait for game-tick checkpoints, not assumed emulator wall-clock speed.
+    # Count both starts and completions, so duplicate dispatch and stuck
+    # actions fail. These swings do not claim confirmed-hit coverage.
+    last_started={kind:int(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_started tick=(\d+)',logs)[-1]) for kind in ('attack','dodge')}
+    for kind,total,x,y in [('attack',4,1198,712),('dodge',3,1088,714)]:
+        for expected in range(2,total+1):
+            ready_tick=last_started[kind]+(41 if kind=='attack' else 44)
+            deadline=time.monotonic()+60
+            while time.monotonic()<deadline:
+                logs=adb('logcat','-d')
+                checkpoints=[int(n) for n in re.findall(r'MOSSLIGHT_RUNTIME tick=(\d+)',logs)]
+                if checkpoints and checkpoints[-1]>=ready_tick: break
+                if not adb('shell','pidof',package): raise RuntimeError(f'Android process exited while waiting for {kind} cooldown')
+                time.sleep(.5)
+            else: raise RuntimeError(f'Android simulation did not reach {kind} cooldown tick {ready_tick}')
+            prior_starts=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_started tick=(\d+)',logs))
+            prior_completions=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_completed tick=(\d+)',logs))
+            tap_action(kind)
+            deadline=time.monotonic()+15
+            while time.monotonic()<deadline:
+                logs=adb('logcat','-d')
+                starts=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_started tick=(\d+)',logs))-prior_starts
+                completions=set(re.findall(fr'MOSSLIGHT_COMBAT kind={kind}_completed tick=(\d+)',logs))-prior_completions
+                assert len(starts)<=1 and len(completions)<=1, f'{kind}: duplicate touch dispatch'
+                if len(starts)==1 and len(completions)==1: break
+                if not adb('shell','pidof',package): raise RuntimeError(f'Android process exited during repeated {kind}')
+                time.sleep(.5)
+            else: raise RuntimeError(f'Android {kind} touch {expected} did not finish')
+            last_started[kind]=int(next(iter(starts)))
+    # Start a fresh real session before the chest route. The long repeated
+    # control phase gives roaming enemies time to approach the original area.
+    # Reset through the same menu a player uses, without altering combat rules.
+    before_reset=len(re.findall(r'MOSSLIGHT_SESSION_STARTED tick=0',logs))
+    tap_action('menu')
+    time.sleep(1)
+    capture('reset-menu.png')
+    tap(640,566) # New game in the initial menu's visible row.
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        if len(re.findall(r'MOSSLIGHT_SESSION_STARTED tick=0',logs))>before_reset: break
+        time.sleep(.5)
+    else: raise RuntimeError('New-game touch did not reset the gameplay session')
     # Exercise actual touch ownership, then open the starting Gloot chest.
     # Read release positions from production diagnostics instead of assuming emulator FPS.
-    for attempt in range(12):
+    for attempt in range(16):
         adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(280*w/1280)),str(int(640*h/800)),'600')
         time.sleep(.4)
         ensure_foreground(timeout=10)
@@ -119,31 +204,29 @@ try:
     else: raise RuntimeError('Touch movement never approached starting chest')
     assert float(positions[-1][0])>220,'Touch input did not change player coordinates'
     capture('chest.png')
-    tap(878,644) # Interact: left side of the named action cluster.
+    tap_action('interact')
     time.sleep(1)
     logs=adb('logcat','-d')
     assert 'MOSSLIGHT_GAMEPLAY kind=resource_depleted value=chest' in logs,'Touch interaction did not empty authoritative chest inventory'
     interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
     assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
     capture('exploration.png')
-    tap(1198,712) # Attack: the large primary button.
-    deadline=time.monotonic()+15
+    # Approach the live enemy group and observe real damage events. This also
+    # exercises repeated confirmed-hit effects on the Android renderer.
+    previous_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))
+    deadline=time.monotonic()+45
+    approaches=0
     while time.monotonic()<deadline:
         logs=adb('logcat','-d')
-        if 'MOSSLIGHT_COMBAT kind=attack_completed' in logs: break
-        time.sleep(.5)
-    else: raise RuntimeError('Real Android Attack touch did not finish a free swing')
-    assert len(re.findall(r'MOSSLIGHT_COMBAT kind=attack_started',logs))==1, 'Attack touch activated more than once'
-    tap(1088,714) # Dodge: beside the primary attack.
-    deadline=time.monotonic()+15
-    while time.monotonic()<deadline:
-        logs=adb('logcat','-d')
-        if 'MOSSLIGHT_COMBAT kind=dodge_completed' in logs: break
-        time.sleep(.5)
-    else: raise RuntimeError('Real Android Dodge touch did not complete')
-    assert len(re.findall(r'MOSSLIGHT_COMBAT kind=dodge_started',logs))==1, 'Dodge touch activated more than once'
-    capture('combat-controls.png')
-    tap(1086,564) # Pack: utility row above the combat thumb arc.
+        observed_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))-previous_hits
+        if len(observed_hits)>=2: break
+        if not adb('shell','pidof',package): raise RuntimeError('Android process exited during real combat damage')
+        if approaches<2:
+            adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(280*w/1280)),str(int(640*h/800)),'600')
+            approaches+=1
+        else: time.sleep(.5)
+    else: raise RuntimeError('Android combat did not produce two real player damage events')
+    tap_action('inventory')
     time.sleep(1)
     capture('inventory.png')
     pids=adb('shell','pidof','screenrecord').split()
@@ -164,18 +247,62 @@ try:
     sheet.save(out/'contact-sheet.jpg')
     for f in frames:f.unlink()
     (out/'recording.json').write_text(json.dumps({'captureStartUnix':recording_start,'source':run('git','rev-parse','HEAD',text=True).strip(),'platform':'hosted x86_64 Android emulator','input':'ADB OS touch events','positions':positions,'fps':'screenrecord variable; inspect video PTS','synchronization':'captureStartUnix anchors screenrecord; logcat timestamps and MOSSLIGHT_TOUCH_RELEASE provide coarse input/displacement correlation, not sub-frame latency'},indent=2))
-    adb('shell','input','keyevent','3') # Background triggers save and cancels held input.
-    time.sleep(2)
-    adb('shell','monkey','-p',package,'-c','android.intent.category.LAUNCHER','1')
-    time.sleep(3)
-    capture('resumed-menu.png',wait=15)
-    assert adb('shell','pidof',package),'Application not running after resume'
-    logs=adb('logcat','-d');(out/'logcat.log').write_text(logs)
-    assert 'MOSSLIGHT_INPUT_CANCELLED' in logs,'Background did not cancel gameplay input'
+    # Repeated background/foreground transitions are intentional: an earlier
+    # Part 2 run resumed to a black Android surface despite a live game process,
+    # and a single successful retry cannot exclude an intermittent regression.
+    # Each cycle checks the actual composed framebuffer, not only CPU markers.
+    # The developer fixture uses real profiles, PPC bodies, SPELL and projectile flight.
+    # F9 enters the same reversible course exposed in Developer diagnostics.
+    adb('shell','input','keyevent','139') # Android KEYCODE_F9
+    deadline=time.monotonic()+45
+    while time.monotonic()<deadline:
+        lab_logs=adb('logcat','-d')
+        if 'MOSSLIGHT_TACTICAL_LAB profiles=prowler,brute,spitter' in lab_logs and 'MOSSLIGHT_LAB_PROJECTILE kind=ProjectileReleased ability=spit' in lab_logs: break
+        time.sleep(.5)
+    else: raise RuntimeError('Android mixed archetype fixture did not enter and release a real spit projectile')
+    capture('mixed-archetypes.png',wait=20)
+    spell_before=adb('logcat','-d').count('MOSSLIGHT_PLAYER_ABILITY id=ember ')
+    tap_action('ember')
+    deadline=time.monotonic()+15
+    while time.monotonic()<deadline:
+        count=adb('logcat','-d').count('MOSSLIGHT_PLAYER_ABILITY id=ember ')-spell_before
+        assert count<=1, 'One spell tap double-dispatched'
+        if count==1: break
+        time.sleep(.25)
+    else: raise RuntimeError('Android Ember action did not activate')
+    capture('spell-cooldown.png',wait=10)
+    lifecycle=[]
+    original_pid=adb('shell','pidof',package)
+    assert original_pid,'Application exited before Android lifecycle verification'
+    for cycle in range(3):
+        prior_logs=adb('logcat','-d')
+        prior_cancels=prior_logs.count('MOSSLIGHT_INPUT_CANCELLED')
+        adb('shell','input','keyevent','3') # Background saves and cancels held input.
+        time.sleep(2)
+        adb('shell','monkey','-p',package,'-c','android.intent.category.LAUNCHER','1')
+        ensure_foreground(timeout=30)
+        image_name='resumed-menu.png' if cycle==0 else f'resumed-menu-{cycle+1}.png'
+        capture(image_name,wait=20)
+        # Resume actual mixed combat between cycles, exercising rebuilt transient views.
+        tap(640,178)
+        time.sleep(1)
+        capture(f'resumed-combat-{cycle+1}.png',wait=20)
+        resumed_pid=adb('shell','pidof',package)
+        logs=adb('logcat','-d')
+        (out/f'resume-{cycle+1}.log').write_text(
+            f'initial_pid={original_pid} resumed_pid={resumed_pid} '
+            f'cancel_count_before={prior_cancels} cancel_count_after={logs.count("MOSSLIGHT_INPUT_CANCELLED")}\\n')
+        assert resumed_pid==original_pid, f'Android process restarted on resume cycle {cycle+1}'
+        assert logs.count('MOSSLIGHT_INPUT_CANCELLED')>prior_cancels, (
+            f'Background cycle {cycle+1} never canceled gameplay input')
+        lifecycle.append({'cycle':cycle+1,'pid':resumed_pid,'screenshot':image_name,
+            'inputCancelCount':logs.count('MOSSLIGHT_INPUT_CANCELLED')})
+    (out/'lifecycle.json').write_text(json.dumps(lifecycle,indent=2))
+    (out/'logcat.log').write_text(logs)
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, one Attack and one Dodge touch, inventory screenshot, gameplay ticks, background input cancellation/resume. ARM64 device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. ARM64 device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     # Preserve the real surface recording on failure as well as success. ADB

@@ -38,11 +38,31 @@ public static class FoundationChecks
         var watch = Stopwatch.StartNew();
         try
         {
+            MobileCombatControlsChecks.Run(Check);
+            EncounterChecks.Run(app,Check);
             ReviewChecks.Run(app, Check);
             PlayabilityChecks.Run(app, Check);
             MovementChecks.Run(app, Check);
             CombatChecks.Run(app, Check);
             DodgeChecks.Run(app, Check);
+            CombatTelegraphChecks.Run(app, Check);
+            CombatPresentationChecks.Run(app, Check);
+            CombatAiChecks.Run(app, Check);
+            ActorSeparationChecks.Run(app, Check);
+            ProjectileChecks.Run(app, Check);
+            string beforeLab=Persistence.Capture(w,app.Narrative);
+            bool labReleased=false;
+            void ObserveLab(CombatPresentationEvent e){if(e.ActorId=="lab:spitter" && e.Kind==CombatPresentationKind.ProjectileReleased)labReleased=true;}
+            w.Presentation+=ObserveLab;
+            try
+            {
+                app.BeginCombatCourse();
+                Check(new[]{"prowler","brute","spitter"}.All(id=>w.Actors.ContainsKey("lab:"+id) && w.Actors["lab:"+id].CombatProfile==id),"reversible developer lab uses three real profiles");
+                for(int i=0;i<120;i++)w.Step(1f/60);
+                Check(labReleased,"developer lab uses authoritative Spit release");
+            }
+            finally{w.Presentation-=ObserveLab;app.LeaveFeelCourse();app.Ui.PauseForVerification();}
+            Check(beforeLab==Persistence.Capture(w,app.Narrative),"developer combat fixture restores normal progress exactly");
             // Exercise nonlinear progression using actual world defeat events before acceptance.
             var early = w.Player;
             var victims = w.Actors.Values.Where(a => a.Profile == "beast").Take(2).ToArray();
@@ -118,7 +138,7 @@ public static class FoundationChecks
             app.Ui.Update();
             await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);
             await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);
-            var draught=app.Ui.GetChildren().OfType<Control>().First().FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text.Contains("Draught"));
+            var draught=app.Ui.ActionControl("potion");
             var touchPoint=draught.GetGlobalRect().GetCenter();
             int potionCount=w.Items.Count("player","potion");
             w.Player.Health=20;

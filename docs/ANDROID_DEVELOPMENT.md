@@ -5,13 +5,13 @@ You do not need a computer, Godot, Android Studio or a cable. GitHub builds the 
 ## Download and install
 
 1. Sign into GitHub in your phone browser and open [Android development APK runs](https://github.com/CigThePig/RPG-test/actions/workflows/android.yml).
-2. Choose a successful run for `feat/rpg-foundation` (PR #2), or `main` after merging. Check its source commit against the change you want to test.
+2. Choose a successful run for `feat/combat-feel-enemy-ai-mobile` (PR #4), or `main` after merging. Check its source commit against the change you want to test.
 3. Scroll to **Artifacts**. Download **Mosslight-android-arm64-debug-COMMIT**. Ignore `emulator-test-package` and diagnostic artifacts.
 4. GitHub downloads a ZIP. Open **My Files → Downloads** on your Samsung phone, select the ZIP and choose **Extract**. Open the extracted `.apk`.
 5. If Android requests it, allow **Install unknown apps** for the app opening the APK (usually My Files or your browser). Install **Mosslight Dev** and open it. Samsung Auto Blocker may also block sideloading; change that setting only if you decide to permit this development install.
 6. Choose **Enter / Resume** to begin, **Load** to restore the selected save slot, or **Recover background autosave** after a previous session.
 
-Artifacts expire after 30 days. A new branch push or PR update builds automatically. Once the workflow is on the default branch, **Run workflow** lets you select a branch manually without merging its changes. While PR #2 is open, pushes to its branch already trigger builds.
+Artifacts expire after 30 days. A new branch push or PR update builds automatically. Once the workflow is on the default branch, **Run workflow** lets you select a branch manually without merging its changes. While PR #4 is open, pushes to its branch already trigger builds.
 
 ## Controls
 
@@ -19,7 +19,7 @@ Use landscape orientation. Drag the circular stick at the lower left to move; re
 
 | Button | Action |
 |---|---|
-| Attack / Ember / Mend | Nearest valid hostile target / spell / self-heal |
+| Attack / Ember / Mend | Free-form directional sword swing / nearest eligible hostile spell / self-heal |
 | Draught | Consume a healing item |
 | Interact | Talk to a nearby warden, gather, loot, use keys or enter a portal |
 | Pack | Inspect, equip, craft, buy and use items; scroll the panel |
@@ -30,7 +30,7 @@ Close the pack to resume exploration. Item use from the pack closes it before pa
 
 ![Hosted preview of the shared UI](native-screenshots/mobile-controls.png)
 
-The current layout keeps a fixed 1280×800 logical canvas with aspect-preserving scaling and conservative margins. Wide phones can have letterboxing. Device-specific cutout, gesture edge and readable-text checks are still part of physical playtesting.
+The project uses a 1280×800 logical canvas with canvas_items stretching and safe-area-aware controls. Wide phones can have letterboxing. Device-specific cutout, gesture edge and readable-text checks are still part of physical playtesting.
 
 ## Saves, updates and signing
 
@@ -77,3 +77,11 @@ Actions artifacts are ZIP archives and require GitHub sign-in. A manually initia
 See [MOBILE_PLAYABILITY.md](MOBILE_PLAYABILITY.md) for collision/placement/container changes and save handling. The in-game menu now exposes collision/navigation and performance overlays. Secondary character/journal/map screens are available from that menu on phones. The stick anchors near the initial thumb contact; drag to move and lift to stop. Opening menus/dialogue or backgrounding cancels held movement.
 
 The runtime smoke test checks release coordinates and a real chest-depletion event after touch interaction; merely reaching the splash/menu or advancing ticks is insufficient. Download the ARM64 artifact only from the tested source commit's Android workflow, and check the separate `android-runtime` job before installing. Existing development-signing limitations still apply: changing the generated signing key can require uninstalling the previous APK, which removes local saves. Use configured persistent signing secrets for reliable in-place updates.
+
+## Part 4 layout diagnostics
+
+Android emits bounded `MOSSLIGHT_CONTROL version=1 id=… x=… y=…` markers on layout changes. Centers are in actual window screen pixels, calculated from production global rectangles through the viewport screen transform. `android-smoke.py` reads these for Attack, Dodge, Interact, Pack and Menu instead of historical hotbar coordinates; the layout manifest is retained in runtime evidence. Menu row and joystick route coordinates still use the documented 1280×800 test canvas. Never treat Godot controls as Android accessibility nodes.
+
+The ARM64 download is the `Mosslight-android-arm64-debug-<sha>` Actions artifact. The separately named emulator package is x86_64 and is unsuitable for the Galaxy S25. Keep the build metadata and SHA with phone feedback. A changed ephemeral development signing key may require uninstalling the old build, which deletes local saves; export desired evidence before uninstalling.
+
+The build SDK is exactly **9.0.203**: root `global.json` disables SDK patch roll-forward. Installing 9.0.203 in CI alone previously allowed a preinstalled 9.0.205 to be selected. Final package metadata verifies the actual SDK; the separate pinned-major Godot runtime policy is retained.

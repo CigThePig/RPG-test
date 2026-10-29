@@ -11,7 +11,8 @@ public partial class Foundation : Node2D
     public Node Narrative { get; private set; } = null !;
     public Dictionary<string, CharacterView> Views { get; } = new();
     public RpgUi Ui => ui;
-    public bool GameplayBlocked => ui == null || suspended || !World.Player.Alive || ui.BlocksInput || Narrative.Get("speaking").AsBool();
+    public bool PresentationBlocked => ui == null || suspended || ui.BlocksInput || Narrative.Get("speaking").AsBool();
+    public bool GameplayBlocked => PresentationBlocked || !World.Player.Alive;
 
     public MovementFeel Feel { get; private set; } = MovementFeel.Presets[1];
     public Camera2D Camera => camera;
@@ -20,6 +21,7 @@ public partial class Foundation : Node2D
     public double DroppedSeconds { get; private set; }
     public PlaytestTrace Trace { get; private set; } = null!;
     GameplayReplay? replay;
+    public CharacterView? ReplayObservedView => replay != null && Views.TryGetValue(replay.ObservedActorId, out var view) ? view : null;
     public bool VerificationMode => OS.GetCmdlineUserArgs().Any(x => x is "--test" or "--visual-check" or "--gameplay-check");
     public void SelectFeel(MovementFeel feel)
     {
@@ -45,7 +47,7 @@ public partial class Foundation : Node2D
             };
     }
     public override void _Process(double delta) => Trace?.Frame(delta);
-    public override void _ExitTree() => Trace?.Dispose();
+    public override void _ExitTree() { presentation?.Dispose(); Trace?.Dispose(); }
     string? courseSnapshot;
     public bool InFeelCourse => courseSnapshot != null;
     public void BeginFeelCourse()
@@ -55,6 +57,42 @@ public partial class Foundation : Node2D
         var map=GameplayReplay.CreateCourse(); World.RegionsById[map.Id]=map;World.InitializeContainers(map);
         var p=World.Player;p.Region=map.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.State=ActionState.Idle;p.StateRemaining=0;p.PendingAbility="";p.Statuses.Clear();p.Cooldowns.Clear();
         TouchMovement=ControllerVelocity=Vector2.Zero; Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/start-or-reset");
+    }
+    public string CombatCourseId { get; private set; } = "";
+    public void BeginCombatCourse() => BeginCombatCourse("mixed", true);
+    public void BeginCombatCourse(string encounter, bool protectedPlayer, ulong seed=42)
+    {
+        BeginFeelCourse();
+        CombatCourseId=encounter;
+        World.Seed=checked((int)seed);
+        var p=World.Player;
+        if(protectedPlayer)p.Health=p.MaxHealth=10000;
+        p.Invulnerable=protectedPlayer ? 10000 : 0;
+        World.RegionsById[p.Region].Features.Clear();
+        foreach(var other in World.Actors.Values.Where(a=>a.Id!="player"))other.Region="reach";
+        string[] profiles=encounter switch {
+            "prowler" => new[]{"prowler"}, "brute" => new[]{"brute"},
+            "spitter" or "projectiles" => new[]{"spitter"},
+            "two melee" => new[]{"prowler","brute"},
+            "four mixed" => new[]{"prowler","brute","spitter","prowler"},
+            "crowd" => Enumerable.Range(0,8).Select(i=>new[]{"prowler","brute","spitter"}[i%3]).ToArray(),
+            _ => new[]{"prowler","brute","spitter"}
+        };
+        for(int i=0;i<profiles.Length;i++)
+        {
+            string id=profiles[i];
+            float x=380+(i/3)*42,y=275+(i%3)*30;
+            if(id=="spitter")x+=65;
+            var a=new ActorState{Id="lab:"+id+(i<3 ? "" : ":"+i),Name=id,Region=p.Region,Faction="beasts",Profile="beast",CombatProfile=id,
+                Appearance=new(){Family=id=="prowler" ? "quadruped" : id=="brute" ? "reptile" : "amorphous",Seed=seed+(ulong)i},
+                X=x,Y=y,HomeX=x,HomeY=y,Health=id=="prowler"?65:id=="brute"?120:55,MaxHealth=id=="prowler"?65:id=="brute"?120:55,
+                Abilities=World.Content.CombatProfiles.Single(c=>c.Id==id).Priorities.Keys.ToList()};
+            AnatomyAdapter.Apply(a);a.Speed=id=="prowler"?88:id=="brute"?46:62;World.Actors[a.Id]=a;
+        }
+        Trace.Marker($"combat-course/{encounter}/seed-{seed}/{(protectedPlayer ? "protected" : "normal")}");
+        Ui.Notify($"Combat lab: {encounter} · {(protectedPlayer ? "protected observation" : "normal health")} · reset / return through Feel lab");
+        RebuildViews();
+        if(OS.HasFeature("android"))GD.Print("MOSSLIGHT_TACTICAL_LAB profiles=prowler,brute,spitter");
     }
     public void LeaveFeelCourse()
     {
@@ -83,6 +121,12 @@ public partial class Foundation : Node2D
     public bool CollisionDebug { get; set; }
     public double SimulationMs { get; private set; }
     Node2D ground = null !;
+    TelegraphView? telegraphs;
+    public CombatEffects CombatEffects { get; private set; } = null!;
+    public CameraFeedback CombatCamera { get; } = new();
+    public CombatPresentationController? CombatPresentation => presentation;
+    public Node Audio => audio;
+    CombatPresentationController? presentation;
     double accumulator;
     long lastRuntimeLog;
     Node audio = null !;
@@ -171,6 +215,7 @@ public partial class Foundation : Node2D
             YSortEnabled = true
         };
         AddChild(actors);
+        AddChild(new PlayerLocator { App=this,ZIndex=50 });
         ground = new Node2D
         {
             ZIndex = -10
@@ -180,11 +225,16 @@ public partial class Foundation : Node2D
         {
             Zoom = new Vector2(1.5f, 1.5f),
             PositionSmoothingEnabled = true,
-            PositionSmoothingSpeed = 12
+            PositionSmoothingSpeed = 12,
+            // Godot's idle-frame smoothing can extrapolate on long frames;
+            // fixed physics ticks retain the follow speed without that overshoot.
+            ProcessCallback = Camera2D.Camera2DProcessCallback.Physics
         };
         AddChild(camera);
         audio = ScriptNode("res://game/audio/AudioService.gd");
         AddChild(audio);
+        CombatEffects = new CombatEffects(); // after actors, below the later UI canvas
+        AddChild(CombatEffects);
         foreach (var name in new[]
         {
             "grass",
@@ -239,7 +289,8 @@ public partial class Foundation : Node2D
             Narrative.Call("import_state", "{\"flags\":{},\"pools\":{},\"quests\":{}}");
         }
 
-        World = new(Content.Load(), items)
+        presentation?.Dispose();
+        World = new(Content.Load(VerificationMode), items)
         {
             Planner = planner
         };
@@ -247,12 +298,19 @@ public partial class Foundation : Node2D
         {
             if (OS.HasFeature("android") && e.Kind is "resource_depleted" or "region_entered")
                 GD.Print($"MOSSLIGHT_GAMEPLAY kind={e.Kind} value={e.Value} tick={World.Tick}");
+            if(OS.HasFeature("android") && e.Kind=="ability_started" && e.Actor=="player")
+                GD.Print($"MOSSLIGHT_PLAYER_ABILITY id={e.Value} tick={World.Tick}");
+            if (OS.HasFeature("android") && e.Kind == "damage" && e.Target == "player")
+                GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0}");
             if(Trace.Active && e.Kind is "region_entered" or "resource_depleted" or "ability_started" or "defeated")Trace.Marker(e.Kind+"/"+e.Value);
             Narrative.Call("receive", e.Kind, e.Actor, e.Target, e.Value, e.Count);
             if (e.Kind == "region_entered")
                 RebuildViews();
             if (e.Kind == "item_equipped" && Views.TryGetValue(e.Actor, out var changed))
+            {
                 changed.Equipment(items.Call("equipment_appearance", e.Actor).AsString());
+                changed.RestoreWindup(World);
+            }
         };
         World.CombatDiagnostic += (kind, direction, context) =>
         {
@@ -260,25 +318,28 @@ public partial class Foundation : Node2D
             if (OS.HasFeature("android") && (kind is "attack_started" or "attack_completed" or "dodge_started" or "dodge_completed"))
                 GD.Print($"MOSSLIGHT_COMBAT kind={kind} tick={World.Tick}");
         };
-        World.Presentation += (id, cue, targetId) =>
+        World.Presentation += e =>
         {
-            if (Views.TryGetValue(id, out var view))
-            {
-                World.Actors.TryGetValue(targetId ?? "", out var target);
-                var ability = World.Content.Abilities.FirstOrDefault(a => a.Id == view.State.PendingAbility);
-                view.Cue(cue, target, ability);
-            }
-            if (cue is "hit" or "cast")
-                PlayCue(cue);
+            if(OS.HasFeature("android") && InFeelCourse && e.Kind is CombatPresentationKind.ProjectileReleased or CombatPresentationKind.ProjectileImpact)
+                GD.Print($"MOSSLIGHT_LAB_PROJECTILE kind={e.Kind} ability={e.AbilityId} outcome={e.Outcome} tick={e.Tick}");
         };
+        presentation = new CombatPresentationController(World, Views, CombatEffects, CombatCamera, audio);
         ContentAudit.Validate(World.Content);
         World.NewGame();
+        if (telegraphs == null)
+        {
+            telegraphs = new TelegraphView { World = World, ZIndex = -1 };
+            AddChild(telegraphs);
+        }
+        else telegraphs.World = World;
         RebuildViews();
         drawnRegion = "";
     }
 
     public void RebuildViews()
     {
+        presentation?.Reset();
+        if (camera != null) camera.Offset = Vector2.Zero;
         foreach (var view in Views.Values)
         {
             actors.RemoveChild(view);
@@ -295,6 +356,7 @@ public partial class Foundation : Node2D
             Views[a.Id] = view;
             view.Equipment(items.Call("equipment_appearance", a.Id).AsString());
         }
+        foreach (var view in Views.Values) view.RestoreWindup(World);
 
         drawnRegion = "";
     }
@@ -349,12 +411,17 @@ public partial class Foundation : Node2D
         }
         else
         { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
+        presentation?.FlushPending();
         var player = World.Player;
+        if (PresentationBlocked) CombatCamera.Reset();
+        else { CombatEffects.Advance((float)delta); CombatCamera.Advance((float)delta); }
         foreach (var(id, view)in Views)
         {
             view.Visible = World.Actors[id].Region == player.Region;
-            view.Creature.Paused = !view.Visible || GameplayBlocked;
+            // A player death blocks gameplay but must not freeze the defeat pose.
+            view.Creature.Paused = !view.Visible || PresentationBlocked || (!player.Alive && view.State.Alive);
             view.HasLoot = !view.State.Alive && World.Items.HasLoot(id);
+            view.SyncCombatFacing(World);
             view.Sync((float)delta);
         }
 
@@ -363,6 +430,7 @@ public partial class Foundation : Node2D
         var half = GetViewportRect().Size / camera.Zoom / 2;
         var focus = GodotConvert.GroundToScreen(player.X, player.Y);
         camera.Position = new Vector2(bounds.X <= half.X*2 ? bounds.X/2 : Mathf.Clamp(focus.X,half.X,bounds.X-half.X), bounds.Y <= half.Y*2 ? bounds.Y/2 : Mathf.Clamp(focus.Y,half.Y,bounds.Y-half.Y));
+        camera.Offset = CombatCamera.Confine(camera.Position, bounds, half);
         var target = World.InteractionTargets(player).FirstOrDefault();
         foreach (var feature in features)
         {
@@ -382,7 +450,8 @@ public partial class Foundation : Node2D
         }
         ui.Update();
         Trace.Sample(delta);
-        replay?.AfterStep();
+        try { replay?.AfterStep(); }
+        catch(Exception error) { GD.PushError(error.ToString()); Trace.Flush(); GetTree().Quit(1); return; }
         QueueRedraw();
     }
 
@@ -400,6 +469,8 @@ public partial class Foundation : Node2D
 
     public override void _UnhandledInput(InputEvent e)
     {
+        if(e is InputEventKey developerKey && developerKey.Pressed && !developerKey.Echo && (developerKey.PhysicalKeycode==Key.F9 || developerKey.Keycode==Key.F9) && !Narrative.Get("speaking").AsBool())
+        { BeginCombatCourse(); GetViewport().SetInputAsHandled(); return; }
         if (e.IsActionPressed("menu"))
         {
             ui.Menu();
@@ -466,13 +537,16 @@ public partial class Foundation : Node2D
         return new NVector((float)Math.Cos(yaw), (float)-Math.Sin(yaw));
     }
 
+    ActorState? NearbyMerchant() => World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == World.Player.Region && NVector.Distance(x.Position, World.Player.Position) < 65 && !World.Hostile(World.Player, x) && World.LineOfSight(World.Player, x));
+    public bool HasInteraction() => World.InteractionTargets(World.Player).Any() || World.LootTargets(World.Player).Any() || NearbyMerchant() != null;
+
     public void Interact()
     {
         if (GameplayBlocked)
             return;
         var a = World.Player;
-        var npc = World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == a.Region && NVector.Distance(x.Position, a.Position) < 65 && !World.Hostile(a, x) && World.LineOfSight(a, x));
-        if (npc != null && !World.InteractionTargets(a).Any() && !World.Actors.Values.Any(x => !x.Alive && x.Region == a.Region && NVector.Distance(x.Position,a.Position) < 48 && World.Items.HasLoot(x.Id)))
+        var npc = NearbyMerchant();
+        if (npc != null && !World.InteractionTargets(a).Any() && !World.LootTargets(a).Any())
         {
             Narrative.Call("talk");
             return;
@@ -491,6 +565,7 @@ public partial class Foundation : Node2D
             Trace?.Marker("lifecycle/pause"); Trace?.Flush();
             TouchMovement = Vector2.Zero;
             ui?.Stick.Cancel();
+            ui?.CancelActionTouches();
             if (OS.HasFeature("android")) GD.Print("MOSSLIGHT_INPUT_CANCELLED");
             suspended = true;
             if (World != null && ui != null)
@@ -591,13 +666,21 @@ public partial class Foundation : Node2D
 
         foreach (var p in World.Projectiles)
         {
-            if (World.Actors[p.Source].Region != r.Id)
-                continue;
-            DrawCircle(GodotConvert.GroundToScreen(p.X, p.Y), 3, new Color(1, .55f, .2f));
+            if ((p.Region == "" ? World.Actors[p.Source].Region : p.Region) != r.Id) continue;
+            var at = GodotConvert.GroundToScreen(p.X, p.Y);
+            var heading = GodotConvert.GroundToScreen(p.HeadingX, p.HeadingY).Normalized();
+            if (heading.LengthSquared() < .001f) heading = Vector2.Right;
+            bool organic = World.FindAbility(p.Ability)?.Projectile?.Visual == "spit";
+            var color = organic ? new Color(.45f, 1, .25f) : new Color(1, .48f, .12f);
+            // A bounded velocity-aligned streak reads authoritative flight; it owns no timer.
+            DrawLine(at - heading * 15, at, new Color(color, .35f), organic ? 5 : 3);
+            if(organic)DrawCircle(at,5.5f,new Color(.9f,.88f,.63f,.9f));
+            DrawCircle(at, organic ? 4 : 3.5f, new Color(.08f, .12f, .06f));
+            DrawCircle(at, organic ? 3 : 2.5f, color);
+            DrawCircle(at + heading, 1.3f, organic ? Colors.LightYellow : Colors.White);
         }
     }
 
-    void PlayCue(string kind) => audio.Call("cue", kind);
     public async void RunVisualChecks()
     {
         try

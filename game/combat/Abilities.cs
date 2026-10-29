@@ -53,6 +53,9 @@ public sealed class ProjectileState
     public string Source { get; set; } = "";
     public string Target { get; set; } = "";
     public string Ability { get; set; } = "";
+    public string Region { get; set; } = "";
+    public float HeadingX { get; set; }
+    public float HeadingY { get; set; }
     public float X { get; set; }
     public float Y { get; set; }
     public float Remaining { get; set; } = 4;

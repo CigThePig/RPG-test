@@ -6,6 +6,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  # GodotPlugins requests net8 with LatestMajor by default; keep hosted .NET 10
+  # preinstalls from silently changing the engine host runtime.
+  DOTNET_ROLL_FORWARD: LatestPatch
 concurrency:
   group: android-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
@@ -106,6 +110,7 @@ jobs:
           name: android-diagnostics-${{ github.run_id }}
           path: |
             build/android/*.log
+            build/encounter-measurements.json
             build/verification-*.log
             build/android/*manifest*
             build/android/*signature*

@@ -1,5 +1,7 @@
 # Verification and limits
 
+Current Part 3 production suite: **3,246 assertions** on `681d15851c02a55b7dc27419f434dfa4498ee766`. Final build/render/replay/Android results and limitations are recorded in [PR4_PART3_PERFORMANCE.md](PR4_PART3_PERFORMANCE.md).
+
 ## Reproduce
 
 ```
@@ -9,7 +11,9 @@ python3 tools/verify.py --headless
 python3 tools/verify.py --visual
 ```
 
-Use Godot **4.6.1 .NET**, SDK **8.0.408**, and Python 3. Visual verification needs a display; CI runs it under Xvfb. `tools/verify.py` requires the success marker, successful process exit and absence of engine/script errors. Native export presets are present; export templates and exported Linux/Windows packages were not locally exercised.
+Use Godot **4.6.1 .NET**, SDK **9.0.203** (with the .NET 8 runtime/targeting pack for desktop), and Python 3. Visual verification needs a display; CI runs it under Xvfb. `tools/verify.py` requires the success marker, successful process exit and absence of engine/script errors. Native export presets are present; export templates and exported Linux/Windows packages were not locally exercised.
+
+PR #4 Part 1 adds `CombatTelegraphChecks` to the existing integration runner, plus desktop and `--mobile` viewport captures and four production replay scenarios (`telegraph-bite`, `telegraph-dodge`, `telegraph-interrupt`, and `telegraph-cone`). Run `xvfb-run -a python3 tools/gameplay-verify.py --presets baseline,precise` to record the actual renderer and extract labelled early, middle and post-impact frames. The visual screenshot fixture slows engine time for reliable capture; the fixed-clock gameplay movies exercise the normal simulation cadence. Inspect the resulting images and movies as well as the assertions. Hosted workflows upload exact-head artifacts; neither software rendering nor an emulator establishes physical phone performance or feel.
 
 ## Executed evidence
 
@@ -43,9 +47,9 @@ The production `game/dev/Foundation.tscn` provides equivalent focused environmen
 ## Known practical limits
 
 - No long-duration soak, native GPU/mobile profiling or packaged export validation has been completed locally.
-- Combat currently uses single-target range/visibility and homing projectiles. Advanced attack arcs, area effects, physical actor-to-actor avoidance and tactical encounter tuning remain gameplay work.
+- Target-locked combat and the existing homing projectile retain their range/visibility rules; the player slash and verification cone have their documented directional geometry. Soft NPC avoidance and tactical profiles are implemented; general area effects and final encounter tuning remain future work.
 - Distant/unloaded NPCs keep coarse schedules, not a detailed simulated economy. AI profiles are small and deterministic; relationships/knowledge have actual encounter state but no conversation-generated intelligence.
-- Incapacitation uses tinted/resting PPC presentation; no bespoke death animation is claimed. Biped sword visuals map to PPC's available short-blade shape.
+- Defeat uses a procedural hit and the rig’s existing rest posture rather than a bespoke animation. Biped sword visuals map to PPC’s available short-blade shape; subjective feel and audio quality remain to be judged on a real device.
 - Saves deliberately store full region arrays in schema 1; generator/schema changes require a future explicit migration or retaining the old executable. This is not an implemented streaming/delta-save system.
 - Dungeon solvability verifies a valid key-spending route; it does not promise every possible key-spending order is recoverable. The adapter retains meaningful key consumption and rejects layouts with no valid route.
 
@@ -55,6 +59,32 @@ The production `game/dev/Foundation.tscn` provides equivalent focused environmen
 
 `python3 tools/verify.py --visual --mobile` runs the production UI with the mobile layout enabled in the desktop engine. It records `mobile-*.png` screenshots and `render-verification-mobile.json`. This is hosted software rendering, not Android GPU evidence. The native/reference CI remains in `.github/workflows/ci.yml`.
 
-The Android workflow additionally exports and structurally validates the signed ARM64 package, including its .NET publish payload. A separate x86_64 export is installed and launched in an Android emulator, with readiness/tick markers from the real C# composition root. The runtime evidence artifact includes install output, emulator log, logcat, screenshot and an explicit result. Read each actual workflow result; no package-only test is described as a runtime pass.
+The Android workflow additionally exports and structurally validates the signed ARM64 package, including its .NET publish payload. A separate x86_64 export is installed and launched in an Android emulator, with readiness/tick markers from the real C# composition root. The smoke check exercises four real free-swing Attack touches and three Dodge touches, checks each start and completion, starts a new game through the menu, and approaches enemies until two real damage events occur. It records the Android surface; it does not test physical ARM64 hardware. The runtime evidence artifact includes install output, emulator log, logcat, screenshot and an explicit result. Read each actual workflow result; no package-only test is described as a runtime pass.
 
 The physical Galaxy S25 checklist, signing limitations and offline phone workflow are in [ANDROID_DEVELOPMENT.md](ANDROID_DEVELOPMENT.md). Full engine diagnostics invoked in the Android development menu write their verification JSON to `user://`, not the read-only exported resource tree.
+
+## Part 2 presentation verification
+
+`CombatPresentationChecks` exercises the production event bridge and PPC motor, including explicit and omitted styles, timing, cancellation, a resumed windup, fatal/restored corpses, captured contact positions, dodge versus invulnerability, release versus collision, bounded effects, camera limits and reusable audio players. Audio tests use the Dummy driver: they check resources and routing, not audible quality. The existing CombatChecks, DodgeChecks and CombatTelegraphChecks remain in the same runner.
+
+The replay adds `presentation-fatal`, `presentation-crowd` and `presentation-projectile` alongside the sword, bite, cone, interruption and dodge scenarios. They initiate real world actions and record actual rendered output; the runner extracts and validates normal-framing sequences around observed events as well as the full movie. It records action state, render counts, active effects and frame timing in the trace. An opt-in trace hashes the actual indexed PPC frames after uploads, and the fixed-clock report counts distinct bitmaps during sword, bite, TailSwipe, hit reaction and dodge windows. This bounds a sampling failure but does not prove the poses read well or that they contain no other visual changes. Movie Maker fixes the simulation clock and must not be used as a real-time performance result.
+
+Rendered verification additionally samples 120 normal-time frames each for the same four-creature idle scene, one bite, one repeated hit reaction, four attackers and four simultaneous hits. A separate fixture applies real damage during deliberately stalled render frames and checks that the camera stays near its target and settles afterward. The report includes wall-frame p50/p95/p99, PPC raster/upload batches, effect peak, main-thread allocations and managed-memory observations. A local comparison against the Part 1 reference is recorded in [PR4_PART2_PERFORMANCE.md](PR4_PART2_PERFORMANCE.md); neither hosted llvmpipe nor the Android emulator establishes physical-phone performance.
+
+## Part 3 tactics and projectiles
+
+`CombatAiChecks`, `ActorSeparationChecks` and `ProjectileChecks` run in the production integration runner alongside every earlier check. They cover real SPELL eligibility, profile distinctions, commitments, hysteresis, repeat simulation/restoration, canonical seeded spawns, deterministic multi-body spacing, doorway clearance, flight modes/turn limits, high-speed swept walls/doors/boundaries, actor ties, defenses/status rejection and schema-1 projectile migration.
+
+The production replay adds ten `tactics-*` scenes; full MP4s, frame-labelled sequences and JSONL state/event/result rows expose decisions and projectile outcomes. Run both baseline/precise presets. `VisualChecks` adds seven normal-time tactical workloads (idle, one, three, four, eight, projectiles, projectiles/effects) and retains the same five Part 2 samples for comparison. `ProfileCombat` is opt-in and reports sampled tick AI (including navigation), navigation, separation and projectile times.
+
+Android smoke retains control/inventory/interaction checks and uses F9's reversible mixed-archetype fixture for real Spit release, nonblank rendering and repeated background/resume during combat. Hosted x86_64 and software-renderer results do not certify physical ARM64 performance or subjective feel. The intermittent resume-to-black history remains an explicit risk. Exact results are in `PR4_PART3_PERFORMANCE.md`; pending or failed checks must not be represented as passes.
+
+## Part 4 tests
+
+`MobileCombatControlsChecks.Run` checks every pair of rectangles at 1280×800, 1280×720, 1920×864, 1024×768 and compact 900×560, with ordinary/nonzero insets, plus scaled/translated physical safe-area conversion. Rendered checks resize the actual window, inject logical safe insets, inspect real global button rectangles and ensure cooldown labels cannot enlarge them. InputPipeline uses Input.ParseInputEvent and separate finger IDs for cross-button drags, outside presses, cancellation, movement+attack/Mend/dodge, cooldown/mana rejection, item+emulated-mouse deduplication, pending-touch modal/focus cancellation and Pack opening. Prior control and gameplay checks remain.
+
+`EncounterChecks` runs seven normal-health stationary exposure fixtures for seeds 1, 42 and 1337. `build/encounter-measurements.json` records starts/hits/misses/avoidance, damage, death, projectile release/collision, nearest-distance mean and tactical intention ticks. The 12-second stationary policy diagnoses pressure; it is neither a player win-rate nor a combat enjoyment measurement. Every fixture must restore the exact original persistence capture. Existing tactical movies exercise active defense and trajectories separately.
+
+Run dotnet build, import-project.py, verify.py --headless, verify.py --visual, verify.py --visual --mobile and gameplay-verify.py --presets baseline,precise. Rendered commands require an X display. Local constrained hosts can use an explicitly started TCP Xvfb and DISPLAY=127.0.0.1:<display>; CI uses xvfb-run. Never count an old assembly after a failed build as verification of new source.
+
+For a focused rendered control iteration, run Godot with `-- --visual-check --mobile-ui --controls-only`; success prints `MOBILE CONTROLS CHECKS PASSED`. This is additional to, and never replaces, the complete rendered suite.
