@@ -57,6 +57,7 @@ public static class ActorSeparationChecks
                 guard.Region = r.Id; guard.X = guard.HomeX = 252; guard.Y = guard.HomeY = 250;
                 w.Cancel(guard);
                 guard.MotionX = guard.MotionY = 0;
+                guard.Activity = "rest"; // Explicitly reproduce the Hour=0 schedule before rendering.
                 check(!w.Hostile(guard, player) && guard.Profession == "merchant", "starting warden is a friendly merchant");
             }
             var positions = wardens.ToDictionary(a => a.Id, a => a.Position);
