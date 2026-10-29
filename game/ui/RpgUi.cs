@@ -9,6 +9,7 @@ public partial class RpgUi : CanvasLayer
     readonly Dictionary<string, Button> abilityButtons = new();
     readonly Dictionary<string, Button> actions = new();
     public Button ActionControl(string id) => actions[id];
+    internal Rect2 StatusRect => health.GetGlobalRect();
     internal Rect2? VerificationSafeArea { get; set; }
     public MobileCombatControls? CombatControls => hotbar as MobileCombatControls;
     Label health = null !, message = null !, title = null !;
@@ -224,6 +225,8 @@ public partial class RpgUi : CanvasLayer
             Stick.Position=pad.Position; Stick.Size=pad.Size;
             title.Position=safe.Position+new Vector2(24,18);
             health.Position=safe.Position+new Vector2(24,48);
+            health.AutowrapMode=TextServer.AutowrapMode.WordSmart;
+            health.Size=new Vector2(Math.Max(200,safe.Size.X-280),100);
             message.Position=new Vector2(safe.Position.X+24,safe.End.Y-42);
             message.Size=new Vector2(safe.Size.X-48,40);
             if(OS.HasFeature("android"))

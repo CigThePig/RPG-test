@@ -35,6 +35,10 @@ public static class MobileCombatControlsChecks
                 app.Ui.VerificationSafeArea=new Rect2(logical.Position+new Vector2(50,24),logical.Size-new Vector2(100,48));
                 app.Ui.Layout();
                 var controls=app.Ui.CombatControls!;
+                if(!controls.SafeRegion.Encloses(app.Ui.StatusRect) ||
+                    app.Ui.StatusRect.Intersects(app.Ui.ActionControl("menu").GetGlobalRect()) ||
+                    app.Ui.StatusRect.Intersects(app.Ui.ActionControl("inventory").GetGlobalRect()))
+                    throw new InvalidOperationException("Status HUD overlaps utilities or leaves safe bounds");
                 var buttons=controls.Actions.Values.ToArray();
                 foreach(var b in buttons)
                     if(!controls.SafeRegion.Encloses(b.GetGlobalRect()))throw new InvalidOperationException("Actual touch rect outside safe area: "+b.Name);
