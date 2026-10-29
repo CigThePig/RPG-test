@@ -39,6 +39,7 @@ public static class FoundationChecks
         try
         {
             DungeonChecks.Run(app, Check);
+            DungeonEncounterChecks.Run(app, Check);
             MobileCombatControlsChecks.Run(Check);
             EncounterChecks.Run(app,Check);
             ReviewChecks.Run(app, Check);

@@ -60,7 +60,7 @@ public static class DungeonVisualChecks
                 if(!w.Interact(p)||!gate.All(r.OpenDoors.Contains))throw new InvalidOperationException("Visual gate interaction failed");
                 await Capture(app,"gate-open");
                 p.X=room.X;p.Y=room.Y;
-                var foes=w.Actors.Values.Where(a=>a.Id!="player"&&a.Profile=="beast").Take(3).ToArray();
+                var foes=w.Actors.Values.Where(a=>a.Id.StartsWith("ruin:spawn:")).Take(3).ToArray();
                 for(int i=0;i<foes.Length;i++)
                 {
                     var a=foes[i];string id=new[]{"prowler","brute","spitter"}[i];

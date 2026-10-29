@@ -24,7 +24,7 @@ Anatomy-derived collision radii remain 6–11 units. Canonical checks use the ac
 
 Opened-map footprint floods reach every feature and gate, covering horizontal/vertical entries, exits and return paths. Interior corner sweeps retain clearance. Production movement/interaction walks acquire keys, open required gates, collect the relic and use the exit. Generated-room tests use the real 90-unit roll, wall-stopped roll, approved sword lunge, full-width closed gate and production projectile sweep.
 
-Mission features stay at room centers. Existing interaction range and visibility remain unchanged. Eight seeded inhabitants retain their profiles/counts. Production FindPlacement still uses actual footprints, reachable floor, 40-unit feature exclusion and radius-based actor separation; canonical checks verify these and entrance safety. No encounter rebalance, alternate navigation system or spawn retry loop was added.
+Mission features stay at room centers. Existing interaction range and visibility remain unchanged. Arrival now uses the existing deterministic `FindPlacement` on entry to the ruin, avoiding overlap with the return marker or surviving inhabitants. Restoring a saved snapshot never takes this entry path or relocates its player. Eight seeded inhabitants retain their profiles/counts. Production FindPlacement still uses actual footprints, reachable floor, 40-unit feature exclusion and radius-based actor separation; canonical checks verify these and entrance safety. No encounter rebalance, alternate navigation system or spawn retry loop was added.
 
 ## Persistence
 
@@ -36,12 +36,13 @@ The old executable produced `game/tests/fixtures/pr4-dungeon-save.json` before g
 
 Local build uses SDK 9.0.203, Godot 4.6.1 .NET and .NET 8.0.15 host. `dotnet build` passes with the existing 58 nullable warnings. `tools/import-project.py` succeeds; the existing editor-shutdown EditorSettings diagnostic remains confined to import and runtime verification rejects engine errors.
 
-- `python3 tools/verify.py --headless`: **4,510 assertions passed**.
+- `python3 tools/verify.py --headless`: **4,521 assertions passed**.
 - `python3 tools/verify.py --visual`: passed; actual viewport images inspected.
 - `python3 tools/verify.py --visual --mobile`: passed; actual mobile-layout images inspected.
 - Geometry seeds: **0–63 plus 1337** (includes 1 and 42), repeated generation, exact PR4 logical topology/mission-role comparison, bounds, cross-sections, determinism, solvability and physical player routes. All five representative footprints on 1/42/1337. Failed seeds raise with dimensions/features/groups and reason.
 - Required-gate runtime progression: seeds 1 and 1337; seed 42 validates its legitimate alternate route. No failed seed is suppressed.
-- Recorded baseline/precise suite and focused touch expedition: results will be recorded after completion.
+- Baseline movie and independent deterministic repeat: passed. Precise replay is completing. Focused seed-1 touch expedition movie, independent rendered repeat and matching authoritative digest: passed and contact sheet inspected.
+- Live generated-doorway encounter checks exercise both cardinal orientations: Prowler crosses and bites, Brute repositions and commits its cone, Spitter maintains range and releases a projectile. These use production seeded inhabitants, World AI and 480 simulation steps per observation.
 - CI, tested runtime SHA and ARM64 APK: pending publication/build; no Android success claimed yet.
 
 ## Actual rendered evidence
@@ -60,7 +61,7 @@ All comparisons use logical seed 42, 1.5× gameplay zoom and the actual viewport
 | Enemy doorway | [View](native-screenshots/dungeon-enemy-doorway.png) | [View](native-screenshots/mobile-dungeon-enemy-doorway.png) |
 | Mixed room | [View](native-screenshots/dungeon-mixed-room.png) | [View](native-screenshots/mobile-dungeon-mixed-room.png) |
 
-The player has visible breathing room at the opening centerline. Some silhouette/wall depth overlap near walls remains possible under the existing projection; collision authority and visual sprite bounds are distinct. The frozen mixed/enemy screenshots establish composition and placement, not live tactical behaviour.
+The player has visible breathing room at the opening centerline. Some silhouette/wall depth overlap near walls remains possible under the existing projection; collision authority and visual sprite bounds are distinct. The frozen mixed/enemy screenshots use production dungeon inhabitants and establish composition/placement. Separate live generated-doorway integration checks verify tactical behaviour.
 
 ## Performance and memory
 
