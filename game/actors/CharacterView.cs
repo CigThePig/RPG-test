@@ -112,7 +112,11 @@ public partial class CharacterView : Node2D
             GroundTerrain?.Invoke(State) ?? Terrain.Grass);
         Position = GodotConvert.GroundToScreen(State.X, State.Y);
         if (!Creature.Paused && defeatDelay > 0) defeatDelay = Math.Max(0, defeatDelay - dt);
-        Creature.Resting = State.Alive ? State.Activity == "rest" && (State.State is ActionState.Idle or ActionState.Moving) : defeatDelay <= 0;
+        // A merchant's "rest" schedule means off-duty, not physically slumped
+        // or asleep on the path. Reserve the PPC rest pose for other creatures
+        // and for the death collapse, so starting Reach wardens stand upright.
+        bool visualRest = State.Activity == "rest" && State.Profession != "merchant";
+        Creature.Resting = State.Alive ? visualRest && (State.State is ActionState.Idle or ActionState.Moving) : defeatDelay <= 0;
         if (State.Alive) { defeatDelay = 0; Creature.Modulate = Colors.White; }
         else
         {
