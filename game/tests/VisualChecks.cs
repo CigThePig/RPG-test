@@ -63,7 +63,7 @@ public static class VisualChecks
         try
         {
             Engine.TimeScale=1;w.ProfileCombat=true;
-            var course=GameplayReplay.CreateCourse();course.Id="tactical-visual";
+            var course=GameplayReplay.CreateCourse();course.Id="tactical-visual";course.Features.Clear();
             w.RegionsById[course.Id]=course;
             var p=w.Player;p.Region=course.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth=10000;p.Invulnerable=1000;
             var enemies=w.Actors.Values.Where(a=>a.Id!="player").OrderBy(a=>a.Id,StringComparer.Ordinal).Take(8).ToArray();

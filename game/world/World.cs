@@ -521,7 +521,7 @@ public sealed class World
                 bool near = a.Region == Player.Region && Vector2.DistanceSquared(a.Position, Player.Position) < 800 * 800;
                 if (near)
                 {
-                    if (Tick % 12 == 0)
+                    if ((Tick + ((uint)StableId(a.Id) % 12)) % 12 == 0)
                     {
                         long start = ProfileCombat ? Stamp() : 0;
                         Think(a, .2f);

@@ -33,7 +33,7 @@ public static class ProjectileChecks
             var expired = Make(straight); expired.Remaining = .01f;
             check(ProjectileFlight.Advance(w, expired, straight, r, .25f).Outcome == "expired" && expired.X < 152, "expiration clips travel to remaining lifetime");
             // Large legal step/high speed: analytic collision, no tiny motion substeps.
-            var fast = new AbilityDef { Id = "spit", ProjectileSpeed = 2000, Projectile = new() { Mode = "straight", Radius = 3 } };
+            var fast = new AbilityDef { Id = "spit", ProjectileSpeed = 2000, Projectile = new() { Mode = "straight", Radius = 3, InterceptHostiles = true } };
             r.Tiles[12 * r.Width + 9] = Terrain.Wall;
             var wall = Make(fast);
             check(ProjectileFlight.Advance(w, wall, fast, r, .25f).Outcome == "terrain" && wall.X < 216, "sweep chooses wall before farther actor");
@@ -45,6 +45,10 @@ public static class ProjectileChecks
             check(ProjectileFlight.Advance(w, Make(fast), fast, r, .25f).Actor == p, "non-hostiles neither take damage nor block projectiles");
             var candidate = new ActorState { Id = "aaa", Region = r.Id, Faction = p.Faction, X = p.X, Y = p.Y }; w.Actors[candidate.Id] = candidate;
             check(ProjectileFlight.Advance(w, Make(fast), fast, r, .25f).Actor == candidate, "equal actor collision ties resolve by ordinal ID");
+            candidate.X=200;
+            var legacyFast=new AbilityDef{Id="ember",ProjectileSpeed=2000};
+            check(ProjectileFlight.Advance(w,Make(legacyFast),legacyFast,r,.25f).Actor==p,"legacy Ember retains target-only collision eligibility");
+            check(ProjectileFlight.Advance(w,Make(fast),fast,r,.25f).Actor==candidate,"authored hostile interception hits nearer eligible enemy");
             candidate.Region = "reach"; p.Y = 450;
             var boundary = Make(fast); boundary.HeadingX = -1; boundary.HeadingY = 0;
             check(ProjectileFlight.Advance(w, boundary, fast, r, .25f).Outcome == "boundary", "boundary swept collision terminates flight");

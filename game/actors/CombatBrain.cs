@@ -24,13 +24,14 @@ public static class CombatBrain
         foreach (var ability in w.Content.Abilities)
         {
             if (ability.Self || !w.CanActivate(a, target, ability) || (ability.Geometry?.Shape == "cone" && distance > ability.Geometry.Range)) continue;
-            float score = profile?.Priorities.GetValueOrDefault(ability.Id, .1f) ?? 1;
+            float score = profile?.Priorities.GetValueOrDefault(ability.Id, .1f) ?? ability.Range;
             if (ability.ProjectileSpeed > 0 && profile != null && distance < profile.MinimumDistance) score *= .2f;
             if (score > bestScore || (score == bestScore && StringComparer.Ordinal.Compare(ability.Id, best?.Id) < 0))
             { best = ability; bestScore = score; }
         }
         if (best != null) return new("ability", a.Position, best.Id);
-        float approach = profile?.ApproachDistance ?? 28;
+        if (profile == null) return new("approach", target.Position); // Legacy actors retain range-first eligible attacks and pursuit.
+        float approach = profile.ApproachDistance;
         float preferred = profile?.PreferredDistance ?? 22;
         if (distance > approach || (a.TacticalIntent == "approach" && distance > preferred))
             return new("approach", target.Position - toward * preferred);

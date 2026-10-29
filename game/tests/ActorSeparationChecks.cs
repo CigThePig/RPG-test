@@ -28,6 +28,7 @@ public static class ActorSeparationChecks
                     }
                 }
                 check(V.Distance(actors[0].Position, actors[1].Position) > 12, count + " overlapping actors separate in free space");
+                check(actors.All(a=>actors.All(b=>a==b || V.Distance(a.Position,b.Position)>=(a.Radius+b.Radius)*.9f)),count+" freely resting bodies resolve substantial overlap");
                 check(actors.All(a => r.CanStand(a.Position, a)), "mixed radii retain valid terrain footprints");
                 actors[1].Health = 0; grid.Rebuild(actors.Take(2));
                 check(grid.Velocity(actors[0], r, V.Zero, 50, .016f) == V.Zero, "dead actor removed from avoidance");

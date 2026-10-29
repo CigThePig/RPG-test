@@ -258,6 +258,7 @@ public sealed class GameplayReplay
             if(s.Id.StartsWith("tactics-"))
             {
                 var w=app.World;
+                map.Features.Clear(); // Dedicated encounter arena; earlier interaction scenarios retain their course props.
                 tacticalActors.Clear(); tacticalStarts=tacticalReleases=tacticalCollisions=tacticalAvoidances=tacticalCancels=tacticalTerrainCollisions=tacticalDodgeAvoidances=0;
                 foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
                 w.Projectiles.Clear(); w.Cancel(p); p.X=s.Start.X; p.Y=s.Start.Y;

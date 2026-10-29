@@ -125,7 +125,8 @@
         "Mode": "straight",
         "Lifetime": 2,
         "Radius": 3,
-        "Visual": "spit"
+        "Visual": "spit",
+        "InterceptHostiles": true
       }
     },
     {
@@ -144,7 +145,8 @@
         "TurnDegrees": 55,
         "Lifetime": 3,
         "Radius": 3,
-        "Visual": "spit"
+        "Visual": "spit",
+        "InterceptHostiles": true
       }
     }
   ],

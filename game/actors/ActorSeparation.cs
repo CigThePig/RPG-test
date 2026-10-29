@@ -34,7 +34,7 @@ public sealed class ActorSeparation
                     {
                         if (b.Id == a.Id) continue;
                         var delta = a.Position - b.Position;
-                        float reach = a.Radius + b.Radius + 7, distance = delta.Length();
+                        float reach = (a.Radius + b.Radius) * 1.6f + 8, distance = delta.Length();
                         if (distance >= reach) continue;
                         if (distance < .001f)
                         {
@@ -45,7 +45,7 @@ public sealed class ActorSeparation
                         else delta /= distance;
                         correction += delta * ((reach - distance) / reach);
                     }
-        Vector2 velocity = desired + correction * speed * .75f;
+        Vector2 velocity = desired + correction * speed * 1.25f;
         if (velocity.LengthSquared() > speed * speed && speed > 0) velocity = Vector2.Normalize(velocity) * speed;
         // Never let avoidance defeat a valid navigation waypoint in a narrow passage.
         if (!r.CanTravel(a.Position, a.Position + velocity * dt, a)) return desired;

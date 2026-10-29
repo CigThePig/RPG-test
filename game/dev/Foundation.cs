@@ -62,6 +62,7 @@ public partial class Foundation : Node2D
     {
         BeginFeelCourse();
         var p=World.Player;p.Health=p.MaxHealth=10000;
+        World.RegionsById[p.Region].Features.Clear();
         foreach(var other in World.Actors.Values.Where(a=>a.Id!="player"))other.Region="reach";
         foreach(var entry in new[]{("prowler","quadruped",88f,380f,275f),("brute","reptile",46f,390f,330f),("spitter","amorphous",62f,445f,300f)})
         {

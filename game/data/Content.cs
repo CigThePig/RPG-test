@@ -35,6 +35,7 @@ public sealed class ProjectileDef
     public float Lifetime { get; set; } = 4;
     public float Radius { get; set; } = 2;
     public string Visual { get; set; } = "ember";
+    public bool InterceptHostiles { get; set; }
 }
 
 public sealed class CombatProfileDef

@@ -99,7 +99,7 @@ public static class ProjectileFlight
         if (w.Actors.TryGetValue(p.Source, out var source))
             foreach (var actor in w.Actors.Values)
             {
-                if (!actor.Alive || actor.Region != r.Id || !w.Hostile(source, actor)) continue;
+                if (!actor.Alive || actor.Region != r.Id || !w.Hostile(source, actor) || (actor.Id != p.Target && ability.Projectile?.InterceptHostiles != true)) continue;
                 if (!Circle(from, delta, actor.Position, actor.Radius + radius, out float t)) continue;
                 // Terrain wins near-equal contacts. Actor ties use stable IDs.
                 if (t < earliest - .000001f || (outcome == "actor" && MathF.Abs(t - earliest) <= .000001f && StringComparer.Ordinal.Compare(actor.Id, victim!.Id) < 0))

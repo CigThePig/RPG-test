@@ -11,6 +11,10 @@ on:
         default: true
 permissions:
   contents: read
+env:
+  # GodotPlugins requests net8 with LatestMajor by default; keep hosted .NET 10
+  # preinstalls from silently changing the engine host runtime.
+  DOTNET_ROLL_FORWARD: LatestPatch
 concurrency:
   group: gameplay-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
