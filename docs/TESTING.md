@@ -1,5 +1,7 @@
 # Verification and limits
 
+Current Part 3 production suite: **3,246 assertions** on `681d15851c02a55b7dc27419f434dfa4498ee766`. Final build/render/replay/Android results and limitations are recorded in [PR4_PART3_PERFORMANCE.md](PR4_PART3_PERFORMANCE.md).
+
 ## Reproduce
 
 ```
@@ -45,7 +47,7 @@ The production `game/dev/Foundation.tscn` provides equivalent focused environmen
 ## Known practical limits
 
 - No long-duration soak, native GPU/mobile profiling or packaged export validation has been completed locally.
-- Target-locked combat and the existing homing projectile retain their range/visibility rules; the player slash and verification cone have their documented directional geometry. General area effects, physical actor-to-actor avoidance and tactical encounter tuning remain gameplay work.
+- Target-locked combat and the existing homing projectile retain their range/visibility rules; the player slash and verification cone have their documented directional geometry. Soft NPC avoidance and tactical profiles are implemented; general area effects and final encounter tuning remain future work.
 - Distant/unloaded NPCs keep coarse schedules, not a detailed simulated economy. AI profiles are small and deterministic; relationships/knowledge have actual encounter state but no conversation-generated intelligence.
 - Defeat uses a procedural hit and the rig’s existing rest posture rather than a bespoke animation. Biped sword visuals map to PPC’s available short-blade shape; subjective feel and audio quality remain to be judged on a real device.
 - Saves deliberately store full region arrays in schema 1; generator/schema changes require a future explicit migration or retaining the old executable. This is not an implemented streaming/delta-save system.

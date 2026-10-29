@@ -1,5 +1,7 @@
 # PR #4 Part 4 handoff
 
+Part 3 implementation and CI acceptance are complete on `681d15851c02a55b7dc27419f434dfa4498ee766`. Part 4 remains pending. The final verification/evidence links are in PR4_PART3_PERFORMANCE.md. Physical phone signoff and the historical lifecycle risk remain outstanding as described below.
+
 Part 3 adds combat profiles, tactical intentions beneath Skelerealms, soft NPC avoidance, authored dungeon archetypes, straight/bounded-homing projectiles and swept collision. Part 4 remains pending. Do not change the completed slash/roll rules to accommodate control layout work.
 
 ## Gameplay ownership

@@ -34,8 +34,35 @@ The existing 5-Hz planning opportunities and slower profile cadence remain. Loca
 
 Native build and 3,246 production assertions passed locally after extended deterministic-restore checks. Import succeeded; its editor shutdown emitted the previously observed EditorSettings diagnostic, which was not counted as a runtime pass. Local rendered attempts could not connect to an X display; desktop/mobile rendering ran on GitHub Actions. A headless touch replay was also unsuitable (no viewport touch dispatch) and is not represented as gameplay evidence.
 
-Final exact-head CI, replay, Android, screenshot review and lifecycle results will be appended after completion. The historical intermittent resume-to-black issue and unavailable physical ARM64/S25 testing remain limitations.
+Final code verification results appear below. The historical intermittent resume-to-black issue and unavailable physical ARM64/S25 testing remain limitations.
 
 An intermediate Android attempt at `c0e7658` built and validated both packages, then failed during readiness polling because an ADB `logcat -d` dump returned exit 255. The retained log contains Godot/Dialogue startup and no established gameplay pass. The read-only logcat query now has three bounded retries with each failed output retained; touches, installs and gameplay assertions are never retried by this helper. This attempt is not an emulator pass.
 
 An intermediate precise job on `1fff6fa` crashed in the Godot editor during asset import, with `libcoreclr.so` from the runner's preinstalled .NET 10.0.14 in the native backtrace. The engine's supplied `GodotPlugins.runtimeconfig.json` requests net8.0 with `LatestMajor`, so the runner had silently selected a newer major runtime. Workflows now set `DOTNET_ROLL_FORWARD=LatestPatch`, retaining the declared net8 host major while allowing installed patches; SDK 9.0.203 and Android net9 targets remain unchanged. This corrects environment drift; the precise failure remains recorded rather than being reported as a gameplay pass. Runtime-selection policy: https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet#options-for-running-an-application .
+
+## Final code verification
+
+All production-code checks passed on `681d15851c02a55b7dc27419f434dfa4498ee766`. The subsequent documentation-only commit records these results and leaves runtime code unchanged.
+
+| Check | Actual result |
+|---|---|
+| Native build and fresh import | Passed; 58 existing nullable warnings. The local editor still emitted its known shutdown EditorSettings diagnostic; no runtime check was represented by that import alone. |
+| Production integration | 3,246 assertions passed, including heading-precision restoration and deterministic continuation. |
+| Desktop and mobile-layout rendering | Both passed, including prior combat, dodge, camera, presentation and new tactical workloads. |
+| Baseline and precise replay | Both passed all 45 scenarios and their deterministic repeats. |
+| ARM64 package | Development APK exported and passed package, .NET payload, architecture and signature validation. |
+| x86_64 Android runtime | Install, launch, movement, four attacks, three dodges, real damage, Gloot chest/inventory, three archetypes and real Spit release passed. |
+| Background/resume | Three consecutive nonblank same-process cycles during mixed combat passed, with input cancellation. |
+| Preserved reference | Original reference tests, generation and build passed. |
+
+- [Native CI and raw performance/screenshots](https://github.com/CigThePig/RPG-test/actions/runs/40820360737/artifacts/12874223153).
+- [Baseline complete recordings, contact sheets, traces and report](https://github.com/CigThePig/RPG-test/actions/runs/40820360672/artifacts/12874423224).
+- [Precise complete recordings, contact sheets, traces and report](https://github.com/CigThePig/RPG-test/actions/runs/40820360672/artifacts/12874935714).
+- [ARM64 development APK](https://github.com/CigThePig/RPG-test/actions/runs/40820360688/artifacts/12873994234).
+- [Android runtime recording, screenshots and lifecycle logs](https://github.com/CigThePig/RPG-test/actions/runs/40820360688/artifacts/12874900922).
+
+The original five Part 2 workloads remain in the raw reports for comparison. The earlier table records the initial Part 3 checkpoint. A later inspected normal-time sample on `5b693a9` measured eight enemies at **28.74 ms p95**, with AI p95 **1.355 ms**, and the projectile-heavy collision sample at **0.056 ms p95**. That commit has the same encounter code as the final tested commit; the last code change preserves projectile heading precision during restore. Runtime pinning, approach distribution and host scheduling are additional variables, so these cross-job timings are not a controlled speedup. Final exact-code raw metrics are in the linked native artifact; Movie Maker wall times are not gameplay FPS.
+
+Real viewport frames from the three archetypes, mixed encounters, crowding and adjacent projectile/attack outcomes were inspected on `5b693a9`. The final `681d158` rendered suites and replays passed after its restoration-only change. The workspace became unavailable after the final native run; this prevented extracting the final artifact images or assembling an additional local evidence package. The complete final source-identified recordings and reports remain available in GitHub artifacts.
+
+Soft avoidance and local approach-angle distribution reduce crowding; eight-melee stress encounters can still partially occlude the player. Part 4 owns encounter density and readability tuning. The historical intermittent resume-to-black failure is not declared permanently fixed. No physical ARM64/S25 performance, subjective thumb-comfort or audible-quality signoff was available. No outstanding inline review threads existed at review; relevant implementation findings (timer order, enemy-only learning, legacy targeting and restoration precision) were resolved and covered by checks.

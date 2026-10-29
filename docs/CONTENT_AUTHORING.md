@@ -41,7 +41,7 @@ The current item material example affects mass and damage/defence/magic power. W
 | `AttackStarted` | One timed rig action; swing/bite cue when appropriate. |
 | `AttackCommitted`, `AttackImpact` | No second animation or assumed hit. The world retains its impact boundary. |
 | `Hit` | Directional victim recoil and contact burst, with one damage cue and nearby restrained camera response. Periodic damage uses a smaller separate effect. |
-| `Miss` | Whiff arc and cue; a matching dodge or invulnerability observation suppresses it. |
+| `Miss` | Ordinary melee whiff except player slash: its single air cue belongs to `AttackImpact`, with no miss burst. Matching avoidance suppresses ordinary whiffs; projectile collision outcomes coalesce separately. |
 | `DefensiveAvoidance` | Dodge gets its own ring and cue; generic invulnerability is not called a dodge. |
 | `AttackCanceled`, `ActionCompleted` | Cancel active/pending action; interruption gets a short accent. |
 | `ProjectileReleased`, `ProjectileImpact` | Distinct release and collision accents. Collision and confirmed damage share one impact burst and cue; an avoided collision uses the avoidance feedback instead. A collision without a damage outcome is flushed after the world step. |

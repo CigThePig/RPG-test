@@ -15,3 +15,12 @@ The selected engine and source integrations are implemented. Continue by buildin
 9. Add incremental region deltas, explicit save schema migrations and player-authored input/gamepad settings once the v1 content contracts settle. Do not create competing state owners.
 
 The development environment is deliberately compact. There is no finished story, comprehensive economy/crime simulation, multiplayer, planet streaming, class balance, commercial UI/audio polish or mobile/browser export promise. Those are not hidden behind placeholder interfaces.
+
+## PR #4 milestone state
+
+- [x] Part 1: Combat architecture, shared geometry and telegraphs.
+- [x] Part 2: Procedural combat animation and impact feedback.
+- [x] Part 3: Enemy intelligence, spacing and projectiles.
+- [ ] Part 4: Mobile controls, encounter balancing and final verification.
+
+Part 3 code was verified on `681d15851c02a55b7dc27419f434dfa4498ee766`. See PR4_PART4_HANDOFF.md and PR4_PART3_PERFORMANCE.md for continuation contracts and actual evidence.
