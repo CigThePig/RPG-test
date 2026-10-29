@@ -530,7 +530,13 @@ public sealed class World
                     if (a.State is ActionState.Idle or ActionState.Moving)
                     {
                         long start = ProfileCombat ? Stamp() : 0;
-                        var velocity = separation.Velocity(a, RegionsById[a.Region], new Vector2(a.MotionX, a.MotionY), Math.Max(0, Stat(a, "speed")), dt);
+                        // Avoidance is for combatants, not passive friendly NPCs. Otherwise
+                        // a nearby player produces movement even when a merchant's planner
+                        // requested zero velocity, making them appear pushable.
+                        var desired = new Vector2(a.MotionX, a.MotionY);
+                        var velocity = a.CombatProfile != "" || Hostile(a, Player)
+                            ? separation.Velocity(a, RegionsById[a.Region], desired, Math.Max(0, Stat(a, "speed")), dt)
+                            : desired;
                         if(ProfileCombat) AvoidanceMilliseconds += Milliseconds(start);
                         Move(a, velocity * dt);
                     }
