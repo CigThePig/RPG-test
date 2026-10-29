@@ -84,11 +84,18 @@ public sealed class CombatPresentationController : IDisposable
                 world.Actors.TryGetValue(e.TargetId, out var target);
                 view?.Cue(ability.Damage < 0 ? "cast" : "attack", target, ability);
                 if (ability.ProjectileSpeed > 0) break; // release has its own cue
-                Sound(ability.Type == "healing" ? "cast" : e.AbilityId == "slash" ? "swing" : ability.ActionStyle == "Bite" ? "bite" : "attack", e.Origin);
+                // Sword windup is silent. The air-only whoosh belongs to the
+                // authoritative strike boundary, whether it hits or misses.
+                if (e.AbilityId != "slash")
+                    Sound(ability.Type == "healing" ? "cast" : ability.ActionStyle == "Bite" ? "bite" : "attack", e.Origin);
                 break;
             case CombatPresentationKind.AttackCommitted:
+                // Commitment starts no second animation or audio cue.
+                break;
             case CombatPresentationKind.AttackImpact:
-                // Commitment is not another start; impact is not proof of damage.
+                // This is an attempted strike, not confirmation of a hit.
+                if (e.ActorId == "player" && e.AbilityId == "slash")
+                    Sound("swing", e.Origin);
                 break;
             case CombatPresentationKind.AttackCanceled:
                 view?.Cue("cancel");
@@ -121,6 +128,9 @@ public sealed class CombatPresentationController : IDisposable
                 }
                 if (wasAvoided) break;
                 if (ability?.ProjectileSpeed > 0) break;
+                // The sword's faint blade trail and air whoosh already say
+                // "swing". A second ring and noise on a miss read as a hit.
+                if (e.ActorId == "player" && e.AbilityId == "slash") break;
                 var dir = Direction(e);
                 float reach = Math.Clamp(ability?.Range ?? 24, 12, 45);
                 var offset = e.Position - e.Origin;
