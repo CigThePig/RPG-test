@@ -31,9 +31,23 @@ public static class CombatPresentationChecks
             w.Items.Equip(p, "iron_sword", "weapon");
             app.RebuildViews();
             var playerMotor = app.Views[p.Id].Creature.Motor!;
+            enemy.X = 700; // Genuine empty-air sword swing, not a mocked event.
+            int swingBefore = app.Audio.Call("debug_cue_count", "swing").AsInt32();
+            int whiffBefore = app.Audio.Call("debug_cue_count", "whiff").AsInt32();
+            int hitBefore = app.Audio.Call("debug_cue_count", "hit").AsInt32();
+            int emptyEffects = app.CombatEffects.EmittedCount;
             check(w.TryStartPlayerSlash(V.UnitX) && playerMotor.CurrentActionStyle == ActionStyle.Strike && playerMotor.ActionTriggerCount == 1,
                 "player sword selects one timed Strike action");
-            w.Cancel(p); p.Cooldowns.Clear(); app.CombatPresentation!.Reset();
+            check(app.Audio.Call("debug_cue_count", "swing").AsInt32() == swingBefore,
+                "sword windup is silent instead of playing a premature hit-like whoosh");
+            for (int i = 0; i < 10; i++) w.Step(Dt);
+            check(app.Audio.Call("debug_cue_count", "swing").AsInt32() == swingBefore + 1 &&
+                app.Audio.Call("debug_cue_count", "whiff").AsInt32() == whiffBefore &&
+                app.Audio.Call("debug_cue_count", "hit").AsInt32() == hitBefore &&
+                app.CombatEffects.EmittedCount == emptyEffects && enemy.Health == enemy.MaxHealth,
+                "empty sword strike plays one air cue but no hit, whiff burst, or impact sound");
+            w.Cancel(p); p.Cooldowns.Clear(); p.X = p.Y = 500;
+            enemy.X = 528; enemy.Y = 500; app.CombatPresentation!.Reset();
             var view = app.Views[enemy.Id]; var motor = view.Creature.Motor!;
             var bite = w.FindAbility("bite")!;
             check(w.Activate(enemy.Id, "bite", p.Id), "presentation fixture starts real bite");
@@ -62,7 +76,10 @@ public static class CombatPresentationChecks
             double facing = motor.Yaw;
             var beforeContact = enemy.Position; var origin = p.Position;
             app.CombatEffects.Reset();
+            hitBefore = app.Audio.Call("debug_cue_count", "hit").AsInt32();
             check(w.Damage(p, enemy, 5, "physical", ability: "slash"), "real damage interrupts the windup");
+            check(app.Audio.Call("debug_cue_count", "hit").AsInt32() == hitBefore + 1,
+                "confirmed sword contact still produces its distinct impact sound");
             check(!motor.ActionActive && motor.CombatSampling && Math.Abs(DMath.WrapAngle(motor.Yaw - facing)) < .00001,
                 "damage cancels the action and begins a hit reaction without rotating the victim");
             var contact = beforeContact + V.Normalize(origin - beforeContact) * Math.Min(8, enemy.Radius * .55f);
