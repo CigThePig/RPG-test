@@ -135,9 +135,9 @@ public sealed class GameplayReplay
         r.Features[17*64+20]="wood";
         return r;
     }
-    void TapAction(string label)
+    void TapAction(string id)
     {
-        var button=app.Ui.ActionControl(label == "Attack" ? "attack" : label.ToLowerInvariant());
+        var button=app.Ui.ActionControl(id);
         var at=button.GetGlobalRect().GetCenter();
         Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=at});
         Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=at});
@@ -308,11 +308,11 @@ public sealed class GameplayReplay
                     a.NextTacticalTime=w.Time+10;
                 }
                 if(test.Id!="tactics-dodge" && local>=58 && local<108)direction=Vector2.Down;
-                if(test.Id=="tactics-dodge" && local==80)TapAction("Dodge");
+                if(test.Id=="tactics-dodge" && local==80)TapAction("dodge");
             }
             if(test.Id=="tactics-spitter" && local>=120 && local<165)direction=Vector2.Right;
             if(test.Id=="tactics-brute" && local>=95 && local<120)direction=Vector2.Left;
-            if(test.Id=="tactics-interrupt" && local==20)TapAction("Attack");
+            if(test.Id=="tactics-interrupt" && local==20)TapAction("attack");
             if(local%6==0)
                 app.Trace.Write(new { kind="tactical-state", scenario=test.Id, tick=w.Tick, frame=Engine.GetFramesDrawn(),
                     actors=tacticalActors.Select(id=>new { id, profile=w.Actors[id].CombatProfile, intent=w.Actors[id].TacticalIntent, x=w.Actors[id].X, y=w.Actors[id].Y, action=w.Actors[id].State.ToString() }).ToArray(),
@@ -356,10 +356,10 @@ public sealed class GameplayReplay
         }
         if(test.Id=="attack-readability" && local==145 && Math.Abs(PixelCreatures.Core.DMath.WrapAngle(app.Views["player"].Creature.Motor!.Yaw-incomingYaw))>.12)
             throw new InvalidOperationException("Incoming hit changed player facing");
-        if (test.Id == "combat-empty" && (local is 10 or 60 or 110)) TapAction("Attack");
+        if (test.Id == "combat-empty" && (local is 10 or 60 or 110)) TapAction("attack");
         if (test.Id is "combat-ahead" or "combat-behind" or "combat-enter" or "combat-wall")
         {
-            if (local == 10) TapAction("Attack");
+            if (local == 10) TapAction("attack");
             if (test.Id == "combat-enter" && local == 16)
             {
                 var enemy=app.World.Actors.Values.First(a=>a.Profile=="beast");
@@ -368,7 +368,7 @@ public sealed class GameplayReplay
         }
         if (test.Id.StartsWith("dodge-"))
         {
-            if (local == 12) TapAction("Dodge");
+            if (local == 12) TapAction("dodge");
             if (test.Id == "dodge-held" && local >= 36) direction=Vector2.Zero;
             if (test.Id == "dodge-evasion" && local == 17)
             {
@@ -396,7 +396,7 @@ public sealed class GameplayReplay
                 app.World.Damage(app.World.Player, enemy, 5, "physical");
                 app.Trace.Marker("telegraph/interrupted");
             }
-            if (test.Id=="telegraph-dodge" && local==22) TapAction("Dodge");
+            if (test.Id=="telegraph-dodge" && local==22) TapAction("dodge");
             if (test.Id=="telegraph-cone" && local==21)
             {
                 app.World.Player.X=enemy.X; app.World.Player.Y=enemy.Y+45;
@@ -408,7 +408,7 @@ public sealed class GameplayReplay
         if (test.Id.StartsWith("presentation-") && local==10)
         {
             var enemy=app.World.Actors[presentationEnemy];
-            if(test.Id=="presentation-fatal") TapAction("Attack");
+            if(test.Id=="presentation-fatal") TapAction("attack");
             if(test.Id=="presentation-crowd")
             {
                 enemy.State=ActionState.Idle; enemy.StateRemaining=0; enemy.Abilities.Add("fixture_sweep");

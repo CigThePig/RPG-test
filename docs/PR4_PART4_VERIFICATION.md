@@ -27,3 +27,11 @@ Actual damage includes existing actor stats/mitigation. Ember's legacy steering/
 ## Physical acceptance
 
 See ANDROID_PLAYTESTING.md. Physical-device touch comfort, subjective combat feel, audio quality, and sustained ARM64 performance remain pending user acceptance before merge.
+
+## Local rendered observations
+
+The complete desktop and mobile suites passed after input fixes, including actual button rectangle/cooldown checks and prior telegraph, roll, hit/miss, camera and tactical checks. The focused suite additionally passed movement+Ember and production chest interaction with a separate action finger. A focus-test iteration initially scheduled a press after simulated focus restoration; it was corrected to wait for the press to reach the input owner before losing focus. An explicit orphan-release guard remains as defensive input handling. No regression was waived.
+
+Actual game frames were inspected for normal controls and the eight-enemy fixture. Crowds still bunch together; the conditional rim identifies player ground position. Hover/disabled action styles now retain the same silhouettes rather than falling back to transparent engine styling. Thumb comfort remains unmeasured.
+
+Same-host short mobile software-rendered comparison (120 frames/workload, not a controlled benchmark): baseline vs Part 4 p95 was idle 19.26 → 18.48 ms, one engaged 17.45 → 18.89, three 27.20 → 19.86, four 18.76 → 18.87, eight 20.02 → 21.28, projectiles 19.02 → 23.66, combined effects 28.14 → 21.62. Projectile collision p95 was 0.080 → 0.086 ms. Scheduling and short samples preclude optimization claims; final CI measurements and target-phone sustained testing take precedence. The baseline binary was built from the handoff before Part 4 code was compiled. Later presentation-style/test-only changes require final exact-commit CI.

@@ -513,7 +513,7 @@ public static class VisualChecks
             string snapshot=Persistence.Capture(app.World,app.Narrative);
             var p=app.World.Player;
             p.Cooldowns.Remove("dodge");
-            var focused=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.IsVisibleInTree() && b.Text.Contains("Draught"));
+            var focused=app.Ui.ActionControl("potion");
             int potionsBefore=app.World.Items.Count("player","potion");
             focused.GrabFocus();
             int starts=0;

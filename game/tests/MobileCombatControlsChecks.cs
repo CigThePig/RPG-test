@@ -93,6 +93,16 @@ public static class MobileCombatControlsChecks
             float mana=p.Mana;
             Tap("mend");await Frame();
             Require(p.Mana<mana && app.Ui.Stick.Finger==7,"movement plus Mend dispatch");
+            app.World.Cancel(p);p.Cooldowns.Clear();p.Mana=p.MaxMana;
+            var rangedTarget=app.World.Actors.Values.First(a=>a.Profile=="beast");
+            rangedTarget.Region=p.Region;rangedTarget.X=p.X+150;rangedTarget.Y=p.Y;rangedTarget.Health=rangedTarget.MaxHealth;
+            await Frame();Tap("ember");await Frame();
+            Require(p.Cooldowns.GetValueOrDefault("ember")>0 && app.Ui.Stick.Finger==7,"movement plus Ember dispatch");
+            rangedTarget.Region="reach";
+            app.World.Cancel(p);p.Cooldowns.Clear();
+            p.X=432;p.Y=300;
+            await Frame();Tap("interact");await Frame();
+            Require(app.World.RegionsById[p.Region].Depleted.Contains(12*64+18) && app.Ui.Stick.Finger==7,"movement plus production chest interaction");
             app.World.Cancel(p);p.Cooldowns.Clear();p.Mana=0;await Frame();
             Tap("mend");await Frame();Require(!p.Cooldowns.ContainsKey("mend") && p.Mana<1,"disabled spell rejects touch");
             p.Health=20;int potions=app.World.Items.Count("player","potion");

@@ -19,6 +19,13 @@ public partial class MobileCombatControls : Control
             BorderColor = new Color("b0af7e"), BorderWidthLeft=2, BorderWidthRight=2, BorderWidthTop=2, BorderWidthBottom=2,
             CornerRadiusTopLeft=24, CornerRadiusTopRight=24, CornerRadiusBottomLeft=24, CornerRadiusBottomRight=24 };
         button.AddThemeStyleboxOverride("normal", face);
+        foreach(string state in new[]{"hover","pressed","disabled"})
+        {
+            var variant=(StyleBoxFlat)face.Duplicate();
+            variant.BgColor=state=="hover" ? face.BgColor.Lightened(.12f) : state=="pressed" ? face.BgColor.Darkened(.2f) : face.BgColor.Darkened(.35f);
+            if(state=="disabled")variant.BorderColor=face.BorderColor.Darkened(.4f);
+            button.AddThemeStyleboxOverride(state,variant);
+        }
     }
     // Android reports physical display pixels. The viewport's screen transform includes
     // canvas_items scaling and letterboxing; camera transforms do not belong here.
