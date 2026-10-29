@@ -40,8 +40,20 @@ public static class Persistence
         }
 
         foreach (var p in s.Projectiles)
-            if (!s.Actors.ContainsKey(p.Source) || !s.Actors.ContainsKey(p.Target) || !content.Abilities.Any(a => a.Id == p.Ability) || !float.IsFinite(p.X) || !float.IsFinite(p.Y) || !float.IsFinite(p.Remaining))
+        {
+            var ability = content.Abilities.FirstOrDefault(a => a.Id == p.Ability);
+            if (!s.Actors.TryGetValue(p.Source, out var source) || ability == null || ability.ProjectileSpeed <= 0 || !float.IsFinite(p.X) || !float.IsFinite(p.Y) || !float.IsFinite(p.Remaining) || p.Remaining < 0 || p.Remaining > 30 || !float.IsFinite(p.HeadingX) || !float.IsFinite(p.HeadingY))
                 throw new InvalidDataException("Invalid projectile");
+            if (p.Region == "") p.Region = source.Region;
+            if (!s.Regions.TryGetValue(p.Region, out var region) || region.Index(new(p.X, p.Y)) < 0)
+                throw new InvalidDataException("Invalid projectile region/position");
+            var heading = new System.Numerics.Vector2(p.HeadingX, p.HeadingY);
+            if (!CombatGeometry.TryNormalize(heading, out heading))
+            {
+                if (!s.Actors.TryGetValue(p.Target, out var target) || !CombatGeometry.TryNormalize(target.Position - new System.Numerics.Vector2(p.X, p.Y), out heading)) heading = System.Numerics.Vector2.UnitX;
+            }
+            p.HeadingX = heading.X; p.HeadingY = heading.Y;
+        }
         foreach (var actor in s.Actors.Values)
         {
             // No detached pending action may reappear after loading. Old schema-1
@@ -72,6 +84,10 @@ public static class Persistence
                 actor.ActionDirectionX = actor.ActionDirectionY = 0;
                 actor.MotionX = actor.MotionY = 0;
             }
+            if (!double.IsFinite(actor.NextTacticalTime) || actor.NextTacticalTime < 0 || actor.NextTacticalTime > s.Time + 2)
+                throw new InvalidDataException("Invalid tactical cadence");
+            // Unknown optional profiles fall back to legacy tactics, preserving old actors.
+            if (!content.CombatProfiles.Any(p => p.Id == actor.CombatProfile)) actor.CombatProfile = "";
             AnatomyAdapter.Apply(actor);
         }
         // Schema-1 saves retain their full terrain, feature IDs and Gloot bags.

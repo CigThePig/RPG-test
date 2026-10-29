@@ -1,1 +1,29 @@
-{"ruin":{"count":8,"families":["quadruped","arthropod","reptile","amorphous","serpent","winged"],"faction":"beasts","ability":"bite"}}
+{
+  "ruin": {
+    "count": 8,
+    "faction": "beasts",
+    "archetypes": [
+      {
+        "profile": "prowler",
+        "name": "Ruin prowler",
+        "family": "quadruped",
+        "speed": 88,
+        "health": 65
+      },
+      {
+        "profile": "brute",
+        "name": "Ruin brute",
+        "family": "reptile",
+        "speed": 46,
+        "health": 120
+      },
+      {
+        "profile": "spitter",
+        "name": "Ruin spitter",
+        "family": "amorphous",
+        "speed": 62,
+        "health": 55
+      }
+    ]
+  }
+}

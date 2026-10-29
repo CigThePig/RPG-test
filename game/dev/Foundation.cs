@@ -615,9 +615,17 @@ public partial class Foundation : Node2D
 
         foreach (var p in World.Projectiles)
         {
-            if (World.Actors[p.Source].Region != r.Id)
-                continue;
-            DrawCircle(GodotConvert.GroundToScreen(p.X, p.Y), 3, new Color(1, .55f, .2f));
+            if ((p.Region == "" ? World.Actors[p.Source].Region : p.Region) != r.Id) continue;
+            var at = GodotConvert.GroundToScreen(p.X, p.Y);
+            var heading = GodotConvert.GroundToScreen(p.HeadingX, p.HeadingY).Normalized();
+            if (heading.LengthSquared() < .001f) heading = Vector2.Right;
+            bool organic = World.FindAbility(p.Ability)?.Projectile?.Visual == "spit";
+            var color = organic ? new Color(.45f, 1, .25f) : new Color(1, .48f, .12f);
+            // A bounded velocity-aligned streak reads authoritative flight; it owns no timer.
+            DrawLine(at - heading * 15, at, new Color(color, .35f), organic ? 5 : 3);
+            DrawCircle(at, organic ? 4 : 3.5f, new Color(.08f, .12f, .06f));
+            DrawCircle(at, organic ? 3 : 2.5f, color);
+            DrawCircle(at + heading, 1.3f, organic ? Colors.LightYellow : Colors.White);
         }
     }
 

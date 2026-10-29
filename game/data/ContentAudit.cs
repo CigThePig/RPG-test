@@ -15,11 +15,19 @@ public static class ContentAudit
         using var spawns = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://game/data/spawns.json"));
         foreach (var region in spawns.RootElement.EnumerateObject())
         {
-            foreach (var f in region.Value.GetProperty("families").EnumerateArray())
-                if (!CreatureRuntime.Registry.TryGetFamily(f.GetString()!, out _))
-                    errors.Add($"spawn {region.Name}: unknown family {f}");
-            if (!content.Abilities.Any(a => a.Id == region.Value.GetProperty("ability").GetString()))
-                errors.Add($"spawn {region.Name}: unknown ability");
+            if (region.Value.GetProperty("count").GetInt32() is < 3 or > 32)
+                errors.Add($"spawn {region.Name}: invalid count");
+            foreach (var archetype in region.Value.GetProperty("archetypes").EnumerateArray())
+            {
+                if (!CreatureRuntime.Registry.TryGetFamily(archetype.GetProperty("family").GetString()!, out _))
+                    errors.Add($"spawn {region.Name}: unknown family");
+                var profile = content.CombatProfiles.FirstOrDefault(p => p.Id == archetype.GetProperty("profile").GetString());
+                if (profile == null || profile.Priorities.Keys.Any(id => content.Abilities.Any(a => a.Id == id && a.RequiresWeapon)))
+                    errors.Add($"spawn {region.Name}: unknown profile or unsupported weapon ability");
+                float speed = archetype.GetProperty("speed").GetSingle(), health = archetype.GetProperty("health").GetSingle();
+                if (!float.IsFinite(speed) || speed <= 0 || !float.IsFinite(health) || health <= 0)
+                    errors.Add($"spawn {region.Name}: invalid attributes");
+            }
         }
 
         using var quests = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://game/data/quests.json"));

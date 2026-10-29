@@ -37,6 +37,9 @@ public sealed class ActorState : ISpellCaster, ISpellTarget
     public string Faction { get; set; } = "reach";
     public string Region { get; set; } = "reach";
     public string Profile { get; set; } = "";
+    public string CombatProfile { get; set; } = "";
+    public string TacticalIntent { get; set; } = "";
+    public double NextTacticalTime { get; set; }
     public string Profession { get; set; } = "";
     public Appearance Appearance { get; set; } = new();
     public float X { get; set; }

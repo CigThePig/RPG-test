@@ -23,7 +23,9 @@
       "Windup": 0.3,
       "Recovery": 0.4,
       "Type": "physical",
-      "Telegraph": { "Style": "target" },
+      "Telegraph": {
+        "Style": "target"
+      },
       "ActionStyle": "Bite"
     },
     {
@@ -37,8 +39,14 @@
       "Windup": 0.3,
       "Recovery": 0.4,
       "Type": "physical",
-      "Geometry": { "Shape": "cone", "Range": 56, "HalfAngleDegrees": 45 },
-      "Telegraph": { "Style": "cone" },
+      "Geometry": {
+        "Shape": "cone",
+        "Range": 56,
+        "HalfAngleDegrees": 45
+      },
+      "Telegraph": {
+        "Style": "cone"
+      },
       "ActionStyle": "TailSwipe"
     },
     {
@@ -80,6 +88,64 @@
       "Status": "ward",
       "UnlockLevel": 2,
       "UnlockCost": 1
+    },
+    {
+      "Id": "slam",
+      "Name": "Crushing sweep",
+      "Range": 46,
+      "Damage": 14,
+      "Cost": 0,
+      "Cooldown": 2.4,
+      "Windup": 0.8,
+      "Recovery": 0.85,
+      "Type": "physical",
+      "Geometry": {
+        "Shape": "cone",
+        "Range": 52,
+        "HalfAngleDegrees": 55
+      },
+      "Telegraph": {
+        "Style": "cone"
+      },
+      "ActionStyle": "Slam"
+    },
+    {
+      "Id": "spit",
+      "Name": "Acid droplet",
+      "Range": 170,
+      "Damage": 7,
+      "Cost": 3,
+      "Cooldown": 1.8,
+      "Windup": 0.48,
+      "Recovery": 0.5,
+      "Type": "acid",
+      "ProjectileSpeed": 135,
+      "ActionStyle": "Spray",
+      "Projectile": {
+        "Mode": "straight",
+        "Lifetime": 2,
+        "Radius": 3,
+        "Visual": "spit"
+      }
+    },
+    {
+      "Id": "fixture_homing",
+      "Name": "Turning droplet",
+      "Range": 240,
+      "Damage": 7,
+      "Cost": 0,
+      "Cooldown": 2,
+      "Windup": 0.3,
+      "Recovery": 0.4,
+      "ProjectileSpeed": 135,
+      "VerificationOnly": true,
+      "Projectile": {
+        "Mode": "bounded_homing",
+        "TurnDegrees": 55,
+        "Lifetime": 3,
+        "Radius": 3,
+        "Visual": "spit"
+      }
     }
   ],
   "statuses": [
@@ -207,6 +273,52 @@
       "Stat": "power",
       "PerRank": 3,
       "MaxRank": 5
+    }
+  ],
+  "combatProfiles": [
+    {
+      "Id": "prowler",
+      "MinimumDistance": 0,
+      "PreferredDistance": 26,
+      "ApproachDistance": 36,
+      "PursuitDistance": 180,
+      "RetreatThreshold": 0.12,
+      "DecisionSeconds": 0.2,
+      "Reposition": 0.65,
+      "Behaviour": "melee",
+      "Priorities": {
+        "bite": 2
+      }
+    },
+    {
+      "Id": "brute",
+      "MinimumDistance": 0,
+      "PreferredDistance": 30,
+      "ApproachDistance": 42,
+      "PursuitDistance": 180,
+      "RetreatThreshold": 0.08,
+      "DecisionSeconds": 0.4,
+      "Reposition": 0.1,
+      "Behaviour": "melee",
+      "Priorities": {
+        "slam": 3,
+        "bite": 1
+      }
+    },
+    {
+      "Id": "spitter",
+      "MinimumDistance": 72,
+      "PreferredDistance": 110,
+      "ApproachDistance": 140,
+      "PursuitDistance": 210,
+      "RetreatThreshold": 0.18,
+      "DecisionSeconds": 0.4,
+      "Reposition": 0.5,
+      "Behaviour": "ranged",
+      "Priorities": {
+        "spit": 3,
+        "bite": 0.5
+      }
     }
   ]
 }

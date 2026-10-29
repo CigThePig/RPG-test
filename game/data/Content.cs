@@ -13,6 +13,7 @@ public sealed class AbilityDef
     public float Cooldown { get; set; }
     public float Windup { get; set; }
     public float Recovery { get; set; }
+    public ProjectileDef? Projectile { get; set; }
     public float ProjectileSpeed { get; set; }
     public int UnlockLevel { get; set; } = 1;
     public int UnlockCost { get; set; } = 1;
@@ -25,6 +26,29 @@ public sealed class AbilityDef
     public TelegraphDef? Telegraph { get; set; }
     // Optional PPC action; an omitted or anatomy-incompatible style uses the rig default.
     public string ActionStyle { get; set; } = "";
+}
+
+public sealed class ProjectileDef
+{
+    public string Mode { get; set; } = "legacy";
+    public float TurnDegrees { get; set; } = 60;
+    public float Lifetime { get; set; } = 4;
+    public float Radius { get; set; } = 2;
+    public string Visual { get; set; } = "ember";
+}
+
+public sealed class CombatProfileDef
+{
+    public string Id { get; set; } = "";
+    public float MinimumDistance { get; set; }
+    public float PreferredDistance { get; set; } = 28;
+    public float ApproachDistance { get; set; } = 38;
+    public float PursuitDistance { get; set; } = 180;
+    public float RetreatThreshold { get; set; } = .2f;
+    public float DecisionSeconds { get; set; } = .2f;
+    public float Reposition { get; set; }
+    public string Behaviour { get; set; } = "melee";
+    public Dictionary<string, float> Priorities { get; set; } = new();
 }
 
 public sealed class AttackGeometryDef
@@ -87,6 +111,7 @@ public sealed class NpcProfile
 
 public sealed class Content
 {
+    public List<CombatProfileDef> CombatProfiles { get; set; } = new();
     public List<SkillDef> Skills { get; set; } = new();
     public List<AbilityDef> Abilities { get; set; } = new();
     public List<StatusDef> Statuses { get; set; } = new();
@@ -116,6 +141,13 @@ public sealed class Content
                     errors.Add($"{domain}: invalid/duplicate id '{g.Key}'");
         }
 
+        Unique(CombatProfiles.Select(x => x.Id), "combat profile");
+        foreach (var p in CombatProfiles)
+        {
+            var values = new[] { p.MinimumDistance, p.PreferredDistance, p.ApproachDistance, p.PursuitDistance, p.RetreatThreshold, p.DecisionSeconds, p.Reposition };
+            if (values.Any(v => !float.IsFinite(v) || v < 0) || p.MinimumDistance > p.PreferredDistance || p.PreferredDistance > p.ApproachDistance || p.ApproachDistance > p.PursuitDistance || p.PursuitDistance > 360 || p.RetreatThreshold > 1 || p.DecisionSeconds < .2f || p.DecisionSeconds > 2 || p.Reposition > 1 || p.Behaviour is not ("melee" or "ranged") || p.Priorities.Count == 0 || p.Priorities.Any(x => !Abilities.Any(a => a.Id == x.Key && !a.Self) || !float.IsFinite(x.Value) || x.Value <= 0))
+                errors.Add($"combat profile {p.Id}: invalid distances, cadence, behaviour or abilities");
+        }
         Unique(Skills.Select(x => x.Id), "skill");
         foreach (var skill in Skills)
             if (skill.MaxRank < 1 || !float.IsFinite(skill.PerRank))
@@ -131,6 +163,8 @@ public sealed class Content
                 !Nonnegative(a.Windup) || !Nonnegative(a.Recovery) || !Nonnegative(a.ProjectileSpeed) ||
                 !float.IsFinite(a.Damage) || (!string.IsNullOrEmpty(a.Status) && !Statuses.Any(s => s.Id == a.Status)))
                 errors.Add($"ability {a.Id}: invalid timing, cost, damage or status reference");
+            if (a.Projectile is { } p && (a.ProjectileSpeed <= 0 || p.Mode is not ("legacy" or "straight" or "bounded_homing") || !Nonnegative(p.TurnDegrees) || p.TurnDegrees > 720 || !Nonnegative(p.Radius) || p.Radius > 12 || !Nonnegative(p.Lifetime) || p.Lifetime <= 0 || p.Lifetime > 30 || p.Visual is not ("ember" or "spit")))
+                errors.Add($"ability {a.Id}: invalid projectile configuration");
             string? shape = a.Geometry == null ? "target" : a.Geometry.Shape;
             string? style = a.Telegraph == null ? "none" : a.Telegraph.Style;
             if (shape is not ("target" or "cone"))
