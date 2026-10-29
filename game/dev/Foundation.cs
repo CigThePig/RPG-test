@@ -58,6 +58,21 @@ public partial class Foundation : Node2D
         var p=World.Player;p.Region=map.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.State=ActionState.Idle;p.StateRemaining=0;p.PendingAbility="";p.Statuses.Clear();p.Cooldowns.Clear();
         TouchMovement=ControllerVelocity=Vector2.Zero; Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/start-or-reset");
     }
+    public void BeginCombatCourse()
+    {
+        BeginFeelCourse();
+        var p=World.Player;p.Health=p.MaxHealth=10000;
+        foreach(var other in World.Actors.Values.Where(a=>a.Id!="player"))other.Region="reach";
+        foreach(var entry in new[]{("prowler","quadruped",88f,380f,275f),("brute","reptile",46f,390f,330f),("spitter","amorphous",62f,445f,300f)})
+        {
+            var a=new ActorState{Id="lab:"+entry.Item1,Name=entry.Item1,Region=p.Region,Faction="beasts",Profile="beast",CombatProfile=entry.Item1,
+                Appearance=new(){Family=entry.Item2,Seed=42},X=entry.Item4,Y=entry.Item5,HomeX=entry.Item4,HomeY=entry.Item5,
+                Abilities=World.Content.CombatProfiles.Single(c=>c.Id==entry.Item1).Priorities.Keys.ToList()};
+            AnatomyAdapter.Apply(a);a.Speed=entry.Item3;World.Actors[a.Id]=a;
+        }
+        RebuildViews();
+        if(OS.HasFeature("android"))GD.Print("MOSSLIGHT_TACTICAL_LAB profiles=prowler,brute,spitter");
+    }
     public void LeaveFeelCourse()
     {
         if(courseSnapshot==null)return;
@@ -279,6 +294,11 @@ public partial class Foundation : Node2D
             if (OS.HasFeature("android") && (kind is "attack_started" or "attack_completed" or "dodge_started" or "dodge_completed"))
                 GD.Print($"MOSSLIGHT_COMBAT kind={kind} tick={World.Tick}");
         };
+        World.Presentation += e =>
+        {
+            if(OS.HasFeature("android") && InFeelCourse && e.Kind is CombatPresentationKind.ProjectileReleased or CombatPresentationKind.ProjectileImpact)
+                GD.Print($"MOSSLIGHT_LAB_PROJECTILE kind={e.Kind} ability={e.AbilityId} outcome={e.Outcome} tick={e.Tick}");
+        };
         presentation = new CombatPresentationController(World, Views, CombatEffects, CombatCamera, audio);
         ContentAudit.Validate(World.Content);
         World.NewGame();
@@ -406,7 +426,8 @@ public partial class Foundation : Node2D
         }
         ui.Update();
         Trace.Sample(delta);
-        replay?.AfterStep();
+        try { replay?.AfterStep(); }
+        catch(Exception error) { GD.PushError(error.ToString()); Trace.Flush(); GetTree().Quit(1); return; }
         QueueRedraw();
     }
 
@@ -424,6 +445,8 @@ public partial class Foundation : Node2D
 
     public override void _UnhandledInput(InputEvent e)
     {
+        if(e is InputEventKey developerKey && developerKey.Pressed && !developerKey.Echo && (developerKey.PhysicalKeycode==Key.F9 || developerKey.Keycode==Key.F9) && !Narrative.Get("speaking").AsBool())
+        { BeginCombatCourse(); GetViewport().SetInputAsHandled(); return; }
         if (e.IsActionPressed("menu"))
         {
             ui.Menu();

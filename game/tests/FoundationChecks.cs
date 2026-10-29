@@ -48,6 +48,19 @@ public static class FoundationChecks
             CombatAiChecks.Run(app, Check);
             ActorSeparationChecks.Run(app, Check);
             ProjectileChecks.Run(app, Check);
+            string beforeLab=Persistence.Capture(w,app.Narrative);
+            bool labReleased=false;
+            void ObserveLab(CombatPresentationEvent e){if(e.ActorId=="lab:spitter" && e.Kind==CombatPresentationKind.ProjectileReleased)labReleased=true;}
+            w.Presentation+=ObserveLab;
+            try
+            {
+                app.BeginCombatCourse();
+                Check(new[]{"prowler","brute","spitter"}.All(id=>w.Actors.ContainsKey("lab:"+id) && w.Actors["lab:"+id].CombatProfile==id),"reversible developer lab uses three real profiles");
+                for(int i=0;i<120;i++)w.Step(1f/60);
+                Check(labReleased,"developer lab uses authoritative Spit release");
+            }
+            finally{w.Presentation-=ObserveLab;app.LeaveFeelCourse();app.Ui.PauseForVerification();}
+            Check(beforeLab==Persistence.Capture(w,app.Narrative),"developer combat fixture restores normal progress exactly");
             // Exercise nonlinear progression using actual world defeat events before acceptance.
             var early = w.Player;
             var victims = w.Actors.Values.Where(a => a.Profile == "beast").Take(2).ToArray();

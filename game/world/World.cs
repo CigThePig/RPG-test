@@ -551,7 +551,7 @@ public sealed class World
             var p = Projectiles[i];
             var d = FindAbility(p.Ability);
             if (d == null || !Actors.TryGetValue(p.Source, out var source) || !RegionsById.TryGetValue(p.Region == "" ? source.Region : p.Region, out var region) || source.Region != region.Id)
-            { Projectiles.RemoveAt(i); continue; }
+            { CombatDiagnostic?.Invoke("projectile_terminal", new Vector2(p.X,p.Y), p.Ability+"/source or region unavailable"); Projectiles.RemoveAt(i); continue; }
             var hit = ProjectileFlight.Advance(this, p, d, region, dt);
             if (hit.Outcome == "") continue;
             CombatDiagnostic?.Invoke("projectile_terminal", new Vector2(p.X, p.Y), d.Id + "/" + hit.Outcome);
@@ -690,7 +690,12 @@ public sealed class World
             a.TacticalIntent = intent.Kind;
             CombatDiagnostic?.Invoke("ai_intent", a.Position, a.Id + "/" + a.CombatProfile + "/" + intent.Kind + "/" + intent.Ability);
             if (intent.Kind == "ability") Activate(a.Id, intent.Ability, target.Id);
-            else if (intent.Kind is "approach" or "circle" or "retreat") Follow(a, intent.Destination, profile?.DecisionSeconds ?? dt);
+            else if (intent.Kind is "approach" or "circle" or "retreat")
+            {
+                Follow(a, intent.Destination, profile?.DecisionSeconds ?? dt);
+                if(intent.Kind=="approach" && a.MotionX==0 && a.MotionY==0)
+                    Follow(a, target.Position, profile?.DecisionSeconds ?? dt);
+            }
         }
         else if (action == "patrol")
         {

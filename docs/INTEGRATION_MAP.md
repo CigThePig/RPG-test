@@ -11,6 +11,8 @@
 | Ability execution | SPELL `SpellsContext` | Complete original costs/requirements/effects/lifecycle | `RpgAbility` binds definitions to authoritative actions |
 | Persistent action/cooldown/status state | `ActorState` and `World` | SPELL creates action; game adapter owns serializable timeline | Windup, recovery, projectile/status resolution |
 | Hit detection/mitigation/death | `World` | Required gameplay adapter, not supplied by SPELL | Grid geometry/range, defence, recovery, XP, loot, cues |
+| Tactical combat / avoidance | `CombatBrain`, `ActorSeparation`, `World` | Focused game adapters beneath Skelerealms | Profile-driven intentions, real SPELL validation and terrain-safe soft steering |
+| Projectile flight/collision | `ProjectileFlight`, `World` | Game adapter around SPELL damage | Heading persistence, straight/bounded/legacy modes, earliest swept contact and shared presentation events |
 | NPC planning | `Planner.gd` | Skelerealms graph planner and PlannerNode | Value-aware conditions; World executes shared actions |
 | Schedules/perception/factions/memory | `World`, `NpcProfile`, `ActorState` | Game integration around planner | Data-driven activity, hostility, sight and recorded encounters |
 | Dialogue | Dialogue Manager 4 | Complete addon/compiler/editor/runtime | Upstream script format, live conditions and mutations |

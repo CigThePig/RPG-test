@@ -19,7 +19,7 @@ public sealed class GameplayReplay
     // Only used by the opt-in verification trace; gameplay never depends on it.
     public string ObservedActorId => warningEnemy.Length > 0 ? warningEnemy : presentationEnemy;
     readonly List<string> tacticalActors = new();
-    int tacticalStarts, tacticalReleases, tacticalCollisions, tacticalAvoidances, tacticalCancels;
+    int tacticalStarts, tacticalReleases, tacticalCollisions, tacticalAvoidances, tacticalCancels, tacticalTerrainCollisions, tacticalDodgeAvoidances;
     int presentationReleases, presentationCollisions, presentationDeaths;
     readonly HashSet<string> presentationVictims = new();
     readonly Dictionary<string, string> fixtureFactions = new();
@@ -97,8 +97,8 @@ public sealed class GameplayReplay
             {
                 if(e.Kind==CombatPresentationKind.AttackStarted)tacticalStarts++;
                 if(e.Kind==CombatPresentationKind.ProjectileReleased)tacticalReleases++;
-                if(e.Kind==CombatPresentationKind.ProjectileImpact)tacticalCollisions++;
-                if(e.Kind==CombatPresentationKind.DefensiveAvoidance)tacticalAvoidances++;
+                if(e.Kind==CombatPresentationKind.ProjectileImpact){tacticalCollisions++;if(e.Outcome is "terrain" or "boundary")tacticalTerrainCollisions++;}
+                if(e.Kind==CombatPresentationKind.DefensiveAvoidance){tacticalAvoidances++;if(e.Outcome=="dodge")tacticalDodgeAvoidances++;}
                 if(e.Kind==CombatPresentationKind.AttackCanceled)tacticalCancels++;
                 app.Trace.Write(new { kind="tactical-event", scenario=app.Trace.Scenario, tick=e.Tick, frame=Engine.GetFramesDrawn(), actor=e.ActorId, ability=e.AbilityId, outcome=e.Outcome, observation=e.Kind.ToString() });
             }
@@ -258,7 +258,7 @@ public sealed class GameplayReplay
             if(s.Id.StartsWith("tactics-"))
             {
                 var w=app.World;
-                tacticalActors.Clear(); tacticalStarts=tacticalReleases=tacticalCollisions=tacticalAvoidances=tacticalCancels=0;
+                tacticalActors.Clear(); tacticalStarts=tacticalReleases=tacticalCollisions=tacticalAvoidances=tacticalCancels=tacticalTerrainCollisions=tacticalDodgeAvoidances=0;
                 foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
                 w.Projectiles.Clear(); w.Cancel(p); p.X=s.Start.X; p.Y=s.Start.Y;
                 p.Health=p.MaxHealth=10000; p.Invulnerable=s.Id=="tactics-dodge" ? 0 : 1000;
@@ -511,10 +511,18 @@ public sealed class GameplayReplay
             if(tacticalStarts==0)throw new InvalidOperationException("Tactical encounter never attacked: "+s.Id);
             if((s.Id is "tactics-straight" or "tactics-homing" or "tactics-wall" or "tactics-dodge" or "tactics-spitter") && tacticalReleases==0)
                 throw new InvalidOperationException("No real projectile released: "+s.Id);
-            if(s.Id=="tactics-wall" && tacticalCollisions==0)throw new InvalidOperationException("Wall fixture never collided");
-            if(s.Id=="tactics-dodge" && tacticalAvoidances==0)throw new InvalidOperationException("Projectile dodge fixture never avoided contact");
+            if(s.Id=="tactics-wall" && tacticalTerrainCollisions==0)throw new InvalidOperationException("Wall fixture never collided");
+            if(s.Id=="tactics-dodge" && tacticalDodgeAvoidances==0)throw new InvalidOperationException("Projectile dodge fixture never avoided contact");
             if(s.Id=="tactics-interrupt" && tacticalCancels==0)throw new InvalidOperationException("Heavy attack was not interrupted");
-            app.Trace.Write(new {kind="tactical-result", scenario=s.Id, tacticalStarts,tacticalReleases,tacticalCollisions,tacticalAvoidances,tacticalCancels});
+            if(s.Id=="tactics-straight" && tacticalCollisions!=0)throw new InvalidOperationException("Straight shot failed to miss moving player");
+            if(s.Id=="tactics-spacing")
+            {
+                var positions=tacticalActors.Select(id=>app.World.Actors[id].Position).ToArray();
+                float minimum=float.PositiveInfinity;
+                for(int i=0;i<positions.Length;i++)for(int j=i+1;j<positions.Length;j++)minimum=Math.Min(minimum,V.Distance(positions[i],positions[j]));
+                if(minimum<6)throw new InvalidOperationException("Crowd did not separate near-identical positions");
+            }
+            app.Trace.Write(new {kind="tactical-result", scenario=s.Id, tacticalStarts,tacticalReleases,tacticalCollisions,tacticalAvoidances,tacticalCancels,tacticalTerrainCollisions,tacticalDodgeAvoidances});
             foreach(string id in tacticalActors){var a=app.World.Actors[id];app.World.Cancel(a);a.Region="reach";a.Abilities.Clear();a.CombatProfile="";}
             tacticalActors.Clear();app.World.Projectiles.Clear();p.Invulnerable=0;
         }

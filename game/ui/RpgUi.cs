@@ -560,6 +560,7 @@ public partial class RpgUi : CanvasLayer
             App.World.Enter(App.World.Player, "reach");
             panel.Hide();
         });
+        Button(body, "Combat archetypes test encounter (F9)", App.BeginCombatCourse);
         Button(body, "Complete integration checks", () =>
         {
             App.RunChecks();

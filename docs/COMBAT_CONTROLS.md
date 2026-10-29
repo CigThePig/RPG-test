@@ -23,3 +23,9 @@ Biped rolling is now a full-body PPC action, not an additive 360-degree torso sp
 ## Combat feedback
 
 Bites and the verification cone use their authored PPC action styles. Successful damage produces a directional recoil and contact flash; a miss produces a lighter whiff, and a successful dodge has a separate cool-colored ring. Defeat transitions into the creature rig's rest posture while the loot marker remains available. Projectile launch and actual collision have separate visual cues. These are observers of world decisions and do not grant movement, damage, immunity or extra stun. Camera feedback is a small bounded presentation offset, configurable through `CameraFeedback.Strength`; setting it to zero disables the nudge.
+
+## Tactical enemies (Part 3)
+
+Ruin Prowlers pressure close range with bites and occasional lateral movement. Brutes close slowly and commit a readable Slam cone, then recover. Spitters preserve moderate range and release straight droplets; movement can evade their actual flight. NPC avoidance gently separates living bodies without making them solid obstacles for the player. The approved sword, aim assist, lunge, movement and roll constants are unchanged.
+
+Developer diagnostics provides a reversible **Combat archetypes test encounter (F9)**. Normal progress is preserved by the existing feel-course snapshot; return through the feel lab. This developer shortcut is separate from player controls. Part 4 owns layout and final balance.

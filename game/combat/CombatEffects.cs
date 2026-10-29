@@ -4,7 +4,7 @@ using Ground = System.Numerics.Vector2;
 
 namespace Mosslight;
 
-public enum CombatEffectKind { Hit, HeavyHit, Whiff, Dodge, Interrupt, ProjectileRelease, ProjectileCollision, Death, Periodic }
+public enum CombatEffectKind { Hit, HeavyHit, Whiff, Dodge, Interrupt, ProjectileRelease, ProjectileCollision, Death, Periodic, TerrainCollision }
 
 /// <summary>One bounded world-space draw layer. Fragments are derived from the event seed, not stored as nodes.</summary>
 public partial class CombatEffects : Node2D
@@ -106,6 +106,7 @@ public partial class CombatEffects : Node2D
                 CombatEffectKind.Dodge => new Color(.54f, .9f, .91f),
                 CombatEffectKind.ProjectileRelease => new Color(1f, .72f, .26f),
                 CombatEffectKind.ProjectileCollision => new Color(1f, .43f, .16f),
+                CombatEffectKind.TerrainCollision => new Color(.65f, .72f, .58f),
                 CombatEffectKind.Death => new Color(.78f, .70f, .58f),
                 CombatEffectKind.Interrupt => new Color(.95f, .75f, .48f),
                 CombatEffectKind.Periodic => new Color(1f, .43f, .18f),

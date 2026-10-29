@@ -13,7 +13,17 @@ def run(*args, **kwargs):
     # Never let a disconnected ADB daemon strand the workflow indefinitely.
     kwargs.setdefault('timeout', 20)
     return subprocess.check_output(args, stderr=subprocess.STDOUT, **kwargs)
-def adb(*args): return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True).strip()
+def adb(*args):
+    # A hosted emulator can close a logcat dump mid-stream with exit 255 while
+    # the game keeps running. Retry this read only; never repeat touch/install mutations.
+    attempts=3 if args==('logcat','-d') else 1
+    for attempt in range(attempts):
+        try: return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True).strip()
+        except subprocess.CalledProcessError as error:
+            if attempts==1: raise
+            (out/f'adb-logcat-read-{time.monotonic_ns()}.log').write_text(str(error)+"\n"+str(error.output))
+            if attempt==attempts-1: raise
+            time.sleep(.5)
 log=(out/'emulator.log').open('w')
 emulator=subprocess.Popen([os.environ['ANDROID_HOME']+'/emulator/emulator','-avd','mosslight',
     '-no-window','-no-audio','-no-boot-anim','-no-snapshot','-gpu','swangle','-skin','1280x800'],stdout=log,stderr=log)
@@ -231,6 +241,16 @@ try:
     # Part 2 run resumed to a black Android surface despite a live game process,
     # and a single successful retry cannot exclude an intermittent regression.
     # Each cycle checks the actual composed framebuffer, not only CPU markers.
+    # The developer fixture uses real profiles, PPC bodies, SPELL and projectile flight.
+    # F9 enters the same reversible course exposed in Developer diagnostics.
+    adb('shell','input','keyevent','139') # Android KEYCODE_F9
+    deadline=time.monotonic()+45
+    while time.monotonic()<deadline:
+        lab_logs=adb('logcat','-d')
+        if 'MOSSLIGHT_TACTICAL_LAB profiles=prowler,brute,spitter' in lab_logs and 'MOSSLIGHT_LAB_PROJECTILE kind=ProjectileReleased ability=spit' in lab_logs: break
+        time.sleep(.5)
+    else: raise RuntimeError('Android mixed archetype fixture did not enter and release a real spit projectile')
+    capture('mixed-archetypes.png',wait=20)
     lifecycle=[]
     original_pid=adb('shell','pidof',package)
     assert original_pid,'Application exited before Android lifecycle verification'
@@ -243,6 +263,10 @@ try:
         ensure_foreground(timeout=30)
         image_name='resumed-menu.png' if cycle==0 else f'resumed-menu-{cycle+1}.png'
         capture(image_name,wait=20)
+        # Resume actual mixed combat between cycles, exercising rebuilt transient views.
+        tap(640,178)
+        time.sleep(1)
+        capture(f'resumed-combat-{cycle+1}.png',wait=20)
         resumed_pid=adb('shell','pidof',package)
         logs=adb('logcat','-d')
         (out/f'resume-{cycle+1}.log').write_text(
@@ -258,7 +282,7 @@ try:
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three nonblank background/resume cycles with input cancellation and stable process identity. ARM64 device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. ARM64 device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     # Preserve the real surface recording on failure as well as success. ADB

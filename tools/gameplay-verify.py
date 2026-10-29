@@ -20,7 +20,7 @@ for preset in a.presets.split(','):
     if a.realtime:
         recorder=subprocess.Popen(['ffmpeg','-v','error','-y','-f','x11grab','-video_size','1280x800','-framerate','30','-i',os.environ['DISPLAY'],'-c:v','libx264','-preset','ultrafast','-crf','24','-pix_fmt','yuv420p',str(folder/'gameplay.mp4')],stdin=subprocess.PIPE)
     try:
-        result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=360)
+        result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=600)
     finally:
         if recorder is not None:
             recorder.communicate(b'q',timeout=30)
@@ -39,7 +39,7 @@ for preset in a.presets.split(','):
     repeat_command=[os.environ.get('GODOT','godot'),'--resolution','1280x800','--path',str(root),'--audio-driver','Dummy','--fixed-fps','60','--','--gameplay-check','--mobile-ui',f'--preset={preset}',f'--evidence={repeat}']
     # The repeat still renders every frame and can exceed two minutes on a
     # constrained software renderer as the scenario suite grows.
-    repeated=subprocess.run(repeat_command,cwd=root,capture_output=True,text=True,timeout=300)
+    repeated=subprocess.run(repeat_command,cwd=root,capture_output=True,text=True,timeout=450)
     (repeat/'engine.log').write_text(repeated.stdout+repeated.stderr)
     assert repeated.returncode==0 and 'GAMEPLAY REPLAY PASSED' in repeated.stdout and 'ERROR:' not in repeated.stdout+repeated.stderr, 'Replay repetition failed'
     repeat_rows=[json.loads(line) for line in (repeat/'trace.jsonl').read_text(encoding='utf-8-sig').splitlines()]

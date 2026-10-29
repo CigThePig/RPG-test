@@ -65,7 +65,7 @@ public sealed class CombatPresentationController : IDisposable
     {
         if (pendingProjectileImpact is not { } impact) return;
         pendingProjectileImpact = null;
-        Emit(CombatEffectKind.ProjectileCollision, impact, impact.Position);
+        Emit(impact.Outcome is "terrain" or "boundary" ? CombatEffectKind.TerrainCollision : CombatEffectKind.ProjectileCollision, impact, impact.Position);
         Sound("projectile_impact", impact.Position);
     }
 

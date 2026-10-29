@@ -12,6 +12,7 @@ public static class CombatAiChecks
             foreach (var actor in w.Actors.Values) actor.Region = "reach";
             var p = w.Player; p.Region = r.Id; p.X = 500; p.Y = 350;
             var a = new ActorState { Id = "ai", Region = r.Id, Faction = "beasts", X = 400, Y = 350, HomeX = 400, HomeY = 350, Abilities = new() { "bite", "slam", "spit" } };
+            AnatomyAdapter.Apply(a);
             w.Actors[a.Id] = a;
             var melee = w.Content.CombatProfiles.Single(x => x.Id == "prowler");
             var ranged = w.Content.CombatProfiles.Single(x => x.Id == "spitter");
@@ -46,6 +47,29 @@ public static class CombatAiChecks
             a.X = 400; a.Y = 250; a.Target = ""; a.CombatProfile = "prowler"; a.NextTacticalTime = 0;
             var dest = new V(400, 400); w.Follow(a, dest, .2f);
             check(a.MotionY > 0 && float.IsFinite(a.MotionX), "production follow finds clear corridor waypoint");
+            r.Tiles=Enumerable.Repeat(Terrain.Floor,1200).ToArray();
+            a.X=400;a.Y=350;a.State=ActionState.Idle;a.CombatProfile="prowler";a.Abilities=new(){"bite"};a.Cooldowns.Clear();a.Mana=60;a.NextTacticalTime=0;a.Target="";
+            p.X=500;p.Y=350;p.Invulnerable=1000;p.Health=p.MaxHealth=10000;
+            string fixture=Persistence.Capture(w,app.Narrative);
+            string Run()
+            {
+                for(int i=0;i<240;i++)w.Step(1f/60);
+                var actor=w.Actors["ai"];
+                return System.Text.Json.JsonSerializer.Serialize(new{actor.X,actor.Y,actor.TacticalIntent,actor.State,actor.PendingAbility,actor.Cooldowns},Content.Json);
+            }
+            string firstRun=Run();
+            check(w.Actors["ai"].X>440 && w.Events.Recent.Any(e=>e.Kind=="ability_started" && e.Actor=="ai"),"production tactical loop approaches and attacks with authored profile");
+            Persistence.Restore(w,app.Narrative,fixture);
+            check(firstRun==Run(),"fixed-step tactical movement and attack sequence repeats across restore");
+            foreach(var state in new[]{ActionState.Windup,ActionState.Recovery,ActionState.Staggered,ActionState.Dead})
+            {
+                var actor=w.Actors["ai"];actor.State=state;actor.StateRemaining=.5f;actor.Health=state==ActionState.Dead?0:100;
+                actor.PendingAbility=state==ActionState.Windup?"bite":"";actor.RecoveryAbility=state==ActionState.Recovery?"bite":"";
+                var restored=Persistence.Parse(Persistence.Capture(w,app.Narrative),w.Content).Actors["ai"];
+                check(restored.State==state && restored.CombatProfile=="prowler", "combat profile/state restoration: "+state);
+            }
+            var invalid=Content.Load(true);invalid.CombatProfiles[0].MinimumDistance=1000;
+            check(invalid.Validate(new(){"potion","iron_sword","oak_staff","coin","herb","ore","wood"}).Any(e=>e.Contains("combat profile")),"contradictory combat distances rejected");
             foreach (int seed in new[] { 1, 42, 1337 })
             {
                 Persistence.Restore(w, app.Narrative, saved);

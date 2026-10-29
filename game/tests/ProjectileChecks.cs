@@ -66,6 +66,14 @@ public static class ProjectileChecks
             events.Clear(); var miss = Make(straight); miss.Remaining = .001f; w.Projectiles.Add(miss); w.Step(1f/60);
             check(!events.Any(e => e.Kind is CombatPresentationKind.ProjectileImpact or CombatPresentationKind.Hit), "expiration fabricates no impact");
             w.Projectiles.Clear(); p.X = 300; p.Y = 300;
+            events.Clear();r.Tiles[12*r.Width+9]=Terrain.Wall;
+            app.CombatPresentation?.Reset();
+            var terrainShot=Make(straight);terrainShot.X=200;w.Projectiles.Add(terrainShot);float terrainHealth=p.Health;
+            w.Step(.25f);app.CombatPresentation?.FlushPending();
+            check(events.Count(e=>e.Kind==CombatPresentationKind.ProjectileImpact && e.Outcome=="terrain")==1 && p.Health==terrainHealth && !events.Any(e=>e.Kind==CombatPresentationKind.Hit),"terrain terminal event cannot cause nearby damage");
+            check(app.CombatEffects.LastKind==CombatEffectKind.TerrainCollision,"terrain contact uses existing controller with distinct subdued effect");
+            r.Tiles[12*r.Width+9]=Terrain.Floor;
+            w.Projectiles.Clear(); p.X = 300; p.Y = 300;
             w.Projectiles.Add(new() { Source = a.Id, Target = p.Id, Ability = "ember", X = 160, Y = 300 });
             w.Projectiles.Add(Make(straight)); w.Projectiles.Add(Make(homing));
             var parsed = Persistence.Parse(Persistence.Capture(w, app.Narrative), w.Content);
