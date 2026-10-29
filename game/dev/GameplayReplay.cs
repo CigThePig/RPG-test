@@ -18,6 +18,8 @@ public sealed class GameplayReplay
     string presentationEnemy = "";
     // Only used by the opt-in verification trace; gameplay never depends on it.
     public string ObservedActorId => warningEnemy.Length > 0 ? warningEnemy : presentationEnemy;
+    readonly List<string> tacticalActors = new();
+    int tacticalStarts, tacticalReleases, tacticalCollisions, tacticalAvoidances, tacticalCancels;
     int presentationReleases, presentationCollisions, presentationDeaths;
     readonly HashSet<string> presentationVictims = new();
     readonly Dictionary<string, string> fixtureFactions = new();
@@ -63,6 +65,16 @@ public sealed class GameplayReplay
         new("presentation-fatal",130,new(300,300),Vector2.Zero),
         new("presentation-crowd",90,new(300,300),Vector2.Zero),
         new("presentation-projectile",140,new(300,300),Vector2.Zero),
+        new("tactics-prowler",240,new(300,300),Vector2.Zero),
+        new("tactics-brute",240,new(300,300),Vector2.Zero),
+        new("tactics-spitter",240,new(300,300),Vector2.Zero),
+        new("tactics-mixed",240,new(300,300),Vector2.Zero),
+        new("tactics-spacing",240,new(300,300),Vector2.Zero),
+        new("tactics-straight",180,new(300,300),Vector2.Zero),
+        new("tactics-homing",180,new(300,300),Vector2.Zero),
+        new("tactics-wall",180,new(660,300),Vector2.Zero),
+        new("tactics-dodge",180,new(300,300),Vector2.Zero),
+        new("tactics-interrupt",120,new(300,300),Vector2.Zero),
         new("turn-south-north",100,new(300,300),Vector2.Up)
     };
     public GameplayReplay(Foundation owner)
@@ -81,6 +93,15 @@ public sealed class GameplayReplay
         };
         app.World.Presentation += e =>
         {
+            if (app.Trace.Scenario.StartsWith("tactics-") && tacticalActors.Contains(e.ActorId))
+            {
+                if(e.Kind==CombatPresentationKind.AttackStarted)tacticalStarts++;
+                if(e.Kind==CombatPresentationKind.ProjectileReleased)tacticalReleases++;
+                if(e.Kind==CombatPresentationKind.ProjectileImpact)tacticalCollisions++;
+                if(e.Kind==CombatPresentationKind.DefensiveAvoidance)tacticalAvoidances++;
+                if(e.Kind==CombatPresentationKind.AttackCanceled)tacticalCancels++;
+                app.Trace.Write(new { kind="tactical-event", scenario=app.Trace.Scenario, tick=e.Tick, frame=Engine.GetFramesDrawn(), actor=e.ActorId, ability=e.AbilityId, outcome=e.Outcome, observation=e.Kind.ToString() });
+            }
             if (app.Trace.Scenario.StartsWith("presentation-") && (e.ActorId == "player" || e.ActorId == presentationEnemy))
             {
                 if (e.Kind == CombatPresentationKind.AttackStarted) app.Trace.Marker("presentation/start");
@@ -234,12 +255,68 @@ public sealed class GameplayReplay
                 presentationReleases=presentationCollisions=presentationDeaths=0; presentationVictims.Clear();
             }
             else presentationEnemy="";
+            if(s.Id.StartsWith("tactics-"))
+            {
+                var w=app.World;
+                tacticalActors.Clear(); tacticalStarts=tacticalReleases=tacticalCollisions=tacticalAvoidances=tacticalCancels=0;
+                foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
+                w.Projectiles.Clear(); w.Cancel(p); p.X=s.Start.X; p.Y=s.Start.Y;
+                p.Health=p.MaxHealth=10000; p.Invulnerable=s.Id=="tactics-dodge" ? 0 : 1000;
+                p.Cooldowns.Clear(); p.Statuses.Clear();
+                int count=s.Id=="tactics-spacing" ? 8 : s.Id=="tactics-mixed" ? 3 : 1;
+                var enemies=w.Actors.Values.Where(a=>a.Profile=="beast").OrderBy(a=>a.Id,StringComparer.Ordinal).Take(count).ToArray();
+                for(int i=0;i<enemies.Length;i++)
+                {
+                    var a=enemies[i]; w.Cancel(a);
+                    string id=s.Id=="tactics-brute" || s.Id=="tactics-interrupt" ? "brute" : s.Id=="tactics-prowler" || s.Id=="tactics-spacing" ? "prowler" : s.Id=="tactics-mixed" ? new[]{"prowler","brute","spitter"}[i] : "spitter";
+                    w.SetAppearance(a,new Appearance { Family=id=="brute" ? "reptile" : id=="spitter" ? "amorphous" : "quadruped", Seed=(ulong)(42+i) });
+                    a.Region=p.Region; a.CombatProfile=id;
+                    a.Abilities=w.Content.CombatProfiles.Single(c=>c.Id==id).Priorities.Keys.ToList();
+                    a.X=s.Id=="tactics-wall" ? 520 : s.Id=="tactics-interrupt" ? 328 : id=="brute" ? 380 : 440+i*4;
+                    a.Y=300+(s.Id=="tactics-mixed" ? (i-1)*45 : s.Id=="tactics-spacing" ? i*3 : 0);
+                    a.HomeX=a.X;a.HomeY=a.Y;a.Speed=id=="prowler" ? 88 : id=="brute" ? 46 : 62;
+                    a.Health=a.MaxHealth=1000;a.Mana=a.MaxMana=60;a.Invulnerable=0;
+                    a.Statuses.Clear();a.Cooldowns.Clear();a.Target="";a.NextTacticalTime=0;a.TacticalIntent="";
+                    if(s.Id is "tactics-straight" or "tactics-homing" or "tactics-wall" or "tactics-dodge")
+                    {
+                        a.Speed=0; a.Abilities=new(){s.Id=="tactics-homing" ? "fixture_homing" : "spit"};
+                        a.State=ActionState.Recovery;a.StateRemaining=100;
+                    }
+                    tacticalActors.Add(a.Id);
+                }
+                presentationEnemy=enemies[0].Id;
+                app.RebuildViews();app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
+            }
             origin=p.Position;
             app.Ui.Notify($"REPLAY · {app.Feel.Id} · {s.Id}");
             app.Trace.Scenario=s.Id; app.Trace.Marker("scenario-start/teleport");
             Touch(true);
         }
         var test=scenarios[index]; var direction=test.Direction;
+        if(test.Id.StartsWith("tactics-"))
+        {
+            var w=app.World;
+            if(test.Id is "tactics-straight" or "tactics-homing" or "tactics-wall" or "tactics-dodge")
+            {
+                var a=w.Actors[tacticalActors[0]];
+                if(local==20)
+                {
+                    a.State=ActionState.Idle;a.Cooldowns.Clear();
+                    if(!w.Activate(a.Id,a.Abilities[0],"player"))throw new InvalidOperationException("Tactical projectile fixture could not release");
+                    // Keep a single shot while retaining the committed production action.
+                    a.NextTacticalTime=w.Time+10;
+                }
+                if(test.Id!="tactics-dodge" && local>=58 && local<108)direction=Vector2.Down;
+                if(test.Id=="tactics-dodge" && local==80)TapAction("Dodge");
+            }
+            if(test.Id=="tactics-spitter" && local>=120 && local<165)direction=Vector2.Right;
+            if(test.Id=="tactics-brute" && local>=95 && local<120)direction=Vector2.Left;
+            if(test.Id=="tactics-interrupt" && local==20)TapAction("Attack");
+            if(local%6==0)
+                app.Trace.Write(new { kind="tactical-state", scenario=test.Id, tick=w.Tick, frame=Engine.GetFramesDrawn(),
+                    actors=tacticalActors.Select(id=>new { id, profile=w.Actors[id].CombatProfile, intent=w.Actors[id].TacticalIntent, x=w.Actors[id].X, y=w.Actors[id].Y, action=w.Actors[id].State.ToString() }).ToArray(),
+                    projectiles=w.Projectiles.Select(p=>new { p.Ability, mode=w.FindAbility(p.Ability)?.Projectile?.Mode ?? "legacy", p.X,p.Y,p.HeadingX,p.HeadingY }).ToArray() });
+        }
         if(test.Id.EndsWith("-route"))
         {
             while(route.Count>0 && V.Distance(app.World.Player.Position,route.Peek())<5)route.Dequeue();
@@ -429,6 +506,18 @@ public sealed class GameplayReplay
             throw new InvalidOperationException("Cone did not produce separate real hit events for all three victims");
         if(s.Id=="presentation-projectile" && (presentationReleases!=1 || presentationCollisions!=1 || !presentationVictims.Contains(presentationEnemy)))
             throw new InvalidOperationException("Projectile did not release, travel and collide exactly once");
+        if(s.Id.StartsWith("tactics-"))
+        {
+            if(tacticalStarts==0)throw new InvalidOperationException("Tactical encounter never attacked: "+s.Id);
+            if((s.Id is "tactics-straight" or "tactics-homing" or "tactics-wall" or "tactics-dodge" or "tactics-spitter") && tacticalReleases==0)
+                throw new InvalidOperationException("No real projectile released: "+s.Id);
+            if(s.Id=="tactics-wall" && tacticalCollisions==0)throw new InvalidOperationException("Wall fixture never collided");
+            if(s.Id=="tactics-dodge" && tacticalAvoidances==0)throw new InvalidOperationException("Projectile dodge fixture never avoided contact");
+            if(s.Id=="tactics-interrupt" && tacticalCancels==0)throw new InvalidOperationException("Heavy attack was not interrupted");
+            app.Trace.Write(new {kind="tactical-result", scenario=s.Id, tacticalStarts,tacticalReleases,tacticalCollisions,tacticalAvoidances,tacticalCancels});
+            foreach(string id in tacticalActors){var a=app.World.Actors[id];app.World.Cancel(a);a.Region="reach";a.Abilities.Clear();a.CombatProfile="";}
+            tacticalActors.Clear();app.World.Projectiles.Clear();p.Invulnerable=0;
+        }
         foreach(var pair in fixtureFactions)
         {
             var victim=app.World.Actors[pair.Key]; victim.Faction=pair.Value; victim.Region="reach";
@@ -436,7 +525,7 @@ public sealed class GameplayReplay
         fixtureFactions.Clear();
         if (s.Id=="turn-south-north" && (turnChanges!=0 || Math.Abs(PixelCreatures.Core.DMath.WrapAngle(app.Views["player"].Creature.Motor!.Yaw-Math.PI/2))>.12)) throw new InvalidOperationException("South-to-north facing oscillated or did not complete");
         if(s.Id=="chest" && !app.World.RegionsById[p.Region].Depleted.Contains(12*64+18))throw new InvalidOperationException("Chest input interaction failed");
-        if(!valid||(!moved && !s.Id.StartsWith("telegraph-") && !s.Id.StartsWith("presentation-")))throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
+        if(!valid||(!moved && !s.Id.StartsWith("telegraph-") && !s.Id.StartsWith("presentation-") && !s.Id.StartsWith("tactics-")))throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
     }
     void Finish()
     {

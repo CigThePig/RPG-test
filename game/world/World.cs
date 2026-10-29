@@ -5,6 +5,13 @@ using MHLab.Spells.Definitions;
 namespace Mosslight;
 public sealed class World
 {
+    public bool ProfileCombat { get; set; }
+    public double TacticalMilliseconds { get; private set; }
+    public double AvoidanceMilliseconds { get; private set; }
+    public double ProjectileMilliseconds { get; private set; }
+    public double NavigationMilliseconds { get; private set; }
+    static long Stamp() => System.Diagnostics.Stopwatch.GetTimestamp();
+    static double Milliseconds(long start) => (Stamp() - start) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
     public int Seed { get; set; }
     public long Tick { get; set; }
     public double Time { get; set; }
@@ -399,7 +406,10 @@ public sealed class World
         // Advance before any actor resolves an attack so protection is independent
         // of dictionary iteration order at the fixed-step boundary.
         if (Player.Alive && Player.State == ActionState.Dodging) AdvanceDodge(Player, dt);
+        TacticalMilliseconds = AvoidanceMilliseconds = ProjectileMilliseconds = NavigationMilliseconds = 0;
+        long avoidanceStart = ProfileCombat ? Stamp() : 0;
         separation.Rebuild(Actors.Values);
+        if(ProfileCombat) AvoidanceMilliseconds += Milliseconds(avoidanceStart);
         foreach (var a in Actors.Values.OrderBy(a => a.Id, StringComparer.Ordinal))
         {
             foreach (var key in a.Cooldowns.Keys.ToArray())
@@ -512,9 +522,18 @@ public sealed class World
                 if (near)
                 {
                     if (Tick % 12 == 0)
+                    {
+                        long start = ProfileCombat ? Stamp() : 0;
                         Think(a, .2f);
+                        if(ProfileCombat) TacticalMilliseconds += Milliseconds(start);
+                    }
                     if (a.State is ActionState.Idle or ActionState.Moving)
-                        Move(a, separation.Velocity(a, RegionsById[a.Region], new Vector2(a.MotionX, a.MotionY), Math.Max(0, Stat(a, "speed")), dt) * dt);
+                    {
+                        long start = ProfileCombat ? Stamp() : 0;
+                        var velocity = separation.Velocity(a, RegionsById[a.Region], new Vector2(a.MotionX, a.MotionY), Math.Max(0, Stat(a, "speed")), dt);
+                        if(ProfileCombat) AvoidanceMilliseconds += Milliseconds(start);
+                        Move(a, velocity * dt);
+                    }
                 }
                 else
                 {
@@ -526,6 +545,7 @@ public sealed class World
             }
         }
 
+        long projectileStart = ProfileCombat ? Stamp() : 0;
         for (int i = Projectiles.Count - 1; i >= 0; i--)
         {
             var p = Projectiles[i];
@@ -546,6 +566,7 @@ public sealed class World
             // Expiration/target loss is diagnostic only, never a fabricated impact.
             Projectiles.RemoveAt(i);
         }
+        if(ProfileCombat) ProjectileMilliseconds = Milliseconds(projectileStart);
     }
 
     public bool VisibleTo(ActorState actor, Vector2 point, bool allowBlockedTarget = false)
@@ -685,12 +706,14 @@ public sealed class World
         a.MotionX = a.MotionY = 0;
         var r = RegionsById[a.Region];
         Vector2 waypoint = target;
+        long navigationStart = ProfileCombat ? Stamp() : 0;
         if (!r.CanTravel(a.Position, target, a))
         {
             var path = r.Path(a.Position, target, a);
-            if (path.Count == 0) return;
+            if (path.Count == 0) { if(ProfileCombat) NavigationMilliseconds += Milliseconds(navigationStart); return; }
             waypoint = r.Center(path[0]);
         }
+        if(ProfileCombat) NavigationMilliseconds += Milliseconds(navigationStart);
         var delta = waypoint - a.Position;
         if (delta.Length() <= .1f) return;
         // Planning happens every .2s. Stop exactly at the waypoint instead of

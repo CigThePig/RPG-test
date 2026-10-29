@@ -9,6 +9,7 @@ public static class VisualChecks
     static object? telegraphPerformance;
     static object? combatPerformance;
     static object? cameraHitch;
+    static object? tacticalPerformance;
     static async System.Threading.Tasks.Task Frames(Foundation app, int count = 12)
     {
         for (int i = 0; i < count; i++)
@@ -55,6 +56,56 @@ public static class VisualChecks
     // The captured pixels come from the actual viewport. Time scale is reduced
     // here only to make screenshots reproducible on slow CI renderers; the movie
     // replay separately exercises the normal fixed-step timing and input path.
+    static async System.Threading.Tasks.Task VerifyTactics(Foundation app)
+    {
+        var w=app.World; string snapshot=Persistence.Capture(w,app.Narrative);
+        double oldScale=Engine.TimeScale;
+        try
+        {
+            Engine.TimeScale=1;w.ProfileCombat=true;
+            var course=GameplayReplay.CreateCourse();course.Id="tactical-visual";
+            w.RegionsById[course.Id]=course;
+            var p=w.Player;p.Region=course.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth=10000;p.Invulnerable=1000;
+            var enemies=w.Actors.Values.Where(a=>a.Id!="player").OrderBy(a=>a.Id,StringComparer.Ordinal).Take(8).ToArray();
+            var samples=new List<object>();
+            foreach(var workload in new[]{("idle",0), ("one engaged",1), ("three archetypes",3), ("four enemies",4), ("eight enemies",8), ("projectiles",3), ("projectiles and effects",4)})
+            {
+                w.Projectiles.Clear();
+                foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
+                for(int i=0;i<Math.Min(workload.Item2,enemies.Length);i++)
+                {
+                    var a=enemies[i];w.Cancel(a);
+                    string id=new[]{"prowler","brute","spitter"}[i%3];
+                    a.CombatProfile=id;a.Region=course.Id;a.Faction="beasts";
+                    a.Abilities=w.Content.CombatProfiles.Single(c=>c.Id==id).Priorities.Keys.ToList();
+                    a.X=370+(i%3)*38;a.Y=255+(i/3)*32;
+                    a.Health=a.MaxHealth=1000;a.Speed=id=="brute"?46:72;a.Invulnerable=0;a.Cooldowns.Clear();a.Statuses.Clear();a.NextTacticalTime=0;
+                }
+                app.RebuildViews();app.ResumeGame();await Frames(app,20);
+                var times=new List<double>();var ai=new List<double>();var avoidance=new List<double>();var navigation=new List<double>();var projectiles=new List<double>();var simulation=new List<double>();
+                long rasters=CreatureRenderQueue.TotalRenders,uploads=CreatureRenderQueue.TotalUploads,allocation=GC.GetAllocatedBytesForCurrentThread(),memory=GC.GetTotalMemory(false);
+                int effectPeak=0,projectilePeak=0;
+                var clock=Stopwatch.StartNew();double last=clock.Elapsed.TotalMilliseconds;
+                for(int frame=0;frame<120;frame++)
+                {
+                    if(workload.Item1.StartsWith("projectiles") && frame%15==0)
+                        for(int j=0;j<4;j++)w.Projectiles.Add(ProjectileFlight.Release(enemies[0],p,w.FindAbility(j%2==0?"spit":"ember")!));
+                    if(workload.Item1=="projectiles and effects" && frame%30==0)
+                        foreach(var a in enemies.Take(4)){a.Invulnerable=0;w.Damage(p,a,1,"physical",ability:"slash");}
+                    await Frames(app,1);
+                    double now=clock.Elapsed.TotalMilliseconds;times.Add(now-last);last=now;
+                    ai.Add(w.TacticalMilliseconds);avoidance.Add(w.AvoidanceMilliseconds);navigation.Add(w.NavigationMilliseconds);projectiles.Add(w.ProjectileMilliseconds);simulation.Add(app.SimulationMs);
+                    effectPeak=Math.Max(effectPeak,app.CombatEffects.ActiveCount);projectilePeak=Math.Max(projectilePeak,w.Projectiles.Count);
+                    if(frame==60)await CaptureRollFrame(app,"tactical-"+workload.Item1.Replace(' ','-'));
+                }
+                double Q(List<double> values,double fraction){values.Sort();return values[Math.Min(values.Count-1,(int)(values.Count*fraction))];}
+                samples.Add(new {scenario=workload.Item1,frames=times.Count,p50ms=Q(times,.5),p95ms=Q(times,.95),p99ms=Q(times,.99),aiP95ms=Q(ai,.95),avoidanceP95ms=Q(avoidance,.95),navigationP95ms=Q(navigation,.95),projectileP95ms=Q(projectiles,.95),simulationP95ms=Q(simulation,.95),rasterizations=CreatureRenderQueue.TotalRenders-rasters,uploads=CreatureRenderQueue.TotalUploads-uploads,allocatedBytes=GC.GetAllocatedBytesForCurrentThread()-allocation,managedStart=memory,managedEnd=GC.GetTotalMemory(false),effectPeak,projectilePeak});
+            }
+            tacticalPerformance=new{renderer=RenderingServer.GetVideoAdapterName(),note="120 normal-time rendered frames per workload; subsystem timings are last simulation tick per frame, AI includes navigation. Software GPU, not physical-phone certification.",samples};
+        }
+        finally{w.ProfileCombat=false;Engine.TimeScale=oldScale;Persistence.Restore(w,app.Narrative,snapshot);app.RebuildViews();await Frames(app,2);}
+    }
+
     static async System.Threading.Tasks.Task VerifyTelegraphs(Foundation app)
     {
         string snapshot = Persistence.Capture(app.World, app.Narrative);
@@ -519,6 +570,7 @@ public static class VisualChecks
             await Frames(app, 2);
         }
         await VerifyTelegraphs(app);
+        await VerifyTactics(app);
         await VerifyCameraHitches(app);
         await VerifyDefeat(app);
         var player=app.World.Player;
@@ -601,7 +653,8 @@ public static class VisualChecks
             managedBytes = GC.GetTotalMemory(false),
             cameraHitch,
             telegraphPerformance,
-            combatPerformance
+            combatPerformance,
+            tacticalPerformance
         };
         File.WriteAllText(app.Ui.MobileLayout ? "docs/render-verification-mobile.json" : "docs/render-verification.json", JsonSerializer.Serialize(data, Content.Json));
         GD.Print("VISUAL CHECKS PASSED");

@@ -124,6 +124,11 @@ for preset in a.presets.split(','):
         for i in range(8):
             row=values[min(i*7,len(values)-1)]
             requests.append((f'south to north {i}',max(0,int(row['frame'])-1),row))
+        for name,values in groups.items():
+            if not name.startswith('tactics-'): continue
+            for phase in [24,54,60,66,90,120,150]:
+                row=values[min(phase,len(values)-1)]
+                requests.append((f'{name} tick {phase}',max(0,int(row['frame'])-1),row))
         warning_requests=[]
         for name in ['telegraph-bite','telegraph-dodge','telegraph-interrupt','telegraph-cone']:
             for phase in ['early','middle','after-impact']:
