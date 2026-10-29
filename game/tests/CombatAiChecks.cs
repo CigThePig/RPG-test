@@ -31,6 +31,10 @@ public static class CombatAiChecks
             check(CombatBrain.Select(w, a, p, melee, false).Ability == "bite", "prowler prefers quick close attack");
             var brute = w.Content.CombatProfiles.Single(x => x.Id == "brute"); a.Abilities.Add("slam");
             check(CombatBrain.Select(w, a, p, brute, false).Ability == "slam", "brute prefers committed heavy attack");
+            var companion=new ActorState{Id="nearby-ally",Faction=a.Faction,Region=r.Id,X=a.X+4,Y=a.Y};w.Actors[companion.Id]=companion;
+            var uncrowd=CombatBrain.Select(w,a,p,melee,false);
+            check(uncrowd.Kind=="circle" && r.CanTravel(a.Position,uncrowd.Destination,a),"crowded melee chooses a valid actor-phased approach position instead of piling into a strike");
+            w.Actors.Remove(companion.Id);
             foreach (var state in new[] { ActionState.Windup, ActionState.Recovery, ActionState.Staggered, ActionState.Dead })
             { a.State = state; check(CombatBrain.Select(w, a, p, melee, false).Kind == "wait", "tactics respects " + state); }
             a.State = ActionState.Idle; a.Faction = p.Faction;

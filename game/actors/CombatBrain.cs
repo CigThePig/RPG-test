@@ -19,6 +19,17 @@ public static class CombatBrain
             if (escape != a.Position) return new("retreat", escape);
             // Cornered enemies may attack; never repeat an invalid escape vector.
         }
+        if (profile?.Behaviour == "melee" && distance < profile.ApproachDistance + 72 &&
+            w.Actors.Values.Any(b => b.Id != a.Id && b.Id != target.Id && b.Alive && b.Region == a.Region && !w.Hostile(a,b) &&
+                Vector2.DistanceSquared(a.Position,b.Position) < MathF.Pow(a.Radius+b.Radius+12,2) && w.LineOfSight(a,b)))
+        {
+            // Local congestion, not a squad reservation or attack token. Several
+            // enemies may still strike together when their approach positions clear.
+            float angle = ((uint)World.StableId(a.Id) % 8) * MathF.PI / 4;
+            var position = target.Position + new Vector2(MathF.Cos(angle),MathF.Sin(angle)) * profile.ApproachDistance;
+            if (Vector2.DistanceSquared(position,a.Position)>12*12 && w.RegionsById[a.Region].CanTravel(a.Position,position,a))
+                return new("circle",position);
+        }
         AbilityDef? best = null;
         float bestScore = float.NegativeInfinity;
         foreach (var ability in w.Content.Abilities)

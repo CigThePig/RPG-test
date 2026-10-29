@@ -20,7 +20,7 @@ Enemy Slam/Spit set `PlayerLearnable: false`, so the content additions do not ad
 
 These values are starting points. Balance health (65/120/55), damage (bite 9, slam 14, spit 7 plus existing actor stats), pressure/recovery, projectile readability, retreat distances and mixed-room pacing against real phone play. Do not infer that a renderer or emulator pass establishes enjoyable difficulty.
 
-Approach/retreat use hysteresis. Equal attack priorities and target distances break by ordinal ID. The selector reuses `CanActivate`, including cooldown, mana, equipment, state, range and sight. Retreat tries six ordered local directions with clearance; a cornered enemy may attack or hold. Repositioning is occasional and actor-ID phased. No wall tracking, global knowledge, squad turn-taking or frame-perfect dodge prediction was added. Missing/unknown saved profile IDs use safe legacy tactics.
+Approach/retreat use hysteresis. Equal attack priorities and target distances break by ordinal ID. The selector reuses `CanActivate`, including cooldown, mana, equipment, state, range and sight. Retreat tries six ordered local directions with clearance; a cornered enemy may attack or hold. Repositioning is occasional and actor-ID phased. Visible nearby allied congestion additionally chooses a stable radial approach point for melee actors when a direct terrain-clear route exists. This spreads front-loaded crowds without attack tokens or a one-enemy-at-a-time rule; blocked corridors retain the normal fallback. No wall tracking, global knowledge, squad turn-taking or frame-perfect dodge prediction was added. Missing/unknown saved profile IDs use safe legacy tactics.
 
 ## Spacing
 
