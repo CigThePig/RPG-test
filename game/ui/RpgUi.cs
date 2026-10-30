@@ -642,10 +642,20 @@ public partial class RegionMap : Control
         for (int y = 0; y < Region.Height; y++)
             for (int x = 0; x < Region.Width; x++)
             {
+                if (Region.Id == "ruin" && !Region.ExploredTiles.Contains(y*Region.Width+x)) continue;
                 var t = Region.Tiles[y * Region.Width + x];
                 DrawRect(new Rect2(x * scale, y * scale, scale + 1, scale + 1), t is Terrain.Wall or Terrain.Rock ? new Color(.2f, .24f, .22f) : t == Terrain.Water ? new Color(.2f, .4f, .46f) : new Color(.48f, .55f, .34f));
             }
 
+        foreach (var landmark in Region.Landmarks)
+        {
+            if (!Region.DiscoveredLandmarks.Contains(Exploration.Identity(Region, landmark))) continue;
+            var at = new Vector2((landmark.OriginX+5.5f)*scale,(landmark.OriginY+5.5f)*scale);
+            DrawCircle(at, 4, landmark.Roles.Contains("objective") ? Colors.Cyan : Colors.White);
+            DrawString(ThemeDB.FallbackFont, at + new Vector2(6,-4), landmark.Template.Replace('-', ' '), HorizontalAlignment.Left, -1, 13, Colors.White);
+        }
+        var entrance = new Vector2((Region.Entrance % Region.Width+.5f)*scale,(Region.Entrance/Region.Width+.5f)*scale);
+        DrawRect(new Rect2(entrance-new Vector2(4,4),new Vector2(8,8)),Colors.LightGreen);
         DrawCircle(new Vector2(Player.X / 24 * scale, Player.Y / 24 * scale), 4, Colors.Gold);
     }
 }

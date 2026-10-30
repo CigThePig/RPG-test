@@ -403,6 +403,7 @@ public sealed class World
         if (dt <= 0 || dt > .25f || !float.IsFinite(dt))
             throw new ArgumentOutOfRangeException(nameof(dt));
         Tick++;
+        Exploration.Discover(this);
         Time += dt;
         Spells.Update(dt);
         // Advance before any actor resolves an attack so protection is independent
@@ -827,6 +828,7 @@ public sealed class World
         }
         a.X = pos.X;
         a.Y = pos.Y;
+        Exploration.PrepareCache(r);
         InitializeContainers(r);
         PopulateRegion(region);
         Events.Publish(new("region_entered", a.Id, "", region));
@@ -834,19 +836,18 @@ public sealed class World
 
     void PopulateRegion(string region)
     {
-        if (region != "ruin" || Actors.Keys.Any(id => id.StartsWith("ruin:spawn:")))
+        if (region != "ruin" || RegionsById[region].EncountersInitialized)
             return;
         using var json = System.Text.Json.JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://game/data/spawns.json"));
         var def = json.RootElement.GetProperty(region);
         int count = def.GetProperty("count").GetInt32();
         var archetypes = def.GetProperty("archetypes").EnumerateArray().ToArray();
         var r = RegionsById[region];
-        var random = new Random(Seed ^ 773);
-        var valid = Enumerable.Range(0, r.Tiles.Length).Where(at => r.Tiles[at] == Terrain.Floor && !r.Features.ContainsKey(at) && Vector2.Distance(r.Center(at), r.Center(r.Entrance)) > 100).OrderBy(_ => random.Next()).Take(count).ToArray();
-        for (int i = 0; i < valid.Length; i++)
+        r.EncountersInitialized = true;
+        for (int i = 0; i < count; i++)
         {
-            var pos = r.Center(valid[i]);
-            var archetype = archetypes[i % archetypes.Length];
+            var pos = r.Center(r.Objective);
+            var archetype = archetypes[(i + 1) % archetypes.Length];
             string combatId = archetype.GetProperty("profile").GetString()!;
             var combat = Content.CombatProfiles.Single(p => p.Id == combatId);
             var actor = new ActorState
@@ -874,8 +875,8 @@ public sealed class World
             Vector2 placed;
             // Seeded floor may lie beyond a locked gate; keep it there. An inhabitant
             // without any clear stand is skipped rather than aborting region entry.
-            try { placed = r.FindPlacement(actor.Position, actor, Actors.Values, throughGates: true); }
-            catch (InvalidOperationException) { continue; }
+            if (!DungeonEncounters.Place(r, actor, Actors.Values, i, out placed)) continue;
+            if (i == 0) actor.Name = "Sanctuary guardian";
             actor.X = actor.HomeX = placed.X; actor.Y = actor.HomeY = placed.Y;
             Actors[actor.Id] = actor;
         }

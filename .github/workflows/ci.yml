@@ -34,6 +34,8 @@ jobs:
         run: python3 tools/import-project.py
       - name: Engine integration and population benchmarks
         run: python3 tools/verify.py --headless
+      - name: Normal-health complete production adventure
+        run: godot --headless --path . -- --adventure-check
       - name: Rendered input, dialogue and UI verification
         run: xvfb-run -a python3 tools/verify.py --visual
       - name: Phone layout and touch UI verification
@@ -49,6 +51,7 @@ jobs:
             docs/verification.json
             docs/render-verification*.json
             build/dungeon/
+            build/adventure/
             build/encounter-measurements.json
             build/verification-*.log
   preserved-reference:

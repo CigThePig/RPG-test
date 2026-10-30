@@ -211,6 +211,31 @@ try:
     interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
     assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
     capture('exploration.png')
+    # Chest is now depleted; the nearby merchant receives the next real Interact tap.
+    tap_action('interact')
+    deadline=time.monotonic()+15
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        choices=re.findall(r'MOSSLIGHT_DIALOGUE_CHOICE text=(.*?) x=([0-9.]+) y=([0-9.]+)',logs)
+        help_choice=next((row for row in reversed(choices) if row[0].startswith('I can help')),None)
+        if help_choice: break
+        time.sleep(.25)
+    else: raise RuntimeError('OS-touch Interact did not open contextual warden dialogue')
+    capture('warden-dialogue.png')
+    tap(float(help_choice[1]),float(help_choice[2]))
+    deadline=time.monotonic()+10
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        if 'MOSSLIGHT_QUEST_ACCEPTED id=1' in logs: break
+        time.sleep(.25)
+    else: raise RuntimeError('OS-touch dialogue choice did not accept introductory quest')
+    choices=re.findall(r'MOSSLIGHT_DIALOGUE_CHOICE text=Continue x=([0-9.]+) y=([0-9.]+)',logs)
+    if not choices:
+        time.sleep(1)
+        choices=re.findall(r'MOSSLIGHT_DIALOGUE_CHOICE text=Continue x=([0-9.]+) y=([0-9.]+)',adb('logcat','-d'))
+    assert choices,'Missing actual Continue control'
+    tap(float(choices[-1][0]),float(choices[-1][1]))
+    time.sleep(.5)
     # Approach the live enemy group and observe real damage events. This also
     # exercises repeated confirmed-hit effects on the Android renderer.
     previous_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))
@@ -320,6 +345,12 @@ try:
                 landmark_marks=re.findall(r'MOSSLIGHT_LANDMARK_READY region=ruin rooms=(\d+) structures=(\d+) templates=([^\r\n]+)',logs)
                 assert landmark_marks and int(landmark_marks[-1][0])>=2 and int(landmark_marks[-1][1])>0, 'Exported dungeon lacks authored landmark structures'
                 assert 'ruined-entrance' in landmark_marks[-1][2] and 'relic-sanctuary' in landmark_marks[-1][2], 'Required mission landmarks absent'
+                deadline=time.monotonic()+10
+                while time.monotonic()<deadline:
+                    logs=adb('logcat','-d')
+                    if 'MOSSLIGHT_GAMEPLAY kind=landmark_discovered' in logs: break
+                    time.sleep(.25)
+                else: raise RuntimeError('Installed production room entry did not emit discovery')
                 movement_before=logs.count('MOSSLIGHT_LANDMARK_MOVEMENT')
                 for move_x in (230,50):
                     adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(move_x*w/1280)),str(int(640*h/800)),'500')
@@ -354,7 +385,7 @@ try:
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. three generated-dungeon entry/attack/roll/return cycles with stable wall/decoration/atlas counts. ARM64 device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. three generated-dungeon entry/attack/roll/return cycles with stable wall/decoration/atlas counts. Warden dialogue and introductory quest accepted with actual OS touches; production entrance discovery observed. Complete relic/return/reward OS-touch adventure is NOT covered. ARM64 physical device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     # Preserve the real surface recording on failure as well as success. ADB

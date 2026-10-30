@@ -22,7 +22,7 @@ public partial class Foundation : Node2D
     public PlaytestTrace Trace { get; private set; } = null!;
     GameplayReplay? replay;
     public CharacterView? ReplayObservedView => replay != null && Views.TryGetValue(replay.ObservedActorId, out var view) ? view : null;
-    public bool VerificationMode => OS.GetCmdlineUserArgs().Any(x => x is "--test" or "--visual-check" or "--gameplay-check");
+    public bool VerificationMode => OS.GetCmdlineUserArgs().Any(x => x is "--test" or "--visual-check" or "--gameplay-check" or "--adventure-check" or "--adventure-visual");
     public void SelectFeel(MovementFeel feel)
     {
         Feel=feel;
@@ -268,7 +268,8 @@ public partial class Foundation : Node2D
         };
         AddChild(ui);
         AddChild(new PlaytestInputObserver { Trace=Trace });
-        Narrative.Connect("reward", Callable.From<string, int>((item, count) => World.Items.Add("player", item, count)));
+        Narrative.Connect("notice", Callable.From<string>(text => ui.Notify(text)));
+        Narrative.Set("deliver_reward", Callable.From<string, int, bool>((item, count) => World.Items.GrantReward(item, count)));
         Narrative.Connect("reputation", Callable.From<string, int>((faction, amount) =>
         {
             World.Player.Reputation[faction] = World.Player.Reputation.GetValueOrDefault(faction) + amount;
@@ -283,6 +284,8 @@ public partial class Foundation : Node2D
         if(dump!=null)
         { foreach(int seed in dump.Split(',').Select(int.Parse))GD.Print(DungeonLayout.Ascii(Regions.Dungeon(seed)));GetTree().Quit();return; }
         if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
+        if (OS.GetCmdlineUserArgs().Contains("--adventure-visual")) CallDeferred(nameof(RunAdventureVisual));
+        if (OS.GetCmdlineUserArgs().Contains("--adventure-check")) CallDeferred(nameof(RunAdventure));
         if (OS.GetCmdlineUserArgs().Contains("--test"))
             CallDeferred(nameof(RunChecks));
         if (OS.GetCmdlineUserArgs().Contains("--visual-check"))
@@ -309,7 +312,7 @@ public partial class Foundation : Node2D
         };
         World.Events.Published += e =>
         {
-            if (OS.HasFeature("android") && e.Kind is "resource_depleted" or "region_entered")
+            if (OS.HasFeature("android") && e.Kind is "resource_depleted" or "region_entered" or "landmark_discovered")
                 GD.Print($"MOSSLIGHT_GAMEPLAY kind={e.Kind} value={e.Value} tick={World.Tick}");
             if(OS.HasFeature("android") && e.Kind=="ability_started" && e.Actor=="player")
                 GD.Print($"MOSSLIGHT_PLAYER_ABILITY id={e.Value} tick={World.Tick}");
@@ -397,12 +400,23 @@ public partial class Foundation : Node2D
         RebuildViews();
     }
 
+    bool adventureVisual;
+    public void RebuildViewsIfNeededForAdventure()
+    {
+        if(Views.Count!=World.Actors.Count || Views.Any(v=>!World.Actors.TryGetValue(v.Key,out var state) || !ReferenceEquals(state,v.Value.State))) RebuildViews();
+    }
+    public async void RunAdventureVisual()
+    {
+        adventureVisual=true;
+        try { await AdventureVisualRun.Run(this); GetTree().Quit(0); }
+        catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
+    }
     public override void _PhysicsProcess(double delta)
     {
         if (ui == null)
             return;
         try { replay?.BeforeStep(); } catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); return; }
-        if (!GameplayBlocked)
+        if (!GameplayBlocked && !adventureVisual)
         {
             DroppedSeconds += Math.Max(0,delta-.1);
             accumulator += Math.Min(delta, .1);
@@ -423,14 +437,15 @@ public partial class Foundation : Node2D
             }
         }
         else
-        { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
+        { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; if(!adventureVisual)World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
         presentation?.FlushPending();
         var player = World.Player;
         if (PresentationBlocked) CombatCamera.Reset();
         else { CombatEffects.Advance((float)delta); CombatCamera.Advance((float)delta); }
         foreach (var(id, view)in Views)
         {
-            view.Visible = showCharacters && World.Actors[id].Region == player.Region;
+            if (!World.Actors.TryGetValue(id, out var live)) { view.Visible = false; continue; }
+            view.Visible = showCharacters && live.Region == player.Region;
             // A player death blocks gameplay but must not freeze the defeat pose.
             view.Creature.Paused = !view.Visible || PresentationBlocked || (!player.Alive && view.State.Alive);
             view.HasLoot = !view.State.Alive && World.Items.HasLoot(id);
@@ -607,7 +622,7 @@ public partial class Foundation : Node2D
                 ControllerVelocity = Vector2.Zero;
                 ui.PauseForVerification();
                 // Never replace the recovery autosave with a defeated player.
-                try { if (SessionStarted && replay == null && !InFeelCourse && World.Player.Alive) Persistence.SaveAutosave(World, Narrative); }
+                try { if (SessionStarted && !VerificationMode && replay == null && !InFeelCourse && World.Player.Alive) Persistence.SaveAutosave(World, Narrative); }
                 catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }
             }
         }
@@ -740,6 +755,12 @@ public partial class Foundation : Node2D
             GD.PushError(e.ToString());
             GetTree().Quit(1);
         }
+    }
+
+    public void RunAdventure()
+    {
+        try { new AdventureRun(this).Run(); GetTree().Quit(0); }
+        catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 
     public async void RunChecks()

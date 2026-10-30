@@ -25,6 +25,11 @@ public sealed class RegionState
     public HashSet<int> OpenDoors { get; set; } = new();
     public HashSet<int> Depleted { get; set; } = new();
     public bool ContainersInitialized { get; set; } = true;
+    // True defaults preserve historical populations/loot even if no surviving actor remains.
+    public bool EncountersInitialized { get; set; } = true;
+    public bool ExplorationInitialized { get; set; } = true;
+    public HashSet<int> ExploredTiles { get; set; } = new();
+    public HashSet<string> DiscoveredLandmarks { get; set; } = new(StringComparer.Ordinal);
     public int PlacementRevision { get; set; }
     public int Entrance { get; set; }
     public int Objective { get; set; }
@@ -282,6 +287,8 @@ public static class Regions
             {
                 Id = "ruin",
                 Seed = seed,
+                EncountersInitialized = false,
+                ExplorationInitialized = false,
                 ContainersInitialized = false,
                 PlacementRevision = 1,
                 Width = carved.Width,

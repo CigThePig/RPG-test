@@ -258,3 +258,11 @@ func unequip_all(owner: String) -> void:
 
 func has_items(owner: String) -> bool:
 	return bags.has(owner) and bags[owner].get_item_count() > 0
+
+# Reward transaction: synchronous, whole delivery or exact bridge rollback.
+func reward_add(owner: String, prototype: String, count: int) -> bool:
+	if not has_space(owner, prototype, count): return false
+	var before := export_state()
+	if add(owner, prototype, count): return true
+	assert(import_state(before), "Reward rollback failed")
+	return false

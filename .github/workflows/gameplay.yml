@@ -50,6 +50,9 @@ jobs:
       - run: python3 tools/import-project.py
       - name: Deterministic production touch replay and actual rendered movies
         run: xvfb-run -a python3 tools/gameplay-verify.py --presets "${{ matrix.preset }}"
+      - name: Complete rendered normal-health adventure and contextual dialogue
+        if: matrix.preset == 'precise'
+        run: xvfb-run -a python3 tools/adventure-verify.py
       - name: Real-time frame pacing and desktop capture
         if: inputs.extended && matrix.preset == 'precise'
         run: xvfb-run -a python3 tools/gameplay-verify.py --presets precise --realtime --output build/gameplay-realtime
@@ -66,4 +69,5 @@ jobs:
           path: |
             build/gameplay/
             build/gameplay-realtime/
+            build/adventure/
           retention-days: 14

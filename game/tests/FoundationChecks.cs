@@ -38,6 +38,7 @@ public static class FoundationChecks
         var watch = Stopwatch.StartNew();
         try
         {
+            AdventureChecks.Run(app,Check);
             LandmarkChecks.Run(app,Check);
             EnvironmentArtChecks.Run(app,Check);
             DungeonChecks.Run(app, Check);
@@ -130,7 +131,11 @@ public static class FoundationChecks
             Check(!app.Narrative.Call("completed", 2).AsBool(), "relic held by another owner does not satisfy player possession");
             int rewardBeforeReturn = w.Items.Count("player", "potion");
             w.Items.Transfer("relic-holder", "player", "relic", 1);
-            Check(app.Narrative.Call("completed", 2).AsBool() && w.Items.Count("player", "potion") == rewardBeforeReturn + 3, "returning relic progresses accepted quest once");
+            Check(!app.Narrative.Call("completed", 2).AsBool(), "possession alone does not complete adventure");
+            w.Enter(w.Player,"ruin");
+            w.Events.Publish(new("resource_depleted","player","ruin","relic"));
+            w.Enter(w.Player,"reach");
+            Check(app.Narrative.Call("report_to_warden").AsBool() && w.Items.Count("player", "potion") == rewardBeforeReturn + 3, "deliberate return and report completes adventure once");
             string relicComplete = Persistence.Capture(w, app.Narrative);
             Persistence.Restore(w, app.Narrative, relicComplete);
             Check(!app.Narrative.Call("accept_quest", 2).AsBool() && w.Items.Count("player", "potion") == rewardBeforeReturn + 3, "relic reward remains unique across restore");
@@ -416,11 +421,16 @@ public static class FoundationChecks
             w.Enter(p, "ruin");
             Check(p.Region == "ruin" && r0 != w.RegionsById[p.Region], "persistent region transition");
             w.Items.Add(p.Id, "relic");
-            Check(app.Narrative.Call("completed", 2).AsBool(), "dungeon item acquisition completes quest");
+            Check(!app.Narrative.Call("completed", 2).AsBool(), "dungeon acquisition is distinct from report");
+            w.Events.Publish(new("resource_depleted","player","ruin","relic"));
+            w.Enter(p,"reach");
+            Check(app.Narrative.Call("report_to_warden").AsBool(),"return and deliberate report completes QuestSystem adventure");
             string completedNarrative = app.Narrative.Call("export_state").AsString(), completedItems = w.Items.Service.Call("export_state").AsString();
             app.Narrative.Call("import_state", relicQuestAvailable);
             int potionsBeforeReconcile = w.Items.Count(p.Id, "potion");
-            Check(app.Narrative.Call("accept_quest", 2).AsBool() && app.Narrative.Call("completed", 2).AsBool() && w.Items.Count(p.Id, "potion") == potionsBeforeReconcile + 3, "quest acceptance reconciles a relic collected before acceptance");
+            Check(app.Narrative.Call("accept_quest", 2).AsBool() && !app.Narrative.Call("completed", 2).AsBool(), "early possession reconciles stages without automatic completion");
+            w.Enter(p,"reach");
+            Check(app.Narrative.Call("report_to_warden").AsBool() && w.Items.Count(p.Id,"potion")==potionsBeforeReconcile+3,"retroactive possession still requires deliberate report");
             Check(!app.Narrative.Call("accept_quest", 2).AsBool() && w.Items.Count(p.Id, "potion") == potionsBeforeReconcile + 3, "repeated early-item quest acceptance cannot repeat rewards");
             app.Narrative.Call("import_state", completedNarrative);
             w.Items.Service.Call("import_state", completedItems);

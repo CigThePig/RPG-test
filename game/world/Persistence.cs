@@ -25,7 +25,7 @@ public static class Persistence
     {
         var s = JsonSerializer.Deserialize<SaveData>(json, Content.Json) ?? throw new InvalidDataException("Empty save");
         if (s.Schema != 1 || s.Generator != Mosslight.Regions.Version)
-            throw new InvalidDataException("Incompatible save schema or region generator; retain the older executable to read this slot");
+            throw new InvalidDataException("This save needs an older Mosslight build. Start a new game in another slot; this file has been kept.");
         if (!s.Actors.ContainsKey("player") || s.Time < 0 || !double.IsFinite(s.Time) || s.Tick < 0 || s.Events.Count > 100)
             throw new InvalidDataException("Invalid world state");
         foreach (var(id, r)in s.Regions)
@@ -151,7 +151,17 @@ public static class Persistence
     public static string AutosavePath => ProjectSettings.GlobalizePath("user://autosave.json");
     public static void SaveAutosave(World w, Node narrative) => WriteSnapshot(w, narrative, AutosavePath);
     public static void LoadAutosave(World w, Node narrative) => Restore(w, narrative, File.ReadAllText(AutosavePath));
-    public static void Save(World w, Node narrative, int slot) => WriteSnapshot(w, narrative, SlotPath(slot));
+    public static void Save(World w, Node narrative, int slot)
+    {
+        string path=SlotPath(slot);
+        if(File.Exists(path))
+        {
+            using var saved=JsonDocument.Parse(File.ReadAllText(path));
+            if(saved.RootElement.GetProperty("Generator").GetString()!=Mosslight.Regions.Version)
+                throw new InvalidDataException("This slot contains an older adventure. Choose a different slot to keep it safe.");
+        }
+        WriteSnapshot(w,narrative,path);
+    }
     static void WriteSnapshot(World w, Node narrative, string path)
     {
         var timer = System.Diagnostics.Stopwatch.StartNew();

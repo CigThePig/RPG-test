@@ -15,6 +15,13 @@ public sealed class Items(Node service, EventStream events)
         return ok;
     }
 
+    public bool GrantReward(string item, int count)
+    {
+        bool ok = service.Call("reward_add", "player", item, count).AsBool();
+        if (ok) events.Publish(new("item_acquired", "player", "quest_reward", item, count));
+        return ok;
+    }
+
     public int Count(string owner, string item) => service.Call("count_item", owner, item).AsInt32();
     public bool Take(string owner, string item, int count) => service.Call("take", owner, item, count).AsBool();
     public bool Transfer(string from, string to, string item, int count)
