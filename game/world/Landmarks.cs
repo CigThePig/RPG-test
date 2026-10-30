@@ -109,6 +109,7 @@ public static class Landmarks
             Need(a.Collision is "terrain" or "cosmetic" && a.Priority is >=0 and <=4 && a.Weight is >=1 and <=100 && a.Facing is >=0 and <=3,"invalid anchor collision/priority/weight/facing");
             Need(a.Collision!="terrain" || (t.Layout[a.Y-1][a.X-1]=='#' && a.Priority<=1 && a.Weight==100),$"structural prop requires permanent visible terrain at {a.X},{a.Y}");
             Need(a.Category!="tall" || a.Collision=="terrain","solid-looking tall props require terrain");
+            Need(a.Collision!="terrain" || new[]{"column","shelf","altar","storage","collapse"}.Contains(a.Asset),"terrain collision requires a structural asset");
             Need(a.Collision!="terrain" || a.Category=="tall","structural props must use tall category");
             Need(a.Collision!="cosmetic" || a.Category is "ground" or "low","cosmetic slots must be ground/low");
             Need(a.Collision!="cosmetic" || new[]{"records","moss","mosaic","threshold","offering"}.Contains(a.Asset),"solid-looking prop cannot be cosmetic");
@@ -224,6 +225,8 @@ public static class Landmarks
             {
                 if(a==null)throw new InvalidDataException("Null saved landmark anchor");
                 if(a.X is <1 or >9 || a.Y is <1 or >9 || !Assets.Contains(a.Asset) || !Categories.Contains(a.Category) || a.Collision is not ("terrain" or "cosmetic") || a.Priority is <0 or >4 || a.Facing is <0 or >3 || a.Variant is <0 or >2)throw new InvalidDataException("Invalid saved landmark anchor "+room.Template);
+                bool structuralAsset=new[]{"column","shelf","altar","storage","collapse"}.Contains(a.Asset);
+                if((a.Collision=="terrain")!=structuralAsset || (a.Collision=="terrain" && a.Category!="tall") || (a.Collision=="cosmetic" && a.Category is not ("ground" or "low")))throw new InvalidDataException("Saved landmark asset/collision mismatch "+room.Template);
                 int at=(room.Y*11+a.Y)*r.Width+room.X*11+a.X;
                 if(a.Collision=="terrain" && r.Tiles[at]!=Terrain.Wall)throw new InvalidDataException("Saved landmark/terrain disagreement "+room.Template);
             }

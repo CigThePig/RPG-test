@@ -18,7 +18,7 @@ public static class LandmarkChecks
         Invalid(t=>t.Layout[0]="?........","symbol");Invalid(t=>t.Theme="missing","material");Invalid(t=>t.Roles=new[]{"fake"},"role");
         Invalid(t=>t.Rotations=new[]{4},"rotation");Invalid(t=>t.DoorMasks=new[]{16},"doors");Invalid(t=>t.Focal=Array.Empty<int>(),"focal");
         Invalid(t=>t.ProtectedFeature=new[]{4,4},"interaction center");Invalid(t=>t.Anchors[0].X=20,"anchor bounds");
-        Invalid(t=>t.Anchors[0].Asset="missing","asset");Invalid(t=>t.Anchors[0].Weight=10,"required visual weight");
+        Invalid(t=>t.Anchors[0].Asset="missing","asset");Invalid(t=>t.Anchors[0].Asset="records","flat asset cannot own invisible collision");Invalid(t=>t.Anchors[0].Weight=10,"required visual weight");
         Invalid(t=>t.Layout[3]="...#.....","blocked protected lane");
         foreach(var t in library)
         {
@@ -61,6 +61,10 @@ public static class LandmarkChecks
         check(Landmarks.Themes.All(themeSet.Contains),"all three themes occur in production");
         foreach(int theme in Enumerable.Range(0,3))foreach(int asset in Enumerable.Range(0,5))foreach(int variant in Enumerable.Range(0,3))
             check(EnvironmentArtGenerator.PropModule(asset,variant,Landmarks.Themes[theme]).All(m=>m.Rect.Position.X>=1 && m.Rect.End.X<=25 && m.Rect.Position.Y>=0 && m.Rect.End.Y<=63),"bounded prop atlas recipe");
+        var invalidSaved=Regions.Dungeon(1);
+        invalidSaved.Landmarks.SelectMany(l=>l.Anchors).First(a=>a.Collision=="terrain").Asset="records";
+        try{Landmarks.ValidateSaved(invalidSaved);throw new Exception("Accepted invisible saved structure");}
+        catch(InvalidDataException e){check(e.Message.Contains("asset/collision"),"saved flat asset cannot own invisible collision");}
         LegacyAndProgress(app,check);
         Combat(app,check);
     }
