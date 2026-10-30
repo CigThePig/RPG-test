@@ -437,6 +437,7 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         Open("REGION MAP");
+        body.AddChild(new Label { Text = "E entrance · A archive · S shrine · T storeroom · R relic · ● you", AutowrapMode=TextServer.AutowrapMode.WordSmart, CustomMinimumSize=new Vector2(400,36) });
         var map = new RegionMap
         {
             Region = App.World.RegionsById[App.World.Player.Region],
@@ -652,7 +653,7 @@ public partial class RegionMap : Control
             if (!Region.DiscoveredLandmarks.Contains(Exploration.Identity(Region, landmark))) continue;
             var at = new Vector2((landmark.OriginX+5.5f)*scale,(landmark.OriginY+5.5f)*scale);
             DrawCircle(at, 4, landmark.Roles.Contains("objective") ? Colors.Cyan : Colors.White);
-            DrawString(ThemeDB.FallbackFont, at + new Vector2(6,-4), landmark.Template.Replace('-', ' '), HorizontalAlignment.Left, -1, 13, Colors.White);
+            DrawString(ThemeDB.FallbackFont, at + new Vector2(6,-4), landmark.Template switch { "ruined-entrance"=>"E", "forgotten-archive"=>"A", "abandoned-shrine"=>"S", "collapsed-storeroom"=>"T", "relic-sanctuary"=>"R", _=>"?" }, HorizontalAlignment.Left, -1, 16, Colors.White);
         }
         var entrance = new Vector2((Region.Entrance % Region.Width+.5f)*scale,(Region.Entrance/Region.Width+.5f)*scale);
         DrawRect(new Rect2(entrance-new Vector2(4,4),new Vector2(8,8)),Colors.LightGreen);

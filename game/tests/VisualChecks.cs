@@ -390,9 +390,24 @@ public static class VisualChecks
         }
     }
 
+    static async System.Threading.Tasks.Task AdventurePanels(Foundation app)
+    {
+        string original=Persistence.Capture(app.World,app.Narrative);
+        try
+        {
+            new AdventureRun(app).Run();
+            app.World.Enter(app.World.Player,"ruin");app.RebuildViews();app.ResumeGame();
+            app.Ui.Map();await Capture(app,"adventure-map");app.Ui.ClosePanels();
+            app.Ui.Journal();await Capture(app,"adventure-completed-journal");app.Ui.ClosePanels();
+        }
+        finally {Persistence.Restore(app.World,app.Narrative,original);app.RebuildViews();app.Ui.ClosePanels();}
+    }
+
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
+        if(OS.GetCmdlineUserArgs().Contains("--adventure-panels-only"))
+        { await AdventurePanels(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--landmarks-only"))
         { await LandmarkVisualChecks.Run(app); GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--environment-only"))
@@ -644,6 +659,7 @@ public static class VisualChecks
         await WallDepthChecks.Run(app);
         await EnvironmentVisualChecks.Run(app);
         await LandmarkVisualChecks.Run(app);
+        await AdventurePanels(app);
         app.World.Enter(app.World.Player, "reach");
         if (app.Ui.MobileLayout) await Capture(app, "controls");
         app.Ui.Workshop();

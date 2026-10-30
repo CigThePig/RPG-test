@@ -95,3 +95,24 @@ Review includes the whole PR's saved geometry, landmark authority, Gloot ownersh
 Before acceptance, inspect exact-source workflow results and the final rendered evidence. Remaining blockers, if any, must be reported explicitly with failed check names. Physical Galaxy S25 testing must cover presentation, touch comfort, audio, sustained performance and longer-session stability. Keep PR #5 **open, draft and unmerged**.
 
 Next milestones after acceptance: refine encounter/loot balance from phone observations; author a second adventure using the existing contracts; profile real-device rendering and memory before expanding population or regions.
+
+## Local final-review observations
+
+The corrected build passes 7,912 assertions and repeats the normal-health API completion at 10,966 ticks / 84 remaining health. The focused production-panel capture also passes:
+
+```sh
+godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --adventure-panels-only
+```
+
+It first completes the real API adventure, then displays its persisted dungeon map and completed journal. Render inspection confirmed the journal scrolls, completion text is readable and the map now uses compact E/A/S/T/R markers plus a legend instead of overlapping full names. Both full visual suites include these panel captures.
+
+Observed local measurements (software host; **not a controlled regression comparison**):
+
+| Workload | Pre-Part-4 | Part 4 |
+| --- | ---: | ---: |
+| Same 30-seed generation median | 38.194 ms | 48.991 ms |
+| 16-actor simulation per tick | 0.281 ms | 0.527 ms |
+| 128-actor simulation per tick | 1.957 ms | 3.874 ms |
+| Managed heap at 128-actor sample | 50,499,136 B | 84,528,344 B |
+
+The Part 4 samples overlapped two software movie encoders/renderers and extra verification fixtures; the baseline did not. The nearly doubled simulation interval therefore cannot be attributed to Part 4 from these measurements. Generation code was not changed in Part 4. Raw results are preserved for investigation rather than claiming an improvement or a physical-phone regression. The 65-seed adventure sample recorded median entry/population preparation of 38.590 ms and maximum 146.254 ms. A 10,000-call probe measured already-discovered-room processing at 11.361 μs/call and the no-op quest event bridge at 34.928 μs/call under that same contention. These are bounded-operation observations, not long-session memory or S25 FPS evidence. A serial paired benchmark and sustained physical-device profiling remain limitations of this delivery if not superseded by attached final evidence.
