@@ -211,7 +211,19 @@ try:
     interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
     assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
     capture('exploration.png')
-    # Chest is now depleted; the nearby merchant receives the next real Interact tap.
+    # The initial warden stands at ground x=348 after feature-clearance placement.
+    # Move into dialogue range using real touch releases, rather than assuming chest range is enough.
+    for approach in range(12):
+        logs=adb('logcat','-d')
+        positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
+        current_x=float(positions[-1][0]) if positions else 0
+        if 305<=current_x<=330: break
+        end_x=280 if current_x<305 else 50
+        adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(end_x*w/1280)),str(int(640*h/800)),'180')
+        time.sleep(.35)
+        ensure_foreground(timeout=10)
+    else: raise RuntimeError('OS-touch route never reached the warden dialogue stand')
+    capture('warden-approach.png')
     tap_action('interact')
     deadline=time.monotonic()+15
     while time.monotonic()<deadline:
@@ -230,8 +242,9 @@ try:
         time.sleep(.25)
     else: raise RuntimeError('OS-touch dialogue choice did not accept introductory quest')
     choices=re.findall(r'MOSSLIGHT_DIALOGUE_CHOICE text=Continue x=([0-9.]+) y=([0-9.]+)',logs)
-    if not choices:
-        time.sleep(1)
+    deadline=time.monotonic()+10
+    while not choices and time.monotonic()<deadline:
+        time.sleep(.25)
         choices=re.findall(r'MOSSLIGHT_DIALOGUE_CHOICE text=Continue x=([0-9.]+) y=([0-9.]+)',adb('logcat','-d'))
     assert choices,'Missing actual Continue control'
     tap(float(choices[-1][0]),float(choices[-1][1]))
