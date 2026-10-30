@@ -22,7 +22,6 @@ public partial class EnvironmentDecoration : Node2D
             if(asset<0)continue;
             result.Add(new EnvironmentDecoration {
                 Position=GodotConvert.GroundToScreen((room.X*11+a.X+.5f)*24,(room.Y*11+a.Y+1f)*24),
-                Scale=new Vector2(a.Facing is 1 or 2?-1:1,1),
                 PropModule=(Array.IndexOf(Landmarks.Themes,room.Theme)*5+asset)*3+a.Variant,
                 TextureFilter=TextureFilterEnum.Nearest });
         }
