@@ -1,0 +1,2035 @@
+{
+  "source": "488174f7a0835584cf5059cb65e9e9b3c87be37e",
+  "dirty": true,
+  "statusEntries": [
+    "?? game/actors/ActorSeparation.cs.uid",
+    "?? game/actors/CombatBrain.cs.uid",
+    "?? game/actors/LootMarker.cs.uid",
+    "?? game/actors/RollDustOverlay.cs.uid",
+    "?? game/art/icon.svg.import",
+    "?? game/combat/CameraFeedback.cs.uid",
+    "?? game/combat/CombatEffects.cs.uid",
+    "?? game/combat/CombatGeometry.cs.uid",
+    "?? game/combat/CombatPresentation.cs.uid",
+    "?? game/combat/CombatPresentationController.cs.uid",
+    "?? game/combat/CombatTuning.cs.uid",
+    "?? game/combat/PlayerLocator.cs.uid",
+    "?? game/combat/ProjectileFlight.cs.uid",
+    "?? game/combat/TelegraphView.cs.uid",
+    "?? game/dev/DungeonTraversalReplay.cs.uid",
+    "?? game/dev/EnvironmentArtGenerator.cs.uid",
+    "?? game/dev/EnvironmentAssetCache.cs.uid",
+    "?? game/dev/EnvironmentDecoration.cs.uid",
+    "?? game/dev/EnvironmentStyle.cs.uid",
+    "?? game/dev/FeatureView.cs.uid",
+    "?? game/dev/PlaytestExport.cs.uid",
+    "?? game/dev/PlaytestInputObserver.cs.uid",
+    "?? game/dev/TerrainBatch.cs.uid",
+    "?? game/dev/TerrainWallRow.cs.uid",
+    "?? game/tests/ActorSeparationChecks.cs.uid",
+    "?? game/tests/CombatAiChecks.cs.uid",
+    "?? game/tests/CombatChecks.cs.uid",
+    "?? game/tests/CombatPresentationChecks.cs.uid",
+    "?? game/tests/CombatTelegraphChecks.cs.uid",
+    "?? game/tests/DodgeChecks.cs.uid",
+    "?? game/tests/DungeonChecks.cs.uid",
+    "?? game/tests/DungeonEncounterChecks.cs.uid",
+    "?? game/tests/DungeonVisualChecks.cs.uid",
+    "?? game/tests/EncounterChecks.cs.uid",
+    "?? game/tests/EnvironmentArtChecks.cs.uid",
+    "?? game/tests/EnvironmentVisualChecks.cs.uid",
+    "?? game/tests/LandmarkChecks.cs.uid",
+    "?? game/tests/LandmarkVisualChecks.cs.uid",
+    "?? game/tests/MobileCombatControlsChecks.cs.uid",
+    "?? game/tests/MovementChecks.cs.uid",
+    "?? game/tests/PlayabilityChecks.cs.uid",
+    "?? game/tests/ProjectileChecks.cs.uid",
+    "?? game/tests/ReviewChecks.cs.uid",
+    "?? game/tests/WallDepthChecks.cs.uid",
+    "?? game/ui/MobileCombatControls.cs.uid",
+    "?? game/ui/TouchScroll.cs.uid",
+    "?? game/world/Landmarks.cs.uid"
+  ],
+  "preset": "precise",
+  "stateDigest": "45da999d6949c30e89c9354a1189e4f7924ae2f6aa550f45fa0c4462c15b4e5d",
+  "deterministicRepeat": true,
+  "movieMode": true,
+  "captureStartUnix": 1793354214.6459007,
+  "environment": {
+    "kind": "session",
+    "schema": 1,
+    "utc": "2026-10-30T09:56:57.9001216Z",
+    "engine": "4.6.1-stable (official)",
+    "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "platform": "Linux",
+    "source": "488174f7a0835584cf5059cb65e9e9b3c87be37e",
+    "units": "ground px, projected canvas px, seconds, milliseconds",
+    "timebase": "tick=simulation 60Hz; frame=Godot drawn frame; wallMs=monotonic session; movieSeconds=frame/60 only in Movie Maker",
+    "preset": "precise",
+    "configuration": {
+      "Id": "precise",
+      "Scale": 2.4,
+      "ScreenUniform": true,
+      "Response": 0,
+      "Deadzone": 0.08,
+      "Curve": 0.8,
+      "CameraFollow": 20,
+      "Zoom": 1.5
+    }
+  },
+  "renderWallPacing": {
+    "p50ms": 45.578899999993155,
+    "p95ms": 50.92979999999807,
+    "p99ms": 53.654999999998836
+  },
+  "distinctIndexedCreatureFrames": {
+    "sword": 12,
+    "bite": 21,
+    "tailSwipe": 21,
+    "hitReaction": 8,
+    "dodge": 12
+  },
+  "simulationSeconds": 97.81666666666666,
+  "wallSeconds": 273.55103590000004,
+  "metrics": {
+    "free-play": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 30,
+      "wallFrameP50ms": 47.28099999999995,
+      "wallFrameP95ms": 52.90280000000007,
+      "wallFrameP99ms": 53.593200000000024,
+      "maxCameraError": 345.4339788700945
+    },
+    "horizontal": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 45.13679999999931,
+      "wallFrameP95ms": 50.965999999999894,
+      "wallFrameP99ms": 60.232199999999466,
+      "maxCameraError": 27.33334000000002
+    },
+    "vertical": {
+      "settledCameraErrorMedian": 5.656854251287943e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.67279999999937,
+      "wallFrameP95ms": 53.05090000000018,
+      "wallFrameP99ms": 58.38640000000123,
+      "maxCameraError": 9.327240000085787
+    },
+    "diagonal": {
+      "settledCameraErrorMedian": 5.656854251287943e-05,
+      "projectedSpeed": 95.99932685168005,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 49.85599999999977,
+      "wallFrameP95ms": 54.70249999999942,
+      "wallFrameP99ms": 62.438500000000204,
+      "maxCameraError": 19.326020000041424
+    },
+    "tap-stop": {
+      "settledCameraErrorMedian": 5.656854251287943e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 50,
+      "wallFrameP50ms": 44.4458999999988,
+      "wallFrameP95ms": 45.32430000000022,
+      "wallFrameP99ms": 46.16660000000047,
+      "maxCameraError": 5.656854251287943e-05
+    },
+    "reversal": {
+      "settledCameraErrorMedian": 5.656854251287943e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.17480000000069,
+      "wallFrameP95ms": 45.44959999999992,
+      "wallFrameP99ms": 46.49099999999817,
+      "maxCameraError": 5.656854251287943e-05
+    },
+    "eight-turns": {
+      "settledCameraErrorMedian": 5.656854251287943e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 160,
+      "wallFrameP50ms": 44.38029999999708,
+      "wallFrameP95ms": 45.6323999999986,
+      "wallFrameP99ms": 46.04330000000118,
+      "maxCameraError": 5.656854251287943e-05
+    },
+    "analog-ramp": {
+      "settledCameraErrorMedian": 5.656854251287943e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.26729999999952,
+      "wallFrameP95ms": 45.492200000000594,
+      "wallFrameP99ms": 46.108500000002095,
+      "maxCameraError": 5.656854251287943e-05
+    },
+    "camera-follow": {
+      "settledCameraErrorMedian": 4.799850000093745,
+      "projectedSpeed": 95.99853,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.21110000000044,
+      "wallFrameP95ms": 46.14089999999851,
+      "wallFrameP99ms": 47.62879999999859,
+      "maxCameraError": 622.6262162949614
+    },
+    "wall-slide": {
+      "settledCameraErrorMedian": 6.403124237245924e-05,
+      "projectedSpeed": 95.99932685168005,
+      "blockedSamples": 95,
+      "samples": 140,
+      "wallFrameP50ms": 45.079499999999825,
+      "wallFrameP95ms": 46.626699999993434,
+      "wallFrameP99ms": 47.31390000000101,
+      "maxCameraError": 235.2514990005296
+    },
+    "wall-recover": {
+      "settledCameraErrorMedian": 4.775250000167559,
+      "projectedSpeed": 95.99853,
+      "blockedSamples": 45,
+      "samples": 140,
+      "wallFrameP50ms": 45.12770000000455,
+      "wallFrameP95ms": 46.58649999999761,
+      "wallFrameP99ms": 48.44829999999638,
+      "maxCameraError": 41.42697797210891
+    },
+    "narrow-passage": {
+      "settledCameraErrorMedian": 4.800000000093704,
+      "projectedSpeed": 95.99853,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 45.82310000000143,
+      "wallFrameP95ms": 47.06369999999879,
+      "wallFrameP99ms": 47.476699999999255,
+      "maxCameraError": 89.46922293793322
+    },
+    "menu-cancel": {
+      "settledCameraErrorMedian": 5.656854251287943e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 70,
+      "wallFrameP50ms": 45.14429999999993,
+      "wallFrameP95ms": 46.673900000001595,
+      "wallFrameP99ms": 47.49279999999999,
+      "maxCameraError": 410.2355991519461
+    },
+    "multitouch": {
+      "settledCameraErrorMedian": 5.656854251287943e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 70,
+      "wallFrameP50ms": 44.21519999999873,
+      "wallFrameP95ms": 45.44840000000113,
+      "wallFrameP99ms": 45.62700000000041,
+      "maxCameraError": 5.656854251287943e-05
+    },
+    "chest": {
+      "settledCameraErrorMedian": 5.656854251287943e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.28519999999844,
+      "wallFrameP95ms": 45.92029999999795,
+      "wallFrameP99ms": 53.748299999992014,
+      "maxCameraError": 5.656854251287943e-05
+    },
+    "settlement-route": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 44,
+      "samples": 240,
+      "wallFrameP50ms": 49.725500000000466,
+      "wallFrameP95ms": 52.46769999999378,
+      "wallFrameP99ms": 55.293799999999464,
+      "maxCameraError": 18.222230000000025
+    },
+    "dungeon-route": {
+      "settledCameraErrorMedian": 0.011950000000013006,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 51.276599999997416,
+      "wallFrameP95ms": 53.16730000000098,
+      "wallFrameP99ms": 56.863200000007055,
+      "maxCameraError": 97.54755756468995
+    },
+    "combat-movement": {
+      "settledCameraErrorMedian": 0.006619999999998072,
+      "projectedSpeed": 96.00005251257683,
+      "blockedSamples": 53,
+      "samples": 180,
+      "wallFrameP50ms": 47.88929999999527,
+      "wallFrameP95ms": 50.72359999999753,
+      "wallFrameP99ms": 54.1472999999969,
+      "maxCameraError": 25.960986075811864
+    },
+    "attack-readability": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 89,
+      "samples": 200,
+      "wallFrameP50ms": 45.83169999999518,
+      "wallFrameP95ms": 47.65810000000056,
+      "wallFrameP99ms": 52.17979999999807,
+      "maxCameraError": 1.7037015990190578
+    },
+    "combat-empty": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 72,
+      "samples": 170,
+      "wallFrameP50ms": 44.810899999996764,
+      "wallFrameP95ms": 46.017699999996694,
+      "wallFrameP99ms": 46.914199999999255,
+      "maxCameraError": 0.2437100000000214
+    },
+    "combat-ahead": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 45.47860000000219,
+      "wallFrameP95ms": 47.345900000000256,
+      "wallFrameP99ms": 47.50239999999758,
+      "maxCameraError": 0.0
+    },
+    "combat-behind": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 44.93529999999737,
+      "wallFrameP95ms": 46.29000000000815,
+      "wallFrameP99ms": 47.13300000000163,
+      "maxCameraError": 0.0
+    },
+    "combat-enter": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 45.164199999999255,
+      "wallFrameP95ms": 46.5341000000044,
+      "wallFrameP99ms": 47.696300000010524,
+      "maxCameraError": 0.8558924495519475
+    },
+    "combat-wall": {
+      "settledCameraErrorMedian": 2.999999992425728e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 45.07020000000193,
+      "wallFrameP95ms": 46.38550000000396,
+      "wallFrameP99ms": 46.818599999998696,
+      "maxCameraError": 283.75124000000005
+    },
+    "dodge-idle": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 47.24620000002324,
+      "wallFrameP95ms": 50.31649999998626,
+      "wallFrameP99ms": 51.618499999982305,
+      "maxCameraError": 285.74881000000005
+    },
+    "dodge-held": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 46.689400000002934,
+      "wallFrameP95ms": 49.93489999999292,
+      "wallFrameP99ms": 50.444699999992736,
+      "maxCameraError": 4.0000000012696546e-05
+    },
+    "dodge-wall": {
+      "settledCameraErrorMedian": 0.00010000000008858478,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 46.685800000006566,
+      "wallFrameP95ms": 48.18829999997979,
+      "wallFrameP99ms": 48.78880000000936,
+      "maxCameraError": 283.75120000000004
+    },
+    "dodge-evasion": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 47.718900000007125,
+      "wallFrameP95ms": 50.367800000007264,
+      "wallFrameP99ms": 50.930999999982305,
+      "maxCameraError": 285.74884
+    },
+    "telegraph-bite": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 14,
+      "samples": 75,
+      "wallFrameP50ms": 45.44519999998738,
+      "wallFrameP95ms": 46.615400000009686,
+      "wallFrameP99ms": 47.48709999999846,
+      "maxCameraError": 0.8237600009711495
+    },
+    "telegraph-dodge": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 47.6697999999742,
+      "wallFrameP95ms": 50.4317999999912,
+      "wallFrameP99ms": 51.203699999983655,
+      "maxCameraError": 4.0000000012696546e-05
+    },
+    "telegraph-interrupt": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 75,
+      "wallFrameP50ms": 45.40869999999995,
+      "wallFrameP95ms": 46.60670000000391,
+      "wallFrameP99ms": 48.67579999999725,
+      "maxCameraError": 4.0000000012696546e-05
+    },
+    "telegraph-cone": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 75,
+      "wallFrameP50ms": 45.031300000002375,
+      "wallFrameP95ms": 46.52400000000489,
+      "wallFrameP99ms": 46.73320000001695,
+      "maxCameraError": 4.0000000012696546e-05
+    },
+    "presentation-fatal": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 130,
+      "wallFrameP50ms": 44.91060000000289,
+      "wallFrameP95ms": 46.554799999983516,
+      "wallFrameP99ms": 47.781999999977415,
+      "maxCameraError": 0.050780015754263094
+    },
+    "presentation-crowd": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 14,
+      "samples": 90,
+      "wallFrameP50ms": 45.87300000002142,
+      "wallFrameP95ms": 48.642499999987194,
+      "wallFrameP99ms": 51.80989999999292,
+      "maxCameraError": 4.0000000012696546e-05
+    },
+    "presentation-projectile": {
+      "settledCameraErrorMedian": 4.0000000012696546e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 40,
+      "samples": 140,
+      "wallFrameP50ms": 45.149499999999534,
+      "wallFrameP95ms": 46.63939999998547,
+      "wallFrameP99ms": 47.25779999999213,
+      "maxCameraError": 0.39279000203675946
+    },
+    "tactics-prowler": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 45.1482000000251,
+      "wallFrameP95ms": 47.874400000000605,
+      "wallFrameP99ms": 51.26350000000093,
+      "maxCameraError": 4.0000000012696546e-05
+    },
+    "tactics-brute": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 44.58259999999427,
+      "wallFrameP95ms": 46.31010000000242,
+      "wallFrameP99ms": 49.04070000001229,
+      "maxCameraError": 0.0
+    },
+    "tactics-spitter": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 45.54889999999432,
+      "wallFrameP95ms": 47.00789999999688,
+      "wallFrameP99ms": 47.51990000001388,
+      "maxCameraError": 0.0
+    },
+    "tactics-mixed": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 45.8232999999891,
+      "wallFrameP95ms": 47.42029999999795,
+      "wallFrameP99ms": 49.15659999998752,
+      "maxCameraError": 0.0
+    },
+    "tactics-spacing": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 47.232400000008056,
+      "wallFrameP95ms": 49.20069999998668,
+      "wallFrameP99ms": 52.03369999999995,
+      "maxCameraError": 0.0
+    },
+    "tactics-straight": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 180,
+      "wallFrameP50ms": 45.647200000006706,
+      "wallFrameP95ms": 46.83939999999711,
+      "wallFrameP99ms": 47.544000000023516,
+      "maxCameraError": 0.0
+    },
+    "tactics-homing": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 180,
+      "wallFrameP50ms": 45.64560000001802,
+      "wallFrameP95ms": 46.88709999999264,
+      "wallFrameP99ms": 47.45650000000023,
+      "maxCameraError": 0.0
+    },
+    "tactics-wall": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 180,
+      "wallFrameP50ms": 47.00010000000475,
+      "wallFrameP95ms": 48.27479999998468,
+      "wallFrameP99ms": 50.406400000007125,
+      "maxCameraError": 155.55554
+    },
+    "tactics-dodge": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 180,
+      "wallFrameP50ms": 46.00160000001779,
+      "wallFrameP95ms": 50.26339999999618,
+      "wallFrameP99ms": 51.86720000000787,
+      "maxCameraError": 155.55554000000006
+    },
+    "tactics-interrupt": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 120,
+      "wallFrameP50ms": 44.6364000000176,
+      "wallFrameP95ms": 46.01610000000801,
+      "wallFrameP99ms": 47.29670000000624,
+      "maxCameraError": 0.5502736370207493
+    },
+    "turn-south-north": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 96.00036,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.009799999999814,
+      "wallFrameP95ms": 45.022999999986496,
+      "wallFrameP99ms": 45.19120000000112,
+      "maxCameraError": 0.0
+    }
+  },
+  "problemPeriods": [
+    {
+      "scenario": "wall-slide",
+      "frame": 868,
+      "movieSeconds": 14.466666666666667,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 869,
+      "movieSeconds": 14.483333333333333,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 870,
+      "movieSeconds": 14.5,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 871,
+      "movieSeconds": 14.516666666666667,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 872,
+      "movieSeconds": 14.533333333333333,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 873,
+      "movieSeconds": 14.55,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 874,
+      "movieSeconds": 14.566666666666666,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 875,
+      "movieSeconds": 14.583333333333334,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 876,
+      "movieSeconds": 14.6,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 877,
+      "movieSeconds": 14.616666666666667,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 878,
+      "movieSeconds": 14.633333333333333,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 879,
+      "movieSeconds": 14.65,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 880,
+      "movieSeconds": 14.666666666666666,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 881,
+      "movieSeconds": 14.683333333333334,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 882,
+      "movieSeconds": 14.7,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 883,
+      "movieSeconds": 14.716666666666667,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 884,
+      "movieSeconds": 14.733333333333333,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 885,
+      "movieSeconds": 14.75,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 886,
+      "movieSeconds": 14.766666666666667,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 887,
+      "movieSeconds": 14.783333333333333,
+      "reason": "Terrain / footprint: Rock at 30,16"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 888,
+      "movieSeconds": 14.8,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 889,
+      "movieSeconds": 14.816666666666666,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 890,
+      "movieSeconds": 14.833333333333334,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 891,
+      "movieSeconds": 14.85,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 892,
+      "movieSeconds": 14.866666666666667,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 893,
+      "movieSeconds": 14.883333333333333,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 894,
+      "movieSeconds": 14.9,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 895,
+      "movieSeconds": 14.916666666666666,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 896,
+      "movieSeconds": 14.933333333333334,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 897,
+      "movieSeconds": 14.95,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 898,
+      "movieSeconds": 14.966666666666667,
+      "reason": "Terrain / footprint: Rock at 30,17"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 899,
+      "movieSeconds": 14.983333333333333,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 900,
+      "movieSeconds": 15.0,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 901,
+      "movieSeconds": 15.016666666666667,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 902,
+      "movieSeconds": 15.033333333333333,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 903,
+      "movieSeconds": 15.05,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 904,
+      "movieSeconds": 15.066666666666666,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 905,
+      "movieSeconds": 15.083333333333334,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 906,
+      "movieSeconds": 15.1,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 907,
+      "movieSeconds": 15.116666666666667,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 908,
+      "movieSeconds": 15.133333333333333,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 909,
+      "movieSeconds": 15.15,
+      "reason": "Terrain / footprint: Rock at 30,18"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 910,
+      "movieSeconds": 15.166666666666666,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 911,
+      "movieSeconds": 15.183333333333334,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 912,
+      "movieSeconds": 15.2,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 913,
+      "movieSeconds": 15.216666666666667,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 914,
+      "movieSeconds": 15.233333333333333,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 915,
+      "movieSeconds": 15.25,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 916,
+      "movieSeconds": 15.266666666666667,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 917,
+      "movieSeconds": 15.283333333333333,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 918,
+      "movieSeconds": 15.3,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 919,
+      "movieSeconds": 15.316666666666666,
+      "reason": "Terrain / footprint: Rock at 30,19"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 920,
+      "movieSeconds": 15.333333333333334,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 921,
+      "movieSeconds": 15.35,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 922,
+      "movieSeconds": 15.366666666666667,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 923,
+      "movieSeconds": 15.383333333333333,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 924,
+      "movieSeconds": 15.4,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 925,
+      "movieSeconds": 15.416666666666666,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 926,
+      "movieSeconds": 15.433333333333334,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 927,
+      "movieSeconds": 15.45,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 928,
+      "movieSeconds": 15.466666666666667,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 929,
+      "movieSeconds": 15.483333333333333,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 930,
+      "movieSeconds": 15.5,
+      "reason": "Terrain / footprint: Rock at 30,20"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 931,
+      "movieSeconds": 15.516666666666667,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 932,
+      "movieSeconds": 15.533333333333333,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 933,
+      "movieSeconds": 15.55,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 934,
+      "movieSeconds": 15.566666666666666,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 935,
+      "movieSeconds": 15.583333333333334,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 936,
+      "movieSeconds": 15.6,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 937,
+      "movieSeconds": 15.616666666666667,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 938,
+      "movieSeconds": 15.633333333333333,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 939,
+      "movieSeconds": 15.65,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 940,
+      "movieSeconds": 15.666666666666666,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 941,
+      "movieSeconds": 15.683333333333334,
+      "reason": "Terrain / footprint: Rock at 30,21"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 942,
+      "movieSeconds": 15.7,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 943,
+      "movieSeconds": 15.716666666666667,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 944,
+      "movieSeconds": 15.733333333333333,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 945,
+      "movieSeconds": 15.75,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 946,
+      "movieSeconds": 15.766666666666667,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 947,
+      "movieSeconds": 15.783333333333333,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 948,
+      "movieSeconds": 15.8,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 949,
+      "movieSeconds": 15.816666666666666,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 950,
+      "movieSeconds": 15.833333333333334,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 951,
+      "movieSeconds": 15.85,
+      "reason": "Terrain / footprint: Rock at 30,22"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 952,
+      "movieSeconds": 15.866666666666667,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 953,
+      "movieSeconds": 15.883333333333333,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 954,
+      "movieSeconds": 15.9,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 955,
+      "movieSeconds": 15.916666666666666,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 956,
+      "movieSeconds": 15.933333333333334,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 957,
+      "movieSeconds": 15.95,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 958,
+      "movieSeconds": 15.966666666666667,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 959,
+      "movieSeconds": 15.983333333333333,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 960,
+      "movieSeconds": 16.0,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 961,
+      "movieSeconds": 16.016666666666666,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 962,
+      "movieSeconds": 16.033333333333335,
+      "reason": "Terrain / footprint: Rock at 30,23"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1000,
+      "movieSeconds": 16.666666666666668,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1001,
+      "movieSeconds": 16.683333333333334,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1002,
+      "movieSeconds": 16.7,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1003,
+      "movieSeconds": 16.716666666666665,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1004,
+      "movieSeconds": 16.733333333333334,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1005,
+      "movieSeconds": 16.75,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1006,
+      "movieSeconds": 16.766666666666666,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1007,
+      "movieSeconds": 16.783333333333335,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1008,
+      "movieSeconds": 16.8,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1009,
+      "movieSeconds": 16.816666666666666,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1010,
+      "movieSeconds": 16.833333333333332,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1011,
+      "movieSeconds": 16.85,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1012,
+      "movieSeconds": 16.866666666666667,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1013,
+      "movieSeconds": 16.883333333333333,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1014,
+      "movieSeconds": 16.9,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1015,
+      "movieSeconds": 16.916666666666668,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1016,
+      "movieSeconds": 16.933333333333334,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1017,
+      "movieSeconds": 16.95,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1018,
+      "movieSeconds": 16.966666666666665,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1019,
+      "movieSeconds": 16.983333333333334,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1020,
+      "movieSeconds": 17.0,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1021,
+      "movieSeconds": 17.016666666666666,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1022,
+      "movieSeconds": 17.033333333333335,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1023,
+      "movieSeconds": 17.05,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1024,
+      "movieSeconds": 17.066666666666666,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1025,
+      "movieSeconds": 17.083333333333332,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1026,
+      "movieSeconds": 17.1,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1027,
+      "movieSeconds": 17.116666666666667,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1028,
+      "movieSeconds": 17.133333333333333,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1029,
+      "movieSeconds": 17.15,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1030,
+      "movieSeconds": 17.166666666666668,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1031,
+      "movieSeconds": 17.183333333333334,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1032,
+      "movieSeconds": 17.2,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1033,
+      "movieSeconds": 17.216666666666665,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1034,
+      "movieSeconds": 17.233333333333334,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1035,
+      "movieSeconds": 17.25,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1036,
+      "movieSeconds": 17.266666666666666,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1037,
+      "movieSeconds": 17.283333333333335,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1038,
+      "movieSeconds": 17.3,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1039,
+      "movieSeconds": 17.316666666666666,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1040,
+      "movieSeconds": 17.333333333333332,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1041,
+      "movieSeconds": 17.35,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1042,
+      "movieSeconds": 17.366666666666667,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1043,
+      "movieSeconds": 17.383333333333333,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1044,
+      "movieSeconds": 17.4,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1585,
+      "movieSeconds": 26.416666666666668,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1586,
+      "movieSeconds": 26.433333333333334,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1587,
+      "movieSeconds": 26.45,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1588,
+      "movieSeconds": 26.466666666666665,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1589,
+      "movieSeconds": 26.483333333333334,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1590,
+      "movieSeconds": 26.5,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1591,
+      "movieSeconds": 26.516666666666666,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1592,
+      "movieSeconds": 26.533333333333335,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1593,
+      "movieSeconds": 26.55,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1594,
+      "movieSeconds": 26.566666666666666,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1595,
+      "movieSeconds": 26.583333333333332,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1596,
+      "movieSeconds": 26.6,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1597,
+      "movieSeconds": 26.616666666666667,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1598,
+      "movieSeconds": 26.633333333333333,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1607,
+      "movieSeconds": 26.783333333333335,
+      "reason": "Terrain / footprint: Rock at 17,23"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1608,
+      "movieSeconds": 26.8,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1609,
+      "movieSeconds": 26.816666666666666,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1610,
+      "movieSeconds": 26.833333333333332,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1611,
+      "movieSeconds": 26.85,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1612,
+      "movieSeconds": 26.866666666666667,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1613,
+      "movieSeconds": 26.883333333333333,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1614,
+      "movieSeconds": 26.9,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1615,
+      "movieSeconds": 26.916666666666668,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1616,
+      "movieSeconds": 26.933333333333334,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1617,
+      "movieSeconds": 26.95,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1618,
+      "movieSeconds": 26.966666666666665,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1619,
+      "movieSeconds": 26.983333333333334,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1620,
+      "movieSeconds": 27.0,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1621,
+      "movieSeconds": 27.016666666666666,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1970,
+      "movieSeconds": 32.833333333333336,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1971,
+      "movieSeconds": 32.85,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1972,
+      "movieSeconds": 32.86666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1973,
+      "movieSeconds": 32.88333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1974,
+      "movieSeconds": 32.9,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1975,
+      "movieSeconds": 32.916666666666664,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1976,
+      "movieSeconds": 32.93333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1977,
+      "movieSeconds": 32.95,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1978,
+      "movieSeconds": 32.96666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1979,
+      "movieSeconds": 32.983333333333334,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1980,
+      "movieSeconds": 33.0,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1981,
+      "movieSeconds": 33.016666666666666,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1982,
+      "movieSeconds": 33.03333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1983,
+      "movieSeconds": 33.05,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1984,
+      "movieSeconds": 33.06666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1985,
+      "movieSeconds": 33.083333333333336,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1986,
+      "movieSeconds": 33.1,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1987,
+      "movieSeconds": 33.11666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1988,
+      "movieSeconds": 33.13333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1989,
+      "movieSeconds": 33.15,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1990,
+      "movieSeconds": 33.166666666666664,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1991,
+      "movieSeconds": 33.18333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1992,
+      "movieSeconds": 33.2,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1993,
+      "movieSeconds": 33.21666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1994,
+      "movieSeconds": 33.233333333333334,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1995,
+      "movieSeconds": 33.25,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1996,
+      "movieSeconds": 33.266666666666666,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1997,
+      "movieSeconds": 33.28333333333333,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1998,
+      "movieSeconds": 33.3,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1999,
+      "movieSeconds": 33.31666666666667,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2000,
+      "movieSeconds": 33.333333333333336,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2001,
+      "movieSeconds": 33.35,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2002,
+      "movieSeconds": 33.36666666666667,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2003,
+      "movieSeconds": 33.38333333333333,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2004,
+      "movieSeconds": 33.4,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2005,
+      "movieSeconds": 33.416666666666664,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2006,
+      "movieSeconds": 33.43333333333333,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2007,
+      "movieSeconds": 33.45,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2008,
+      "movieSeconds": 33.46666666666667,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2009,
+      "movieSeconds": 33.483333333333334,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2092,
+      "movieSeconds": 34.86666666666667,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2093,
+      "movieSeconds": 34.88333333333333,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2094,
+      "movieSeconds": 34.9,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2095,
+      "movieSeconds": 34.916666666666664,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2096,
+      "movieSeconds": 34.93333333333333,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2097,
+      "movieSeconds": 34.95,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2098,
+      "movieSeconds": 34.96666666666667,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2099,
+      "movieSeconds": 34.983333333333334,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2100,
+      "movieSeconds": 35.0,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2101,
+      "movieSeconds": 35.016666666666666,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2102,
+      "movieSeconds": 35.03333333333333,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2103,
+      "movieSeconds": 35.05,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2104,
+      "movieSeconds": 35.06666666666667,
+      "reason": "Terrain / footprint: Rock at 7,20"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2877,
+      "movieSeconds": 47.95,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2878,
+      "movieSeconds": 47.96666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2879,
+      "movieSeconds": 47.983333333333334,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2880,
+      "movieSeconds": 48.0,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2881,
+      "movieSeconds": 48.016666666666666,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2882,
+      "movieSeconds": 48.03333333333333,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2883,
+      "movieSeconds": 48.05,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2884,
+      "movieSeconds": 48.06666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2885,
+      "movieSeconds": 48.083333333333336,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2886,
+      "movieSeconds": 48.1,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2887,
+      "movieSeconds": 48.11666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2888,
+      "movieSeconds": 48.13333333333333,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2889,
+      "movieSeconds": 48.15,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2890,
+      "movieSeconds": 48.166666666666664,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2891,
+      "movieSeconds": 48.18333333333333,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2892,
+      "movieSeconds": 48.2,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2893,
+      "movieSeconds": 48.21666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2894,
+      "movieSeconds": 48.233333333333334,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2895,
+      "movieSeconds": 48.25,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2896,
+      "movieSeconds": 48.266666666666666,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2897,
+      "movieSeconds": 48.28333333333333,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2898,
+      "movieSeconds": 48.3,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2899,
+      "movieSeconds": 48.31666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2900,
+      "movieSeconds": 48.333333333333336,
+      "reason": "Action: Dodging"
+    }
+  ],
+  "visualReview": "Automated sanity/temporal checks only. Human or vision inspection must be reported separately."
+}
