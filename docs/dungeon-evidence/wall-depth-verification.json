@@ -1,0 +1,19 @@
+{
+  "source": "59fc7ec3c9c9db97a7cecfda177cc247bc31257e",
+  "nativeWorkflow": 40998033597,
+  "desktop": {
+    "coveredForegroundPixels": 694,
+    "visibleUpperSilhouettePixels": 1140,
+    "frontSideDifferencePixels": 1446,
+    "clearDoorwayDifferencePixels": 0,
+    "wallRowNodes": 33
+  },
+  "mobileLayout": {
+    "coveredForegroundPixels": 694,
+    "visibleUpperSilhouettePixels": 1140,
+    "frontSideDifferencePixels": 1446,
+    "clearDoorwayDifferencePixels": 0,
+    "wallRowNodes": 33
+  },
+  "physicalDeviceTested": false
+}

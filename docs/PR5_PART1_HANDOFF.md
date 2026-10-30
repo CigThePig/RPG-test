@@ -1,5 +1,7 @@
 # PR5 Part 1 — Dungeon scale and traversal
 
+Latest wall-depth correction: **`59fc7ec3c9c9db97a7cecfda177cc247bc31257e`**. [Download the corrected ARM64 APK ZIP](https://github.com/CigThePig/RPG-test/actions/runs/40998033592/artifacts/12951683875). The wall-depth follow-up at the end records its verification; earlier Part 1 measurements and APKs below are historical baselines.
+
 ## Implemented spatial foundation
 
 Base: merged PR4 `9eace0f1db3e4f2c7e5cc94cd2474eaa612cfe1b`, verified as main at checkout. Branch: `feat/dungeon-exploration`. Part 1 only; do not merge this draft PR.
@@ -97,13 +99,13 @@ Later authored rooms must preserve reciprocal boundary semantics and sufficient 
 
 Parts 2–4 remain unimplemented. The draft PR must remain unmerged.
 
-## Package identity
+## Original Part 1 package identity
 
 ARM64 APK source: `c949175fd6e6144bb3d04a52824d647e26890d9e`. APK SHA-256: `b0f5d1c0fca4e0cb43efddee4bf7e13f7879de78966fe4f0e7044968554a0b2d`. Signing mode reported by package validation: `ephemeral-debug-key-uninstall-required-between-runs`. Preserve/export valuable progress before uninstalling a differently signed prior build; format compatibility does not preserve Android private storage across uninstall.
 
-## Final exact-source CI and downloads
+## Original Part 1 CI and downloads (before wall-depth correction)
 
-All runtime verification and the APK below use **`c949175fd6e6144bb3d04a52824d647e26890d9e`**. The final handoff/screenshot update changes documentation and evidence only; it does not change that tested runtime.
+The original Part 1 verification and APK in this section use **`c949175fd6e6144bb3d04a52824d647e26890d9e`**; the corrected wall-depth runtime and replacement APK are recorded below. The final handoff/screenshot update changes documentation and evidence only; it does not change that tested runtime.
 
 | Verification | Final result | Evidence |
 |---|---|---|
@@ -129,4 +131,36 @@ There is one mesh/node per wall-containing row (33 in the seed-42 fixture), neve
 
 The full headless suite still passes 4,521 assertions. Desktop and mobile rendered suites now also pass actual pixel checks: 694 formerly overlapping pixels correctly covered by foreground wall, 1,140 visible upper-silhouette pixels, 1,446 pixels establishing front-side visibility, and zero pixel differences across a clear doorway. These counts describe this fixture, not all possible silhouettes. The wall-only/background references and old-order reproduction use the real viewport. The fix is actor-agnostic because all CharacterViews share the same ground-depth container.
 
-Replacement exact-source CI/APK links will be added after verification. Earlier APK c949175fd6e6 and its evidence above remain the historical Part 1 baseline and do not contain this correction.
+The corrected runtime is `59fc7ec3c9c9db97a7cecfda177cc247bc31257e`. Earlier APK c949175fd6e6 and its evidence above remain the historical Part 1 baseline and do not contain this correction. Latest verification and replacement download links are recorded below.
+
+### Corrected wall-depth evidence
+
+[Before/behind/in-front viewport crops](native-screenshots/wall-depth-comparison.png), enlarged 2× with nearest-neighbour scaling. The left panel reproduces the old depth order in the same scene. Full normal-zoom captures:
+
+| Position | Desktop | Mobile layout |
+|---|---|---|
+| Old-order reproduction | [View](native-screenshots/wall-depth-old-order-reproduction.png) | [View](native-screenshots/mobile-wall-depth-old-order-reproduction.png) |
+| Behind foreground wall | [View](native-screenshots/wall-depth-behind.png) | [View](native-screenshots/mobile-wall-depth-behind.png) |
+| In front of wall | [View](native-screenshots/wall-depth-in-front.png) | [View](native-screenshots/mobile-wall-depth-in-front.png) |
+| Clear doorway | [View](native-screenshots/wall-depth-doorway.png) | [View](native-screenshots/mobile-wall-depth-doorway.png) |
+
+These images were downloaded from the exact-source native workflow and inspected. Current renderer measurements are [desktop](dungeon-evidence/wall-depth-render-desktop.json) and [mobile layout](dungeon-evidence/wall-depth-render-mobile.json). For the expanded seed-42 map, combined floor + wall-row mesh construction measured **2.406 ms desktop / 2.384 ms mobile layout**; static-room p95 intervals were **18.408 / 18.341 ms** on CI software rendering. The wall-row portion was 1.656 / 1.744 ms. These include deferred row mesh construction; they do not measure full region-entry latency, and comparison with earlier runs on other hosts is not a controlled speedup claim. Physical S25 performance remains unverified.
+
+### Wall-depth correction: final verification and replacement APK
+
+All correction results below use **`59fc7ec3c9c9db97a7cecfda177cc247bc31257e`**. Final screenshots/documentation are a separate evidence-only commit.
+
+| Check | Result | Link |
+|---|---|---|
+| Build/import and integration | Passed, 4,521 assertions | [Native CI](https://github.com/CigThePig/RPG-test/actions/runs/40998033597) |
+| Desktop/mobile viewport suites | Both passed, including foreground/front-side/doorway pixel checks | [Exact-source native evidence](https://github.com/CigThePig/RPG-test/actions/runs/40998033597/artifacts/12952248049) |
+| Baseline / precise replay | 45 scenarios plus matching independent rendered repeat per preset | [Movie workflow](https://github.com/CigThePig/RPG-test/actions/runs/40998033567) |
+| Focused dungeon expedition | Recorded Dodge/corner/key/gate/relic/return and deterministic repeat passed | [Precise + dungeon evidence](https://github.com/CigThePig/RPG-test/actions/runs/40998033567/artifacts/12953085390) |
+| ARM64 package | Export, source, ABI, runtime, resources and signature passed | [Android workflow](https://github.com/CigThePig/RPG-test/actions/runs/40998033592) |
+| Installed Android emulator | Gameplay, OS touch and three nonblank mixed-combat lifecycle cycles passed | [Android runtime evidence](https://github.com/CigThePig/RPG-test/actions/runs/40998033592/artifacts/12951769223) |
+
+**Replacement download:** [ARM64 development APK ZIP — 59fc7ec3c9c9](https://github.com/CigThePig/RPG-test/actions/runs/40998033592/artifacts/12951683875). APK SHA-256: `c62ff056fa16e7121b4129f7a4329822ef4dff54afe1ff55dc8c0c77899fb113`. Package signing remains ephemeral debug signing. Replacing a differently signed installation can require uninstalling it and deleting private saves.
+
+The rendering correction applies to existing saved ruins as well as new ones; a new game is not required by the fix. Saved tiles, actors, progression and collisions remain unchanged. Physical S25 wall presentation and sustained performance still need user acceptance; the emulator smoke checks normal gameplay and the tactical fixture, while wall pixel checks run in real desktop/mobile-layout viewports. No physical-device or sustained-60-FPS claim is made.
+
+PR #5 remains draft and unmerged. This is the narrow rendering correction prompted by Part 1 phone feedback, not implementation of the broader Part 2 environment-art milestone.
