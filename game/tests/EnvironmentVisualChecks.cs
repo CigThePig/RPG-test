@@ -39,8 +39,8 @@ public static class EnvironmentVisualChecks
                 a.Abilities=w.Content.CombatProfiles.Single(c=>c.Id==a.CombatProfile).Priorities.Keys.ToList();
             }
             app.RebuildViews();await Capture(app,"dungeon-reference");
-            var camera=app.GetViewport().GetCamera2D();var zoom=camera.Zoom;
-            camera.Zoom=new Vector2(3,3);await Capture(app,"objects");camera.Zoom=zoom;
+            // Normal-zoom source for optional nearest-neighbour object crops.
+            await Capture(app,"objects");
             // Sample real windup/telegraph and multi-actor animation at production zoom.
             Engine.TimeScale=.15;w.TryStartPlayerSlash(V.UnitX);
             await Capture(app,"dungeon-combat");
@@ -64,6 +64,14 @@ public static class EnvironmentVisualChecks
             var arrival=overworld.FindPlacement(overworld.Center(overworld.Entrance)+new V(72,0),p,w.Actors.Values);
             p.X=arrival.X;p.Y=arrival.Y;app.RebuildViews();app.ResumeGame();
             await Capture(app,"overworld");
+            foreach(string destination in new[]{"ruin","reach"})
+            {
+                Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.F10,Keycode=Key.F10,Pressed=true});
+                Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.F10,Keycode=Key.F10,Pressed=false});
+                Input.FlushBufferedEvents();await Frames(app,16);
+                if(w.Player.Region!=destination)throw new InvalidOperationException("Developer region key failed: "+destination);
+                await Capture(app,"diagnostic-"+destination);
+            }
             for(int iteration=0;iteration<6;iteration++)
             {
                 p.Region=iteration%2==0?r.Id:"reach";

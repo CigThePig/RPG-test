@@ -482,6 +482,20 @@ public partial class Foundation : Node2D
     {
         if(e is InputEventKey developerKey && developerKey.Pressed && !developerKey.Echo && (developerKey.PhysicalKeycode==Key.F9 || developerKey.Keycode==Key.F9) && !Narrative.Get("speaking").AsBool())
         { BeginCombatCourse(); GetViewport().SetInputAsHandled(); return; }
+        // Development shortcut for the existing Diagnostics entry/return actions.
+        // Android OS-key smoke can verify exported-region art without bypassing
+        // World.Enter, regenerating saved terrain, or adding gameplay state.
+        if(e is InputEventKey regionKey && regionKey.Pressed && !regionKey.Echo &&
+            (regionKey.PhysicalKeycode==Key.F10 || regionKey.Keycode==Key.F10) && !Narrative.Get("speaking").AsBool())
+        {
+            LeaveFeelCourse();Ui.ClosePanels();
+            World.Enter(World.Player,World.Player.Region=="ruin"?"reach":"ruin");
+            TouchMovement=ControllerVelocity=Vector2.Zero;Ui.Stick.Cancel();RebuildViews();
+            BuildTerrain();drawnRegion=World.Player.Region;
+            _=EnvironmentAssetCache.Floors;_=EnvironmentAssetCache.Walls;ResumeGame();
+            GD.Print($"MOSSLIGHT_ENVIRONMENT_READY region={World.Player.Region} walls={wallRows.Count} decorations={decorations.Count} atlases={EnvironmentAssetCache.TextureCount}");
+            GetViewport().SetInputAsHandled();return;
+        }
         if (e.IsActionPressed("menu"))
         {
             ui.Menu();

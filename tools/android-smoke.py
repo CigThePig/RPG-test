@@ -297,12 +297,47 @@ try:
             f'Background cycle {cycle+1} never canceled gameplay input')
         lifecycle.append({'cycle':cycle+1,'pid':resumed_pid,'screenshot':image_name,
             'inputCancelCount':logs.count('MOSSLIGHT_INPUT_CANCELLED')})
+    # Exercise the existing developer region-entry actions on the installed
+    # exported application. F10 uses World.Enter, leaving the reversible combat
+    # fixture first; it is not a mock scene or a direct edit of region state.
+    regions=[]
+    for cycle in range(3):
+        for region in ('ruin','reach'):
+            prior=adb('logcat','-d').count('MOSSLIGHT_ENVIRONMENT_READY')
+            adb('shell','input','keyevent','140') # Android KEYCODE_F10
+            deadline=time.monotonic()+30
+            while time.monotonic()<deadline:
+                logs=adb('logcat','-d')
+                marks=re.findall(r'MOSSLIGHT_ENVIRONMENT_READY region=(\w+) walls=(\d+) decorations=(\d+) atlases=(\d+)',logs)
+                if len(marks)>prior:
+                    assert marks[-1][0]==region, 'Unexpected Android region transition'
+                    break
+                time.sleep(.25)
+            else: raise RuntimeError('Installed Android never entered '+region)
+            time.sleep(.75)
+            capture(f'{region}-entry-{cycle+1}.png',wait=20)
+            if region=='ruin':
+                attacks=logs.count('MOSSLIGHT_COMBAT kind=attack_completed')
+                rolls=logs.count('MOSSLIGHT_COMBAT kind=dodge_completed')
+                tap_action('attack');time.sleep(1);tap_action('dodge');time.sleep(1)
+                logs=adb('logcat','-d')
+                assert logs.count('MOSSLIGHT_COMBAT kind=attack_completed')>attacks, 'No attack inside exported dungeon'
+                assert logs.count('MOSSLIGHT_COMBAT kind=dodge_completed')>rolls, 'No roll inside exported dungeon'
+                capture(f'ruin-combat-{cycle+1}.png',wait=20)
+            marks=re.findall(r'MOSSLIGHT_ENVIRONMENT_READY region=(\w+) walls=(\d+) decorations=(\d+) atlases=(\d+)',logs)
+            state=marks[-1]
+            assert int(state[3])==2, 'Unbounded or missing environment atlas cache'
+            assert int(state[2])<=96, 'Unbounded Android decoration count'
+            previous=[r for r in regions if r['region']==region]
+            if previous: assert previous[-1]['counts']==list(state[1:]), 'Android region views accumulate'
+            regions.append({'cycle':cycle+1,'region':region,'counts':list(state[1:])})
+    (out/'regions.json').write_text(json.dumps(regions,indent=2))
     (out/'lifecycle.json').write_text(json.dumps(lifecycle,indent=2))
     (out/'logcat.log').write_text(logs)
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. ARM64 device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. three generated-dungeon entry/attack/roll/return cycles with stable wall/decoration/atlas counts. ARM64 device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     # Preserve the real surface recording on failure as well as success. ADB
