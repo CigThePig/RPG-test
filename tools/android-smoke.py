@@ -317,12 +317,17 @@ try:
             time.sleep(.75)
             capture(f'{region}-entry-{cycle+1}.png',wait=20)
             if region=='ruin':
-                attacks=logs.count('MOSSLIGHT_COMBAT kind=attack_completed')
-                rolls=logs.count('MOSSLIGHT_COMBAT kind=dodge_completed')
-                tap_action('attack');time.sleep(1);tap_action('dodge');time.sleep(1)
-                logs=adb('logcat','-d')
-                assert logs.count('MOSSLIGHT_COMBAT kind=attack_completed')>attacks, 'No attack inside exported dungeon'
-                assert logs.count('MOSSLIGHT_COMBAT kind=dodge_completed')>rolls, 'No roll inside exported dungeon'
+                for action,marker in (('attack','attack_completed'),('dodge','dodge_completed')):
+                    before=adb('logcat','-d').count('MOSSLIGHT_COMBAT kind='+marker)
+                    tap_action(action)
+                    deadline=time.monotonic()+15
+                    while time.monotonic()<deadline:
+                        logs=adb('logcat','-d')
+                        completed=logs.count('MOSSLIGHT_COMBAT kind='+marker)-before
+                        assert completed<=1, 'One dungeon action tap double-dispatched'
+                        if completed==1: break
+                        time.sleep(.25)
+                    else: raise RuntimeError('No '+action+' completion inside exported dungeon')
                 capture(f'ruin-combat-{cycle+1}.png',wait=20)
             marks=re.findall(r'MOSSLIGHT_ENVIRONMENT_READY region=(\w+) walls=(\d+) decorations=(\d+) atlases=(\d+)',logs)
             state=marks[-1]
