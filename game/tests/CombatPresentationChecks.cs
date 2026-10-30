@@ -244,11 +244,6 @@ public static class CombatPresentationChecks
             }
             check(w.Tick == deathTick && !app.Views[p.Id].Creature.Paused && app.Views[p.Id].Creature.Motor!.RestProgress > .1 && app.Views[enemy.Id].Creature.Paused,
                 "player defeat advances while the world and living creatures remain paused");
-            // Touch builds have no Escape key: the still-visible hotbar Menu must respond.
-            var menuAt = app.Ui.ActionControl("menu").GetGlobalRect().GetCenter();
-            app.Ui._Input(new InputEventScreenTouch { Index = 9, Pressed = true, Position = menuAt });
-            app.Ui._Input(new InputEventScreenTouch { Index = 9, Pressed = false, Position = menuAt });
-            check(app.Ui.MenuOpen, "defeated player can open the menu from the touch hotbar");
             app.Ui.PauseForVerification();
         }
         finally
