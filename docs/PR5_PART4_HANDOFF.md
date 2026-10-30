@@ -53,7 +53,7 @@ Missing Part 4 fields in current-generation saves default to initialized encount
 
 Initial branch: `a29784389169ac954fb8850f32b8ffe725760675`. A separate detached checkout supplied the pre-Part-4 comparison; it is not a new development branch.
 
-Local .NET 9.0.203 build succeeds (58 existing third-party nullable warnings, zero errors). The expanded production-engine headless suite passed **7,915 assertions** after the autosave/dialogue correction and relic/corpse persistence additions. It includes seeds 0–63 plus 1337, repeated encounter-stream placement, actual-room occupancy, density/feature clearance, unchanged survivors, empty-population revisit, discovery/corridor distinction, old-field defaults, full/partially available reward capacity, pending reload/retry and exactly-once reputation. Existing geometry, landmarks, combat, movement, saves and quest checks remain enabled. The first published source, `a2f7072`, failed its autosave regression check because the new verification safeguard also suppressed the existing autosave fixture. The correction scopes suppression to adventure fixtures only; the local full suite then passed. Render inspection also found disabled dialogue rows overflowing the mobile viewport; unavailable responses are now omitted. Final exact-source CI status is authoritative and must be checked, not inferred from these earlier local runs.
+Local .NET 9.0.203 build succeeds (58 existing third-party nullable warnings, zero errors). The expanded production-engine headless suite passed **7,918 assertions** after the autosave/dialogue correction and relic/corpse persistence and legacy active-stage restoration additions. It includes seeds 0–63 plus 1337, repeated encounter-stream placement, actual-room occupancy, density/feature clearance, unchanged survivors, empty-population revisit, discovery/corridor distinction, old-field defaults, full/partially available reward capacity, pending reload/retry and exactly-once reputation. Existing geometry, landmarks, combat, movement, saves and quest checks remain enabled. The first published source, `a2f7072`, failed its autosave regression check because the new verification safeguard also suppressed the existing autosave fixture. The correction scopes suppression to adventure fixtures only; the local full suite then passed. Render inspection also found disabled dialogue rows overflowing the mobile viewport; unavailable responses are now omitted. Final exact-source CI status is authoritative and must be checked, not inferred from these earlier local runs.
 
 Commands (use the pinned engine through `GODOT` if not on PATH):
 
@@ -98,7 +98,7 @@ Next milestones after acceptance: refine encounter/loot balance from phone obser
 
 ## Local final-review observations
 
-The corrected build passes 7,915 assertions and repeats the normal-health API completion at 10,966 ticks / 84 remaining health. The focused production-panel capture also passes:
+The corrected build passes 7,918 assertions and repeats the normal-health API completion at 10,966 ticks / 84 remaining health. The focused production-panel capture also passes:
 
 ```sh
 godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --adventure-panels-only
@@ -129,4 +129,4 @@ An identical additional diagnostic harness was compiled into separate detached b
 | 64-actor World tick | 0.964 ms | 0.879 ms |
 | 128-actor World tick | 1.803 ms | 1.711 ms |
 
-These results replace any inference from the earlier overlapping recordings. They do not establish sustained S25 performance or long-session GPU/texture memory. Three additional file-system regression assertions verify that an older recovery file is retained byte-for-byte, repeated retention cannot overwrite earlier copies, and current-generation saves do not create repeated backups. The complete local integration suite passes 7,915 assertions.
+These results replace any inference from the earlier overlapping recordings. They do not establish sustained S25 performance or long-session GPU/texture memory. Three additional file-system regression assertions verify that an older recovery file is retained byte-for-byte, repeated retention cannot overwrite earlier copies, and current-generation saves do not create repeated backups. The complete local integration suite passes 7,918 assertions.
