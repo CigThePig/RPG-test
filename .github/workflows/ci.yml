@@ -1,5 +1,10 @@
 name: RPG foundation verification
-on: [push, pull_request, workflow_dispatch]
+# Pushes to feature branches are covered by their pull request run.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 env:
@@ -11,13 +16,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: |
             8.0.408
             9.0.203
-      - uses: chickensoft-games/setup-godot@v2
+      - uses: chickensoft-games/setup-godot@ac93246ea68518a384c1c280a496e5989341f2f6 # v2
         with:
           version: 4.6.1
           use-dotnet: true
@@ -33,7 +38,7 @@ jobs:
         run: xvfb-run -a python3 tools/verify.py --visual
       - name: Phone layout and touch UI verification
         run: xvfb-run -a python3 tools/verify.py --visual --mobile
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: native-rpg-evidence
@@ -51,13 +56,13 @@ jobs:
       run:
         working-directory: examples/mosslight
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: examples/mosslight/package-lock.json
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: |
             8.0.408
