@@ -71,3 +71,7 @@ Save schema 1 and `rpg-regions-1` remain unchanged. Full saved regions are autho
 Raised `Terrain.Wall` geometry is no longer part of the background terrain mesh. `TerrainWallRow` creates one mesh/node per nonempty tile row in the same Y-sorted container as CharacterView and FeatureView. Its sorting anchor is the projected front ground edge `(row + 1) * Tile`, independent of the 14-pixel cap rise. A character behind that edge is drawn before the opaque wall; a character in front is drawn afterward. Each mesh contains only actual wall columns, retaining doorway gaps. Floors remain batched in the background; natural-rock rendering remains unchanged.
 
 This is presentation only: no terrain, footprint, actor position, movement, gate or persistence rule changes. Row meshes are built on region presentation rebuild, bounded by region height, and removed on region transitions. Hiding characters for verification leaves wall meshes visible. Terrain construction measurements include both the floor batch and wall-row mesh construction.
+
+## PR5 Part 2 environment presentation
+
+See [PR5_PART2_HANDOFF.md](PR5_PART2_HANDOFF.md) for the shared floor/wall atlases, cosmetic hashing, PPC natural-art pivots, bounded nonblocking decoration, production reference scenes and exact-source verification. Region/gameplay authority and Part 1 front-edge wall Y sorting remain unchanged. `--visual-check --environment-only` runs focused real-renderer references and repeated region rebuild measurements; add `--mobile-ui` for the phone layout.

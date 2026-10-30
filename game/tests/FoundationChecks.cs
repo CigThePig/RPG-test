@@ -38,6 +38,7 @@ public static class FoundationChecks
         var watch = Stopwatch.StartNew();
         try
         {
+            EnvironmentArtChecks.Run(app,Check);
             DungeonChecks.Run(app, Check);
             DungeonEncounterChecks.Run(app, Check);
             MobileCombatControlsChecks.Run(Check);

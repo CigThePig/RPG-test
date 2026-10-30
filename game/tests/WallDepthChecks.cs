@@ -101,6 +101,48 @@ public static class WallDepthChecks
             Place(new V(doorX,y-48));
             var start=p.Position;w.Move(p,new V(0,144));w.Move(p,new V(0,-144));
             if(!r.CanStand(p.Position,p)||V.Distance(start,p.Position)>.1f)throw new InvalidOperationException("Depth fix changed doorway traversal");
+            // East/west connection: assert its actual ground strip remains clear,
+            // even though a tall head can legitimately extend behind its north wall.
+            int horizontal=Enumerable.Range(0,r.Tiles.Length).First(at=>at%r.Width%11==10 && at/r.Width%11==5 &&
+                at%r.Width>2 && at%r.Width<r.Width-3 && r.Tiles[at]==Terrain.Floor && r.Tiles[at+1]==Terrain.Floor);
+            var crossing=r.Center(horizontal)+new V(12,0);Place(crossing);await Frames(app,8);
+            await Image(app,"horizontal-doorway");
+            app.ShowCharacters(false);var horizontalWalls=await Image(app);
+            foreach(var row in rows)row.Visible=false;
+            var horizontalFloor=await Image(app);
+            var foot=view.GetGlobalTransformWithCanvas().Origin;
+            for(int py=(int)foot.Y-3;py<(int)foot.Y+3;py++)for(int px=(int)foot.X-5;px<(int)foot.X+5;px++)
+                if(Different(horizontalWalls.GetPixel(px,py),horizontalFloor.GetPixel(px,py)))
+                    throw new InvalidOperationException("Wall covers horizontal doorway ground strip");
+            foreach(var row in rows)row.Visible=true;app.ShowCharacters(true);
+            Place(crossing-new V(48,0));var horizontalStart=p.Position;
+            w.Move(p,new V(96,0));w.Move(p,new V(-96,0));
+            if(V.Distance(horizontalStart,p.Position)>.1f)throw new InvalidOperationException("Horizontal doorway traversal changed");
+            // A real production tree view shares the same ground-contact sorting.
+            var treePoint=r.Center(r.Entrance);
+            var tree=new FeatureView {Kind="wood",Art=new Dictionary<string,Texture2D>{{"tree1",GD.Load<Texture2D>("res://game/art/tree1.png")}},
+                Position=GodotConvert.GroundToScreen(treePoint.X,treePoint.Y)};
+            parent.AddChild(tree);
+            try
+            {
+                Place(treePoint-new V(0,12));await Frames(app,8);
+                view.Visible=false;var treeOnly=await Image(app);
+                view.Visible=true;tree.ZIndex=-1;var treeBroken=await Image(app);
+                tree.ZIndex=0;var treeBehind=await Image(app,"tree-behind");
+                int covered=0;
+                for(int py=0;py<treeBehind.GetHeight();py++)for(int px=0;px<treeBehind.GetWidth();px++)
+                    if(Different(treeBroken.GetPixel(px,py),treeOnly.GetPixel(px,py)) &&
+                        !Different(treeBehind.GetPixel(px,py),treeOnly.GetPixel(px,py)))covered++;
+                if(covered<20)throw new InvalidOperationException("Tall prop does not cover behind actor");
+                Place(treePoint+new V(0,12));await Frames(app,8);
+                var treeFront=await Image(app,"tree-front");tree.ZIndex=1;var treeWrong=await Image(app);
+                int revealed=0;
+                for(int py=0;py<treeFront.GetHeight();py++)for(int px=0;px<treeFront.GetWidth();px++)
+                    if(Different(treeFront.GetPixel(px,py),treeWrong.GetPixel(px,py)))revealed++;
+                if(revealed<20)throw new InvalidOperationException("Tall prop hides front actor");
+                GD.Print($"PROP DEPTH CHECKS PASSED: covered={covered}, front={revealed}");
+            }
+            finally {parent.RemoveChild(tree);tree.QueueFree();view.Visible=true;}
             GD.Print($"WALL DEPTH CHECKS PASSED: foreground pixels={occluded}, visible silhouette={visibleAbove}, front pixels={frontPixels}, doorway changes={doorwayChanges}, row nodes={rows.Length}");
         }
         finally{app.ShowCharacters(true);Engine.TimeScale=scale;Persistence.Restore(w,app.Narrative,snapshot);app.RebuildViews();app.ResumeGame();}

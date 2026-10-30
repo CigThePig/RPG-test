@@ -125,6 +125,7 @@ public partial class Foundation : Node2D
     string drawnRegion = "";
     readonly List<FeatureView> features = new();
     readonly List<TerrainWallRow> wallRows = new();
+    readonly List<EnvironmentDecoration> decorations = new();
     public bool CollisionDebug { get; set; }
     public double SimulationMs { get; private set; }
     Node2D ground = null !;
@@ -615,6 +616,10 @@ public partial class Foundation : Node2D
         wallRows.Clear();
         wallRows.AddRange(TerrainWallRow.Create(r));
         foreach (var row in wallRows) actors.AddChild(row);
+        foreach(var decoration in decorations) { actors.RemoveChild(decoration); decoration.QueueFree(); }
+        decorations.Clear();
+        decorations.AddRange(EnvironmentDecoration.Create(r,art));
+        foreach(var decoration in decorations)actors.AddChild(decoration);
         foreach (var feature in features) { actors.RemoveChild(feature); feature.QueueFree(); }
         features.Clear();
         var gates = r.GateGroups();
@@ -623,7 +628,7 @@ public partial class Foundation : Node2D
             int[] gate = kind == "lock" ? gates.Single(g => Array.BinarySearch(g, at) >= 0) : Array.Empty<int>();
             if (gate.Length > 0 && gate[0] != at) continue;
             var pos = r.Center(at);
-            var feature = new FeatureView { Kind = kind, GateCells = gate, Visible = showCharacters,
+            var feature = new FeatureView { Kind = kind, Art = art, VisualSeed = EnvironmentStyle.Hash(r.Seed,at%r.Width,at/r.Width), GateCells = gate, Visible = showCharacters,
                 GateOffsets = gate.Select(cell => GodotConvert.GroundToScreen(r.Center(cell).X-pos.X, r.Center(cell).Y-pos.Y)).ToArray(),
                 Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
             feature.SetMeta("tile",at);
@@ -736,6 +741,8 @@ public partial class Foundation : Node2D
 public partial class TerrainView : Node2D
 {
     public static double LastBuildMilliseconds { get; private set; }
+    public static long LastVertexBytes { get; private set; }
+    public override void _ExitTree() { foreach(var batch in batches)batch.Dispose(); }
     readonly List<TerrainBatch> batches=new();
     public RegionState Region { get; set; } = null !;
     public Dictionary<string, Texture2D> Art { get; set; } = null !;
@@ -743,6 +750,7 @@ public partial class TerrainView : Node2D
     public override void _Draw()
     {
         var buildTimer = System.Diagnostics.Stopwatch.StartNew();
+        foreach(var oldBatch in batches)oldBatch.Dispose();
         batches.Clear();
         var batch=new TerrainBatch();batches.Add(batch);
         // Ground layers do not overlap: group by texture so the engine can batch them.
@@ -758,10 +766,20 @@ public partial class TerrainView : Node2D
                     Terrain.Floor => new Color(.31f, .33f, .29f),
                     Terrain.Earth => new Color(.36f, .37f, .26f),
                     _ => new Color(.3f, .39f, .27f)};
-                batch.Rect(new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), color);
+                var origin = GodotConvert.GroundToScreen(x * 24, y * 24);
+                batch.Rect(new Rect2(origin, new Vector2(24, 12)), color);
             }
 
-        batch.Draw(this);batch=new TerrainBatch();batches.Add(batch);
+        batch.Draw(this);
+        var floorBatch=new TerrainBatch { Texture=EnvironmentAssetCache.Floors };batches.Add(floorBatch);
+        for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+            if(Region.Tiles[y*Region.Width+x]==Terrain.Floor)
+            {
+                int variant=(int)(EnvironmentStyle.Hash(Region.Seed,x,y)&15);
+                floorBatch.Sprite(new Rect2(GodotConvert.GroundToScreen(x*24,y*24),new Vector2(24,12)),new Rect2(variant*24,0,24,12));
+            }
+        floorBatch.Draw(this);
+        batch=new TerrainBatch();batches.Add(batch);
         foreach (var(terrain, key)in new[]
         {
             (Terrain.Grass, "grass"),
@@ -779,6 +797,14 @@ public partial class TerrainView : Node2D
                         DrawTextureRect(texture, new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), false, new Color(1, 1, 1, .32f));
         }
 
+        if(Art.TryGetValue("rock1",out var rock))
+        {
+            var rockBatch=new TerrainBatch { Texture=rock };batches.Add(rockBatch);
+            for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+                if(Region.Tiles[y*Region.Width+x]==Terrain.Rock)
+                    rockBatch.Sprite(new Rect2(GodotConvert.GroundToScreen(x*24,y*24)+new Vector2(0,-7),new Vector2(24,19)),new Rect2(Vector2.Zero,rock.GetSize()));
+            rockBatch.Draw(this);
+        }
         for (int y = 0; y < Region.Height; y++)
             for (int x = 0; x < Region.Width; x++)
             {
@@ -787,14 +813,6 @@ public partial class TerrainView : Node2D
                 var p=GodotConvert.GroundToScreen(x*24,y*24);
                 // Raised dungeon walls live in TerrainWallRow beside the actors.
                 // Natural rocks retain their established overworld rendering here.
-                if(tile == Terrain.Rock)
-                {
-                    float rise=8;
-                    batch.Rect(new Rect2(p+new Vector2(0,-rise),new Vector2(24,12)),new Color("697268"));
-                    batch.Rect(new Rect2(p+new Vector2(0,12-rise),new Vector2(24,rise)),new Color("354344"));
-                    batch.Line(p+new Vector2(0,-rise),p+new Vector2(24,-rise),new Color("92988a"),1);
-                    batch.Line(p+new Vector2(3,-rise+4),p+new Vector2(13,-rise+4),new Color("7d8477"),1);
-                }
                 if(tile==Terrain.Water)
                 {
                     if(y>0 && Region.Tiles[at-Region.Width]!=Terrain.Water) batch.Line(p,p+new Vector2(24,0),new Color("b2bea0"),2);
@@ -804,6 +822,7 @@ public partial class TerrainView : Node2D
                 }
             }
         batch.Draw(this);
+        LastVertexBytes=batches.Sum(b=>b.VertexBytes);
         LastBuildMilliseconds = buildTimer.Elapsed.TotalMilliseconds;
     }
 }

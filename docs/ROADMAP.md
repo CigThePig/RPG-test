@@ -31,10 +31,11 @@ Part 4 implementation adds separated mobile combat/utility zones, stable control
 
 Part 1 implements the procedural spatial foundation: 11×11 logical cells, 9×9 interiors, three-tile connectors, shared logical gates, physical-clearance and legacy-save coverage, deterministic seed/topology checks and actual viewport comparisons. See `PR5_PART1_HANDOFF.md` for exact verification and phone-only acceptance status.
 
-Remaining milestones on the same draft PR:
+Milestones on the same draft PR:
 
-2. Dungeon readability and spatial presentation: floor/wall depth, composition, interaction readability and residual wall/sprite occlusion.
-3. Handcrafted landmarks: curated chambers and special locations integrated with procedural geography.
-4. Compact RPG adventure: connect exploration, quests, NPCs, equipment and rewards.
+1. Dungeon scale and traversal — completed, including foreground-wall depth.
+2. Procedural environmental art and rendering architecture — current; see `PR5_PART2_HANDOFF.md`.
+3. Handcrafted landmarks, environmental themes and procedural decoration.
+4. Integrated RPG exploration adventure and final verification.
 
 Mosslight is a traditional fantasy action RPG; the flexible approximately 50/50 procedural/authored direction is a creative goal, not a numeric quota or a creature-collection system.
