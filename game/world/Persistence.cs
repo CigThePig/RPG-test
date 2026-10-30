@@ -155,7 +155,28 @@ public static class Persistence
 
     public static double LastSaveMilliseconds { get; private set; }
     public static string AutosavePath => ProjectSettings.GlobalizePath("user://autosave.json");
-    public static void SaveAutosave(World w, Node narrative) => WriteSnapshot(w, narrative, AutosavePath);
+    public static void SaveAutosave(World w, Node narrative)
+    {
+        PreserveOlderBackgroundSave(AutosavePath);
+        WriteSnapshot(w,narrative,AutosavePath);
+    }
+    // A new game's recovery file must not erase the only copy of an older adventure.
+    public static void PreserveOlderBackgroundSave(string path)
+    {
+        if(!File.Exists(path))return;
+        bool compatible=false;
+        try
+        {
+            using var old=JsonDocument.Parse(File.ReadAllText(path));
+            compatible=old.RootElement.ValueKind==JsonValueKind.Object&&old.RootElement.TryGetProperty("Generator",out var generator)&&generator.ValueKind==JsonValueKind.String&&generator.GetString()==Mosslight.Regions.Version&&
+                old.RootElement.TryGetProperty("Schema",out var schema)&&schema.TryGetInt32(out int version)&&version==1;
+        }
+        catch(JsonException) { } // Preserve malformed recovery files too, rather than discarding them.
+        if(compatible)return;
+        int suffix=1;string retained;
+        do {retained=path+$".retained-{suffix++}.json";}while(File.Exists(retained));
+        File.Copy(path,retained); // No overwrite; an I/O failure leaves the original untouched.
+    }
     public static void LoadAutosave(World w, Node narrative) => Restore(w, narrative, File.ReadAllText(AutosavePath));
     public static void Save(World w, Node narrative, int slot)
     {

@@ -45,7 +45,7 @@ Population remains eight using existing prowler, brute and spitter profiles. A d
 
 ## Save compatibility
 
-Generator identity remains `rpg-regions-2`, schema 1. Old generator saves still require a new game and are not deleted. Manual save refuses to overwrite an incompatible-generator slot; choose another slot. No risky geographical migration is attempted.
+Generator identity remains `rpg-regions-2`, schema 1. Old generator saves still require a new game and are not deleted. Manual save refuses to overwrite an incompatible-generator slot; choose another slot. Before replacing an incompatible or malformed background recovery file, autosave preserves its exact bytes under a unique `.retained-N.json` sibling; previous retained files are never overwritten. Current-generation recovery files keep the normal single autosave path. No risky geographical migration is attempted.
 
 Missing Part 4 fields in current-generation saves default to initialized encounters/exploration, empty discovery and map history. This preserves existing actors, terrain, opened gates, relic, containers and loot. It does not grant retroactive discovery bonuses. Entering a room later records its discovery normally; discovery itself does not grant items. Active old adventure objectives use current definitions; completed old adventures retain their historical completion/reward status. New fields participate in the existing unified snapshot/rollback and background save.
 
@@ -53,7 +53,7 @@ Missing Part 4 fields in current-generation saves default to initialized encount
 
 Initial branch: `a29784389169ac954fb8850f32b8ffe725760675`. A separate detached checkout supplied the pre-Part-4 comparison; it is not a new development branch.
 
-Local .NET 9.0.203 build succeeds (58 existing third-party nullable warnings, zero errors). The expanded production-engine headless suite passed **7,912 assertions** after the autosave/dialogue correction and relic/corpse persistence additions. It includes seeds 0–63 plus 1337, repeated encounter-stream placement, actual-room occupancy, density/feature clearance, unchanged survivors, empty-population revisit, discovery/corridor distinction, old-field defaults, full/partially available reward capacity, pending reload/retry and exactly-once reputation. Existing geometry, landmarks, combat, movement, saves and quest checks remain enabled. The first published source, `a2f7072`, failed its autosave regression check because the new verification safeguard also suppressed the existing autosave fixture. The correction scopes suppression to adventure fixtures only; the local full suite then passed. Render inspection also found disabled dialogue rows overflowing the mobile viewport; unavailable responses are now omitted. Final exact-source CI status is authoritative and must be checked, not inferred from these earlier local runs.
+Local .NET 9.0.203 build succeeds (58 existing third-party nullable warnings, zero errors). The expanded production-engine headless suite passed **7,915 assertions** after the autosave/dialogue correction and relic/corpse persistence additions. It includes seeds 0–63 plus 1337, repeated encounter-stream placement, actual-room occupancy, density/feature clearance, unchanged survivors, empty-population revisit, discovery/corridor distinction, old-field defaults, full/partially available reward capacity, pending reload/retry and exactly-once reputation. Existing geometry, landmarks, combat, movement, saves and quest checks remain enabled. The first published source, `a2f7072`, failed its autosave regression check because the new verification safeguard also suppressed the existing autosave fixture. The correction scopes suppression to adventure fixtures only; the local full suite then passed. Render inspection also found disabled dialogue rows overflowing the mobile viewport; unavailable responses are now omitted. Final exact-source CI status is authoritative and must be checked, not inferred from these earlier local runs.
 
 Commands (use the pinned engine through `GODOT` if not on PATH):
 
@@ -98,7 +98,7 @@ Next milestones after acceptance: refine encounter/loot balance from phone obser
 
 ## Local final-review observations
 
-The corrected build passes 7,912 assertions and repeats the normal-health API completion at 10,966 ticks / 84 remaining health. The focused production-panel capture also passes:
+The corrected build passes 7,915 assertions and repeats the normal-health API completion at 10,966 ticks / 84 remaining health. The focused production-panel capture also passes:
 
 ```sh
 godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --adventure-panels-only
@@ -116,3 +116,17 @@ Observed local measurements (software host; **not a controlled regression compar
 | Managed heap at 128-actor sample | 50,499,136 B | 84,528,344 B |
 
 The Part 4 samples overlapped two software movie encoders/renderers and extra verification fixtures; the baseline did not. The nearly doubled simulation interval therefore cannot be attributed to Part 4 from these measurements. Generation code was not changed in Part 4. Raw results are preserved for investigation rather than claiming an improvement or a physical-phone regression. The 65-seed adventure sample recorded median entry/population preparation of 38.590 ms and maximum 146.254 ms. A 10,000-call probe measured already-discovered-room processing at 11.361 μs/call and the no-op quest event bridge at 34.928 μs/call under that same contention. These are bounded-operation observations, not long-session memory or S25 FPS evidence. A serial paired benchmark and sustained physical-device profiling remain limitations of this delivery if not superseded by attached final evidence.
+
+## Serial paired benchmark (supersedes the contention comparison)
+
+An identical additional diagnostic harness was compiled into separate detached baseline/current checkouts. It uses production World/Gloot/GOAP without presentation or narrative subscribers; no gameplay implementation was changed by the harness. Baseline ran to completion before current began. The raw canonical-seed samples, three repeated 600-tick population samples and harness are committed in `docs/adventure-evidence/`. This measures CPU work; renderer/texture/frame-pacing evidence remains in the viewport suites. The tested gameplay candidate was `a7c960d`; the subsequent recovery-file retention change is outside these benchmark operations.
+
+| Workload (median) | Baseline | Part 4 |
+| --- | ---: | ---: |
+| Canonical dungeon generation | 22.181 ms | 19.600 ms |
+| Region population | 32.657 ms | 10.076 ms |
+| 16-actor World tick | 0.518 ms | 0.298 ms |
+| 64-actor World tick | 0.964 ms | 0.879 ms |
+| 128-actor World tick | 1.803 ms | 1.711 ms |
+
+These results replace any inference from the earlier overlapping recordings. They do not establish sustained S25 performance or long-session GPU/texture memory. Three additional file-system regression assertions verify that an older recovery file is retained byte-for-byte, repeated retention cannot overwrite earlier copies, and current-generation saves do not create repeated backups. The complete local integration suite passes 7,915 assertions.

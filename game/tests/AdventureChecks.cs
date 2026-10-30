@@ -112,6 +112,18 @@ public static class AdventureChecks
             check(w.Items.Count("player","coin")==coins+5&&w.Player.Reputation.GetValueOrDefault("wardens")==rep+5&&!n.Call("has_pending").AsBool(),"pending reward delivers and grants reputation exactly once");
             string complete=Persistence.Capture(w,n);Persistence.Restore(w,n,complete);n.Call("claim_pending");
             check(w.Items.Count("player","coin")==coins+5,"claimed reward remains unique after save/load");
+            string recovery=Path.Combine(Path.GetTempPath(),"mosslight-recovery-"+Guid.NewGuid()+".json");
+            try
+            {
+                const string oldRecovery="{\"Schema\":1,\"Generator\":\"rpg-regions-1\",\"history\":\"keep\"}";
+                File.WriteAllText(recovery,oldRecovery);Persistence.PreserveOlderBackgroundSave(recovery);
+                check(File.ReadAllText(recovery)==oldRecovery&&File.ReadAllText(recovery+".retained-1.json")==oldRecovery,"older background save preserved byte-for-byte before replacement");
+                Persistence.PreserveOlderBackgroundSave(recovery);
+                check(File.ReadAllText(recovery+".retained-1.json")==oldRecovery&&File.Exists(recovery+".retained-2.json"),"older background backup never overwrites prior retained copy");
+                File.WriteAllText(recovery,"{\"Schema\":1,\"Generator\":\"rpg-regions-2\"}");Persistence.PreserveOlderBackgroundSave(recovery);
+                check(!File.Exists(recovery+".retained-3.json"),"current-generation background saves do not create repeated backups");
+            }
+            finally {foreach(string file in Directory.GetFiles(Path.GetDirectoryName(recovery)!,Path.GetFileName(recovery)+"*"))File.Delete(file);}
             Directory.CreateDirectory("build/adventure");File.WriteAllText("build/adventure/seed-measurements.json",JsonSerializer.Serialize(rows,Content.Json));
         }
         finally{Persistence.Restore(w,n,original);app.RebuildViews();}
