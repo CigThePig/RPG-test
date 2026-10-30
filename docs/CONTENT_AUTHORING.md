@@ -64,3 +64,7 @@ Generated cells are 11×11 tiles, with 9×9 interiors and a centered three-tile 
 Mission features retain room-center indices. Eight seeded inhabitants retain the prowler/brute/spitter profiles and deterministic `FindPlacement` selection, which checks reachable floor, footprints, feature clearance and actor separation. Gates are isolated connected lock components; never place independent authored gates so their cells touch. Adjacent lock cells intentionally mean one key/one gate. Later authored-room work must either respect this constraint or introduce explicit compatible gate identity.
 
 Keep schema-1 serialized layouts intact. New geometry applies only to newly generated ruins. Part 2 may refine floors/walls, environmental depth and occlusion; Part 3 will introduce authored room/landmark integration. This milestone introduces neither a room-template framework nor additional adventure content.
+
+## Environment art and future landmarks
+
+Use `EnvironmentStyle` for the shared palette and cosmetic revision/hash, and `EnvironmentArtGenerator` for bounded integer-pixel floor/wall recipes. Atlases are generated once by `EnvironmentAssetCache`; do not make per-tile textures. Interactive objects remain existing `RegionState.Features` consumed by `FeatureView`. Nonblocking visual slots belong in `EnvironmentDecoration`, with stable ground-contact pivots and the actor Y-sort parent. Preserve saved terrain and gameplay RNG when extending themes. See `PR5_PART2_HANDOFF.md`; full landmark authoring remains Part 3.

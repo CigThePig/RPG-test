@@ -34,7 +34,7 @@ Part 1 implements the procedural spatial foundation: 11×11 logical cells, 9×9 
 Milestones on the same draft PR:
 
 1. Dungeon scale and traversal — completed, including foreground-wall depth.
-2. Procedural environmental art and rendering architecture — current; see `PR5_PART2_HANDOFF.md`.
+2. Procedural environmental art and rendering architecture — implemented and verified; physical S25 acceptance pending; see `PR5_PART2_HANDOFF.md`.
 3. Handcrafted landmarks, environmental themes and procedural decoration.
 4. Integrated RPG exploration adventure and final verification.
 

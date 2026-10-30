@@ -27,3 +27,15 @@
 | Artwork tooling | PPC offline exporter | Original sheet/environment algorithms | Arbitrary family/seed catalogs, matching pixels and metadata |
 
 Custom adapters are explicitly distinguished from imported source. No claim is made that Skelerealms supplies our actor, persistence, inventory or combat implementation. Those conflicting modules were inspected and not imported.
+
+## PR5 environment presentation
+
+| Responsibility | Presentation owner | Gameplay boundary |
+| --- | --- | --- |
+| Materials and cosmetic variation | `EnvironmentStyle`, `EnvironmentArtGenerator` | Stable coordinate/seed hashing; no World RNG |
+| Reusable procedural atlases | `EnvironmentAssetCache`, `TerrainBatch` | Two bounded shared textures; no terrain ownership |
+| Ground and raised walls | `TerrainView`, `TerrainWallRow` | Consume serialized tiles; preserve front-edge actor Y sorting |
+| Interactive prop appearance | `FeatureView` | Consume existing feature/spent/selected state; World/Gloot still own results |
+| Noninteractive vegetation/rubble | `EnvironmentDecoration` | Bounded nonblocking views, never added to features or saves |
+
+See `PR5_PART2_HANDOFF.md` for API contracts, evidence and measured costs. F10 is a development shortcut for existing Diagnostics region entry/return actions; Android smoke uses the same World.Enter and production views.

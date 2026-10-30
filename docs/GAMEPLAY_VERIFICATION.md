@@ -78,3 +78,5 @@ The existing `tools/gameplay-verify.py --presets baseline,precise` command also 
 ## PR5 Part 2 environment presentation
 
 See [PR5_PART2_HANDOFF.md](PR5_PART2_HANDOFF.md) for the shared floor/wall atlases, cosmetic hashing, PPC natural-art pivots, bounded nonblocking decoration, production reference scenes and exact-source verification. Region/gameplay authority and Part 1 front-edge wall Y sorting remain unchanged. `--visual-check --environment-only` runs focused real-renderer references and repeated region rebuild measurements; add `--mobile-ui` for the phone layout.
+
+The extended installed-Android smoke also uses the F10 developer region-entry shortcut for three generated-ruin Attack/Dodge/return cycles. It requires real completion events with a bounded timeout and stable wall/decoration/atlas counts. F10 delegates to the existing World.Enter/Diagnostics route and leaves the reversible combat course first. This covers exported-region rendering and repeated transitions; the full key/gate/relic expedition remains the separate production-touch movie fixture, and S25 physical acceptance remains manual.
