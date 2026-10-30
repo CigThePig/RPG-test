@@ -38,7 +38,7 @@ public static class DungeonVisualChecks
                 {
                     await Frames(app,1);double now=clock.Elapsed.TotalMilliseconds;intervals.Add(now-last);last=now;
                 }
-                intervals.Sort();stats.Add(new{legacy,seed=42,cell,interior=cell-2,passage=legacy?1:3,zoom=camera.Zoom.X,width=r.Width,height=r.Height,terrainBuildMs=TerrainView.LastBuildMilliseconds,p50ms=intervals[45],p95ms=intervals[85],renderer=RenderingServer.GetVideoAdapterName()});
+                intervals.Sort();stats.Add(new{legacy,seed=42,cell,interior=cell-2,passage=legacy?1:3,zoom=camera.Zoom.X,width=r.Width,height=r.Height,terrainBuildMs=TerrainView.LastBuildMilliseconds+TerrainWallRow.BuildMilliseconds,wallBuildMs=TerrainWallRow.BuildMilliseconds,p50ms=intervals[45],p95ms=intervals[85],renderer=RenderingServer.GetVideoAdapterName()});
                 // Equivalent first open graph edge, same seed and scan ordering.
                 int door=-1;V direction=V.Zero;
                 for(int y=0;y<r.Height && door<0;y+=cell)for(int x=0;x<r.Width && door<0;x+=cell)

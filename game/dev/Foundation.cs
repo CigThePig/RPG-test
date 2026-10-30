@@ -110,7 +110,13 @@ public partial class Foundation : Node2D
     public bool CanManageItems => !suspended && World.Player.Alive && !Narrative.Get("speaking").AsBool() && !ui.MenuOpen;
     public bool ManageItem(Func<bool> operation) => CanManageItems && operation();
     public bool UseQuickItem(string selector) => !GameplayBlocked && World.UseItem(World.Player, selector);
-    public void ShowCharacters(bool show) => actors.Visible = show;
+    bool showCharacters = true;
+    public void ShowCharacters(bool show)
+    {
+        showCharacters = show;
+        foreach (var view in Views.Values) view.Visible = show && view.State.Region == World.Player.Region;
+        foreach (var feature in features) feature.Visible = show;
+    }
     Node items = null !, planner = null !;
     RpgUi ui = null !;
     Camera2D camera = null !;
@@ -118,6 +124,7 @@ public partial class Foundation : Node2D
     Dictionary<string, Texture2D> art = new();
     string drawnRegion = "";
     readonly List<FeatureView> features = new();
+    readonly List<TerrainWallRow> wallRows = new();
     public bool CollisionDebug { get; set; }
     public double SimulationMs { get; private set; }
     Node2D ground = null !;
@@ -417,7 +424,7 @@ public partial class Foundation : Node2D
         else { CombatEffects.Advance((float)delta); CombatCamera.Advance((float)delta); }
         foreach (var(id, view)in Views)
         {
-            view.Visible = World.Actors[id].Region == player.Region;
+            view.Visible = showCharacters && World.Actors[id].Region == player.Region;
             // A player death blocks gameplay but must not freeze the defeat pose.
             view.Creature.Paused = !view.Visible || PresentationBlocked || (!player.Alive && view.State.Alive);
             view.HasLoot = !view.State.Alive && World.Items.HasLoot(id);
@@ -604,6 +611,10 @@ public partial class Foundation : Node2D
             Art = art
         };
         ground.AddChild(tilemap);
+        foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
+        wallRows.Clear();
+        wallRows.AddRange(TerrainWallRow.Create(r));
+        foreach (var row in wallRows) actors.AddChild(row);
         foreach (var feature in features) { actors.RemoveChild(feature); feature.QueueFree(); }
         features.Clear();
         var gates = r.GateGroups();
@@ -612,7 +623,7 @@ public partial class Foundation : Node2D
             int[] gate = kind == "lock" ? gates.Single(g => Array.BinarySearch(g, at) >= 0) : Array.Empty<int>();
             if (gate.Length > 0 && gate[0] != at) continue;
             var pos = r.Center(at);
-            var feature = new FeatureView { Kind = kind, GateCells = gate,
+            var feature = new FeatureView { Kind = kind, GateCells = gate, Visible = showCharacters,
                 GateOffsets = gate.Select(cell => GodotConvert.GroundToScreen(r.Center(cell).X-pos.X, r.Center(cell).Y-pos.Y)).ToArray(),
                 Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
             feature.SetMeta("tile",at);
@@ -774,10 +785,12 @@ public partial class TerrainView : Node2D
                 int at=y*Region.Width+x;
                 var tile=Region.Tiles[at];
                 var p=GodotConvert.GroundToScreen(x*24,y*24);
-                if(tile is Terrain.Rock or Terrain.Wall)
+                // Raised dungeon walls live in TerrainWallRow beside the actors.
+                // Natural rocks retain their established overworld rendering here.
+                if(tile == Terrain.Rock)
                 {
-                    float rise=tile==Terrain.Wall ? 14 : 8;
-                    batch.Rect(new Rect2(p+new Vector2(0,-rise),new Vector2(24,12)),new Color(tile==Terrain.Wall ? "4d5d60" : "697268"));
+                    float rise=8;
+                    batch.Rect(new Rect2(p+new Vector2(0,-rise),new Vector2(24,12)),new Color("697268"));
                     batch.Rect(new Rect2(p+new Vector2(0,12-rise),new Vector2(24,rise)),new Color("354344"));
                     batch.Line(p+new Vector2(0,-rise),p+new Vector2(24,-rise),new Color("92988a"),1);
                     batch.Line(p+new Vector2(3,-rise+4),p+new Vector2(13,-rise+4),new Color("7d8477"),1);

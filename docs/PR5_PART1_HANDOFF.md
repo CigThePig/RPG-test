@@ -120,3 +120,13 @@ All runtime verification and the APK below use **`c949175fd6e6144bb3d04a52824d64
 **Download:** [Verified ARM64 development APK ZIP — c949175fd6e6](https://github.com/CigThePig/RPG-test/actions/runs/40950726160/artifacts/12932066317). Extract and install the `.apk`, not the x86_64 emulator package. The artifact also includes metadata/checksums and is retained until November 28, 2026.
 
 [Draft PR #5](https://github.com/CigThePig/RPG-test/pull/5) targets main on `feat/dungeon-exploration`. Parts 2–4 remain future work; do not merge. No outstanding inline review threads were present at the final review check.
+
+## Follow-up: wall depth sorting from phone feedback
+
+The phone screenshot revealed a real draw-order defect: all raised wall geometry was in the background terrain mesh at Z=-10, so every character painted over it. The spacious geometry did not correct this. Raised wall rows now share the existing actor/feature Y-sort layer, anchored at their front ground edge. Opaque foreground walls cover the lower character silhouette; actors standing in front cover the wall. Doorway gaps contain no occluding geometry. Floors stay in their background batch, and natural rocks retain their existing rendering.
+
+There is one mesh/node per wall-containing row (33 in the seed-42 fixture), never one per tile. No geometry, collision, movement, combat or saved-state rules change. Both newly generated and previously saved ruins use corrected depth rendering without regenerating their layouts.
+
+The full headless suite still passes 4,521 assertions. Desktop and mobile rendered suites now also pass actual pixel checks: 694 formerly overlapping pixels correctly covered by foreground wall, 1,140 visible upper-silhouette pixels, 1,446 pixels establishing front-side visibility, and zero pixel differences across a clear doorway. These counts describe this fixture, not all possible silhouettes. The wall-only/background references and old-order reproduction use the real viewport. The fix is actor-agnostic because all CharacterViews share the same ground-depth container.
+
+Replacement exact-source CI/APK links will be added after verification. Earlier APK c949175fd6e6 and its evidence above remain the historical Part 1 baseline and do not contain this correction.

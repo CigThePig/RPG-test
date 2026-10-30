@@ -393,6 +393,10 @@ public static class VisualChecks
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
+        if(OS.GetCmdlineUserArgs().Contains("--wall-depth-only"))
+        {
+            await WallDepthChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return;
+        }
         if(OS.GetCmdlineUserArgs().Contains("--controls-only"))
         {
             await MobileCombatControlsChecks.Rendered(app);
@@ -629,6 +633,7 @@ public static class VisualChecks
         app.World.Enter(app.World.Player, "ruin");
         await Capture(app, "dungeon");
         await DungeonVisualChecks.Run(app);
+        await WallDepthChecks.Run(app);
         app.World.Enter(app.World.Player, "reach");
         if (app.Ui.MobileLayout) await Capture(app, "controls");
         app.Ui.Workshop();
