@@ -31,11 +31,14 @@ public sealed class LandmarkTemplate
     public LandmarkAnchor[] Anchors { get; set; } = Array.Empty<LandmarkAnchor>();
 }
 // Resolved manifest, not a pointer back into mutable template content. Terrain is
-// always the saved tile array. Old schema-1 regions default to an empty list.
+// always the saved tile array.
 public sealed class LandmarkRoom
 {
+    // Layout cell, plus the absolute tile origin of the template frame (core minus one).
     public int X { get; set; }
     public int Y { get; set; }
+    public int OriginX { get; set; }
+    public int OriginY { get; set; }
     public string Template { get; set; } = "";
     public int Revision { get; set; }
     public int Rotation { get; set; }
@@ -116,17 +119,12 @@ public static class Landmarks
             Need(a.Collision!="cosmetic" || t.Layout[a.Y-1][a.X-1]=='.',"cosmetic anchor on blocker");
         }
     }
-    public static string[] Classify(RegionState r,int x,int y,int doors)
+    public static string[] Classify(RegionState r,DungeonRoom room)
     {
-        string feature=r.Features.GetValueOrDefault((y*11+5)*r.Width+x*11+5,"");
+        string feature=r.Features.GetValueOrDefault(room.CenterY*r.Width+room.CenterX,"");
         string primary=feature switch {"exit"=>"entrance","relic"=>"objective","key"=>"key","chest"=>"chest",_=>"ordinary"};
-        int count=Enumerable.Range(0,4).Count(i=>(doors&(1<<i))!=0);
+        int count=Enumerable.Range(0,4).Count(i=>(room.Doors&(1<<i))!=0);
         return new[]{primary,count==1?"dead-end":count==4?"hub":count==3?"junction":"ordinary"}.Distinct().ToArray();
-    }
-    public static int Doors(RegionState r,int x,int y)
-    {
-        int mid=(y*11+5)*r.Width+x*11+5;
-        return (r.Tiles[mid-5*r.Width]==Terrain.Floor?1:0)|(r.Tiles[mid+5]==Terrain.Floor?2:0)|(r.Tiles[mid+5*r.Width]==Terrain.Floor?4:0)|(r.Tiles[mid-5]==Terrain.Floor?8:0);
     }
     public static uint Hash(int seed,int x,int y,int slot=0)
     {
@@ -141,13 +139,13 @@ public static class Landmarks
         var timer=Stopwatch.StartNew();LastValidationMilliseconds=LastSelectionMilliseconds=0;rejections.Clear();
         if(r.Landmarks.Count!=0)throw new InvalidOperationException("Never recompose an existing region");
         // Admit mission landmarks before optional rooms can consume structural budget.
-        var cells=Enumerable.Range(0,r.Height/11).SelectMany(y=>Enumerable.Range(0,r.Width/11).Select(x=>(X:x,Y:y)))
-            .Where(c=>r.Tiles[(c.Y*11+5)*r.Width+c.X*11+5]==Terrain.Floor)
-            .OrderBy(c=>r.Features.GetValueOrDefault((c.Y*11+5)*r.Width+c.X*11+5,"") switch {"exit"=>0,"relic"=>1,"key"=>2,"chest"=>3,_=>4}).ThenBy(c=>c.Y).ThenBy(c=>c.X);
+        // Halls are corridor junctions and never receive templates.
+        var cells=r.Rooms.Where(c=>c.Kind=="room")
+            .OrderBy(c=>r.Features.GetValueOrDefault(c.CenterY*r.Width+c.CenterX,"") switch {"exit"=>0,"relic"=>1,"key"=>2,"chest"=>3,_=>4}).ThenBy(c=>c.Y).ThenBy(c=>c.X);
         foreach(var cell in cells)
         {
             int x=cell.X,y=cell.Y;
-            int doors=Doors(r,x,y);var roles=Classify(r,x,y,doors);
+            int doors=cell.Doors;var roles=Classify(r,cell);
             var selectionTimer=Stopwatch.StartNew();
             var options=Library.SelectMany(t=>t.Rotations.Where(turn=>Compatible(t,roles,doors,turn)).Select(turn=>(Template:t,Turn:turn)))
                 .OrderBy(o=>Hash(r.Seed,x,y,unchecked((int)IdHash(o.Template.Id)+o.Turn*97))).ThenBy(o=>o.Template.Id,StringComparer.Ordinal).ThenBy(o=>o.Turn).ToArray();
@@ -155,18 +153,19 @@ public static class Landmarks
             bool applied=false;
             foreach(var option in options)
             {
-                if(TryApply(r,x,y,doors,roles,option.Template,option.Turn)){applied=true;break;}
+                if(TryApply(r,cell,doors,roles,option.Template,option.Turn)){applied=true;break;}
                 string reason=$"seed={r.Seed} room={x},{y} template={option.Template.Id}@{option.Template.Revision} rotation={option.Turn}: {LastCandidateFailure}";
                 rejections.Add(reason);Godot.GD.Print("LANDMARK CANDIDATE REJECTED: "+reason);
             }
-            if(!applied)r.Landmarks.Add(new LandmarkRoom{X=x,Y=y,Template="safe-open",Revision=1,Doors=doors,Roles=roles,Theme=Zone(r.Seed,x,y)});
+            if(!applied)r.Landmarks.Add(new LandmarkRoom{X=x,Y=y,OriginX=cell.CoreX-1,OriginY=cell.CoreY-1,Template="safe-open",Revision=1,Doors=doors,Roles=roles,Theme=Zone(r.Seed,x,y)});
         }
         if(!DungeonValidator.Solvable(r))throw new InvalidOperationException("Landmark composition violated mission integrity for seed "+r.Seed);
         LastComposeMilliseconds=timer.Elapsed.TotalMilliseconds;
     }
-    static string Zone(int seed,int x,int y) => Hash(seed,x/2,y/2,31)%3==0?"overgrown":"weathered";
-    public static bool TryApply(RegionState r,int x,int y,int doors,string[] roles,LandmarkTemplate t,int rotation)
+    public static string Zone(int seed,int x,int y) => Hash(seed,x/2,y/2,31)%3==0?"overgrown":"weathered";
+    public static bool TryApply(RegionState r,DungeonRoom cell,int doors,string[] roles,LandmarkTemplate t,int rotation)
     {
+        int x=cell.X,y=cell.Y,ox=cell.CoreX-1,oy=cell.CoreY-1;
         LastCandidateFailure="role/doorway mismatch";
         if(!Compatible(t,roles,doors,rotation))return false;
         LastCandidateFailure="structural node budget exhausted";
@@ -174,16 +173,16 @@ public static class Landmarks
         var changed=new List<int>();
         for(int ly=1;ly<=9;ly++)for(int lx=1;lx<=9;lx++)if(t.Layout[ly-1][lx-1]=='#')
         {
-            var p=Rotate(lx,ly,rotation);int at=(y*11+p.Y)*r.Width+x*11+p.X;
+            var p=Rotate(lx,ly,rotation);int at=(oy+p.Y)*r.Width+ox+p.X;
             LastCandidateFailure=$"terrain/feature conflict at local {p.X},{p.Y}";
             if(r.Tiles[at]!=Terrain.Floor || r.Features.Any(f=>f.Value!="lock" && V.Distance(r.Center(f.Key),r.Center(at))<60))return false;
             changed.Add(at);
         }
         foreach(int at in changed)r.Tiles[at]=Terrain.Wall;
-        var timer=Stopwatch.StartNew();bool safe=RoomSafe(r,x,y);LastValidationMilliseconds+=timer.Elapsed.TotalMilliseconds;
+        var timer=Stopwatch.StartNew();bool safe=RoomSafe(r,cell);LastValidationMilliseconds+=timer.Elapsed.TotalMilliseconds;
         LastCandidateFailure="radius-11 footprint or protected lane disconnected";
         if(!safe){foreach(int at in changed)r.Tiles[at]=Terrain.Floor;return false;}
-        var room=new LandmarkRoom{X=x,Y=y,Template=t.Id,Revision=t.Revision,Rotation=rotation,Doors=doors,Roles=roles,Theme=t.Theme=="zone"?Zone(r.Seed,x,y):t.Theme};
+        var room=new LandmarkRoom{X=x,Y=y,OriginX=ox,OriginY=oy,Template=t.Id,Revision=t.Revision,Rotation=rotation,Doors=doors,Roles=roles,Theme=t.Theme=="zone"?Zone(r.Seed,x,y):t.Theme};
         var focal=Rotate(t.Focal[0],t.Focal[1],rotation);room.FocalX=focal.X;room.FocalY=focal.Y;
         int slot=0;
         foreach(var a in t.Anchors)
@@ -194,23 +193,23 @@ public static class Landmarks
         }
         r.Landmarks.Add(room);LastCandidateFailure="";return true;
     }
-    public static bool RoomSafe(RegionState r,int x,int y)
+    public static bool RoomSafe(RegionState r,DungeonRoom cell)
     {
-        // Largest production radius is 11. Flood actual swept circular footprints,
-        // not only point connectivity. No doors are opened/mutated by validation.
-        var actor=new ActorState{Radius=11};int mid=(y*11+5)*r.Width+x*11+5;
+        // Largest production radius is 11. Flood actual swept circular footprints across
+        // the whole room shape, not only point connectivity. No doors are opened/mutated.
+        var actor=new ActorState{Radius=11};int mid=cell.CenterY*r.Width+cell.CenterX;
         var seen=new HashSet<int>{mid};var queue=new Queue<int>();queue.Enqueue(mid);
         while(queue.Count>0)
         {
             int at=queue.Dequeue();
             foreach(int n in r.Neighbours(at))
-                if(n%r.Width/11==x && n/r.Width/11==y && !seen.Contains(n) && r.CanTravel(r.Center(at),r.Center(n),actor,true)){seen.Add(n);queue.Enqueue(n);}
+                if(cell.Contains(n%r.Width,n/r.Width) && !seen.Contains(n) && r.CanTravel(r.Center(at),r.Center(n),actor,true)){seen.Add(n);queue.Enqueue(n);}
         }
-        for(int ly=1;ly<=9;ly++)for(int lx=1;lx<=9;lx++)
+        foreach(var (tx,ty) in cell.Tiles())
         {
-            int at=(y*11+ly)*r.Width+x*11+lx;
+            int at=ty*r.Width+tx,lx=tx-cell.CoreX+1,ly=ty-cell.CoreY+1;
             if(r.Tiles[at]==Terrain.Floor && !seen.Contains(at))return false;
-            if(Protected(lx,ly) && r.Tiles[at]!=Terrain.Floor)return false;
+            if(lx is >=1 and <=9 && ly is >=1 and <=9 && Protected(lx,ly) && r.Tiles[at]!=Terrain.Floor)return false;
         }
         return true;
     }
@@ -218,16 +217,18 @@ public static class Landmarks
     {
         if(r.Landmarks!=null && r.Landmarks.All(l=>l!=null && l.Anchors!=null) && r.Landmarks.Sum(l=>l.Anchors.Count(a=>a!=null && a.Collision=="terrain"))>96)throw new InvalidDataException("Saved landmark node budget exceeded");
         if(r.Landmarks==null || r.Landmarks.Any(l=>l==null || l.Anchors==null || l.Roles==null || l.Template==null) || r.Landmarks.Count>r.Tiles.Length/121 || r.Landmarks.Select(l=>(l.X,l.Y)).Distinct().Count()!=r.Landmarks.Count)throw new InvalidDataException("Invalid landmark room count/identity");
+        if(r.Rooms==null || r.Passages==null || r.Rooms.Any(c=>c==null || c.Rects==null || c.Rects.Count==0 || c.Kind is not ("room" or "hall") || c.Rects.Any(q=>q==null || q.Length!=4 || q[0]<1 || q[1]<1 || q[2]<1 || q[3]<1 || q[0]+q[2]>=r.Width || q[1]+q[3]>=r.Height)) || r.Passages.Any(p=>p==null || p.X<1 || p.Y<1 || p.X+2>=r.Width || p.Y+2>=r.Height || p.Dx+p.Dy!=1 || p.Dx*p.Dy!=0))
+            throw new InvalidDataException("Invalid saved dungeon rooms/passages");
         foreach(var room in r.Landmarks)
         {
-            if(room.X<0 || room.Y<0 || room.X*11+10>=r.Width || room.Y*11+10>=r.Height || room.Revision<1 || room.FocalX is <1 or >9 || room.FocalY is <1 or >9 || room.Rotation is <0 or >3 || !Themes.Contains(room.Theme) || room.Anchors.Count>24 || room.Doors is <1 or >15 || room.Template.Length==0 || room.Roles.Length==0 || room.Roles.Any(role=>!Roles.Contains(role)))throw new InvalidDataException("Invalid saved landmark "+room.Template);
+            if(room.X<0 || room.Y<0 || room.OriginX<0 || room.OriginY<0 || room.OriginX+10>=r.Width || room.OriginY+10>=r.Height || room.Revision<1 || room.FocalX is <1 or >9 || room.FocalY is <1 or >9 || room.Rotation is <0 or >3 || !Themes.Contains(room.Theme) || room.Anchors.Count>24 || room.Doors is <1 or >15 || room.Template.Length==0 || room.Roles.Length==0 || room.Roles.Any(role=>!Roles.Contains(role)))throw new InvalidDataException("Invalid saved landmark "+room.Template);
             foreach(var a in room.Anchors)
             {
                 if(a==null)throw new InvalidDataException("Null saved landmark anchor");
                 if(a.X is <1 or >9 || a.Y is <1 or >9 || !Assets.Contains(a.Asset) || !Categories.Contains(a.Category) || a.Collision is not ("terrain" or "cosmetic") || a.Priority is <0 or >4 || a.Facing is <0 or >3 || a.Variant is <0 or >2)throw new InvalidDataException("Invalid saved landmark anchor "+room.Template);
                 bool structuralAsset=new[]{"column","shelf","altar","storage","collapse"}.Contains(a.Asset);
                 if((a.Collision=="terrain")!=structuralAsset || (a.Collision=="terrain" && a.Category!="tall") || (a.Collision=="cosmetic" && a.Category is not ("ground" or "low")))throw new InvalidDataException("Saved landmark asset/collision mismatch "+room.Template);
-                int at=(room.Y*11+a.Y)*r.Width+room.X*11+a.X;
+                int at=(room.OriginY+a.Y)*r.Width+room.OriginX+a.X;
                 if(a.Collision=="terrain" && r.Tiles[at]!=Terrain.Wall)throw new InvalidDataException("Saved landmark/terrain disagreement "+room.Template);
             }
         }

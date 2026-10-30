@@ -21,7 +21,7 @@ public partial class EnvironmentDecoration : Node2D
             int asset=Array.IndexOf(new[]{"column","shelf","altar","storage","collapse"},a.Asset);
             if(asset<0)continue;
             result.Add(new EnvironmentDecoration {
-                Position=GodotConvert.GroundToScreen((room.X*11+a.X+.5f)*24,(room.Y*11+a.Y+1f)*24),
+                Position=GodotConvert.GroundToScreen((room.OriginX+a.X+.5f)*24,(room.OriginY+a.Y+1f)*24),
                 PropModule=(Array.IndexOf(Landmarks.Themes,room.Theme)*5+asset)*3+a.Variant,
                 TextureFilter=TextureFilterEnum.Nearest });
         }
@@ -34,7 +34,7 @@ public partial class EnvironmentDecoration : Node2D
                 if(tile is not (Terrain.Grass or Terrain.Floor) || h%29!=0)continue;
                 // Keep all feature stands, doorway lanes and arrival clear of tall silhouettes.
                 if(r.Features.Keys.Any(f=>Math.Abs(f%r.Width-x)<3 && Math.Abs(f/r.Width-y)<3))continue;
-                if(tile==Terrain.Floor && (x%11 is 0 or 1 or 4 or 5 or 6 or 9 or 10 || y%11 is 0 or 1 or 4 or 5 or 6 or 9 or 10))continue;
+                if(tile==Terrain.Floor && !RubbleAllowed(r,x,y))continue;
                 string key=h%4==0?"tree1":h%4==1?"rock1":"bush1";
                 art.TryGetValue(key,out var texture);
                 result.Add(new EnvironmentDecoration
@@ -46,6 +46,17 @@ public partial class EnvironmentDecoration : Node2D
                 });
             }
         return result;
+    }
+    // Rubble stays inside rooms, off the core's protected cross and perimeter lanes and
+    // off room edges, so corridors and their doorways read as clear passages.
+    static bool RubbleAllowed(RegionState r,int x,int y)
+    {
+        var room=r.RoomAt(x,y);
+        if(room==null || room.Kind!="room" || !room.Contains(x,y))return false;
+        if(!room.Contains(x-1,y) || !room.Contains(x+1,y) || !room.Contains(x,y-1) || !room.Contains(x,y+1))return false;
+        int lx=x-room.CoreX+1,ly=y-room.CoreY+1;
+        bool Lane(int n) => n is 0 or 1 or 4 or 5 or 6 or 9 or 10;
+        return !(lx is >=0 and <=10 && Lane(lx) || ly is >=0 and <=10 && Lane(ly));
     }
     public override void _Draw()
     {

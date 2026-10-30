@@ -35,7 +35,7 @@ public sealed class DungeonTraversalReplay
     {
         var p=world.Player;
         if(Complete)return V.Zero;
-        if(p.Region=="ruin")Rooms.Add((int)(p.Y/(11*24))*1000+(int)(p.X/(11*24)));
+        if(p.Region=="ruin")Rooms.Add((int)(p.Y/(DungeonGeometry.Cell*24))*1000+(int)(p.X/(DungeonGeometry.Cell*24)));
         if(delay-->0)return V.Zero;
         if(action=="dodge")
         {

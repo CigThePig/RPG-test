@@ -449,7 +449,7 @@ public static class FoundationChecks
             bool rejected = false;
             try
             {
-                Persistence.Restore(w, app.Narrative, save.Replace("rpg-regions-1", "incompatible"));
+                Persistence.Restore(w, app.Narrative, save.Replace(Regions.Version, "incompatible"));
             }
             catch (InvalidDataException)
             {

@@ -22,37 +22,25 @@ public static class DungeonVisualChecks
         {
             Engine.TimeScale=0;
             foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
-            foreach(bool legacy in new[]{true,false})
             {
-                var r=legacy?JsonSerializer.Deserialize<RegionState>(Godot.FileAccess.GetFileAsString("res://game/tests/fixtures/pr4-seed42-region.json"),Content.Json)!:Regions.Dungeon(42);
+                var r=Regions.Dungeon(42);
                 r.Id="ruin";w.RegionsById["ruin"]=r;
                 var p=w.Player;p.Region="ruin";w.Cancel(p);p.Health=p.MaxHealth;p.Invulnerable=1000;
-                int cell=legacy?7:11,center=cell/2;
                 var room=r.Center(r.Entrance);p.X=room.X;p.Y=room.Y;
                 app.RebuildViews();app.ResumeGame();
-                string tag=legacy?"before":"after";
-                await Capture(app,tag+"-room");
+                await Capture(app,"room");
                 var camera=app.GetViewport().GetCamera2D();
                 var intervals=new List<double>();var clock=Stopwatch.StartNew();double last=clock.Elapsed.TotalMilliseconds;
                 for(int frame=0;frame<90;frame++)
                 {
                     await Frames(app,1);double now=clock.Elapsed.TotalMilliseconds;intervals.Add(now-last);last=now;
                 }
-                intervals.Sort();stats.Add(new{legacy,seed=42,cell,interior=cell-2,passage=legacy?1:3,zoom=camera.Zoom.X,width=r.Width,height=r.Height,terrainBuildMs=TerrainView.LastBuildMilliseconds+TerrainWallRow.BuildMilliseconds,wallBuildMs=TerrainWallRow.BuildMilliseconds,p50ms=intervals[45],p95ms=intervals[85],renderer=RenderingServer.GetVideoAdapterName()});
-                // Equivalent first open graph edge, same seed and scan ordering.
-                int door=-1;V direction=V.Zero;
-                for(int y=0;y<r.Height && door<0;y+=cell)for(int x=0;x<r.Width && door<0;x+=cell)
-                    foreach(var d in new[]{new V(1,0),new V(0,1)})
-                    {
-                        int at=(y+center+(int)d.Y*center)*r.Width+x+center+(int)d.X*center;
-                        if(r.Tiles[at]!=Terrain.Floor||r.Features.ContainsKey(at))continue;
-                        door=at;direction=d;break;
-                    }
-                if(door<0)throw new InvalidOperationException("No ordinary visual doorway");
-                var doorway=r.Center(door)+direction*12;p.X=doorway.X;p.Y=doorway.Y;app.RebuildViews();
-                await Capture(app,tag+"-doorway");
-                if(legacy)continue;
-                w.Move(p,direction*48);app.Views["player"].SnapPosition();await Capture(app,"adjacent-room");
+                intervals.Sort();stats.Add(new{seed=42,cell=DungeonGeometry.Cell,core=DungeonGeometry.Core,passage=DungeonGeometry.Opening,rooms=r.Rooms.Count(c=>c.Kind=="room"),halls=r.Rooms.Count(c=>c.Kind=="hall"),zoom=camera.Zoom.X,width=r.Width,height=r.Height,terrainBuildMs=TerrainView.LastBuildMilliseconds+TerrainWallRow.BuildMilliseconds,wallBuildMs=TerrainWallRow.BuildMilliseconds,p50ms=intervals[45],p95ms=intervals[85],renderer=RenderingServer.GetVideoAdapterName()});
+                // First ungated corridor crossing in generation order.
+                var passage=r.Passages.First(q=>!q.Locked);V direction=new(passage.Dx,passage.Dy);
+                var doorway=r.Center(passage.Y*r.Width+passage.X)+direction*12;p.X=doorway.X;p.Y=doorway.Y;app.RebuildViews();
+                await Capture(app,"doorway");
+                w.Move(p,direction*48);app.Views["player"].SnapPosition();await Capture(app,"corridor");
                 var gate=r.GateGroups().First();
                 int stand=gate.SelectMany(r.Neighbours).Distinct().Order().First(at=>r.CanStand(r.Center(at),p)&&gate.Any(g=>V.Distance(r.Center(g),r.Center(at))<48));
                 var atStand=r.Center(stand);p.X=atStand.X;p.Y=atStand.Y;app.RebuildViews();await Capture(app,"gate-closed");

@@ -30,7 +30,7 @@ public static class LandmarkVisualChecks
             void Show(RegionState region,LandmarkRoom room)
             {
                 region.Id="landmark-visual";w.RegionsById[region.Id]=region;p.Region=region.Id;
-                var center=region.Center((room.Y*11+5)*region.Width+room.X*11+5);p.X=center.X;p.Y=center.Y+48;p.Health=p.MaxHealth;p.Invulnerable=10000;w.Cancel(p);app.RebuildViews();app.ResumeGame();
+                var center=region.Center((room.OriginY+5)*region.Width+room.OriginX+5);p.X=center.X;p.Y=center.Y+48;p.Health=p.MaxHealth;p.Invulnerable=10000;w.Cancel(p);app.RebuildViews();app.ResumeGame();
             }
             string? selected=OS.GetCmdlineUserArgs().FirstOrDefault(s=>s.StartsWith("--landmark="))?.Split('=')[1];
             if(selected!=null)
@@ -38,7 +38,7 @@ public static class LandmarkVisualChecks
                 int Read(string arg,int value)=>int.TryParse(OS.GetCmdlineUserArgs().FirstOrDefault(s=>s.StartsWith(arg+"="))?.Split('=')[1],out int parsed)?parsed:value;
                 int turn=Read("--orientation",0),seed=Read("--visual-seed",42);
                 var t=Landmarks.Library.Single(t=>t.Id==selected);var fixture=LandmarkChecks.Fixture();fixture.Seed=seed;
-                if(!t.Rotations.Contains(turn) || !Landmarks.TryApply(fixture,0,0,Landmarks.RotateDoors(t.DoorMasks[0],turn),new[]{t.Roles[0]},t,turn))throw new InvalidDataException("Invalid preview orientation/template");
+                if(!t.Rotations.Contains(turn) || !Landmarks.TryApply(fixture,fixture.Rooms[0],Landmarks.RotateDoors(t.DoorMasks[0],turn),new[]{t.Roles[0]},t,turn))throw new InvalidDataException("Invalid preview orientation/template");
                 if(t.Roles.Contains("entrance"))fixture.Features[60]="exit";
                 if(t.Roles.Contains("objective"))fixture.Features[60]="relic";
                 Show(fixture,fixture.Landmarks[0]);
@@ -76,17 +76,17 @@ public static class LandmarkVisualChecks
             }
             var r=Regions.Dungeon(42);var entrance=r.Landmarks.Single(l=>l.Template=="ruined-entrance");Show(r,entrance);
             // Actual player movement along the room's protected lane.
-            var centerPoint=r.Center((entrance.Y*11+5)*r.Width+entrance.X*11+5);
+            var centerPoint=r.Center((entrance.OriginY+5)*r.Width+entrance.OriginX+5);
             p.X=centerPoint.X-72;p.Y=centerPoint.Y;app.Views["player"].SnapPosition();
             for(int step=0;step<48;step++)w.Move(p,new V(3,0));
             if(V.Distance(p.Position,centerPoint+new V(72,0))>.1f || !r.CanStand(p.Position,p))throw new InvalidOperationException("Rendered room crossing failed");
             using(var crossing=await Capture(app,"architecture-crossing")){}
-            int connection=Enumerable.Range(0,r.Tiles.Length).First(at=>at%r.Width%11==10 && at/r.Width%11==5 && at%r.Width<r.Width-1 && r.Tiles[at]==Terrain.Floor && r.Tiles[at+1]==Terrain.Floor);
+            var passage=r.Passages.First(q=>q.Dx==1);int connection=passage.Y*r.Width+passage.X;
             r.OpenDoors.UnionWith(r.GateAt(connection));var adjacent=r.Center(connection)+new V(12,0);p.X=adjacent.X;p.Y=adjacent.Y;app.RebuildViews();
             using(var adjacency=await Capture(app,"adjacent-rooms")){}
             // New structural column: exact-pixel foreground and background checks.
             Show(r,entrance);await Frames(app);var anchor=entrance.Anchors.First(a=>a.Asset=="column");
-            int pillar=(entrance.Y*11+anchor.Y)*r.Width+entrance.X*11+anchor.X;
+            int pillar=(entrance.OriginY+anchor.Y)*r.Width+entrance.OriginX+anchor.X;
             var point=r.Center(pillar);var parent=app.Views["player"].GetParent();
             var prop=parent.GetChildren().OfType<EnvironmentDecoration>().Single(d=>d.Position.DistanceTo(GodotConvert.GroundToScreen(point.X,point.Y+12))<.1f);
             p.X=point.X;p.Y=point.Y-12-p.Radius-1;app.Views["player"].SnapPosition();await Frames(app);

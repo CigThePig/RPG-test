@@ -91,4 +91,4 @@ For a focused rendered control iteration, run Godot with `-- --visual-check --mo
 
 ## PR5 dungeon verification
 
-Run the supported build/import/headless/desktop/mobile/replay commands from the assignment, plus the focused `--replay-only=dungeon-expedition` scenario documented in `GAMEPLAY_VERIFICATION.md`. Compatibility fixtures and capture provenance are in `game/tests/fixtures/README.md`. Detailed measurements, screenshot meanings, CI/APK identity and incomplete physical-device checks are in `PR5_PART1_HANDOFF.md`.
+Run the supported build/import/headless/desktop/mobile/replay commands from the assignment, plus the focused `--replay-only=dungeon-expedition` scenario documented in `GAMEPLAY_VERIFICATION.md`. The room/corridor geometry contract and its checks are in `DUNGEON_LAYOUT.md`. Historical PR5 measurements, CI/APK identity and incomplete physical-device checks are in the `PR5_PART*_HANDOFF.md` files.

@@ -8,7 +8,8 @@ public static class WallDepthChecks
 {
     static async System.Threading.Tasks.Task Frames(Foundation app, int count=4)
     {
-        for(int i=0;i<count;i++)await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);
+        // Time is frozen, so smoothing never moves the camera: snap it to each new fixture.
+        for(int i=0;i<count;i++){await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);app.Camera.ResetSmoothing();}
     }
     static async System.Threading.Tasks.Task<Image> Image(Foundation app, string? name=null)
     {
@@ -28,15 +29,17 @@ public static class WallDepthChecks
         try
         {
             Engine.TimeScale=0;w.Projectiles.Clear();w.Cancel(w.Player);
-            var r=Regions.Dungeon(42);r.Id="wall-depth";r.Features.Clear();r.OpenDoors.Clear();
-            w.RegionsById[r.Id]=r;var p=w.Player;p.Region=r.Id;
+            var p=w.Player;
+            // A real two-row wall with safe floor on either side, from the first seed that has one.
+            bool Fixture(RegionState region,int at) => at%region.Width is >2 && at%region.Width<region.Width-3 && region.Tiles[at]==Terrain.Wall && region.Tiles[at+region.Width]==Terrain.Wall &&
+                region.Tiles[at-region.Width]==Terrain.Floor && region.Tiles[at+2*region.Width]==Terrain.Floor &&
+                region.CanStand(new V(region.Center(at).X,at/region.Width*24-p.Radius-1),p) &&
+                region.CanStand(new V(region.Center(at).X,(at/region.Width+2)*24+p.Radius+1),p);
+            var r=Enumerable.Range(42,64).Select(Regions.Dungeon).First(region=>Enumerable.Range(region.Width*2,region.Tiles.Length-region.Width*4).Any(at=>Fixture(region,at)));
+            r.Id="wall-depth";r.Features.Clear();r.OpenDoors.Clear();
+            w.RegionsById[r.Id]=r;p.Region=r.Id;
             foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
-            // A real two-row shared boundary with safe floor on either side.
-            int wall=Enumerable.Range(r.Width*2,r.Tiles.Length-r.Width*4).First(at=>
-                at%r.Width%11==8 && at/r.Width%11==10 && r.Tiles[at]==Terrain.Wall && r.Tiles[at+r.Width]==Terrain.Wall &&
-                r.Tiles[at-r.Width]==Terrain.Floor && r.Tiles[at+2*r.Width]==Terrain.Floor &&
-                r.CanStand(new V(r.Center(at).X,at/r.Width*24-p.Radius-1),p) &&
-                r.CanStand(new V(r.Center(at).X,(at/r.Width+2)*24+p.Radius+1),p));
+            int wall=Enumerable.Range(r.Width*2,r.Tiles.Length-r.Width*4).First(at=>Fixture(r,at));
             float x=r.Center(wall).X,y=wall/r.Width*24;
             void Place(V point){p.X=point.X;p.Y=point.Y;app.Views["player"].SnapPosition();}
             p.X=x;p.Y=y-p.Radius-1;app.RebuildViews();app.ResumeGame();await Frames(app,16);
@@ -88,8 +91,9 @@ public static class WallDepthChecks
             int frontPixels=0;Pixels((px,py)=>{if(Different(front.GetPixel(px,py),incorrectlyAbove.GetPixel(px,py)))frontPixels++;});
             if(frontPixels<20)throw new InvalidOperationException("Actor in front was incorrectly hidden by the wall");
             foreach(var row in rows)row.ZIndex=0;
-            // Same shared boundary's centered three-tile doorway stays visibly open.
-            float doorX=(wall%r.Width/11*11+5.5f)*24;
+            // A north/south corridor crossing's three-tile opening stays visibly open.
+            var southward=r.Passages.First(q=>q.Dy==1);
+            float doorX=(southward.X+.5f)*24;y=(southward.Y+1)*24-24;
             var doorway=new V(doorX,y+24);
             if(!r.CanStand(doorway,p))throw new InvalidOperationException("Depth fixture doorway is not traversable");
             Place(doorway);await Frames(app,8);
@@ -107,8 +111,7 @@ public static class WallDepthChecks
             if(!r.CanStand(p.Position,p)||V.Distance(start,p.Position)>.1f)throw new InvalidOperationException("Depth fix changed doorway traversal");
             // East/west connection: assert its actual ground strip remains clear,
             // even though a tall head can legitimately extend behind its north wall.
-            int horizontal=Enumerable.Range(0,r.Tiles.Length).First(at=>at%r.Width%11==10 && at/r.Width%11==5 &&
-                at%r.Width>2 && at%r.Width<r.Width-3 && r.Tiles[at]==Terrain.Floor && r.Tiles[at+1]==Terrain.Floor);
+            var eastward=r.Passages.First(q=>q.Dx==1);int horizontal=eastward.Y*r.Width+eastward.X;
             var crossing=r.Center(horizontal)+new V(12,0);Place(crossing);await Frames(app,8);
             await Image(app,"horizontal-doorway");
             app.ShowCharacters(false);var horizontalWalls=await Image(app);
@@ -123,7 +126,9 @@ public static class WallDepthChecks
             w.Move(p,new V(96,0));w.Move(p,new V(-96,0));
             if(V.Distance(horizontalStart,p.Position)>.1f)throw new InvalidOperationException("Horizontal doorway traversal changed");
             // A real production tree view shares the same ground-contact sorting.
-            var treePoint=r.Center(r.Entrance);
+            // A room core away from the map edges, so the camera frames the whole tree.
+            var treeRoom=r.Rooms.Where(c=>c.Kind=="room").OrderBy(c=>Math.Abs(c.CenterX-r.Width/2)+Math.Abs(c.CenterY-r.Height/2)).First();
+            var treePoint=r.Center(treeRoom.CenterY*r.Width+treeRoom.CenterX);
             var tree=new FeatureView {Kind="wood",Art=new Dictionary<string,Texture2D>{{"tree1",GD.Load<Texture2D>("res://game/art/tree1.png")}},
                 Position=GodotConvert.GroundToScreen(treePoint.X,treePoint.Y)};
             parent.AddChild(tree);

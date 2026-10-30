@@ -1,5 +1,7 @@
 # PR5 Part 1 — Dungeon scale and traversal
 
+> **Superseded geometry and saves.** Part 1's one-room-per-cell grid (11×11 cells with fixed 9×9 interiors) was later replaced by variable rooms with a 9×9 minimum core, 3×3 halls and turning corridors. The current room/corridor layout, saved fields and checks are in [DUNGEON_LAYOUT.md](DUNGEON_LAYOUT.md). Earlier saves are no longer loaded.
+
 Latest wall-depth correction: **`59fc7ec3c9c9db97a7cecfda177cc247bc31257e`**. [Download the corrected ARM64 APK ZIP](https://github.com/CigThePig/RPG-test/actions/runs/40998033592/artifacts/12951683875). The wall-depth follow-up at the end records its verification; earlier Part 1 measurements and APKs below are historical baselines.
 
 ## Implemented spatial foundation
@@ -8,7 +10,7 @@ Base: merged PR4 `9eace0f1db3e4f2c7e5cc94cd2474eaa612cfe1b`, verified as main at
 
 The old adapter used 7×7 cells, 5×5 interiors and one-tile (24-unit) openings. Circular actor collision could technically fit while large PPC silhouettes and combat movement felt cramped. The upstream mission graph was not the cause.
 
-Final geometry exactly matches the starting target: 11×11 cells, 9×9 interiors (216×216 units), three-tile passages (72 units), center coordinate 5, one-tile enclosing boundary and unchanged 24-unit tiles. Each valid reciprocal cardinal graph edge carves three parallel floor lanes from its center through its own boundary. Adjacent cells carve the other half. Unoccupied cells, corners and unconnected boundaries remain blocked. No RNG consumption, mission grammar or logical topology changes are introduced.
+Part 1 shipped 11×11 cells with 9×9 interiors (216×216 units), three-tile passages (72 units), a one-tile enclosing boundary and unchanged 24-unit tiles; the 9×9 interior is now the minimum room core. Each valid reciprocal cardinal graph edge carves three parallel floor lanes from its center through its own boundary. Adjacent cells carve the other half. Unoccupied cells, corners and unconnected boundaries remain blocked. No RNG consumption, mission grammar or logical topology changes are introduced.
 
 The target leaves considerably more interior and lateral space at modest absolute map sizes; no further enlargement was justified by footprint checks or the inspected normal-zoom renders.
 
@@ -30,9 +32,7 @@ Mission features stay at room centers. Existing interaction range and visibility
 
 ## Persistence
 
-Schema 1 and `rpg-regions-1` are unchanged. Previously generated ruins retain their complete serialized tiles, dimensions, indices, locks, depleted features, actors, loot, inventory/equipment and quests. They remain narrow intentionally. Saves without a generated ruin keep their progress and create the expanded ruin on first entry. New ruins restore exactly and continue deterministically.
-
-The old executable produced `game/tests/fixtures/pr4-dungeon-save.json` before generator edits. It includes collected key/opened lock/depleted chest, a dead enemy and survivors, equipment/inventory and quest progress. Capture provenance and the synthetic chest detail are documented in the fixture README. Exact roundtrip and continued-save tests pass without writing user slots. No production persistence changes were required.
+New ruins restore exactly and continue deterministically; tests capture and restore in memory without writing user slots. Part 1 also kept pre-PR5 saves loadable; that compatibility (and its PR4 save fixtures) has since been dropped, and the generator identity is now `rpg-regions-2`.
 
 ## Verification and exact source
 

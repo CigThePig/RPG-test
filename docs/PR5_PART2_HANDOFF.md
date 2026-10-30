@@ -1,5 +1,7 @@
 # PR5 Part 2 — Procedural environmental art
 
+> **Superseded geometry and saves.** Part 2's renderer still applies; its room screenshots show the earlier fixed 11×11 grid, and its legacy-save notes no longer apply. The current room/corridor layout, saved fields and checks are in [DUNGEON_LAYOUT.md](DUNGEON_LAYOUT.md). Earlier saves are no longer loaded.
+
 ## Implementation and approach
 
 Continues `42b74baf210a6a7eb5ac99af86a3347cfe4e5a06` on the existing draft `feat/dungeon-exploration` branch. Keep PR #5 draft and unmerged.
@@ -29,7 +31,7 @@ Regenerate PPC originals with `node tools/export-art.mjs /tmp/catalog --family=b
 
 ## Saves and gameplay
 
-Schema 1, full saved terrain arrays, generator identity, region geometry, mission graph and all simulation code remain unchanged. No new authoritative save fields. Legacy narrow dungeons receive the same upgraded material renderer on their saved cells. Existing Part 1 legacy fixtures, gate progression and exact save roundtrips remain in the full integration suite. `EnvironmentArtChecks` adds bounded recipes, resource availability, cache reuse, boundary-coordinate hashing, decoration stability and a repeated real World input simulation with/without cosmetic work, requiring identical full serialized outcomes.
+Part 2 changed no region geometry, mission graph, simulation code or authoritative save fields. Gate progression and exact save roundtrips remain in the full integration suite. `EnvironmentArtChecks` adds bounded recipes, resource availability, cache reuse, boundary-coordinate hashing, decoration stability and a repeated real World input simulation with/without cosmetic work, requiring identical full serialized outcomes.
 
 ## Reproduction and evidence
 
@@ -54,7 +56,7 @@ Use a real display (Xvfb on Linux CI). This fixture includes existing generated 
 | Overworld | [Reach](environment-screenshots/environment-overworld.png) | [Reach](environment-screenshots/mobile-environment-overworld.png) |
 | Combat | [Live](environment-screenshots/environment-dungeon-combat-live.png) | [Live](environment-screenshots/mobile-environment-dungeon-combat-live.png) |
 
-All images are real viewport captures. The existing `dungeon-before-*` fixtures compare **legacy geometry using the current renderer**, not historical artwork; the explicitly named `environment-part1-*` images are from an untouched Part 1 checkout on this runner. Enlarged crops are supplemental only.
+All images are real viewport captures of the fixed-grid geometry of the time; the explicitly named `environment-part1-*` images are from an untouched Part 1 checkout on this runner. Enlarged crops are supplemental only.
 
 ## Verification and exact source
 

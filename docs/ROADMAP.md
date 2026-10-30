@@ -29,13 +29,13 @@ Part 4 implementation adds separated mobile combat/utility zones, stable control
 
 ## PR #5 — Dungeon scale, exploration spaces & landmark foundations
 
-Part 1 implements the procedural spatial foundation: 11×11 logical cells, 9×9 interiors, three-tile connectors, shared logical gates, physical-clearance and legacy-save coverage, deterministic seed/topology checks and actual viewport comparisons. See `PR5_PART1_HANDOFF.md` for exact verification and phone-only acceptance status.
+Part 1 implemented the procedural spatial foundation: three-tile connectors, shared logical gates, physical-clearance coverage, deterministic seed checks and actual viewport comparisons. Its fixed one-room-per-cell grid has since been replaced by variable rooms (9×9 minimum core plus wings), 3×3 halls and turning three-tile corridors; see `DUNGEON_LAYOUT.md`. `PR5_PART1_HANDOFF.md` records Part 1's own verification.
 
 Milestones on the same draft PR:
 
 1. Dungeon scale and traversal — completed, including foreground-wall depth.
 2. Procedural environmental art and rendering architecture — implemented and verified; physical S25 acceptance pending; see `PR5_PART2_HANDOFF.md`.
-3. Handcrafted landmarks, environmental themes and procedural decoration.
+3. Handcrafted landmarks, environmental themes and procedural decoration — implemented; followed by variable room shapes and corridors (`DUNGEON_LAYOUT.md`).
 4. Integrated RPG exploration adventure and final verification.
 
 Mosslight is a traditional fantasy action RPG; the flexible approximately 50/50 procedural/authored direction is a creative goal, not a numeric quota or a creature-collection system.

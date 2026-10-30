@@ -29,6 +29,9 @@ public sealed class RegionState
     public int Entrance { get; set; }
     public int Objective { get; set; }
     public List<LandmarkRoom> Landmarks { get; set; } = new();
+    public List<DungeonRoom> Rooms { get; set; } = new();
+    public List<DungeonPassage> Passages { get; set; } = new();
+    public DungeonRoom? RoomAt(int x, int y) => Rooms.FirstOrDefault(r => r.X == x / DungeonGeometry.Cell && r.Y == y / DungeonGeometry.Cell);
 
     public const int Tile = 24;
     public int Index(Vector2 p) => p.X < 0 || p.Y < 0 || p.X >= Width * Tile || p.Y >= Height * Tile ? -1 : (int)(p.Y / Tile) * Width + (int)(p.X / Tile);
@@ -49,9 +52,9 @@ public sealed class RegionState
         };
     }
 
-    // Gates are isolated cardinally connected lock components. Each shared room
-    // boundary owns one component; separate boundaries cannot touch (solid corners).
-    // Derived from serialized feature indices, so legacy two-cell gates need no migration.
+    // Gates are isolated cardinally connected lock components. Each locked passage
+    // owns one component; passages keep clear of block corners, so they never touch.
+    // Derived from serialized feature indices.
     public List<int[]> GateGroups()
     {
         var remaining = Features.Where(x => x.Value == "lock").Select(x => x.Key).ToHashSet();
@@ -173,20 +176,9 @@ public sealed class RegionState
     }
 }
 
-public static class DungeonGeometry
-{
-    public const int Cell = 11;
-    public const int Boundary = 1;
-    public const int Interior = Cell - Boundary * 2;
-    public const int Center = Cell / 2;
-    public const int Opening = 3;
-    public const int HalfOpening = Opening / 2;
-    public const int Reach = Center;
-}
-
 public static class Regions
 {
-    public const string Version = "rpg-regions-1";
+    public const string Version = "rpg-regions-2";
     public static RegionState Overworld(int seed, int width = 64, int height = 48)
     {
         if (width < 16 || height < 16 || width > 256 || height > 256)
@@ -261,78 +253,70 @@ public static class Regions
             if (layout == null || !ObstacleTowerGeneration.Helper.checkIsSolvable(layout.get2DMap(), layout.getCell(0)))
                 continue;
             var cells = layout.get2DMap();
-            int room = DungeonGeometry.Cell, w = cells.GetLength(0) * room, h = cells.GetLength(1) * room;
-            var r = new RegionState
-            {
-                Id = "ruin",
-                Seed = seed,
-            ContainersInitialized = false,
-            PlacementRevision = 1,
-                Width = w,
-                Height = h,
-                Tiles = Enumerable.Repeat(Terrain.Wall, w * h).ToArray()
-            };
-            for (int x = 0; x < cells.GetLength(0); x++)
-                for (int y = 0; y < cells.GetLength(1); y++)
+            int columns = cells.GetLength(0), rows = cells.GetLength(1);
+            var occupied = new List<(int X, int Y, bool Hall)>();
+            var links = new List<DungeonLayout.Link>();
+            for (int y = 0; y < rows; y++)
+                for (int x = 0; x < columns; x++)
                 {
                     var c = cells[x, y];
                     if (c == null)
                         continue;
-                    for (int dx = DungeonGeometry.Boundary; dx < room - DungeonGeometry.Boundary; dx++)
-                        for (int dy = DungeonGeometry.Boundary; dy < room - DungeonGeometry.Boundary; dy++)
-                            r.Tiles[(y * room + dy) * w + x * room + dx] = Terrain.Floor;
-                    int mid = (y * room + DungeonGeometry.Center) * w + x * room + DungeonGeometry.Center;
-                    if (c.node != null)
-                    {
-                        switch (c.node.type)
-                        {
-                            case MG.NodeType.Start:
-                                r.Entrance = mid;
-                                r.Features[mid] = "exit";
-                                break;
-                            case MG.NodeType.End:
-                                r.Objective = mid;
-                                r.Features[mid] = "relic";
-                                break;
-                            case MG.NodeType.Key:
-                                r.Features[mid] = "key";
-                                break;
-                            case MG.NodeType.Puzzle:
-                                r.Features[mid] = "chest";
-                                break;
-                        }
-                    }
-
-                    foreach (var(dx, dy)in new[]
-                    {
-                        (-1, 0),
-                        (1, 0),
-                        (0, -1),
-                        (0, 1)
-                    }
-
-                    )
+                    occupied.Add((x, y, c.type == LG.CellType.Connection));
+                    foreach (var (dx, dy) in new[] { (-1, 0), (1, 0), (0, -1), (0, 1) })
                     {
                         var door = c.getDoor(-dx, -dy);
                         if ((int)door == 0)
                             continue;
-                        // Both boundary rows stay solid unless a reciprocal layout
-                        // connection exists. No random draws are consumed by geometry.
                         int nx = x + dx, ny = y + dy;
-                        if (nx < 0 || ny < 0 || nx >= cells.GetLength(0) || ny >= cells.GetLength(1) ||
-                            cells[nx, ny] == null || (int)cells[nx, ny].getDoor(dx, dy) == 0)
+                        if (nx < 0 || ny < 0 || nx >= columns || ny >= rows || cells[nx, ny] == null || (int)cells[nx, ny].getDoor(dx, dy) == 0)
                             throw new InvalidOperationException($"Dungeon seed {seed}: nonreciprocal connection {x},{y} -> {nx},{ny}");
-                        bool locked = door == LG.DoorType.KeyLock || cells[nx, ny].getDoor(dx, dy) == LG.DoorType.KeyLock;
-                        for (int k = 1; k <= DungeonGeometry.Reach; k++)
-                            for (int side = -DungeonGeometry.HalfOpening; side <= DungeonGeometry.HalfOpening; side++)
-                            {
-                                int at = mid + dx * k + dy * k * w + side * (-dy + dx * w);
-                                r.Tiles[at] = Terrain.Floor;
-                                if (locked && k == DungeonGeometry.Reach) r.Features[at] = "lock";
-                            }
-
+                        // Each connection is carved once, from its west or north cell.
+                        if (dx + dy > 0)
+                            links.Add(new(x, y, nx, ny, door == LG.DoorType.KeyLock || cells[nx, ny].getDoor(dx, dy) == LG.DoorType.KeyLock));
                     }
                 }
+            // Room sizes, wings and corridor bends use their own hash, never mission RNG draws.
+            var carved = DungeonLayout.Carve(seed, columns, rows, occupied, links);
+            var r = new RegionState
+            {
+                Id = "ruin",
+                Seed = seed,
+                ContainersInitialized = false,
+                PlacementRevision = 1,
+                Width = carved.Width,
+                Height = carved.Height,
+                Tiles = carved.Tiles,
+                Rooms = carved.Rooms,
+                Passages = carved.Passages
+            };
+            foreach (var room in r.Rooms)
+            {
+                var node = cells[room.X, room.Y].node;
+                int mid = room.CenterY * r.Width + room.CenterX;
+                switch (node?.type)
+                {
+                    case MG.NodeType.Start:
+                        r.Entrance = mid;
+                        r.Features[mid] = "exit";
+                        break;
+                    case MG.NodeType.End:
+                        r.Objective = mid;
+                        r.Features[mid] = "relic";
+                        break;
+                    case MG.NodeType.Key:
+                        r.Features[mid] = "key";
+                        break;
+                    case MG.NodeType.Puzzle:
+                        r.Features[mid] = "chest";
+                        break;
+                }
+            }
+            // A locked passage gates both boundary rows across its full width.
+            foreach (var passage in r.Passages.Where(p => p.Locked))
+                for (int k = 0; k <= 1; k++)
+                    for (int side = -DungeonGeometry.HalfOpening; side <= DungeonGeometry.HalfOpening; side++)
+                        r.Features[(passage.Y + passage.Dy * k + passage.Dx * side) * r.Width + passage.X + passage.Dx * k + passage.Dy * side] = "lock";
 
             if (DungeonValidator.Solvable(r))
             {

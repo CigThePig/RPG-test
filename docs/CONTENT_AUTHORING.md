@@ -57,13 +57,11 @@ Optional ability `Projectile` accepts `Mode` (`legacy`, `straight`, `bounded_hom
 
 Enemy `slam` and `spit` set `PlayerLearnable: false`; they remain usable through NPC SPELL ability sets and are excluded from player progression. Omission retains existing player learning behaviour.
 
-## Dungeon spaces and gates (PR5 Part 1)
+## Dungeon spaces and gates
 
-Generated cells are 11×11 tiles, with 9×9 interiors and a centered three-tile opening on connected edges; tiles remain 24 ground units. Ordinary passage width is 72 ground units. Production anatomy derives circular radii 6–11 (diameters 12–22), leaving at least 50 units of lateral width beyond the largest tested footprint. Rendered silhouette size is separate from collision radius. Test large silhouettes at normal zoom rather than shrinking them to fit.
+Generated ruins use variable rooms joined by corridors; see [DUNGEON_LAYOUT.md](DUNGEON_LAYOUT.md). Every room has at least a 9×9 core (216×216 units) and may gain wings; corridors and gates are three tiles (72 units) wide; tiles remain 24 ground units. Production anatomy derives circular radii 6–11 (diameters 12–22), leaving at least 50 units of lateral width beyond the largest tested footprint. Rendered silhouette size is separate from collision radius. Test large silhouettes at normal zoom rather than shrinking them to fit.
 
-Mission features retain room-center indices. Eight seeded inhabitants retain the prowler/brute/spitter profiles and deterministic `FindPlacement` selection, which checks reachable floor, footprints, feature clearance and actor separation. Gates are isolated connected lock components; never place independent authored gates so their cells touch. Adjacent lock cells intentionally mean one key/one gate. Later authored-room work must either respect this constraint or introduce explicit compatible gate identity.
-
-Keep schema-1 serialized layouts intact. New geometry applies only to newly generated ruins. Part 2 may refine floors/walls, environmental depth and occlusion; Part 3 will introduce authored room/landmark integration. This milestone introduces neither a room-template framework nor additional adventure content.
+Mission features sit on room core centers. Eight seeded inhabitants retain the prowler/brute/spitter profiles and deterministic `FindPlacement` selection, which checks reachable floor, footprints, feature clearance and actor separation. Gates are isolated connected lock components; never place independent authored gates so their cells touch. Adjacent lock cells intentionally mean one key/one gate.
 
 ## Environment art and future landmarks
 

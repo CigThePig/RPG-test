@@ -279,6 +279,9 @@ public partial class Foundation : Node2D
         SelectFeel(MovementFeel.Presets.FirstOrDefault(x=>x.Id==preset) ?? MovementFeel.Presets[1]);
         if(OS.GetCmdlineUserArgs().Contains("--validate-landmarks"))
         { GD.Print($"LANDMARK VALIDATION PASSED: {Landmarks.Library.Count} templates");GetTree().Quit();return; }
+        var dump=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--dump-dungeons="))?.Split('=',2)[1];
+        if(dump!=null)
+        { foreach(int seed in dump.Split(',').Select(int.Parse))GD.Print(DungeonLayout.Ascii(Regions.Dungeon(seed)));GetTree().Quit();return; }
         if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
         if (OS.GetCmdlineUserArgs().Contains("--test"))
             CallDeferred(nameof(RunChecks));
@@ -802,7 +805,7 @@ public partial class TerrainView : Node2D
         var landmarkGround = new TerrainBatch(); batches.Add(landmarkGround);
         foreach(var room in Region.Landmarks)
             foreach(var anchor in room.Anchors.Where(a=>a.Collision=="cosmetic"))
-                EnvironmentArtGenerator.GroundDetail(landmarkGround,GodotConvert.GroundToScreen((room.X*11+anchor.X+.5f)*24,(room.Y*11+anchor.Y+.5f)*24),anchor,room.Theme);
+                EnvironmentArtGenerator.GroundDetail(landmarkGround,GodotConvert.GroundToScreen((room.OriginX+anchor.X+.5f)*24,(room.OriginY+anchor.Y+.5f)*24),anchor,room.Theme);
         landmarkGround.Draw(this);
         batch=new TerrainBatch();batches.Add(batch);
         foreach (var(terrain, key)in new[]

@@ -15,14 +15,12 @@ public static class DungeonEncounterChecks
             foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
             foreach(var direction in new[]{V.UnitX,V.UnitY})
             {
-                int door=-1;
-                for(int y=0;y<r.Height&&door<0;y+=11)for(int x=0;x<r.Width&&door<0;x+=11)
-                {
-                    int mid=(y+5+(int)direction.Y*5)*r.Width+x+5+(int)direction.X*5;
-                    if(r.Tiles[mid]==Terrain.Floor)door=mid;
-                }
-                check(door>=0,"generated encounter has cardinal opening "+direction);
-                var center=r.Center(door)+direction*12;
+                // A real corridor crossing: its straight run reaches past either side.
+                var passage=r.Passages.FirstOrDefault(q=>q.Dx==(int)direction.X && q.Dy==(int)direction.Y &&
+                    enemies.All(e=>r.CanTravel(r.Center(q.Y*r.Width+q.X)+direction*12-direction*70,r.Center(q.Y*r.Width+q.X)+direction*12+direction*70,e)));
+                check(passage!=null,"generated encounter has cardinal corridor crossing "+direction);
+                if(passage==null)continue;
+                var center=r.Center(passage.Y*r.Width+passage.X)+direction*12;
                 foreach(var enemy in enemies)
                 {
                     foreach(var a in enemies)a.Region="reach";

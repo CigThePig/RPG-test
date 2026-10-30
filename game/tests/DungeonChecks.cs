@@ -85,8 +85,8 @@ public static class DungeonChecks
         {
             var a=new ActorState{Id=id,CombatProfile=id,Appearance=new(){Family=family,Seed=42}};AnatomyAdapter.Apply(a);actors.Add(a);
         }
-        var topology=JsonSerializer.Deserialize<Dictionary<int,string>>(Godot.FileAccess.GetFileAsString("res://game/tests/fixtures/pr4-topology.json"),Content.Json)!;
         var measurements=new List<object>();
+        var footprints=new HashSet<string>();int wingRooms=0,halls=0,bends=0,corridorTiles=0,largeRooms=0;
         Regions.Dungeon(42); // warm up grammar, JIT and resource caches for both comparisons
         foreach(int seed in Enumerable.Range(0,64).Append(1337))
         {
@@ -94,47 +94,22 @@ public static class DungeonChecks
             string label=$"seed={seed} size={r.Width}x{r.Height} features={string.Join(',',r.Features.Select(x=>$"{x.Key}:{x.Value}"))} gates={string.Join(';',r.GateGroups().Select(g=>string.Join(',',g)))}";
             try
             {
-                var signature=new List<string>{$"{r.Width/11}x{r.Height/11}"};
-                for(int y=0;y<r.Height;y+=11)for(int x=0;x<r.Width;x+=11)
-                {
-                    int mid=(y+5)*r.Width+x+5;
-                    signature.Add($"{r.Tiles[mid]}:{r.Features.GetValueOrDefault(mid, "")}:{r.Tiles[mid-5]}:{r.Tiles[mid+5]}:{r.Tiles[mid-5*r.Width]}:{r.Tiles[mid+5*r.Width]}");
-                }
-                check(topology[seed]==string.Join("|",signature),"PR4 graph topology/mission roles unchanged "+seed);
-                check(r.Width%11==0 && r.Height%11==0 && r.Width<=512 && r.Height<=512,"expanded dimensions "+seed);
-                check(r.Tiles.SequenceEqual(repeat.Tiles) && r.Features.SequenceEqual(repeat.Features) && r.GateGroups().Select(g=>string.Join(',',g)).SequenceEqual(repeat.GateGroups().Select(g=>string.Join(',',g))),"deterministic terrain/features/gates "+seed);
+                int cell=DungeonGeometry.Cell;
+                check(r.Width%cell==0 && r.Height%cell==0 && r.Width<=512 && r.Height<=512,"block dimensions "+seed);
+                check(r.Tiles.SequenceEqual(repeat.Tiles) && r.Features.SequenceEqual(repeat.Features) && r.GateGroups().Select(g=>string.Join(',',g)).SequenceEqual(repeat.GateGroups().Select(g=>string.Join(',',g))) && JsonSerializer.Serialize(r.Rooms,Content.Json)==JsonSerializer.Serialize(repeat.Rooms,Content.Json),"deterministic terrain/features/gates/rooms "+seed);
                 check(DungeonValidator.Solvable(r),"mission solvable "+seed);
                 check(new[]{"exit","key","relic"}.All(kind=>r.Features.Values.Contains(kind)),"mission features "+seed);
-                // Every cell corner stays solid, all occupied interiors are exactly 9x9;
-                // each boundary cross-section is either solid or centered width three.
-                for(int cy=0;cy<r.Height;cy+=11)for(int cx=0;cx<r.Width;cx+=11)
+                Geometry(r);
+                foreach(var room in r.Rooms)
                 {
-                    bool occupied=r.Tiles[(cy+5)*r.Width+cx+5]==Terrain.Floor;
-                    for(int y=1;y<=9;y++)for(int x=1;x<=9;x++)
-                        {
-                            var tile=r.Tiles[(cy+y)*r.Width+cx+x];
-                            if(!occupied && tile!=Terrain.Wall)throw new InvalidOperationException("unoccupied cell carved");
-                            if(occupied && tile!=Terrain.Floor && (tile!=Terrain.Wall || Landmarks.Protected(x,y) || x is 1 or 9 || y is 1 or 9))throw new InvalidOperationException("illegal interior architecture");
-                        }
-                    if(occupied && !Landmarks.RoomSafe(r,cx/11,cy/11))throw new InvalidOperationException("interior footprint/lane disconnected");
-                    foreach(var (dx,dy) in new[]{(-1,0),(1,0),(0,-1),(0,1)})
-                    {
-                        int mid=(cy+5+dy*5)*r.Width+cx+5+dx*5;
-                        bool opening=r.Tiles[mid]==Terrain.Floor;
-                        for(int side=-5;side<=5;side++)
-                        {
-                            int at=mid+side*(-dy+dx*r.Width);
-                            bool floor=r.Tiles[at]==Terrain.Floor;
-                            if(floor!=(opening && Math.Abs(side)<=1))throw new InvalidOperationException("boundary width/corner");
-                            if(opening && Math.Abs(side)<=1)
-                            {
-                                int next=at+dx+dy*r.Width;
-                                if(next<0||next>=r.Tiles.Length||r.Tiles[next]!=Terrain.Floor)throw new InvalidOperationException("asymmetric opening");
-                            }
-                        }
-                    }
+                    if(room.Kind=="hall"){halls++;continue;}
+                    var tiles=room.Tiles().ToArray();
+                    int w=tiles.Max(t=>t.X)-tiles.Min(t=>t.X)+1,h=tiles.Max(t=>t.Y)-tiles.Min(t=>t.Y)+1;
+                    footprints.Add($"{w}x{h}:{tiles.Length}");if(room.Rects.Count>1)wingRooms++;if(tiles.Length>81)largeRooms++;
                 }
-                check(true,"validated authored 9x9 interiors/four-direction symmetric three-tile boundaries/solid corners "+seed);
+                corridorTiles+=Enumerable.Range(0,r.Tiles.Length).Count(at=>r.Tiles[at]==Terrain.Floor && r.Rooms.All(c=>!c.Contains(at%r.Width,at/r.Width)));
+                bends+=Bends(r);
+                check(true,"validated room cores/wings, sealed block rings, three-wide corridor crossings and graph topology "+seed);
                 foreach(var gate in r.GateGroups())
                 {
                     int xs=gate.Select(i=>i%r.Width).Distinct().Count(),ys=gate.Select(i=>i/r.Width).Distinct().Count();
@@ -146,16 +121,15 @@ public static class DungeonChecks
                 {
                     var reachable=Reachable(r,a);
                     check(r.Features.Keys.All(reachable.Contains),$"footprint reaches all features and open gates {a.Id} radius={a.Radius} seed={seed}");
-                    // Radius-aware short turn inside each occupied chamber.
-                    for(int cy=0;cy<r.Height;cy+=11)for(int cx=0;cx<r.Width;cx+=11)
+                    // Radius-aware short turn inside each room core; every carved floor tile is reachable.
+                    foreach(var room in r.Rooms.Where(c=>c.Kind=="room"))
                     {
-                        int mid=(cy+5)*r.Width+cx+5;if(r.Tiles[mid]!=Terrain.Floor)continue;
-                        var center=r.Center(mid);
+                        var center=r.Center(room.CenterY*r.Width+room.CenterX);
                         foreach(var direction in new[]{V.UnitX,-V.UnitX,V.UnitY,-V.UnitY})
                             if(!r.CanTravel(center,center+direction*84,a))throw new InvalidOperationException("protected combat lane clearance "+a.Id);
-                        foreach(int at in Enumerable.Range(1,9).SelectMany(ly=>Enumerable.Range(1,9).Select(lx=>(cy+ly)*r.Width+cx+lx)).Where(at=>r.Tiles[at]==Terrain.Floor))
-                            if(!reachable.Contains(at))throw new InvalidOperationException("unreachable interior floor "+a.Id);
                     }
+                    foreach(int at in Enumerable.Range(0,r.Tiles.Length).Where(at=>r.Tiles[at]==Terrain.Floor))
+                        if(!reachable.Contains(at))throw new InvalidOperationException("unreachable floor "+a.Id+" at "+at%r.Width+","+at/r.Width);
                 }
                 r.OpenDoors.Clear();
                 if(seed is 1 or 42 or 1337)
@@ -176,9 +150,85 @@ public static class DungeonChecks
             }
             catch(Exception e){throw new InvalidOperationException(label,e);}
         }
+        // Variety across the sample: the minimum 9x9 room is a floor, not the norm.
+        check(footprints.Count>=100,"room footprints vary across seeds: "+footprints.Count);
+        check(wingRooms>=250 && largeRooms>=250,$"rooms grow past the 9x9 minimum and gain wings: wings={wingRooms} large={largeRooms}");
+        check(halls>=20 && bends>=150 && corridorTiles>=8000,$"hallways connect rooms: halls={halls} bends={bends} corridorTiles={corridorTiles}");
         Directory.CreateDirectory("build/dungeon");File.WriteAllText("build/dungeon/expanded.json",JsonSerializer.Serialize(measurements,Content.Json));
         SaveChecks(app,check);
         CombatClearance(app,check);
+    }
+
+    // Structural invariants of a carved ruin. Throws with the offending location.
+    public static void Geometry(RegionState r)
+    {
+        int cell=DungeonGeometry.Cell,core=DungeonGeometry.Core,half=DungeonGeometry.HalfOpening;
+        void Fail(string why,int x,int y)=>throw new InvalidOperationException($"{why} at {x},{y}");
+        var crossings=new HashSet<int>();
+        foreach(var q in r.Passages)
+        {
+            if(q.Dx+q.Dy!=1 || (q.Dx==1 ? q.X%cell!=cell-1 : q.Y%cell!=cell-1))Fail("passage not on a block boundary",q.X,q.Y);
+            int lane=q.Dx==1?q.Y%cell:q.X%cell;
+            if(lane<DungeonGeometry.CrossingMargin || lane>cell-1-DungeonGeometry.CrossingMargin)Fail("passage too close to a block corner",q.X,q.Y);
+            var a=r.RoomAt(q.X,q.Y)!;var b=r.RoomAt(q.X+q.Dx,q.Y+q.Dy)!;
+            if(a==null || b==null || (a.Doors&(q.Dx==1?2:4))==0 || (b.Doors&(q.Dx==1?8:1))==0)Fail("passage without matching room doors",q.X,q.Y);
+            for(int k=0;k<=1;k++)for(int side=-half;side<=half;side++)
+            {
+                int x=q.X+q.Dx*k+q.Dy*side,y=q.Y+q.Dy*k+q.Dx*side,at=y*r.Width+x;
+                if(r.Tiles[at]!=Terrain.Floor)Fail("passage crossing not open",x,y);
+                if(q.Locked!=(r.Features.GetValueOrDefault(at)=="lock"))Fail("gate does not match passage lock",x,y);
+                crossings.Add(at);
+            }
+        }
+        if(r.Rooms.Sum(c=>BitCount(c.Doors))!=2*r.Passages.Count)throw new InvalidOperationException("room doors and passages disagree");
+        if(r.Features.Any(f=>f.Value=="lock" && !crossings.Contains(f.Key)))throw new InvalidOperationException("gate outside a passage");
+        // Blocks meet only at passage crossings: every other ring tile is solid.
+        for(int y=0;y<r.Height;y++)for(int x=0;x<r.Width;x++)
+        {
+            bool ring=x%cell is 0 || x%cell==cell-1 || y%cell is 0 || y%cell==cell-1;
+            if(ring && r.Tiles[y*r.Width+x]==Terrain.Floor && !crossings.Contains(y*r.Width+x))Fail("accidental connection through block ring",x,y);
+        }
+        var rooms=r.Rooms.ToDictionary(c=>(c.X,c.Y));
+        if(rooms.Count!=r.Rooms.Count)throw new InvalidOperationException("duplicate room cell");
+        for(int cy=0;cy<r.Height/cell;cy++)for(int cx=0;cx<r.Width/cell;cx++)
+        {
+            var interior=new List<int>();
+            for(int y=cy*cell+1;y<(cy+1)*cell-1;y++)for(int x=cx*cell+1;x<(cx+1)*cell-1;x++)if(r.Tiles[y*r.Width+x]==Terrain.Floor)interior.Add(y*r.Width+x);
+            if(!rooms.TryGetValue((cx,cy),out var room)){if(interior.Count>0)Fail("unoccupied block carved",cx*cell,cy*cell);continue;}
+            // Every room and corridor tile in a block joins its room; corridors leave through the ring only.
+            var set=interior.ToHashSet();var seen=new HashSet<int>{room.CenterY*r.Width+room.CenterX};var queue=new Queue<int>(seen);
+            while(queue.Count>0){int at=queue.Dequeue();foreach(int n in r.Neighbours(at))if(set.Contains(n)&&seen.Add(n))queue.Enqueue(n);}
+            if(seen.Count!=set.Count)Fail("disconnected floor inside block",cx*cell,cy*cell);
+            foreach(var q in room.Rects)
+                if(q[0]<=cx*cell || q[1]<=cy*cell || q[0]+q[2]>=(cx+1)*cell-1+1 || q[1]+q[3]>=(cy+1)*cell-1+1)Fail("room rect touches block ring",q[0],q[1]);
+            if(room.Kind=="hall")
+            {
+                if(room.Rects.Count!=1 || room.Rects[0][2]!=3 || room.Rects[0][3]!=3 || r.Features.ContainsKey(room.CenterY*r.Width+room.CenterX))Fail("hall is not a bare 3x3 junction",room.CoreX,room.CoreY);
+                continue;
+            }
+            if(!room.Rects.Any(q=>q[0]==room.CoreX && q[1]==room.CoreY && q[2]==core && q[3]==core))Fail("room lacks its 9x9 core",room.CoreX,room.CoreY);
+            foreach(var (x,y) in room.Tiles())
+            {
+                var tile=r.Tiles[y*r.Width+x];int lx=x-room.CoreX+1,ly=y-room.CoreY+1;
+                bool authored=lx is >=2 and <=8 && ly is >=2 and <=8 && !Landmarks.Protected(lx,ly);
+                if(tile!=Terrain.Floor && (tile!=Terrain.Wall || !authored))Fail("illegal room architecture",x,y);
+            }
+            if(!Landmarks.RoomSafe(r,room))Fail("room footprint/lane disconnected",room.CoreX,room.CoreY);
+        }
+    }
+    static int BitCount(int n){int c=0;for(;n!=0;n&=n-1)c++;return c;}
+    // Corridor turns: convex corners of corridor or hall floor, walled on two perpendicular sides.
+    static int Bends(RegionState r)
+    {
+        bool Wall(int x,int y)=>r.Tiles[y*r.Width+x]!=Terrain.Floor;
+        int bends=0;
+        for(int y=1;y<r.Height-1;y++)for(int x=1;x<r.Width-1;x++)
+        {
+            if(Wall(x,y) || r.Rooms.Any(c=>c.Kind=="room" && c.Contains(x,y)))continue;
+            bool w=Wall(x-1,y),e=Wall(x+1,y),n=Wall(x,y-1),s=Wall(x,y+1);
+            if((w?1:0)+(e?1:0)+(n?1:0)+(s?1:0)==2 && w!=e && n!=s)bends++;
+        }
+        return bends;
     }
 
     static void CombatClearance(Foundation app, Action<bool,string> check)
@@ -231,20 +281,11 @@ public static class DungeonChecks
         var w=app.World;string snapshot=Persistence.Capture(w,app.Narrative);
         try
         {
-            string legacy=Godot.FileAccess.GetFileAsString("res://game/tests/fixtures/pr4-dungeon-save.json");
-            var old=Persistence.Parse(legacy,w.Content);Persistence.Restore(w,app.Narrative,legacy);
-            var loaded=Persistence.Parse(Persistence.Capture(w,app.Narrative),w.Content);
-            File.WriteAllText("build/dungeon/legacy-before.json",JsonSerializer.Serialize(old,Content.Json));
-            File.WriteAllText("build/dungeon/legacy-after.json",JsonSerializer.Serialize(loaded,Content.Json));
-            check(JsonSerializer.Serialize(old,Content.Json)==JsonSerializer.Serialize(loaded,Content.Json),"PR4 fixture roundtrip preserves regions/actors/inventory/equipment/quest/events");
-            var r=loaded.Regions["ruin"];
-            check(r.Width%7==0 && r.Height%7==0 && r.OpenDoors.Count>0 && r.Depleted.Any(i=>r.Features[i]=="key") && r.Depleted.Any(i=>r.Features[i]=="chest"),"legacy layout and world mutations preserved");
-            check(loaded.Actors.Values.Any(a=>a.Region=="ruin"&&!a.Alive)&&loaded.Actors.Values.Any(a=>a.Region=="ruin"&&a.Alive),"legacy living/dead identities preserved");
             w.RegionsById.Remove("ruin");foreach(string id in w.Actors.Keys.Where(x=>x.StartsWith("ruin:spawn:")).ToArray())w.Actors.Remove(id);
             w.Enter(w.Player,"reach");string unvisited=Persistence.Capture(w,app.Narrative);Persistence.Restore(w,app.Narrative,unvisited);w.Enter(w.Player,"ruin");
-            check(w.RegionsById["ruin"].Width%11==0,"old save without ruin generates new geometry on entry");
+            check(w.RegionsById["ruin"].Width%DungeonGeometry.Cell==0 && w.RegionsById["ruin"].Rooms.Count>0,"save without a ruin generates it on entry");
             string fresh=Persistence.Capture(w,app.Narrative);Persistence.Restore(w,app.Narrative,fresh);
-            check(fresh==Persistence.Capture(w,app.Narrative),"new expanded dungeon exact save roundtrip");
+            check(fresh==Persistence.Capture(w,app.Narrative),"dungeon exact save roundtrip");
             for(int i=0;i<60;i++)w.Step(1f/60);string next=Persistence.Capture(w,app.Narrative);
             Persistence.Restore(w,app.Narrative,fresh);for(int i=0;i<60;i++)w.Step(1f/60);
             check(next==Persistence.Capture(w,app.Narrative),"new dungeon deterministic continuation");

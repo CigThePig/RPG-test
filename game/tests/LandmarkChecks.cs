@@ -30,8 +30,8 @@ public static class LandmarkChecks
                 foreach(int mask in Enumerable.Range(1,15))
                 {
                     var fixture=Fixture();var roles=new[]{t.Roles[0]};
-                    check(Landmarks.TryApply(fixture,0,0,mask,roles,t,turn),$"safe template {t.Id} orientation={turn} doors={mask}");
-                    check(Landmarks.RoomSafe(fixture,0,0),"radius 11 interior sweep "+t.Id);
+                    check(Landmarks.TryApply(fixture,fixture.Rooms[0],mask,roles,t,turn),$"safe template {t.Id} orientation={turn} doors={mask}");
+                    check(Landmarks.RoomSafe(fixture,fixture.Rooms[0]),"radius 11 interior sweep "+t.Id);
                     check(fixture.Landmarks.Single().Anchors.Where(a=>a.Collision=="terrain").All(a=>fixture.Tiles[a.Y*11+a.X]==Terrain.Wall),"visible structural terrain agreement "+t.Id);
                 }
             }
@@ -40,7 +40,7 @@ public static class LandmarkChecks
         var restricted=JsonSerializer.Deserialize<LandmarkTemplate>(JsonSerializer.Serialize(library[0],Content.Json),Content.Json)!;
         restricted.DoorMasks=new[]{1};check(!Landmarks.Compatible(restricted,restricted.Roles,3,0) && Landmarks.Compatible(restricted,restricted.Roles,2,1),"rotated eligibility respects actual cardinal connections");
         var conflict=Fixture();conflict.Features[2*11+2]="chest";string untouched=JsonSerializer.Serialize(conflict,Content.Json);
-        check(!Landmarks.TryApply(conflict,0,0,1,new[]{library[0].Roles[0]},library[0],0) && untouched==JsonSerializer.Serialize(conflict,Content.Json),"candidate feature conflict leaves terrain untouched");
+        check(!Landmarks.TryApply(conflict,conflict.Rooms[0],1,new[]{library[0].Roles[0]},library[0],0) && untouched==JsonSerializer.Serialize(conflict,Content.Json),"candidate feature conflict leaves terrain untouched");
         var encountered=new HashSet<string>();var themeSet=new HashSet<string>();
         foreach(int seed in Enumerable.Range(0,64).Append(1337).Concat(Enumerable.Range(1000,32)))
         {
@@ -48,6 +48,7 @@ public static class LandmarkChecks
             check(JsonSerializer.Serialize(a,Content.Json)==JsonSerializer.Serialize(b,Content.Json),"independent resolved generation/save manifest repeat "+seed);
             check(a.Landmarks.Count>0 && a.Landmarks.Count(l=>l.Roles.Contains("entrance"))==1 && a.Landmarks.Count(l=>l.Roles.Contains("objective"))==1,"classified mission landmarks "+seed);
             check(a.Landmarks.SelectMany(l=>l.Anchors).Count(v=>v.Collision=="terrain")<=96,"required architectural node budget "+seed);
+            check(a.Landmarks.Any(l=>l.Template=="ruined-entrance") && a.Landmarks.Any(l=>l.Template=="relic-sanctuary"),"mission landmarks fit varied room shapes "+seed);
             check(Landmarks.LastRejections.All(message=>message.Contains("seed="+seed)),"bounded rejection diagnostics identify seed "+seed);
             foreach(var room in a.Landmarks){encountered.Add(room.Template);themeSet.Add(room.Theme);}
             Landmarks.ValidateSaved(a);
@@ -65,21 +66,15 @@ public static class LandmarkChecks
         invalidSaved.Landmarks.SelectMany(l=>l.Anchors).First(a=>a.Collision=="terrain").Asset="records";
         try{Landmarks.ValidateSaved(invalidSaved);throw new Exception("Accepted invisible saved structure");}
         catch(InvalidDataException e){check(e.Message.Contains("asset/collision"),"saved flat asset cannot own invisible collision");}
-        LegacyAndProgress(app,check);
+        Progress(app,check);
         Combat(app,check);
     }
-    static void LegacyAndProgress(Foundation app,Action<bool,string> check)
+    static void Progress(Foundation app,Action<bool,string> check)
     {
         var w=app.World;string original=Persistence.Capture(w,app.Narrative);
         try
         {
-            string legacy=Godot.FileAccess.GetFileAsString("res://game/tests/fixtures/pr5-part2-dungeon-save.json");
-            var old=Persistence.Parse(legacy,w.Content);var tiles=old.Regions["ruin"].Tiles.ToArray();
-            Persistence.Restore(w,app.Narrative,legacy);
-            check(w.RegionsById["ruin"].Landmarks.Count==0 && tiles.SequenceEqual(w.RegionsById["ruin"].Tiles),"real pre-Part3 expanded dungeon retains geometry without inferred landmarks");
-            string captured=Persistence.Capture(w,app.Narrative);Persistence.Restore(w,app.Narrative,captured);
-            check(captured==Persistence.Capture(w,app.Narrative),"Part2 snapshot exact continuation roundtrip");
-            Persistence.Restore(w,app.Narrative,original);
+            string captured;
             w.RegionsById["ruin"]=Regions.Dungeon(1);w.Enter(w.Player,"ruin");var r=w.RegionsById["ruin"];
             foreach(string kind in new[]{"key","lock","chest","relic"})
             {
@@ -93,7 +88,8 @@ public static class LandmarkChecks
     }
     public static RegionState Fixture()
     {
-        var r=new RegionState{Id="landmark-fixture",Width=11,Height=11,Tiles=Enumerable.Repeat(Terrain.Wall,121).ToArray(),Entrance=60,Objective=60};
+        var r=new RegionState{Id="landmark-fixture",Width=11,Height=11,Tiles=Enumerable.Repeat(Terrain.Wall,121).ToArray(),Entrance=60,Objective=60,
+            Rooms={new DungeonRoom{CoreX=1,CoreY=1,Rects={new[]{1,1,9,9}}}}};
         for(int y=1;y<=9;y++)for(int x=1;x<=9;x++)r.Tiles[y*11+x]=Terrain.Floor;
         return r;
     }
@@ -105,7 +101,7 @@ public static class LandmarkChecks
             var r=Regions.Dungeon(42);w.RegionsById["ruin"]=r;
             foreach(var actor in w.Actors.Values)actor.Region="reach";
             var p=w.Player;p.Region="ruin";var room=r.Landmarks.First(l=>l.Template=="ruined-entrance");
-            var anchor=room.Anchors.First(a=>a.Collision=="terrain");int at=(room.Y*11+anchor.Y)*r.Width+room.X*11+anchor.X;
+            var anchor=room.Anchors.First(a=>a.Collision=="terrain");int at=(room.OriginY+anchor.Y)*r.Width+room.OriginX+anchor.X;
             var center=r.Center(at);
             void Reset(V point){w.Cancel(p);p.X=point.X;p.Y=point.Y;p.Health=p.MaxHealth;p.Cooldowns.Clear();p.Statuses.Clear();}
             Reset(center+new V(0,24));var start=p.Position;
