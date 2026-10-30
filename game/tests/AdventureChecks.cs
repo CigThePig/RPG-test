@@ -73,6 +73,19 @@ public static class AdventureChecks
             }
             finally{w.Events.Published-=Observe;}
             Persistence.Restore(w,n,original);
+            n.Call("receive","defeated","player","","beast",2);n.Call("accept_quest",1);n.Call("accept_quest",2);
+            w.RegionsById["ruin"]=Regions.Dungeon(1);w.Enter(w.Player,"ruin");
+            var oldActive=JsonNode.Parse(Persistence.Capture(w,n))!;
+            var oldNarrative=JsonNode.Parse(oldActive["Narrative"]!.GetValue<string>())!;
+            oldNarrative["flags"]!.AsObject().Remove("region");
+            oldNarrative["quests"]!["2"]!.AsObject().Remove("stage_index");oldNarrative["quests"]!["2"]!.AsObject().Remove("stage_id");
+            oldNarrative["quests"]!["2"]!["progress"]=0;oldActive["Narrative"]=oldNarrative.ToJsonString();
+            Persistence.Restore(w,n,oldActive.ToJsonString());
+            check(n.Call("journal").AsString().Contains("Find keys"),"legacy active adventure inside ruin reconciles entered stage from restored World");
+            var oldRuin=w.RegionsById["ruin"];w.Player.X=oldRuin.Center(oldRuin.Objective).X;w.Player.Y=oldRuin.Center(oldRuin.Objective).Y;
+            check(w.Interact(w.Player)&&!n.Call("completed",2).AsBool()&&n.Call("journal").AsString().Contains("Return through"),"legacy active adventure can recover physical relic without softlock");
+            w.Enter(w.Player,"reach");check(n.Call("report_to_warden").AsBool(),"legacy active adventure returns and reports successfully");
+            Persistence.Restore(w,n,original);
             w.RegionsById["ruin"]=Regions.Dungeon(1);w.Enter(w.Player,"ruin");
             var relicRegion=w.RegionsById["ruin"];var relicPoint=relicRegion.Center(relicRegion.Objective);
             w.Player.X=relicPoint.X;w.Player.Y=relicPoint.Y; // Explicit capacity fixture, never adventure traversal evidence.

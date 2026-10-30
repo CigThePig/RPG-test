@@ -140,6 +140,7 @@ public static class Persistence
         w.RegionsById = s.Regions;
         w.Projectiles = s.Projectiles;
         w.Events.Recent = s.Events;
+        narrative.Call("reconcile_world", w.Player.Region);
         foreach (var actor in w.Actors.Values)
             w.Items.Reconcile(actor);
 

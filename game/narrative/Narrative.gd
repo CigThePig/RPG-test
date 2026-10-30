@@ -83,7 +83,15 @@ func reconcile_adventure(q: Quest) -> void:
 	elif flags.get("region", "reach") == "ruin":
 		q.stage_index = maxi(q.stage_index, 1)
 	q.progress = q.stage_index
-	q.stage_id = str(q.stages[q.stage_index].id)
+	q.stage_id = "complete" if q.stage_index >= q.stages.size() else str(q.stages[q.stage_index].id)
+
+func reconcile_world(region: String) -> void:
+	# Called only after the unified snapshot has restored actors and Gloot.
+	# Older current-generation saves have no region/stage fields in Narrative.
+	for q in manager.get_active_quests():
+		if not q.stages.is_empty():
+			flags["region"] = region
+			reconcile_adventure(q)
 
 func accepted(id: int) -> bool:
 	return flags.get("accepted_%d" % id, false)
