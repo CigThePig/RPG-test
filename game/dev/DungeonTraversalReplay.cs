@@ -41,7 +41,9 @@ public sealed class DungeonTraversalReplay
         {
             if(!issued){tap("dodge");issued=true;delay=35;return V.Zero;}
             if(p.State==ActionState.Dodging)throw new InvalidOperationException("Dungeon roll did not finish");
-            Aim(region.Entrance+3*region.Width+3,"corner");
+            // The authored corner quadrant may contain a pillar; its outer ring
+            // is a protected lane and requires a real route around architecture.
+            Aim(region.Entrance+4*region.Width+4,"corner");
         }
         while(route.Count>0 && V.Distance(p.Position,route.Peek())<3)route.Dequeue();
         if(route.Count>0)return V.Normalize(route.Peek()-p.Position);

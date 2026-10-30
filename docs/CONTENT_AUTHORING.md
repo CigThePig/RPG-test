@@ -68,3 +68,7 @@ Keep schema-1 serialized layouts intact. New geometry applies only to newly gene
 ## Environment art and future landmarks
 
 Use `EnvironmentStyle` for the shared palette and cosmetic revision/hash, and `EnvironmentArtGenerator` for bounded integer-pixel floor/wall recipes. Atlases are generated once by `EnvironmentAssetCache`; do not make per-tile textures. Interactive objects remain existing `RegionState.Features` consumed by `FeatureView`. Nonblocking visual slots belong in `EnvironmentDecoration`, with stable ground-contact pivots and the actor Y-sort parent. Preserve saved terrain and gameplay RNG when extending themes. See `PR5_PART2_HANDOFF.md`; full landmark authoring remains Part 3.
+
+## PR5 authored landmarks
+
+Author production rooms in `game/data/landmarks/rooms.json`. [LANDMARK_AUTHORING.md](LANDMARK_AUTHORING.md) covers the complete schema, coordinates, doorway masks, safe blockers, supported assets/themes, rotation, stable selection, previews and Part 4 hooks. Templates load in ContentAudit, via packaged FileAccess. They compose new dungeons only; saved resolved manifests and terrain remain authoritative.

@@ -7,6 +7,7 @@ public partial class TerrainWallRow : Node2D
 {
     public const float Rise = 16;
     public int Seed { get; init; }
+    public Color[] Tints { get; init; } = Array.Empty<Color>();
     public int Row { get; init; }
     public int[] Columns { get; init; } = Array.Empty<int>();
     public static double BuildMilliseconds { get; private set; }
@@ -24,6 +25,7 @@ public partial class TerrainWallRow : Node2D
             rows.Add(new TerrainWallRow
             {
                 Row = y, Columns = columns, Seed = region.Seed,
+                Tints=Enumerable.Range(0,region.Width).Select(x=>EnvironmentThemes.Tint(EnvironmentThemes.At(region,x,y))).ToArray(),
                 // The front ground edge is the depth anchor, not the raised cap.
                 // Actors north of it render first; actors south render afterward.
                 Position = GodotConvert.GroundToScreen(0, (y + 1) * RegionState.Tile)
@@ -46,7 +48,7 @@ public partial class TerrainWallRow : Node2D
             int variant=(int)(EnvironmentStyle.Hash(Seed,x,Row)&15);
             int module=ends*16+variant;
             batch.Sprite(new Rect2(p+new Vector2(0,-Rise),new Vector2(24,12+Rise)),
-                new Rect2(module*26+1,1,24,12+Rise));
+                new Rect2(module*26+1,1,24,12+Rise),Tints.Length>x?Tints[x]:Colors.White);
         }
         batch.Draw(this);
         BuildMilliseconds += timer.Elapsed.TotalMilliseconds;

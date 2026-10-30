@@ -33,7 +33,7 @@ public static class WallDepthChecks
             foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
             // A real two-row shared boundary with safe floor on either side.
             int wall=Enumerable.Range(r.Width*2,r.Tiles.Length-r.Width*4).First(at=>
-                at%r.Width%11==8 && r.Tiles[at]==Terrain.Wall && r.Tiles[at+r.Width]==Terrain.Wall &&
+                at%r.Width%11==8 && at/r.Width%11==10 && r.Tiles[at]==Terrain.Wall && r.Tiles[at+r.Width]==Terrain.Wall &&
                 r.Tiles[at-r.Width]==Terrain.Floor && r.Tiles[at+2*r.Width]==Terrain.Floor &&
                 r.CanStand(new V(r.Center(at).X,at/r.Width*24-p.Radius-1),p) &&
                 r.CanStand(new V(r.Center(at).X,(at/r.Width+2)*24+p.Radius+1),p));
@@ -45,14 +45,18 @@ public static class WallDepthChecks
                 throw new InvalidOperationException("Walls must be complete bounded row meshes in the shared actor depth layer");
             var parent=(Node2D)app.Views["player"].GetParent();
             if(!parent.YSortEnabled || rows.Any(row=>row.GetParent()!=parent))throw new InvalidOperationException("Walls and characters do not share Y sorting");
+            // Isolate wall ordering from independently Y-sorted tall architecture.
+            // The column suite checks those props separately with the real geometry.
+            foreach(var decoration in parent.GetChildren().OfType<EnvironmentDecoration>())decoration.Visible=false;
             app.ShowCharacters(false);
             var wallOnly=await Image(app);
-            foreach(var row in rows)row.Visible=false;
+            var foregroundRows=rows.Where(row=>row.Row==wall/r.Width || row.Row==wall/r.Width+1).ToArray();
+            foreach(var row in foregroundRows)row.Visible=false;
             var floorOnly=await Image(app);
-            foreach(var row in rows){row.Visible=true;row.ZIndex=-1;}
+            foreach(var row in foregroundRows){row.Visible=true;row.ZIndex=-1;}
             app.ShowCharacters(true);
             var broken=await Image(app,"old-order-reproduction");
-            foreach(var row in rows)row.ZIndex=0;
+            foreach(var row in foregroundRows)row.ZIndex=0;
             var behind=await Image(app,"behind");
             var view=app.Views["player"];
             var screen=view.GetGlobalTransformWithCanvas().Origin;

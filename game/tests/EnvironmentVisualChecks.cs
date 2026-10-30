@@ -91,7 +91,7 @@ public static class EnvironmentVisualChecks
                     bufferMemoryBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.BufferMemUsed),
                     actorLayerNodes=parent.GetChildCount(),wallNodes=parent.GetChildren().OfType<TerrainWallRow>().Count(),
                     decorationNodes=parent.GetChildren().OfType<EnvironmentDecoration>().Count(),
-                    cachedModules=EnvironmentArtGenerator.CachedModuleCount,environmentTextures=EnvironmentAssetCache.TextureCount,environmentAtlasBytes=EnvironmentAssetCache.PixelBytes,
+                    atlasBuildMs=EnvironmentAssetCache.TotalBuildMilliseconds,cachedModules=EnvironmentArtGenerator.CachedModuleCount,environmentTextures=EnvironmentAssetCache.TextureCount,environmentAtlasBytes=EnvironmentAssetCache.PixelBytes,
                     p50ms=intervals[30],p95ms=intervals[57],renderer=RenderingServer.GetVideoAdapterName()});
             }
             Directory.CreateDirectory("build/dungeon");

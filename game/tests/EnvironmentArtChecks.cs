@@ -11,9 +11,9 @@ public static class EnvironmentArtChecks
             art[key]=GD.Load<Texture2D>("res://game/art/"+key+".png");
             check(art[key].GetWidth()>0 && art[key].GetHeight()>0,"valid PPC texture "+key);
         }
-        var floors=EnvironmentAssetCache.Floors;var walls=EnvironmentAssetCache.Walls;
+        var floors=EnvironmentAssetCache.Floors;var walls=EnvironmentAssetCache.Walls;_=EnvironmentAssetCache.Props;
         check(ReferenceEquals(floors,EnvironmentAssetCache.Floors) && ReferenceEquals(walls,EnvironmentAssetCache.Walls),"two atlases reused across regions");
-        check(EnvironmentAssetCache.TextureCount==2 && EnvironmentAssetCache.PixelBytes<220000,"bounded environment texture memory");
+        check(EnvironmentAssetCache.TextureCount==3 && EnvironmentAssetCache.PixelBytes==517632,"bounded environment texture memory");
         using(var pixels=floors.GetImage())
             check(pixels.GetWidth()==384 && pixels.GetHeight()==12 && pixels.GetPixel(0,0).A==1,"valid opaque floor atlas");
         foreach(int variant in Enumerable.Range(0,16))

@@ -39,3 +39,5 @@ Milestones on the same draft PR:
 4. Integrated RPG exploration adventure and final verification.
 
 Mosslight is a traditional fantasy action RPG; the flexible approximately 50/50 procedural/authored direction is a creative goal, not a numeric quota or a creature-collection system.
+
+Part 3 implementation adds five authored templates, coherent themes, production structural/cosmetic composition, resolved save manifests and reusable content hooks. Exact acceptance evidence and any remaining limits are tracked in [PR5_PART3_HANDOFF.md](PR5_PART3_HANDOFF.md). Part 4 should use these landmarks with existing quests, encounters and rewards; keep this PR draft until final integration review.

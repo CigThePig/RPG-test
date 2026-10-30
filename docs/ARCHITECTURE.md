@@ -75,3 +75,7 @@ This is presentation only: no terrain, footprint, actor position, movement, gate
 ## PR5 Part 2 environment presentation
 
 See [PR5_PART2_HANDOFF.md](PR5_PART2_HANDOFF.md) for the shared floor/wall atlases, cosmetic hashing, PPC natural-art pivots, bounded nonblocking decoration, production reference scenes and exact-source verification. Region/gameplay authority and Part 1 front-edge wall Y sorting remain unchanged. `--visual-check --environment-only` runs focused real-renderer references and repeated region rebuild measurements; add `--mobile-ui` for the phone layout.
+
+## PR5 Part 3 room composition
+
+`Landmarks` applies validated JSON room compositions after the existing graph/layout/solvability pass, inside new dungeon generation only. Independent revisioned integer hashes select compatible role/mask/orientation candidates, without consuming upstream RNG. Protected cross/perimeter lanes, real radius-11 sweeps, feature clearance, bounded candidate rollback and safe-open fallback preserve traversal. Mission landmarks reserve architecture nodes first. RegionState stores the resolved composition alongside authoritative tiles; restoration never reruns templates. Renderer-only theme tints reuse floor/wall atlases; one shared prop atlas and static ground-details mesh extend the Part 2 pipeline. See [LANDMARK_AUTHORING.md](LANDMARK_AUTHORING.md) and [PR5_PART3_HANDOFF.md](PR5_PART3_HANDOFF.md).

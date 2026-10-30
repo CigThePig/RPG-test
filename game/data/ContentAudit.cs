@@ -6,6 +6,7 @@ public static class ContentAudit
 {
     public static void Validate(Content content)
     {
+        _=Landmarks.Library;
         var items = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(Godot.FileAccess.GetFileAsString("res://game/data/items.json"))!;
         var errors = content.Validate(items.Keys.ToHashSet());
         using var materials = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://game/data/materials.json"));

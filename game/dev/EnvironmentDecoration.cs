@@ -8,9 +8,25 @@ public partial class EnvironmentDecoration : Node2D
     public Texture2D? Texture { get; init; }
     public Vector2 Pivot { get; init; }
     public bool Rubble { get; init; }
+    public int PropModule { get; init; } = -1;
     public static List<EnvironmentDecoration> Create(RegionState r, Dictionary<string,Texture2D> art)
     {
         var result=new List<EnvironmentDecoration>();
+        // Every structural anchor is required and admitted by generation's budget.
+        // Ground anchors are batched in TerrainView, using no decoration nodes.
+        foreach(var entry in r.Landmarks.SelectMany(room=>room.Anchors.Where(a=>a.Collision=="terrain").Select(a=>(Room:room,Anchor:a)))
+            .OrderBy(e=>e.Anchor.Priority).ThenBy(e=>e.Room.Y).ThenBy(e=>e.Room.X).ThenBy(e=>e.Anchor.Y).ThenBy(e=>e.Anchor.X))
+        {
+            var a=entry.Anchor;var room=entry.Room;
+            int asset=Array.IndexOf(new[]{"column","shelf","altar","storage","collapse"},a.Asset);
+            if(asset<0)continue;
+            result.Add(new EnvironmentDecoration {
+                Position=GodotConvert.GroundToScreen((room.X*11+a.X+.5f)*24,(room.Y*11+a.Y+1f)*24),
+                Scale=new Vector2(a.Facing is 1 or 2?-1:1,1),
+                PropModule=(Array.IndexOf(Landmarks.Themes,room.Theme)*5+asset)*3+a.Variant,
+                TextureFilter=TextureFilterEnum.Nearest });
+        }
+        if(result.Count>Maximum)throw new InvalidDataException("Saved landmark exceeds architectural node budget");
         for(int y=1;y<r.Height-1 && result.Count<Maximum;y++)
             for(int x=1;x<r.Width-1 && result.Count<Maximum;x++)
             {
@@ -34,6 +50,7 @@ public partial class EnvironmentDecoration : Node2D
     }
     public override void _Draw()
     {
+        if(PropModule>=0)DrawTextureRectRegion(EnvironmentAssetCache.Props,new Rect2(-13,-62,26,64),new Rect2(PropModule*26,0,26,64));
         if(Texture!=null)DrawTexture(Texture,-Pivot);
         if(Rubble)
         {

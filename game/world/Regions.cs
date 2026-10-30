@@ -28,6 +28,7 @@ public sealed class RegionState
     public int PlacementRevision { get; set; }
     public int Entrance { get; set; }
     public int Objective { get; set; }
+    public List<LandmarkRoom> Landmarks { get; set; } = new();
 
     public const int Tile = 24;
     public int Index(Vector2 p) => p.X < 0 || p.Y < 0 || p.X >= Width * Tile || p.Y >= Height * Tile ? -1 : (int)(p.Y / Tile) * Width + (int)(p.X / Tile);
@@ -334,7 +335,10 @@ public static class Regions
                 }
 
             if (DungeonValidator.Solvable(r))
+            {
+                Landmarks.Compose(r);
                 return r;
+            }
         }
 
         throw new InvalidOperationException($"Dungeon seed {seed}: exceeded 30 bounded grammar/layout attempts");

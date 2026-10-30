@@ -111,7 +111,12 @@ public static class DungeonChecks
                 {
                     bool occupied=r.Tiles[(cy+5)*r.Width+cx+5]==Terrain.Floor;
                     for(int y=1;y<=9;y++)for(int x=1;x<=9;x++)
-                        if((r.Tiles[(cy+y)*r.Width+cx+x]==Terrain.Floor)!=occupied)throw new InvalidOperationException("incomplete interior");
+                        {
+                            var tile=r.Tiles[(cy+y)*r.Width+cx+x];
+                            if(!occupied && tile!=Terrain.Wall)throw new InvalidOperationException("unoccupied cell carved");
+                            if(occupied && tile!=Terrain.Floor && (tile!=Terrain.Wall || Landmarks.Protected(x,y) || x is 1 or 9 || y is 1 or 9))throw new InvalidOperationException("illegal interior architecture");
+                        }
+                    if(occupied && !Landmarks.RoomSafe(r,cx/11,cy/11))throw new InvalidOperationException("interior footprint/lane disconnected");
                     foreach(var (dx,dy) in new[]{(-1,0),(1,0),(0,-1),(0,1)})
                     {
                         int mid=(cy+5+dy*5)*r.Width+cx+5+dx*5;
@@ -129,7 +134,7 @@ public static class DungeonChecks
                         }
                     }
                 }
-                check(true,"9x9 interiors/four-direction symmetric three-tile boundaries/solid corners "+seed);
+                check(true,"validated authored 9x9 interiors/four-direction symmetric three-tile boundaries/solid corners "+seed);
                 foreach(var gate in r.GateGroups())
                 {
                     int xs=gate.Select(i=>i%r.Width).Distinct().Count(),ys=gate.Select(i=>i/r.Width).Distinct().Count();
@@ -145,8 +150,11 @@ public static class DungeonChecks
                     for(int cy=0;cy<r.Height;cy+=11)for(int cx=0;cx<r.Width;cx+=11)
                     {
                         int mid=(cy+5)*r.Width+cx+5;if(r.Tiles[mid]!=Terrain.Floor)continue;
-                        var center=r.Center(mid);var corner=center+new V(72,72);
-                        if(!r.CanTravel(center,corner,a)||!r.CanTravel(corner,corner+new V(-48,0),a))throw new InvalidOperationException("corner clearance "+a.Id);
+                        var center=r.Center(mid);
+                        foreach(var direction in new[]{V.UnitX,-V.UnitX,V.UnitY,-V.UnitY})
+                            if(!r.CanTravel(center,center+direction*84,a))throw new InvalidOperationException("protected combat lane clearance "+a.Id);
+                        foreach(int at in Enumerable.Range(1,9).SelectMany(ly=>Enumerable.Range(1,9).Select(lx=>(cy+ly)*r.Width+cx+lx)).Where(at=>r.Tiles[at]==Terrain.Floor))
+                            if(!reachable.Contains(at))throw new InvalidOperationException("unreachable interior floor "+a.Id);
                     }
                 }
                 r.OpenDoors.Clear();
@@ -160,7 +168,7 @@ public static class DungeonChecks
                         d.OpenDoors.UnionWith(d.Features.Where(x=>x.Value=="lock").Select(x=>x.Key));
                         timer.Restart();d.Path(d.Center(d.Entrance),d.Center(d.Objective),actors[0]);double nav=timer.Elapsed.TotalMilliseconds;
                         timer.Restart();d.FindPlacement(d.Center(d.Objective),actors[0],Array.Empty<ActorState>());double place=timer.Elapsed.TotalMilliseconds;
-                        samples.Add(new{generationMs=gen,allocatedBytes=allocated,validationMs=validation,navigationMs=nav,placementMs=place});
+                        samples.Add(new{compositionMs=Landmarks.LastComposeMilliseconds,selectionMs=Landmarks.LastSelectionMilliseconds,structuralValidationMs=Landmarks.LastValidationMilliseconds,generationMs=gen,allocatedBytes=allocated,validationMs=validation,navigationMs=nav,placementMs=place});
                     }
                     measurements.Add(new{seed,width=r.Width,height=r.Height,tiles=r.Tiles.Length,walkable=r.Tiles.Count(t=>t==Terrain.Floor),tileArrayBytes=r.Tiles.Length*4,samples});
                     Progress(app,check,seed);

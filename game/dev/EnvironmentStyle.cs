@@ -19,3 +19,10 @@ public static class EnvironmentStyle
         }
     }
 }
+
+public static class EnvironmentThemes
+{
+    public static Color Tint(string theme) => theme switch { "overgrown"=>new Color("b0c9a1"),"ceremonial"=>new Color("cbd1c5"),_=>Colors.White };
+    public static Color Accent(string theme) => theme switch { "overgrown"=>new Color("718f56"),"ceremonial"=>new Color("b2a576"),_=>new Color("8c927b") };
+    public static string At(RegionState r,int x,int y) => r.Landmarks.FirstOrDefault(room=>room.X==x/11 && room.Y==y/11)?.Theme ?? "weathered";
+}

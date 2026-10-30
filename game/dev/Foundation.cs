@@ -277,6 +277,8 @@ public partial class Foundation : Node2D
         GD.Print($"MOSSLIGHT_READY actors={World.Actors.Count} families={CreatureRuntime.Registry.Families.Count()} framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription} source={BuildIdentity.Source}");
         var preset=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--preset="))?.Split('=',2)[1];
         SelectFeel(MovementFeel.Presets.FirstOrDefault(x=>x.Id==preset) ?? MovementFeel.Presets[1]);
+        if(OS.GetCmdlineUserArgs().Contains("--validate-landmarks"))
+        { GD.Print($"LANDMARK VALIDATION PASSED: {Landmarks.Library.Count} templates");GetTree().Quit();return; }
         if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
         if (OS.GetCmdlineUserArgs().Contains("--test"))
             CallDeferred(nameof(RunChecks));
@@ -492,7 +494,9 @@ public partial class Foundation : Node2D
             World.Enter(World.Player,World.Player.Region=="ruin"?"reach":"ruin");
             TouchMovement=ControllerVelocity=Vector2.Zero;Ui.Stick.Cancel();RebuildViews();
             BuildTerrain();drawnRegion=World.Player.Region;
-            _=EnvironmentAssetCache.Floors;_=EnvironmentAssetCache.Walls;ResumeGame();
+            _=EnvironmentAssetCache.Floors;_=EnvironmentAssetCache.Walls;_=EnvironmentAssetCache.Props;ResumeGame();
+            var activeRegion=World.RegionsById[World.Player.Region];
+            GD.Print($"MOSSLIGHT_LANDMARK_READY region={activeRegion.Id} rooms={activeRegion.Landmarks.Count} structures={activeRegion.Landmarks.Sum(l=>l.Anchors.Count(a=>a.Collision=="terrain"))} templates={string.Join(",",activeRegion.Landmarks.Select(l=>l.Template).Distinct())}");
             GD.Print($"MOSSLIGHT_ENVIRONMENT_READY region={World.Player.Region} walls={wallRows.Count} decorations={decorations.Count} atlases={EnvironmentAssetCache.TextureCount}");
             GetViewport().SetInputAsHandled();return;
         }
@@ -792,9 +796,14 @@ public partial class TerrainView : Node2D
             if(Region.Tiles[y*Region.Width+x]==Terrain.Floor)
             {
                 int variant=(int)(EnvironmentStyle.Hash(Region.Seed,x,y)&15);
-                floorBatch.Sprite(new Rect2(GodotConvert.GroundToScreen(x*24,y*24),new Vector2(24,12)),new Rect2(variant*24,0,24,12));
+                floorBatch.Sprite(new Rect2(GodotConvert.GroundToScreen(x*24,y*24),new Vector2(24,12)),new Rect2(variant*24,0,24,12),EnvironmentThemes.Tint(EnvironmentThemes.At(Region,x,y)));
             }
         floorBatch.Draw(this);
+        var landmarkGround = new TerrainBatch(); batches.Add(landmarkGround);
+        foreach(var room in Region.Landmarks)
+            foreach(var anchor in room.Anchors.Where(a=>a.Collision=="cosmetic"))
+                EnvironmentArtGenerator.GroundDetail(landmarkGround,GodotConvert.GroundToScreen((room.X*11+anchor.X+.5f)*24,(room.Y*11+anchor.Y+.5f)*24),anchor,room.Theme);
+        landmarkGround.Draw(this);
         batch=new TerrainBatch();batches.Add(batch);
         foreach (var(terrain, key)in new[]
         {

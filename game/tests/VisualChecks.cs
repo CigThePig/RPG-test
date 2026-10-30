@@ -393,6 +393,8 @@ public static class VisualChecks
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
+        if(OS.GetCmdlineUserArgs().Contains("--landmarks-only"))
+        { await LandmarkVisualChecks.Run(app); GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--environment-only"))
         {
             app.World.Enter(app.World.Player,"ruin");
@@ -641,6 +643,7 @@ public static class VisualChecks
         await DungeonVisualChecks.Run(app);
         await WallDepthChecks.Run(app);
         await EnvironmentVisualChecks.Run(app);
+        await LandmarkVisualChecks.Run(app);
         app.World.Enter(app.World.Player, "reach");
         if (app.Ui.MobileLayout) await Capture(app, "controls");
         app.Ui.Workshop();

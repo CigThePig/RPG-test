@@ -14,13 +14,13 @@ public sealed class TerrainBatch : IDisposable
         Add(a); Add(new Vector2(b.X,a.Y)); Add(b); Add(a); Add(b); Add(new Vector2(a.X,b.Y));
         void Add(Vector2 p) { vertices.Add(new Vector3(p.X,p.Y,0)); colors.Add(color); }
     }
-    public void Sprite(Rect2 destination, Rect2 source)
+    public void Sprite(Rect2 destination, Rect2 source, Color? tint = null)
     {
         var a=destination.Position;var b=destination.End;
         var u=source.Position/Texture!.GetSize();var v=source.End/Texture.GetSize();
         Add(a,u);Add(new Vector2(b.X,a.Y),new Vector2(v.X,u.Y));Add(b,v);
         Add(a,u);Add(b,v);Add(new Vector2(a.X,b.Y),new Vector2(u.X,v.Y));
-        void Add(Vector2 p,Vector2 uv){vertices.Add(new Vector3(p.X,p.Y,0));colors.Add(Colors.White);uvs.Add(uv);}
+        void Add(Vector2 p,Vector2 uv){vertices.Add(new Vector3(p.X,p.Y,0));colors.Add(tint ?? Colors.White);uvs.Add(uv);}
     }
     public int VertexCount => vertices.Count;
     public long VertexBytes => vertices.Count * (Texture==null?28L:36L);

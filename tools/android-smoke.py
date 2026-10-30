@@ -317,6 +317,18 @@ try:
             time.sleep(.75)
             capture(f'{region}-entry-{cycle+1}.png',wait=20)
             if region=='ruin':
+                landmark_marks=re.findall(r'MOSSLIGHT_LANDMARK_READY region=ruin rooms=(\d+) structures=(\d+) templates=([^\r\n]+)',logs)
+                assert landmark_marks and int(landmark_marks[-1][0])>=2 and int(landmark_marks[-1][1])>0, 'Exported dungeon lacks authored landmark structures'
+                assert 'ruined-entrance' in landmark_marks[-1][2] and 'relic-sanctuary' in landmark_marks[-1][2], 'Required mission landmarks absent'
+                movement_before=logs.count('MOSSLIGHT_LANDMARK_MOVEMENT')
+                for move_x in (230,50):
+                    adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(move_x*w/1280)),str(int(640*h/800)),'500')
+                    time.sleep(.3)
+                logs=adb('logcat','-d')
+                movement=re.findall(r'MOSSLIGHT_LANDMARK_MOVEMENT clear=(True|False) x=([0-9.]+) y=([0-9.]+)',logs)
+                assert len(movement)>=movement_before+2, 'Dungeon joystick input did not complete'
+                assert all(m[0]=='True' for m in movement), 'Installed Android player overlaps authored terrain'
+                assert len({(m[1],m[2]) for m in movement[-2:]})>1, 'Dungeon joystick produced no displacement'
                 for action,marker in (('attack','attack_completed'),('dodge','dodge_completed')):
                     before=adb('logcat','-d').count('MOSSLIGHT_COMBAT kind='+marker)
                     tap_action(action)
@@ -331,7 +343,7 @@ try:
                 capture(f'ruin-combat-{cycle+1}.png',wait=20)
             marks=re.findall(r'MOSSLIGHT_ENVIRONMENT_READY region=(\w+) walls=(\d+) decorations=(\d+) atlases=(\d+)',logs)
             state=marks[-1]
-            assert int(state[3])==2, 'Unbounded or missing environment atlas cache'
+            assert int(state[3])==3, 'Unbounded or missing environment atlas cache'
             assert int(state[2])<=96, 'Unbounded Android decoration count'
             previous=[r for r in regions if r['region']==region]
             if previous: assert previous[-1]['counts']==list(state[1:]), 'Android region views accumulate'
