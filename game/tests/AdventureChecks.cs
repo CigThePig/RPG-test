@@ -36,6 +36,9 @@ public static class AdventureChecks
                 string save=Persistence.Capture(w,n);Persistence.Restore(w,n,save);
                 w.Enter(w.Player,"reach");w.Enter(w.Player,"ruin");
                 check(positions==JsonSerializer.Serialize(w.Actors.Values.Where(a=>a.Id.StartsWith("ruin:spawn:")).OrderBy(a=>a.Id,StringComparer.Ordinal).Select(a=>new{a.Id,a.CombatProfile,a.X,a.Y})),"adventure revisit preserves actors "+seed);
+                var killed=w.Actors[enemies[0].Id];w.Damage(w.Player,killed,10000,"magic"); // Explicit persistence fixture, not combat proof.
+                string corpse=Persistence.Capture(w,n);Persistence.Restore(w,n,corpse);w.Enter(w.Player,"reach");w.Enter(w.Player,"ruin");
+                check(!w.Actors[killed.Id].Alive&&w.Actors.Count(a=>a.Key.StartsWith("ruin:spawn:"))==8,"defeated actor survives save and revisit without duplication "+seed);
                 foreach(var a in enemies)w.Actors.Remove(a.Id); // Explicit no-actors persistence fixture, not combat proof.
                 w.Enter(w.Player,"reach");w.Enter(w.Player,"ruin");
                 check(!w.Actors.Keys.Any(id=>id.StartsWith("ruin:spawn:")),"adventure empty population never respawns "+seed);
@@ -55,6 +58,12 @@ public static class AdventureChecks
                 w.Player.X=region.Center(room.CenterY*region.Width+room.CenterX).X;w.Player.Y=region.Center(room.CenterY*region.Width+room.CenterX).Y;
                 Exploration.Discover(w);Exploration.Discover(w);
                 check(events==1&&region.DiscoveredLandmarks.Contains(Exploration.Identity(region,landmark)),"actual room discovery emitted once with stable identity");
+                var timing=System.Diagnostics.Stopwatch.StartNew();
+                for(int i=0;i<10000;i++)Exploration.Discover(w);
+                double discoveryMicros=timing.Elapsed.TotalMilliseconds/10;
+                timing.Restart();for(int i=0;i<10000;i++)n.Call("receive","benchmark_noop","player","","",0);
+                double narrativeMicros=timing.Elapsed.TotalMilliseconds/10;
+                Directory.CreateDirectory("build/adventure");File.WriteAllText("build/adventure/processing.json",JsonSerializer.Serialize(new{iterations=10000,discoveryMicrosecondsPerCall=discoveryMicros,questBridgeMicrosecondsPerCall=narrativeMicros,managedBytes=GC.GetTotalMemory(false)},Content.Json));
                 string discovered=Persistence.Capture(w,n);Persistence.Restore(w,n,discovered);Exploration.Discover(w);
                 check(events==1,"discovery restore emits no duplicate event");
                 var legacy=JsonNode.Parse(discovered)!;foreach(var entry in legacy["Regions"]!.AsObject())
@@ -63,6 +72,17 @@ public static class AdventureChecks
                 check(w.RegionsById["ruin"].EncountersInitialized&&w.RegionsById["ruin"].ExplorationInitialized&&w.RegionsById["ruin"].DiscoveredLandmarks.Count==0,"current-generator absent fields preserve old population and loot without retro rewards");
             }
             finally{w.Events.Published-=Observe;}
+            Persistence.Restore(w,n,original);
+            w.RegionsById["ruin"]=Regions.Dungeon(1);w.Enter(w.Player,"ruin");
+            var relicRegion=w.RegionsById["ruin"];var relicPoint=relicRegion.Center(relicRegion.Objective);
+            w.Player.X=relicPoint.X;w.Player.Y=relicPoint.Y; // Explicit capacity fixture, never adventure traversal evidence.
+            var relicBag=w.Items.Service.Call("bag","player").AsGodotObject() as Node;
+            var relicLimit=GD.Load<GDScript>("res://addons/gloot/core/constraints/item_count_constraint.gd").New().AsGodotObject() as Node;
+            relicBag!.AddChild(relicLimit!);relicLimit!.Set("capacity",relicBag.Call("get_item_count").AsInt32());
+            check(!w.Interact(w.Player)&&!relicRegion.Depleted.Contains(relicRegion.Objective)&&w.Items.Count("player","relic")==0,"full inventory preserves physical relic for retry");
+            relicBag.RemoveChild(relicLimit);relicLimit.Free();
+            check(w.Interact(w.Player)&&relicRegion.Depleted.Contains(relicRegion.Objective)&&w.Items.Count("player","relic")==1,"relic retry transfers exactly one objective");
+            check(!w.Interact(w.Player)&&w.Items.Count("player","relic")==1,"repeated relic interaction cannot duplicate objective");
             Persistence.Restore(w,n,original);
             // Deliberate integration setup for transactional failure tests, separate from adventure run.
             n.Call("accept_quest",3);w.Items.Craft("player",w.Content.Recipes.Single(r=>r.Id=="draught"));

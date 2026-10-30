@@ -31,7 +31,13 @@ public static class Persistence
         foreach (var(id, r)in s.Regions)
             if (r.Id != id || r.Width < 1 || r.Height < 1 || r.Width > 512 || r.Height > 512 || r.Tiles.Length != r.Width * r.Height || r.Features.Keys.Any(k => k < 0 || k >= r.Tiles.Length) || r.Tiles.Any(t => !Enum.IsDefined(t)) || r.OpenDoors.Any(k => !r.Features.ContainsKey(k)) || r.Depleted.Any(k => !r.Features.ContainsKey(k)))
                 throw new InvalidDataException($"Invalid region {id}");
-        foreach (var region in s.Regions.Values) Landmarks.ValidateSaved(region);
+        foreach (var region in s.Regions.Values)
+        {
+            Landmarks.ValidateSaved(region);
+            if(region.DiscoveredLandmarks == null || region.ExploredTiles == null || region.ExploredTiles.Any(at=>at<0||at>=region.Tiles.Length) ||
+                region.DiscoveredLandmarks.Any(id=>!region.Landmarks.Any(l=>Exploration.Identity(region,l)==id)))
+                throw new InvalidDataException("Invalid saved exploration state");
+        }
         foreach (var(id, a)in s.Actors)
         {
             if (a.Id != id || !s.Regions.TryGetValue(a.Region, out var r) || !float.IsFinite(a.X) || !float.IsFinite(a.Y) || a.X < 0 || a.Y < 0 || a.X >= r.Width * 24 || a.Y >= r.Height * 24 || a.Health < 0 || a.Health > a.MaxHealth || !float.IsFinite(a.Health) || !float.IsFinite(a.Mana) || !float.IsFinite(a.MaxMana) || !float.IsFinite(a.MaxHealth) || !float.IsFinite(a.Strength) || !float.IsFinite(a.Defence) || !float.IsFinite(a.Speed) || !float.IsFinite(a.Radius) || !float.IsFinite(a.MotionX) || !float.IsFinite(a.MotionY) || !float.IsFinite(a.StateRemaining) || a.MaxHealth <= 0 || a.Radius <= 0 || a.Speed < 0 || !Enum.IsDefined(a.State) || a.Mana < 0 || a.Mana > a.MaxMana || a.Level < 1 || a.Experience < 0 || a.SkillPoints < 0 || a.SkillRanks.Any(x => !content.Skills.Any(d => d.Id == x.Key) || x.Value < 0) || a.Abilities.Any(k => !content.Abilities.Any(d => d.Id == k)) || a.Statuses.Any(x => !content.Statuses.Any(d => d.Id == x.Id) || x.Stacks < 1 || !float.IsFinite(x.Remaining)) || a.Cooldowns.Any(x => !float.IsFinite(x.Value) || x.Value < 0))

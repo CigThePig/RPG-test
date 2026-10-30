@@ -622,7 +622,7 @@ public partial class Foundation : Node2D
                 ControllerVelocity = Vector2.Zero;
                 ui.PauseForVerification();
                 // Never replace the recovery autosave with a defeated player.
-                try { if (SessionStarted && !VerificationMode && replay == null && !InFeelCourse && World.Player.Alive) Persistence.SaveAutosave(World, Narrative); }
+                try { if (SessionStarted && !adventureVisual && !OS.GetCmdlineUserArgs().Contains("--adventure-check") && replay == null && !InFeelCourse && World.Player.Alive) Persistence.SaveAutosave(World, Narrative); }
                 catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }
             }
         }

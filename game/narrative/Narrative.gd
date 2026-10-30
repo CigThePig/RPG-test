@@ -256,6 +256,7 @@ func advance(cue: String) -> void:
 		choices.add_child(button)
 	else:
 		for response in current_line.responses:
+			if not response.is_allowed: continue
 			var button := Button.new()
 			button.custom_minimum_size.y = 64
 			button.text = response.text
