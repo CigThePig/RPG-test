@@ -32,11 +32,12 @@ public sealed class RegionState
     public const int Tile = 24;
     public int Index(Vector2 p) => p.X < 0 || p.Y < 0 || p.X >= Width * Tile || p.Y >= Height * Tile ? -1 : (int)(p.Y / Tile) * Width + (int)(p.X / Tile);
     public Vector2 Center(int index) => new((index % Width + .5f) * Tile, (index / Width + .5f) * Tile);
-    public bool Passable(int index, ActorState a)
+    // gatesOpen treats every locked gate as unlocked, for placement queries only.
+    public bool Passable(int index, ActorState a, bool gatesOpen = false)
     {
         if (index < 0 || index >= Tiles.Length)
             return false;
-        if (Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index))
+        if (!gatesOpen && Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index))
             return false;
         return Tiles[index] switch
         {
@@ -72,9 +73,9 @@ public sealed class RegionState
     public int[] GateAt(int at) => GateGroups().FirstOrDefault(g => Array.BinarySearch(g, at) >= 0) ?? Array.Empty<int>();
 
     public bool BlocksSight(int index) => index < 0 || index >= Tiles.Length || Tiles[index] is Terrain.Wall or Terrain.Rock || (Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index));
-    public bool CanStand(Vector2 p, ActorState a) => BlockingCell(p,a)==-1;
+    public bool CanStand(Vector2 p, ActorState a, bool gatesOpen = false) => BlockingCell(p,a,gatesOpen)==-1;
     // -1 means clear; -2 is a boundary/invalid position; otherwise the blocking footprint tile.
-    public int BlockingCell(Vector2 p, ActorState a)
+    public int BlockingCell(Vector2 p, ActorState a, bool gatesOpen = false)
     {
         if (!float.IsFinite(p.X) || !float.IsFinite(p.Y) || p.X - a.Radius < 0 || p.Y - a.Radius < 0 || p.X + a.Radius >= Width * Tile || p.Y + a.Radius >= Height * Tile)
             return -2;
@@ -83,22 +84,25 @@ public sealed class RegionState
         for (int y = (int)((p.Y - a.Radius) / Tile); y <= (int)((p.Y + a.Radius) / Tile); y++)
             for (int x = (int)((p.X - a.Radius) / Tile); x <= (int)((p.X + a.Radius) / Tile); x++)
             {
-                if (Passable(y * Width + x, a)) continue;
+                if (Passable(y * Width + x, a, gatesOpen)) continue;
                 var nearest = new Vector2(Math.Clamp(p.X, x * Tile, (x + 1) * Tile), Math.Clamp(p.Y, y * Tile, (y + 1) * Tile));
                 if (Vector2.DistanceSquared(p, nearest) < a.Radius * a.Radius) return y * Width + x;
             }
         return -1;
     }
 
-    public bool CanTravel(Vector2 from, Vector2 to, ActorState a)
+    public bool CanTravel(Vector2 from, Vector2 to, ActorState a, bool gatesOpen = false)
     {
         int steps = Math.Max(1, (int)Math.Ceiling(Vector2.Distance(from, to) / Math.Min(2, a.Radius / 2)));
         for (int i = 0; i <= steps; i++)
-            if (!CanStand(Vector2.Lerp(from, to, (float)i / steps), a)) return false;
+            if (!CanStand(Vector2.Lerp(from, to, (float)i / steps), a, gatesOpen)) return false;
         return true;
     }
 
-    public Vector2 FindPlacement(Vector2 preferred, ActorState a, IEnumerable<ActorState> occupants)
+    // throughGates searches the whole mission, so inhabitants may start beyond locked
+    // gates instead of being pulled onto the entrance side. The chosen point still
+    // clears every closed gate, feature and occupant.
+    public Vector2 FindPlacement(Vector2 preferred, ActorState a, IEnumerable<ActorState> occupants, bool throughGates = false)
     {
         var others = occupants.Where(b => b.Region == a.Region && b.Id != a.Id && b.Alive).ToArray();
         var reachable = new HashSet<int> { Entrance };
@@ -107,7 +111,7 @@ public sealed class RegionState
         {
             int at=pending.Dequeue();
             foreach(int next in Neighbours(at))
-                if(!reachable.Contains(next) && CanTravel(Center(at),Center(next),a)) { reachable.Add(next);pending.Enqueue(next); }
+                if(!reachable.Contains(next) && CanTravel(Center(at),Center(next),a,throughGates)) { reachable.Add(next);pending.Enqueue(next); }
         }
         foreach (int at in reachable.OrderBy(i => Vector2.DistanceSquared(Center(i), preferred)).ThenBy(i => i))
         {

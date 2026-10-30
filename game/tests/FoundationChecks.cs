@@ -79,6 +79,16 @@ public static class FoundationChecks
             string rewardedSave = Persistence.Capture(w, app.Narrative);
             Persistence.Restore(w, app.Narrative, rewardedSave);
             Check(!app.Narrative.Call("accept_quest", 1).AsBool() && w.Items.Count("player", "coin") == beforeReward + 15, "load and repeated acceptance cannot duplicate historical reward");
+            // A save written before quest 3 existed: adding content must not strand it.
+            var olderNarrative = System.Text.Json.Nodes.JsonNode.Parse(app.Narrative.Call("export_state").AsString())!;
+            foreach (var pool in new[] { "available", "active", "completed" })
+            {
+                var ids = olderNarrative["pools"]![pool]!.AsArray();
+                foreach (var id in ids.Where(x => x!.GetValue<double>() == 3).ToArray()) ids.Remove(id);
+            }
+            olderNarrative["quests"]!.AsObject().Remove("3");
+            Check(app.Narrative.Call("import_state", olderNarrative.ToJsonString()).AsBool() && app.Narrative.Call("accept_quest", 3).AsBool(),
+                "save predating an authored quest loads and offers that quest");
             Persistence.Restore(w, app.Narrative, original);
             var bag = w.Items.Service.Call("bag", "capacity-test").AsGodotObject() as Node;
             w.Items.Add("capacity-test", "iron_sword");

@@ -159,7 +159,9 @@ public partial class RpgUi : CanvasLayer
         if (e is InputEventScreenDrag drag && touchButtons.ContainsKey(drag.Index))
         { GetViewport().SetInputAsHandled(); return; }
         if (e is not InputEventScreenTouch touch) return;
-        if (App.GameplayBlocked) { CancelActionTouches(); return; }
+        // Death blocks gameplay but leaves the hotbar visible; its Menu button must
+        // still dispatch, and every gameplay command already rejects a dead player.
+        if (App.PresentationBlocked) { CancelActionTouches(); return; }
         if (touch.Canceled)
         {
             if (touchButtons.Remove(touch.Index,out var canceled)) { canceled.Modulate=Colors.White; GetViewport().SetInputAsHandled(); }
@@ -281,11 +283,15 @@ public partial class RpgUi : CanvasLayer
 
     double interactionEmphasisUntil;
     long interactionCheckTick = -1;
+    bool defeatAnnounced;
     public void Notify(string text) => message.Text = text;
     public void Update()
     {
         hotbar.Visible = !BlocksInput && !App.Narrative.Get("speaking").AsBool();
-        if (!hotbar.Visible || App.GameplayBlocked) CancelActionTouches();
+        if (!hotbar.Visible || App.PresentationBlocked) CancelActionTouches();
+        bool defeated = !App.World.Player.Alive;
+        if (defeated && !defeatAnnounced) Notify("Defeated · open the menu to load a save or start a new game");
+        defeatAnnounced = defeated;
         Stick.Visible = MobileLayout && !App.GameplayBlocked;
         if (App.GameplayBlocked) Stick.Cancel();
         marker.Visible=App.Trace.Active && !BlocksInput;
@@ -371,14 +377,15 @@ public partial class RpgUi : CanvasLayer
                 Notify(App.ManageItem(() => App.World.Items.Craft("player", recipe)) ? "Crafted " + recipe.Output : "Missing ingredients");
                 Inventory();
             });
-        var player = App.World.Player;
-        var merchant = App.World.Actors.Values.FirstOrDefault(a => a.Profession == "merchant" && a.Alive && a.Region == player.Region && System.Numerics.Vector2.Distance(a.Position, player.Position) < 80 && !App.World.Hostile(player, a) && App.World.LineOfSight(player, a));
+        var merchant = App.NearbyMerchant();
         if (merchant != null)
         {
             using var stock = JsonDocument.Parse(App.World.Items.Service.Call("catalog", merchant.Id).AsString());
             foreach (var row in stock.RootElement.EnumerateArray())
             {
                 string id = row.GetProperty("id").GetString()!;
+                // Coins received from earlier sales are payment, not stock for sale.
+                if (id == "coin") continue;
                 string title = row.GetProperty("title").GetString()!;
                 Button(body, "Buy · " + title + " · 5 crowns", () =>
                 {

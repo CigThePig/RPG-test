@@ -14,13 +14,16 @@ func bag(owner: String) -> Inventory:
 		bags[owner] = inventory
 	return bags[owner]
 
-func add(owner: String, prototype: String, count: int = 1) -> bool:
+func has_space(owner: String, prototype: String, count: int = 1) -> bool:
 	if count <= 0 or not protos.data.has(prototype): return false
 	var inventory := bag(owner)
-	var probe := inventory.create_item(prototype)
-	var space = inventory._constraint_manager.get_space_for(probe)
+	var space = inventory._constraint_manager.get_space_for(inventory.create_item(prototype))
+	return space.is_inf() or space.count >= count
+
+func add(owner: String, prototype: String, count: int = 1) -> bool:
 	# Preflight the whole grant so a partially full bag cannot repeatedly farm a node.
-	if not space.is_inf() and space.count < count: return false
+	if not has_space(owner, prototype, count): return false
+	var inventory := bag(owner)
 	for n in count:
 		var item := inventory.create_item(prototype)
 		serial += 1
@@ -86,6 +89,8 @@ func equip(owner: String, prototype: String, slot_name: String, grasping: bool) 
 		slots[key] = slot
 	var previous: InventoryItem = slots[key].get_item()
 	if previous != null:
+		# Never detach equipment the bag cannot take back; it would be lost.
+		if not bag(owner).can_add_item(previous): return false
 		slots[key]._inventory.remove_item(previous)
 		bag(owner).add_item(previous)
 	return slots[key].equip(item)
@@ -238,7 +243,7 @@ func reconcile_equipment(owner: String, grasping: bool) -> void:
 	var key := owner + ":weapon"
 	if grasping or not slots.has(key): return
 	var item: InventoryItem = slots[key].get_item()
-	if item != null:
+	if item != null and bag(owner).can_add_item(item):
 		slots[key]._inventory.remove_item(item)
 		bag(owner).add_item(item)
 
@@ -246,7 +251,8 @@ func unequip_all(owner: String) -> void:
 	for key in slots:
 		if not key.begins_with(owner + ":"): continue
 		var item: InventoryItem = slots[key].get_item()
-		if item != null:
+		# A full bag keeps the item equipped rather than dropping it.
+		if item != null and bag(owner).can_add_item(item):
 			slots[key]._inventory.remove_item(item)
 			bag(owner).add_item(item)
 

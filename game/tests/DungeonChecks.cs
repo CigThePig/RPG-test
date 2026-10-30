@@ -47,6 +47,13 @@ public static class DungeonChecks
             check(r.CanStand(p.Position,p) && r.Features.Keys.All(at=>V.Distance(p.Position,r.Center(at))>=40),"arrival clears walls and return marker "+seed);
             check(inhabitants.Length==8 && inhabitants.All(a=>r.CanStand(a.Position,a) && V.Distance(a.Position,p.Position)>a.Radius+p.Radius+16),"eight production inhabitants and safe entrance "+seed);
             check(inhabitants.All(a=>r.Features.Keys.All(at=>V.Distance(a.Position,r.Center(at))>=40) && inhabitants.Where(b=>b.Id!=a.Id).All(b=>V.Distance(a.Position,b.Position)>=a.Radius+b.Radius+16)),"spawn separation from features/actors "+seed);
+            // Seeded inhabitants may start beyond a locked gate; placement must not pull them to the entrance side.
+            var closed=Reachable(r,p);
+            if(!closed.Contains(r.Objective))
+            {
+                var beyond=r.FindPlacement(r.Center(r.Objective)+new V(48,48),p,Array.Empty<ActorState>(),throughGates:true);
+                check(!closed.Contains(r.Index(beyond)) && r.CanStand(beyond,p),"placement beyond a locked gate stays beyond it "+seed);
+            }
             check(DungeonValidator.TrySolve(r,out var plan),"progression witness "+seed);
             int count=w.Items.Count(p.Id,"dungeon_key");if(count>0)w.Items.Take(p.Id,"dungeon_key",count);
             foreach(int gate in plan)

@@ -95,16 +95,17 @@ func import_state(text: String) -> bool:
 		for pool in ["available", "active", "completed"]:
 			if not data.pools.has(pool) or not data.pools[pool] is Array: return false
 			for id in data.pools[pool]:
-				if seen.has(int(id)) or not definitions.any(func(q): return q.id == int(id)): return false
-				if not data.quests.has(str(int(id))): return false
+				if seen.has(int(id)) or not data.quests.has(str(int(id))): return false
 				seen[int(id)] = true
-		if seen.size() != definitions.size(): return false
 	manager.reset_pool()
 	definitions.clear()
 	register_quests()
 	if not data.pools.is_empty():
 		manager.reset_pool()
+		# Quests since removed from quests.json have no definition and are ignored.
 		manager.restore_pool_state_from_dict(data.pools, definitions.duplicate())
+		# Quests authored after this save was written start out available.
+		for q in definitions: manager.mark_quest_as_available(q)
 	manager.deserialize_quests(data.quests)
 	flags = data.flags
 	speaking = false

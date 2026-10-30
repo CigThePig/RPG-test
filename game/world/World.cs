@@ -315,7 +315,9 @@ public sealed class World
         float resistance = type == "physical" ? Stat(target, "defence") : 0;
         float actual = Math.Max(1, amount - resistance);
         target.Health = Math.Max(0, target.Health - actual);
-        target.Invulnerable = .12f;
+        // Only direct hits grant the short post-hit window. A damage-over-time tick
+        // must not make its victim immune to the next sword or projectile.
+        if (!periodic) target.Invulnerable = .12f;
         Cancel(target);
         target.State = target.Alive ? ActionState.Staggered : ActionState.Dead;
         target.StateRemaining = .22f;
@@ -752,14 +754,16 @@ public sealed class World
         var r = RegionsById[a.Region];
         InteractionFeedback = "No accessible object nearby";
         var nearby = InteractionTargets(a).ToArray();
+        bool keyRequired = false;
         foreach (var(at, kind)in nearby)
         {
             if (kind == "lock")
             {
                 if (r.OpenDoors.Contains(at))
                     continue;
+                // A closer locked gate must not hide a key, chest or exit also in reach.
                 if (!Items.Take(a.Id, "dungeon_key", 1))
-                { InteractionFeedback = "A ruin key is required"; return false; }
+                { keyRequired = true; continue; }
                 InteractionFeedback = "Door unlocked";
                 foreach (int cell in r.GateAt(at)) r.OpenDoors.Add(cell);
                 Events.Publish(new("door_unlocked", a.Id, a.Region, at.ToString()));
@@ -797,7 +801,9 @@ public sealed class World
         var corpses = LootTargets(a);
         foreach (var corpse in corpses)
             if (Items.LootAll(corpse.Id, a.Id)) { InteractionFeedback = "Loot collected"; return true; }
-        if (r.Features.Any(x => x.Value == "chest" && r.Depleted.Contains(x.Key) && Vector2.Distance(a.Position,r.Center(x.Key)) < 48 && VisibleTo(a,r.Center(x.Key))))
+        if (keyRequired)
+            InteractionFeedback = "A ruin key is required";
+        else if (r.Features.Any(x => x.Value == "chest" && r.Depleted.Contains(x.Key) && Vector2.Distance(a.Position,r.Center(x.Key)) < 48 && VisibleTo(a,r.Center(x.Key))))
             InteractionFeedback = "Chest already empty";
         return false;
     }
@@ -814,7 +820,11 @@ public sealed class World
         // reachable floor, clear of that feature and surviving inhabitants.
         // Loading a snapshot never enters here or relocates saved actors.
         if (region == "ruin")
-            pos = r.FindPlacement(pos + new Vector2(RegionState.Tile * 2, RegionState.Tile), a, Actors.Values);
+        {
+            // Placement only refines arrival; without a clear stand, keep the entrance tile.
+            try { pos = r.FindPlacement(pos + new Vector2(RegionState.Tile * 2, RegionState.Tile), a, Actors.Values); }
+            catch (InvalidOperationException) { }
+        }
         a.X = pos.X;
         a.Y = pos.Y;
         InitializeContainers(r);
@@ -856,13 +866,16 @@ public sealed class World
                 Y = pos.Y,
                 HomeX = pos.X,
                 HomeY = pos.Y,
-                Grasps = false,
                 Abilities = combat.Priorities.Keys.OrderBy(x => x, StringComparer.Ordinal).ToList()
             };
             AnatomyAdapter.Apply(actor);
             actor.Speed = archetype.GetProperty("speed").GetSingle();
             actor.Health = actor.MaxHealth = archetype.GetProperty("health").GetSingle();
-            var placed = r.FindPlacement(actor.Position, actor, Actors.Values);
+            Vector2 placed;
+            // Seeded floor may lie beyond a locked gate; keep it there. An inhabitant
+            // without any clear stand is skipped rather than aborting region entry.
+            try { placed = r.FindPlacement(actor.Position, actor, Actors.Values, throughGates: true); }
+            catch (InvalidOperationException) { continue; }
             actor.X = actor.HomeX = placed.X; actor.Y = actor.HomeY = placed.Y;
             Actors[actor.Id] = actor;
         }
@@ -967,7 +980,6 @@ public sealed class World
                     Family = p.Family,
                     Seed = (ulong)(Seed + i * 17)
                 },
-                Grasps = p.Family == "biped",
                 Abilities = new()
                 {
                     i < 2 ? "slash" : "bite"

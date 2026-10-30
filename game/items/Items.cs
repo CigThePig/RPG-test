@@ -56,18 +56,24 @@ public sealed class Items(Node service, EventStream events)
     public string Describe(string owner) => service.Call("describe", owner).AsString();
     public bool Craft(string owner, RecipeDef recipe)
     {
-        if (recipe.Ingredients.Count == 0 || recipe.Ingredients.Any(x => x.Value < 1 || Count(owner, x.Key) < x.Value) || !service.Call("can_produce", recipe.Output, recipe.Count, recipe.Material, recipe.Quality).AsBool())
+        // Check room for the output before consuming any ingredient.
+        if (recipe.Ingredients.Count == 0 || recipe.Ingredients.Any(x => x.Value < 1 || Count(owner, x.Key) < x.Value) || !service.Call("can_produce", recipe.Output, recipe.Count, recipe.Material, recipe.Quality).AsBool() || !service.Call("has_space", owner, recipe.Output, recipe.Count).AsBool())
             return false;
         foreach (var x in recipe.Ingredients)
             Take(owner, x.Key, x.Value);
+        int produced = 0;
         if (recipe.Material != "")
         {
             for (int i = 0; i < recipe.Count; i++)
-                service.Call("generate_item", owner, recipe.Output, recipe.Material, recipe.Quality);
-            events.Publish(new("item_acquired", owner, "", recipe.Output, recipe.Count));
+                if (service.Call("generate_item", owner, recipe.Output, recipe.Material, recipe.Quality).AsBool())
+                    produced++;
+            if (produced > 0)
+                events.Publish(new("item_acquired", owner, "", recipe.Output, produced));
         }
-        else
-            Add(owner, recipe.Output, recipe.Count);
+        else if (Add(owner, recipe.Output, recipe.Count))
+            produced = recipe.Count;
+        if (produced == 0)
+            return false;
         events.Publish(new("crafted", owner, "", recipe.Id));
         return true;
     }
@@ -76,10 +82,18 @@ public sealed class Items(Node service, EventStream events)
     {
         if (price < 0 || Count(buyer, "coin") < price || Count(merchant, item) < 1)
             return false;
-        if (!Transfer(merchant, buyer, item, 1))
+        // Take payment first and refund it if the goods cannot be delivered, so a
+        // failed transfer can never hand over an item for free.
+        if (price > 0 && !service.Call("transfer", buyer, merchant, "coin", price).AsBool())
             return false;
+        if (!Transfer(merchant, buyer, item, 1))
+        {
+            if (price > 0)
+                service.Call("transfer", merchant, buyer, "coin", price);
+            return false;
+        }
         if (price > 0)
-            Transfer(buyer, merchant, "coin", price);
+            events.Publish(new("item_acquired", merchant, buyer, "coin", price));
         events.Publish(new("traded", buyer, merchant, item));
         return true;
     }

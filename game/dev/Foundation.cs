@@ -562,7 +562,8 @@ public partial class Foundation : Node2D
         return new NVector((float)Math.Cos(yaw), (float)-Math.Sin(yaw));
     }
 
-    ActorState? NearbyMerchant() => World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == World.Player.Region && NVector.Distance(x.Position, World.Player.Position) < 65 && !World.Hostile(World.Player, x) && World.LineOfSight(World.Player, x));
+    // Shared by Interact (dialogue) and the pack (Buy), so both use one range.
+    public ActorState? NearbyMerchant() => World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == World.Player.Region && NVector.Distance(x.Position, World.Player.Position) < 65 && !World.Hostile(World.Player, x) && World.LineOfSight(World.Player, x));
     public bool HasInteraction() => World.InteractionTargets(World.Player).Any() || World.LootTargets(World.Player).Any() || NearbyMerchant() != null;
 
     public void Interact()
@@ -598,7 +599,8 @@ public partial class Foundation : Node2D
                 World.CancelPlayerDodge();
                 ControllerVelocity = Vector2.Zero;
                 ui.PauseForVerification();
-                try { if (SessionStarted && replay == null && !InFeelCourse) Persistence.SaveAutosave(World, Narrative); }
+                // Never replace the recovery autosave with a defeated player.
+                try { if (SessionStarted && replay == null && !InFeelCourse && World.Player.Alive) Persistence.SaveAutosave(World, Narrative); }
                 catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }
             }
         }
