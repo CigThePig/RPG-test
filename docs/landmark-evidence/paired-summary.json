@@ -1,0 +1,119 @@
+{
+  "baseline": "a080e538c080be8204b8d4ecb86205324ab5e1a5",
+  "part3": "488174f7a0835584cf5059cb65e9e9b3c87be37e",
+  "renderer": "llvmpipe / Compatibility",
+  "layout": "1280x800 mobile UI, unchanged normal zoom",
+  "method": "three alternating baseline/current independent processes on same host; median of three equivalent dungeon entries per process, then median of three paired runs",
+  "limitations": "short software-rendered fixtures, ambient shared-host load; CPU command construction and atlas upload submission, not GPU completion; neither sustained performance nor Galaxy S25 FPS",
+  "summary": {
+    "baseline": {
+      "p50ms": 10.978300000000019,
+      "p95ms": 12.91540000000009,
+      "terrainBuildMs": 0.8715,
+      "wallBuildMs": 0.6904999999999998,
+      "viewBuildMs": 4.1825,
+      "actorLayerNodes": 59,
+      "decorationNodes": 5,
+      "textureMemoryBytes": 10457689,
+      "bufferMemoryBytes": 6934092,
+      "combinedMeshMs": 1.5884
+    },
+    "part3": {
+      "p50ms": 11.87639999999999,
+      "p95ms": 15.694500000000005,
+      "terrainBuildMs": 1.2049,
+      "wallBuildMs": 0.7836000000000002,
+      "viewBuildMs": 4.1641,
+      "actorLayerNodes": 114,
+      "decorationNodes": 60,
+      "textureMemoryBytes": 10857041,
+      "bufferMemoryBytes": 6961760,
+      "combinedMeshMs": 1.9885000000000002
+    },
+    "p95DeltaMs": 2.7790999999999144,
+    "p95DeltaPercent": 21.517723028321964
+  },
+  "runs": [
+    {
+      "pair": 1,
+      "baseline": {
+        "p50ms": 10.978300000000019,
+        "p95ms": 12.91540000000009,
+        "terrainBuildMs": 0.8644,
+        "wallBuildMs": 0.6904999999999998,
+        "viewBuildMs": 4.3586,
+        "actorLayerNodes": 59,
+        "decorationNodes": 5,
+        "textureMemoryBytes": 10457689,
+        "bufferMemoryBytes": 6934092,
+        "combinedMeshMs": 1.5548999999999997
+      },
+      "part3": {
+        "p50ms": 11.825199999999995,
+        "p95ms": 15.526700000000005,
+        "terrainBuildMs": 1.153,
+        "wallBuildMs": 0.7093,
+        "viewBuildMs": 4.4562,
+        "actorLayerNodes": 114,
+        "decorationNodes": 60,
+        "textureMemoryBytes": 10857041,
+        "bufferMemoryBytes": 6961760,
+        "combinedMeshMs": 1.8623
+      }
+    },
+    {
+      "pair": 2,
+      "baseline": {
+        "p50ms": 10.639700000000005,
+        "p95ms": 12.751000000000033,
+        "terrainBuildMs": 1.1858,
+        "wallBuildMs": 0.6871999999999999,
+        "viewBuildMs": 4.143,
+        "actorLayerNodes": 59,
+        "decorationNodes": 5,
+        "textureMemoryBytes": 10457689,
+        "bufferMemoryBytes": 6934092,
+        "combinedMeshMs": 1.8729999999999998
+      },
+      "part3": {
+        "p50ms": 11.87639999999999,
+        "p95ms": 18.005300000000005,
+        "terrainBuildMs": 1.3217,
+        "wallBuildMs": 0.8808999999999998,
+        "viewBuildMs": 4.1641,
+        "actorLayerNodes": 114,
+        "decorationNodes": 60,
+        "textureMemoryBytes": 10857041,
+        "bufferMemoryBytes": 6961760,
+        "combinedMeshMs": 2.2026
+      }
+    },
+    {
+      "pair": 3,
+      "baseline": {
+        "p50ms": 11.397199999999998,
+        "p95ms": 16.173099999999977,
+        "terrainBuildMs": 0.8715,
+        "wallBuildMs": 0.7168999999999999,
+        "viewBuildMs": 4.1825,
+        "actorLayerNodes": 59,
+        "decorationNodes": 5,
+        "textureMemoryBytes": 10457689,
+        "bufferMemoryBytes": 6934092,
+        "combinedMeshMs": 1.5884
+      },
+      "part3": {
+        "p50ms": 12.12639999999999,
+        "p95ms": 15.694500000000005,
+        "terrainBuildMs": 1.2049,
+        "wallBuildMs": 0.7836000000000002,
+        "viewBuildMs": 4.0319,
+        "actorLayerNodes": 114,
+        "decorationNodes": 60,
+        "textureMemoryBytes": 10857041,
+        "bufferMemoryBytes": 6961760,
+        "combinedMeshMs": 1.9885000000000002
+      }
+    }
+  ]
+}

@@ -22,7 +22,7 @@ public partial class Foundation : Node2D
     public PlaytestTrace Trace { get; private set; } = null!;
     GameplayReplay? replay;
     public CharacterView? ReplayObservedView => replay != null && Views.TryGetValue(replay.ObservedActorId, out var view) ? view : null;
-    public bool VerificationMode => OS.GetCmdlineUserArgs().Any(x => x is "--test" or "--visual-check" or "--gameplay-check");
+    public bool VerificationMode => OS.GetCmdlineUserArgs().Any(x => x is "--test" or "--visual-check" or "--gameplay-check" or "--adventure-check" or "--adventure-visual");
     public void SelectFeel(MovementFeel feel)
     {
         Feel=feel;
@@ -110,7 +110,13 @@ public partial class Foundation : Node2D
     public bool CanManageItems => !suspended && World.Player.Alive && !Narrative.Get("speaking").AsBool() && !ui.MenuOpen;
     public bool ManageItem(Func<bool> operation) => CanManageItems && operation();
     public bool UseQuickItem(string selector) => !GameplayBlocked && World.UseItem(World.Player, selector);
-    public void ShowCharacters(bool show) => actors.Visible = show;
+    bool showCharacters = true;
+    public void ShowCharacters(bool show)
+    {
+        showCharacters = show;
+        foreach (var view in Views.Values) view.Visible = show && view.State.Region == World.Player.Region;
+        foreach (var feature in features) feature.Visible = show;
+    }
     Node items = null !, planner = null !;
     RpgUi ui = null !;
     Camera2D camera = null !;
@@ -118,6 +124,8 @@ public partial class Foundation : Node2D
     Dictionary<string, Texture2D> art = new();
     string drawnRegion = "";
     readonly List<FeatureView> features = new();
+    readonly List<TerrainWallRow> wallRows = new();
+    readonly List<EnvironmentDecoration> decorations = new();
     public bool CollisionDebug { get; set; }
     public double SimulationMs { get; private set; }
     Node2D ground = null !;
@@ -260,7 +268,8 @@ public partial class Foundation : Node2D
         };
         AddChild(ui);
         AddChild(new PlaytestInputObserver { Trace=Trace });
-        Narrative.Connect("reward", Callable.From<string, int>((item, count) => World.Items.Add("player", item, count)));
+        Narrative.Connect("notice", Callable.From<string>(text => ui.Notify(text)));
+        Narrative.Set("deliver_reward", Callable.From<string, int, bool>((item, count) => World.Items.GrantReward(item, count)));
         Narrative.Connect("reputation", Callable.From<string, int>((faction, amount) =>
         {
             World.Player.Reputation[faction] = World.Player.Reputation.GetValueOrDefault(faction) + amount;
@@ -269,7 +278,14 @@ public partial class Foundation : Node2D
         GD.Print($"MOSSLIGHT_READY actors={World.Actors.Count} families={CreatureRuntime.Registry.Families.Count()} framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription} source={BuildIdentity.Source}");
         var preset=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--preset="))?.Split('=',2)[1];
         SelectFeel(MovementFeel.Presets.FirstOrDefault(x=>x.Id==preset) ?? MovementFeel.Presets[1]);
+        if(OS.GetCmdlineUserArgs().Contains("--validate-landmarks"))
+        { GD.Print($"LANDMARK VALIDATION PASSED: {Landmarks.Library.Count} templates");GetTree().Quit();return; }
+        var dump=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--dump-dungeons="))?.Split('=',2)[1];
+        if(dump!=null)
+        { foreach(int seed in dump.Split(',').Select(int.Parse))GD.Print(DungeonLayout.Ascii(Regions.Dungeon(seed)));GetTree().Quit();return; }
         if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
+        if (OS.GetCmdlineUserArgs().Contains("--adventure-visual")) CallDeferred(nameof(RunAdventureVisual));
+        if (OS.GetCmdlineUserArgs().Contains("--adventure-check")) CallDeferred(nameof(RunAdventure));
         if (OS.GetCmdlineUserArgs().Contains("--test"))
             CallDeferred(nameof(RunChecks));
         if (OS.GetCmdlineUserArgs().Contains("--visual-check"))
@@ -296,7 +312,7 @@ public partial class Foundation : Node2D
         };
         World.Events.Published += e =>
         {
-            if (OS.HasFeature("android") && e.Kind is "resource_depleted" or "region_entered")
+            if (OS.HasFeature("android") && e.Kind is "resource_depleted" or "region_entered" or "landmark_discovered")
                 GD.Print($"MOSSLIGHT_GAMEPLAY kind={e.Kind} value={e.Value} tick={World.Tick}");
             if(OS.HasFeature("android") && e.Kind=="ability_started" && e.Actor=="player")
                 GD.Print($"MOSSLIGHT_PLAYER_ABILITY id={e.Value} tick={World.Tick}");
@@ -384,12 +400,23 @@ public partial class Foundation : Node2D
         RebuildViews();
     }
 
+    bool adventureVisual;
+    public void RebuildViewsIfNeededForAdventure()
+    {
+        if(Views.Count!=World.Actors.Count || Views.Any(v=>!World.Actors.TryGetValue(v.Key,out var state) || !ReferenceEquals(state,v.Value.State))) RebuildViews();
+    }
+    public async void RunAdventureVisual()
+    {
+        adventureVisual=true;
+        try { await AdventureVisualRun.Run(this); GetTree().Quit(0); }
+        catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
+    }
     public override void _PhysicsProcess(double delta)
     {
         if (ui == null)
             return;
         try { replay?.BeforeStep(); } catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); return; }
-        if (!GameplayBlocked)
+        if (!GameplayBlocked && !adventureVisual)
         {
             DroppedSeconds += Math.Max(0,delta-.1);
             accumulator += Math.Min(delta, .1);
@@ -410,14 +437,15 @@ public partial class Foundation : Node2D
             }
         }
         else
-        { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
+        { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; if(!adventureVisual)World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
         presentation?.FlushPending();
         var player = World.Player;
         if (PresentationBlocked) CombatCamera.Reset();
         else { CombatEffects.Advance((float)delta); CombatCamera.Advance((float)delta); }
         foreach (var(id, view)in Views)
         {
-            view.Visible = World.Actors[id].Region == player.Region;
+            if (!World.Actors.TryGetValue(id, out var live)) { view.Visible = false; continue; }
+            view.Visible = showCharacters && live.Region == player.Region;
             // A player death blocks gameplay but must not freeze the defeat pose.
             view.Creature.Paused = !view.Visible || PresentationBlocked || (!player.Alive && view.State.Alive);
             view.HasLoot = !view.State.Alive && World.Items.HasLoot(id);
@@ -434,7 +462,12 @@ public partial class Foundation : Node2D
         var target = World.InteractionTargets(player).FirstOrDefault();
         foreach (var feature in features)
         {
-            bool selected = target.Value != null && feature.GetMeta("tile").AsInt32() == target.Key;
+            int at = feature.GetMeta("tile").AsInt32();
+            bool selected = target.Value != null && (at == target.Key || feature.GateCells.Contains(target.Key));
+            bool spent = region.Depleted.Contains(at) || (feature.GateCells.Length > 0 ? feature.GateCells.All(region.OpenDoors.Contains) : region.OpenDoors.Contains(at));
+            if (feature.Spent != spent) { feature.Spent = spent; feature.QueueRedraw(); }
+            bool lit = region.Lit.Contains(at);
+            if (feature.Lit != lit) { feature.Lit = lit; feature.QueueRedraw(); }
             if (feature.Selected != selected) { feature.Selected = selected; feature.QueueRedraw(); }
         }
         if (drawnRegion != player.Region)
@@ -471,6 +504,22 @@ public partial class Foundation : Node2D
     {
         if(e is InputEventKey developerKey && developerKey.Pressed && !developerKey.Echo && (developerKey.PhysicalKeycode==Key.F9 || developerKey.Keycode==Key.F9) && !Narrative.Get("speaking").AsBool())
         { BeginCombatCourse(); GetViewport().SetInputAsHandled(); return; }
+        // Development shortcut for the existing Diagnostics entry/return actions.
+        // Android OS-key smoke can verify exported-region art without bypassing
+        // World.Enter, regenerating saved terrain, or adding gameplay state.
+        if(e is InputEventKey regionKey && regionKey.Pressed && !regionKey.Echo &&
+            (regionKey.PhysicalKeycode==Key.F10 || regionKey.Keycode==Key.F10) && !Narrative.Get("speaking").AsBool())
+        {
+            LeaveFeelCourse();Ui.ClosePanels();
+            World.Enter(World.Player,World.Player.Region=="ruin"?"reach":"ruin");
+            TouchMovement=ControllerVelocity=Vector2.Zero;Ui.Stick.Cancel();RebuildViews();
+            BuildTerrain();drawnRegion=World.Player.Region;
+            _=EnvironmentAssetCache.Floors;_=EnvironmentAssetCache.Walls;_=EnvironmentAssetCache.Props;ResumeGame();
+            var activeRegion=World.RegionsById[World.Player.Region];
+            GD.Print($"MOSSLIGHT_LANDMARK_READY region={activeRegion.Id} rooms={activeRegion.Landmarks.Count} structures={activeRegion.Landmarks.Sum(l=>l.Anchors.Count(a=>a.Collision=="terrain"))} templates={string.Join(",",activeRegion.Landmarks.Select(l=>l.Template).Distinct())}");
+            GD.Print($"MOSSLIGHT_ENVIRONMENT_READY region={World.Player.Region} walls={wallRows.Count} decorations={decorations.Count} atlases={EnvironmentAssetCache.TextureCount}");
+            GetViewport().SetInputAsHandled();return;
+        }
         if (e.IsActionPressed("menu"))
         {
             ui.Menu();
@@ -537,7 +586,8 @@ public partial class Foundation : Node2D
         return new NVector((float)Math.Cos(yaw), (float)-Math.Sin(yaw));
     }
 
-    ActorState? NearbyMerchant() => World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == World.Player.Region && NVector.Distance(x.Position, World.Player.Position) < 65 && !World.Hostile(World.Player, x) && World.LineOfSight(World.Player, x));
+    // Shared by Interact (dialogue) and the pack (Buy), so both use one range.
+    public ActorState? NearbyMerchant() => World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == World.Player.Region && NVector.Distance(x.Position, World.Player.Position) < 65 && !World.Hostile(World.Player, x) && World.LineOfSight(World.Player, x));
     public bool HasInteraction() => World.InteractionTargets(World.Player).Any() || World.LootTargets(World.Player).Any() || NearbyMerchant() != null;
 
     public void Interact()
@@ -573,7 +623,8 @@ public partial class Foundation : Node2D
                 World.CancelPlayerDodge();
                 ControllerVelocity = Vector2.Zero;
                 ui.PauseForVerification();
-                try { if (SessionStarted && replay == null && !InFeelCourse) Persistence.SaveAutosave(World, Narrative); }
+                // Never replace the recovery autosave with a defeated player.
+                try { if (SessionStarted && !adventureVisual && !OS.GetCmdlineUserArgs().Contains("--adventure-check") && replay == null && !InFeelCourse && World.Player.Alive) Persistence.SaveAutosave(World, Narrative); }
                 catch (Exception e) { GD.PushWarning("Background save: " + e.Message); }
             }
         }
@@ -601,12 +652,25 @@ public partial class Foundation : Node2D
             Art = art
         };
         ground.AddChild(tilemap);
+        foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
+        wallRows.Clear();
+        wallRows.AddRange(TerrainWallRow.Create(r));
+        foreach (var row in wallRows) actors.AddChild(row);
+        foreach(var decoration in decorations) { actors.RemoveChild(decoration); decoration.QueueFree(); }
+        decorations.Clear();
+        decorations.AddRange(EnvironmentDecoration.Create(r,art));
+        foreach(var decoration in decorations)actors.AddChild(decoration);
         foreach (var feature in features) { actors.RemoveChild(feature); feature.QueueFree(); }
         features.Clear();
+        var gates = new[] { "lock", "portcullis", "seal" }.ToDictionary(k => k, k => r.GateGroups(k));
         foreach (var (at, kind) in r.Features)
         {
+            int[] gate = RegionState.IsGate(kind) ? gates[kind].Single(g => Array.BinarySearch(g, at) >= 0) : Array.Empty<int>();
+            if (gate.Length > 0 && gate[0] != at) continue;
             var pos = r.Center(at);
-            var feature = new FeatureView { Kind = kind, Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
+            var feature = new FeatureView { Kind = kind, Art = art, VisualSeed = EnvironmentStyle.Hash(r.Seed,at%r.Width,at/r.Width), GateCells = gate, Visible = showCharacters,
+                GateOffsets = gate.Select(cell => GodotConvert.GroundToScreen(r.Center(cell).X-pos.X, r.Center(cell).Y-pos.Y)).ToArray(),
+                Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Lit = r.Lit.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
             feature.SetMeta("tile",at);
             actors.AddChild(feature); features.Add(feature);
         }
@@ -695,6 +759,13 @@ public partial class Foundation : Node2D
         }
     }
 
+    public void RunAdventure()
+    {
+        var ruin=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--adventure-ruin="))?.Split('=',2)[1];
+        try { new AdventureRun(this){RuinSeed=ruin==null?null:int.Parse(ruin)}.Run(); GetTree().Quit(0); }
+        catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
+    }
+
     public async void RunChecks()
     {
         try
@@ -716,12 +787,17 @@ public partial class Foundation : Node2D
 
 public partial class TerrainView : Node2D
 {
+    public static double LastBuildMilliseconds { get; private set; }
+    public static long LastVertexBytes { get; private set; }
+    public override void _ExitTree() { foreach(var batch in batches)batch.Dispose(); }
     readonly List<TerrainBatch> batches=new();
     public RegionState Region { get; set; } = null !;
     public Dictionary<string, Texture2D> Art { get; set; } = null !;
 
     public override void _Draw()
     {
+        var buildTimer = System.Diagnostics.Stopwatch.StartNew();
+        foreach(var oldBatch in batches)oldBatch.Dispose();
         batches.Clear();
         var batch=new TerrainBatch();batches.Add(batch);
         // Ground layers do not overlap: group by texture so the engine can batch them.
@@ -737,10 +813,25 @@ public partial class TerrainView : Node2D
                     Terrain.Floor => new Color(.31f, .33f, .29f),
                     Terrain.Earth => new Color(.36f, .37f, .26f),
                     _ => new Color(.3f, .39f, .27f)};
-                batch.Rect(new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), color);
+                var origin = GodotConvert.GroundToScreen(x * 24, y * 24);
+                batch.Rect(new Rect2(origin, new Vector2(24, 12)), color);
             }
 
-        batch.Draw(this);batch=new TerrainBatch();batches.Add(batch);
+        batch.Draw(this);
+        var floorBatch=new TerrainBatch { Texture=EnvironmentAssetCache.Floors };batches.Add(floorBatch);
+        for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+            if(Region.Tiles[y*Region.Width+x]==Terrain.Floor)
+            {
+                int variant=(int)(EnvironmentStyle.Hash(Region.Seed,x,y)&15);
+                floorBatch.Sprite(new Rect2(GodotConvert.GroundToScreen(x*24,y*24),new Vector2(24,12)),new Rect2(variant*24,0,24,12),EnvironmentThemes.Tint(EnvironmentThemes.At(Region,x,y)));
+            }
+        floorBatch.Draw(this);
+        var landmarkGround = new TerrainBatch(); batches.Add(landmarkGround);
+        foreach(var room in Region.Landmarks)
+            foreach(var anchor in room.Anchors.Where(a=>a.Collision=="cosmetic"))
+                EnvironmentArtGenerator.GroundDetail(landmarkGround,GodotConvert.GroundToScreen((room.OriginX+anchor.X+.5f)*24,(room.OriginY+anchor.Y+.5f)*24),anchor,room.Theme);
+        landmarkGround.Draw(this);
+        batch=new TerrainBatch();batches.Add(batch);
         foreach (var(terrain, key)in new[]
         {
             (Terrain.Grass, "grass"),
@@ -758,20 +849,22 @@ public partial class TerrainView : Node2D
                         DrawTextureRect(texture, new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), false, new Color(1, 1, 1, .32f));
         }
 
+        if(Art.TryGetValue("rock1",out var rock))
+        {
+            var rockBatch=new TerrainBatch { Texture=rock };batches.Add(rockBatch);
+            for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+                if(Region.Tiles[y*Region.Width+x]==Terrain.Rock)
+                    rockBatch.Sprite(new Rect2(GodotConvert.GroundToScreen(x*24,y*24)+new Vector2(0,-7),new Vector2(24,19)),new Rect2(Vector2.Zero,rock.GetSize()));
+            rockBatch.Draw(this);
+        }
         for (int y = 0; y < Region.Height; y++)
             for (int x = 0; x < Region.Width; x++)
             {
                 int at=y*Region.Width+x;
                 var tile=Region.Tiles[at];
                 var p=GodotConvert.GroundToScreen(x*24,y*24);
-                if(tile is Terrain.Rock or Terrain.Wall)
-                {
-                    float rise=tile==Terrain.Wall ? 14 : 8;
-                    batch.Rect(new Rect2(p+new Vector2(0,-rise),new Vector2(24,12)),new Color(tile==Terrain.Wall ? "4d5d60" : "697268"));
-                    batch.Rect(new Rect2(p+new Vector2(0,12-rise),new Vector2(24,rise)),new Color("354344"));
-                    batch.Line(p+new Vector2(0,-rise),p+new Vector2(24,-rise),new Color("92988a"),1);
-                    batch.Line(p+new Vector2(3,-rise+4),p+new Vector2(13,-rise+4),new Color("7d8477"),1);
-                }
+                // Raised dungeon walls live in TerrainWallRow beside the actors.
+                // Natural rocks retain their established overworld rendering here.
                 if(tile==Terrain.Water)
                 {
                     if(y>0 && Region.Tiles[at-Region.Width]!=Terrain.Water) batch.Line(p,p+new Vector2(24,0),new Color("b2bea0"),2);
@@ -781,5 +874,7 @@ public partial class TerrainView : Node2D
                 }
             }
         batch.Draw(this);
+        LastVertexBytes=batches.Sum(b=>b.VertexBytes);
+        LastBuildMilliseconds = buildTimer.Elapsed.TotalMilliseconds;
     }
 }

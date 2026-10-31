@@ -17,10 +17,11 @@ else:
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     mode = 'ephemeral-debug-key-uninstall-required-between-runs'
 key.chmod(0o600)
+# Alias and password are deliberately not exported: GITHUB_ENV reaches every later
+# step, including those that build and run pull-request code. Only the export steps
+# receive them, directly from the workflow (falling back to this debug alias/password).
 with open(os.environ['GITHUB_ENV'], 'a') as out:
     for name, value in {'GODOT_ANDROID_KEYSTORE_DEBUG_PATH':str(key),
-                        'GODOT_ANDROID_KEYSTORE_DEBUG_USER':alias,
-                        'GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD':password,
                         'SIGNING_MODE':mode}.items():
         if '\n' in value or '\r' in value: raise SystemExit('Invalid signing environment value')
         out.write(f'{name}={value}\n')

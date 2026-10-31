@@ -1,0 +1,39 @@
+{
+  "baseline": {
+    "generationMedianMs": 22.1813,
+    "populationMedianMs": 32.6565,
+    "simulation": {
+      "16": {
+        "medianMsPerTick": 0.518337,
+        "medianManagedBytes": 9577512
+      },
+      "64": {
+        "medianMsPerTick": 0.964356,
+        "medianManagedBytes": 12627472
+      },
+      "128": {
+        "medianMsPerTick": 1.8028804999999999,
+        "medianManagedBytes": 14413392
+      }
+    }
+  },
+  "part4": {
+    "generationMedianMs": 19.5997,
+    "populationMedianMs": 10.076,
+    "simulation": {
+      "16": {
+        "medianMsPerTick": 0.29750733333333335,
+        "medianManagedBytes": 9575640
+      },
+      "64": {
+        "medianMsPerTick": 0.8789984999999999,
+        "medianManagedBytes": 10520200
+      },
+      "128": {
+        "medianMsPerTick": 1.711226666666667,
+        "medianManagedBytes": 23251840
+      }
+    }
+  },
+  "setup": "Same host/engine/runtime; identical additional harness; serial baseline then current; canonical seeds five repeats, simulation three repeats. Pure World/Gloot/GOAP without presentation or narrative subscribers. Baseline a297843; current gameplay a7c960d; later recovery-file backup does not participate in this workload."
+}

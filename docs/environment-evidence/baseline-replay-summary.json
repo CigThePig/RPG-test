@@ -1,0 +1,13 @@
+{
+  "source": "b3abe42075b14ed73ca8aeffefd2ea9ecf9fc04e",
+  "preset": "baseline",
+  "stateDigest": "8505cd21cbbc6375b14d0c70b162da44d7d8022072304d8ef6683cb3e8b36d45",
+  "deterministicRepeat": true,
+  "distinctIndexedCreatureFrames": {
+    "sword": 12,
+    "bite": 21,
+    "tailSwipe": 21,
+    "hitReaction": 8,
+    "dodge": 12
+  }
+}

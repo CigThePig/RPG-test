@@ -6,7 +6,7 @@ Godot **4.6.1 .NET** / **.NET SDK 9.0.203** (desktop net8.0 / Android net9.0). O
 
 ## Play on Android
 
-[Download, install and play from your phone](docs/ANDROID_DEVELOPMENT.md). GitHub Actions builds a signed ARM64 APK for each PR/branch update. No desktop setup is required for phone testing.
+[Download, install and play from your phone](docs/ANDROID_DEVELOPMENT.md). GitHub Actions builds a signed ARM64 APK for every pull request update and every push to `main`. No desktop setup is required for phone testing.
 
 ## Start
 
@@ -22,7 +22,7 @@ Set `GODOT` to your executable path for the Python commands if needed. Open `pro
 
 **WASD** moves with terrain collision. **1 / 2 / 3** use melee, ember and healing abilities; **Space** dodges; **4** consumes a draught. **E** interacts with nearby resources, chests, fallen enemies, wardens and portals. **I / C / J / M** open inventory, character, quest journal and map. **Escape** opens pause/save/load/settings. Sword attacks can be made in any direction without a target; enemies are checked in the facing arc at impact. Other targeted abilities retain their existing targeting.
 
-Visit a warden for actual branching dialogue and quests. Equip armour, craft a draught or buy merchant stock through the pack panel. The eastern portal opens a seeded dungeon with keys, locked corridors, creatures and a relic. The development menu exposes creature generation/mutation/export, region transitions, diagnostics and the production integration suite. This is an engineering test environment, not a finished game or a balanced adventure.
+Visit a warden for actual branching dialogue and quests. Equip armour, craft a draught or buy merchant stock through the pack panel. The eastern portal opens a seeded dungeon with keys, locked corridors, creatures and a relic. Some ruins also have lever-raised portcullis shortcuts and light seals broken by lighting a ring of braziers ([dungeon mechanisms](docs/DUNGEON_MECHANISMS.md)). The development menu exposes creature generation/mutation/export, region transitions, diagnostics and the production integration suite. This is an engineering test environment, not a finished game or a balanced adventure.
 
 ## Verify and author
 

@@ -1,0 +1,57 @@
+using Godot;
+using System.Diagnostics;
+using System.Text.Json;
+namespace Mosslight;
+public static class DungeonBaselineCapture
+{
+    public static void Run(Foundation app)
+    {
+        var w=app.World;w.RegionsById["ruin"]=Regions.Dungeon(42);w.Enter(w.Player,"ruin");
+        var r=w.RegionsById["ruin"];
+        // Production PR4 state, captured before replacing the generator.
+        var key=r.Features.First(x=>x.Value=="key").Key;r.Depleted.Add(key);
+        w.Items.Add("player","dungeon_key",1);
+        var gate=r.Features.First(x=>x.Value=="lock").Key;
+        r.OpenDoors.Add(gate);foreach(int n in r.Neighbours(gate))if(r.Features.GetValueOrDefault(n)=="lock")r.OpenDoors.Add(n);
+        var chest=r.Features.FirstOrDefault(x=>x.Value=="chest").Key;
+        if(chest==0){chest=r.Entrance+2;r.Features[chest]="chest";r.ContainersInitialized=false;w.InitializeContainers(r);}
+        w.Items.LootAll("ruin:"+chest,"player");r.Depleted.Add(chest);
+        app.Narrative.Call("accept_quest",1);
+        var enemy=w.Actors.Values.First(a=>a.Id.StartsWith("ruin:spawn:"));w.Damage(w.Player,enemy,10000,"magic");
+        app.Narrative.Call("accept_quest",2);
+        Directory.CreateDirectory("build/dungeon");
+        Persistence.Restore(w,app.Narrative,Persistence.Capture(w,app.Narrative));
+        File.WriteAllText("build/dungeon/pr4-save.json",Persistence.Capture(w,app.Narrative));
+        File.WriteAllText("build/dungeon/seed42-region.json",JsonSerializer.Serialize(Regions.Dungeon(42),Content.Json));
+        var data=new List<object>();Regions.Dungeon(42);
+        foreach(int seed in new[]{1,42,1337})
+        {
+            var samples=new List<object>();
+            for(int i=0;i<5;i++)
+            {
+                long bytes=GC.GetAllocatedBytesForCurrentThread();var timer=Stopwatch.StartNew();var d=Regions.Dungeon(seed);double gen=timer.Elapsed.TotalMilliseconds;
+                long allocated=GC.GetAllocatedBytesForCurrentThread()-bytes;
+                timer.Restart();bool solvable=DungeonValidator.Solvable(d);double validation=timer.Elapsed.TotalMilliseconds;
+                foreach(var k in d.Features.Where(x=>x.Value=="lock"))d.OpenDoors.Add(k.Key);
+                timer.Restart();var path=d.Path(d.Center(d.Entrance),d.Center(d.Objective),w.Player);double nav=timer.Elapsed.TotalMilliseconds;
+                timer.Restart();d.FindPlacement(d.Center(d.Objective),w.Player,Array.Empty<ActorState>());double place=timer.Elapsed.TotalMilliseconds;
+                samples.Add(new{generationMs=gen,allocatedBytes=allocated,validationMs=validation,navigationMs=nav,placementMs=place,solvable,path=path.Count});
+            }
+            var r0=Regions.Dungeon(seed);data.Add(new{seed,width=r0.Width,height=r0.Height,tiles=r0.Tiles.Length,walkable=r0.Tiles.Count(t=>t==Terrain.Floor),tileArrayBytes=r0.Tiles.Length*4,samples});
+        }
+        File.WriteAllText("build/dungeon/baseline.json",JsonSerializer.Serialize(data,Content.Json));
+        var topology=new Dictionary<int,string>();
+        foreach(int seed in Enumerable.Range(0,64).Append(1337))
+        {
+            var d=Regions.Dungeon(seed);var parts=new List<string>{$"{d.Width/7}x{d.Height/7}"};
+            for(int y=0;y<d.Height;y+=7)for(int x=0;x<d.Width;x+=7)
+            {
+                int mid=(y+3)*d.Width+x+3;
+                parts.Add($"{d.Tiles[mid]}:{d.Features.GetValueOrDefault(mid, "")}:{d.Tiles[mid-3]}:{d.Tiles[mid+3]}:{d.Tiles[mid-3*d.Width]}:{d.Tiles[mid+3*d.Width]}");
+            }
+            topology[seed]=string.Join("|",parts);
+        }
+        File.WriteAllText("build/dungeon/pr4-topology.json",JsonSerializer.Serialize(topology,Content.Json));
+        GD.Print("FOUNDATION CHECKS PASSED baseline capture only");
+    }
+}

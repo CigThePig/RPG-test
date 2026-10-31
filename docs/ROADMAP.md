@@ -26,3 +26,22 @@ The development environment is deliberately compact. There is no finished story,
 Part 3 code was verified on `681d15851c02a55b7dc27419f434dfa4498ee766`. See PR4_PART4_HANDOFF.md and PR4_PART3_PERFORMANCE.md for continuation contracts and actual evidence.
 
 Part 4 implementation adds separated mobile combat/utility zones, stable control IDs, safe-area/resize checks, expanded real input regression tests, normal-health combat fixtures, a conditional crowd locator and higher-contrast Spit. Final source c7c4d3293f5008312e30353d0199e5df34d8582a passed all executable checks; see PR4_PART4_VERIFICATION.md. Phone-only acceptance remains separate from code review readiness.
+
+## PR #5 — Dungeon scale, exploration spaces & landmark foundations
+
+Part 1 implemented the procedural spatial foundation: three-tile connectors, shared logical gates, physical-clearance coverage, deterministic seed checks and actual viewport comparisons. Its fixed one-room-per-cell grid has since been replaced by variable rooms (9×9 minimum core plus wings), 3×3 halls and turning three-tile corridors; see `DUNGEON_LAYOUT.md`. `PR5_PART1_HANDOFF.md` records Part 1's own verification.
+
+Milestones on the same draft PR:
+
+1. Dungeon scale and traversal — completed, including foreground-wall depth.
+2. Procedural environmental art and rendering architecture — implemented and verified; physical S25 acceptance pending; see `PR5_PART2_HANDOFF.md`.
+3. Handcrafted landmarks, environmental themes and procedural decoration — implemented; followed by variable room shapes and corridors (`DUNGEON_LAYOUT.md`).
+4. Integrated RPG exploration adventure and final verification.
+
+Mosslight is a traditional fantasy action RPG; the flexible approximately 50/50 procedural/authored direction is a creative goal, not a numeric quota or a creature-collection system.
+
+Part 3 is implemented and verified on runtime `488174f7a0835584cf5059cb65e9e9b3c87be37e`: 6,210 assertions, full desktop/mobile visuals, gameplay movies/repeats and installed Android smoke pass. It adds five authored templates, coherent themes, production structural/cosmetic composition, resolved save manifests and reusable content hooks. Exact acceptance evidence and any remaining limits are tracked in [PR5_PART3_HANDOFF.md](PR5_PART3_HANDOFF.md). Part 4 should use these landmarks with existing quests, encounters and rewards; keep this PR draft until final integration review.
+
+Dungeon mechanisms (follow-up): the grammar's Lever and Puzzle nodes are now physical lever-raised portcullis shortcuts and brazier-ring light seals, saved, rendered, mapped and exercised by real-input and normal-health adventure runs. See [DUNGEON_MECHANISMS.md](DUNGEON_MECHANISMS.md).
+
+Part 4 implementation connects The Buried Light to ordered stages, contextual return/hand-in dialogue, confirmed/pending Gloot rewards, saved room discovery/map knowledge, optional lore/supply cache and once-only room-aware eight-enemy pacing. See [PR5_PART4_HANDOFF.md](PR5_PART4_HANDOFF.md) for actual verification status. PR #5 remains draft for final checks and physical S25 acceptance. Future content should extend these contracts, not introduce parallel mission, inventory or quest stores.

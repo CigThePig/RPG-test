@@ -1,9 +1,11 @@
 """Fresh clones must import textures before plugins preload their SVGs."""
 from pathlib import Path
-import os, subprocess
+import os, signal, subprocess, sys
 root = Path(__file__).resolve().parents[1]
 project = root / "project.godot"
 text = project.read_text()
+# CI cancellation and timeouts send SIGTERM; unwind so `finally` restores the plugins.
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
 try:
     lines = text.splitlines()
     lines = ['enabled=PackedStringArray()' if line.startswith('enabled=PackedStringArray(') else line for line in lines]

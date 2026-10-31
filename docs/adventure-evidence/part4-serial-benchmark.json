@@ -1,0 +1,166 @@
+{
+  "setup": "Identical extra benchmark harness; production World/Gloot/GOAP, no presentation/event subscribers; canonical seeds five repeats; 600 ticks three repeats per population",
+  "rows": [
+    {
+      "seed": 1,
+      "repeat": 0,
+      "generationMs": 28.2878,
+      "populationMs": 41.8051,
+      "actors": 17
+    },
+    {
+      "seed": 1,
+      "repeat": 1,
+      "generationMs": 16.3198,
+      "populationMs": 10.5659,
+      "actors": 17
+    },
+    {
+      "seed": 1,
+      "repeat": 2,
+      "generationMs": 12.6313,
+      "populationMs": 9.9832,
+      "actors": 17
+    },
+    {
+      "seed": 1,
+      "repeat": 3,
+      "generationMs": 18.5495,
+      "populationMs": 9.4274,
+      "actors": 17
+    },
+    {
+      "seed": 1,
+      "repeat": 4,
+      "generationMs": 11.0257,
+      "populationMs": 8.2751,
+      "actors": 17
+    },
+    {
+      "seed": 42,
+      "repeat": 0,
+      "generationMs": 19.3774,
+      "populationMs": 8.56,
+      "actors": 17
+    },
+    {
+      "seed": 42,
+      "repeat": 1,
+      "generationMs": 19.5997,
+      "populationMs": 8.8275,
+      "actors": 17
+    },
+    {
+      "seed": 42,
+      "repeat": 2,
+      "generationMs": 20.6326,
+      "populationMs": 10.7295,
+      "actors": 17
+    },
+    {
+      "seed": 42,
+      "repeat": 3,
+      "generationMs": 16.8914,
+      "populationMs": 9.3347,
+      "actors": 17
+    },
+    {
+      "seed": 42,
+      "repeat": 4,
+      "generationMs": 17.9628,
+      "populationMs": 10.4571,
+      "actors": 17
+    },
+    {
+      "seed": 1337,
+      "repeat": 0,
+      "generationMs": 57.4035,
+      "populationMs": 28.0095,
+      "actors": 17
+    },
+    {
+      "seed": 1337,
+      "repeat": 1,
+      "generationMs": 37.5269,
+      "populationMs": 10.076,
+      "actors": 17
+    },
+    {
+      "seed": 1337,
+      "repeat": 2,
+      "generationMs": 41.6042,
+      "populationMs": 10.3612,
+      "actors": 17
+    },
+    {
+      "seed": 1337,
+      "repeat": 3,
+      "generationMs": 52.0492,
+      "populationMs": 10.1833,
+      "actors": 17
+    },
+    {
+      "seed": 1337,
+      "repeat": 4,
+      "generationMs": 27.4447,
+      "populationMs": 9.4746,
+      "actors": 17
+    }
+  ],
+  "simulation": [
+    {
+      "count": 16,
+      "repeat": 0,
+      "msPerTick": 0.3273526666666667,
+      "managedBytes": 10027840
+    },
+    {
+      "count": 16,
+      "repeat": 1,
+      "msPerTick": 0.29750733333333335,
+      "managedBytes": 9574216
+    },
+    {
+      "count": 16,
+      "repeat": 2,
+      "msPerTick": 0.27617816666666667,
+      "managedBytes": 9575640
+    },
+    {
+      "count": 64,
+      "repeat": 0,
+      "msPerTick": 1.151246,
+      "managedBytes": 10519968
+    },
+    {
+      "count": 64,
+      "repeat": 1,
+      "msPerTick": 0.8789984999999999,
+      "managedBytes": 10520200
+    },
+    {
+      "count": 64,
+      "repeat": 2,
+      "msPerTick": 0.8078415,
+      "managedBytes": 10520248
+    },
+    {
+      "count": 128,
+      "repeat": 0,
+      "msPerTick": 1.711226666666667,
+      "managedBytes": 9899112
+    },
+    {
+      "count": 128,
+      "repeat": 1,
+      "msPerTick": 1.6127256666666667,
+      "managedBytes": 24442384
+    },
+    {
+      "count": 128,
+      "repeat": 2,
+      "msPerTick": 1.8390376666666668,
+      "managedBytes": 23251840
+    }
+  ]
+}

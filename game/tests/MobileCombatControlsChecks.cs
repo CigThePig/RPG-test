@@ -125,6 +125,10 @@ public static class MobileCombatControlsChecks
             app._Notification((int)Node.NotificationApplicationFocusIn);app.ResumeGame();await Frame();
             Touch(8,false,attack);await Frame();Require(attacks==prior && app.TouchMovement==Vector2.Zero,$"focus loss clears held touches (attacks {attacks}/{prior}, movement {app.TouchMovement})");
             Tap("inventory");await Frame();Require(app.Ui.BlocksInput,"stable Pack action opens panel");
+            // Touch builds have no Escape key: after defeat the still-visible Menu must respond.
+            app.Ui.ClosePanels();p.Invulnerable=0;p.Health=0;p.State=ActionState.Dead;await Frame();
+            Require(app.GameplayBlocked && !app.Ui.BlocksInput && app.Ui.ActionControl("menu").IsVisibleInTree(),"defeat leaves the hotbar Menu visible");
+            Tap("menu");await Frame();Require(app.Ui.MenuOpen,"defeated player opens the menu by touch");
         }
         finally{app.World.CombatDiagnostic-=Diagnostic;app.LeaveFeelCourse();app.Ui.PauseForVerification();}
     }
