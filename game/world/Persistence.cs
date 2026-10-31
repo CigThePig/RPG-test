@@ -29,7 +29,7 @@ public static class Persistence
         if (!s.Actors.ContainsKey("player") || s.Time < 0 || !double.IsFinite(s.Time) || s.Tick < 0 || s.Events.Count > 100)
             throw new InvalidDataException("Invalid world state");
         foreach (var(id, r)in s.Regions)
-            if (r.Id != id || r.Width < 1 || r.Height < 1 || r.Width > 512 || r.Height > 512 || r.Tiles.Length != r.Width * r.Height || r.Features.Keys.Any(k => k < 0 || k >= r.Tiles.Length) || r.Tiles.Any(t => !Enum.IsDefined(t)) || r.OpenDoors.Any(k => !r.Features.ContainsKey(k)) || r.Depleted.Any(k => !r.Features.ContainsKey(k)))
+            if (r.Id != id || r.Width < 1 || r.Height < 1 || r.Width > 512 || r.Height > 512 || r.Tiles.Length != r.Width * r.Height || r.Features.Keys.Any(k => k < 0 || k >= r.Tiles.Length) || r.Tiles.Any(t => !Enum.IsDefined(t)) || r.OpenDoors.Any(k => !r.Features.ContainsKey(k)) || r.Depleted.Any(k => !r.Features.ContainsKey(k)) || r.Lit == null || r.Lit.Any(k => r.Features.GetValueOrDefault(k) != "brazier") || r.Passages == null || r.Passages.Any(p => p == null || p.Mechanism is not ("" or "lever" or "puzzle")))
                 throw new InvalidDataException($"Invalid region {id}");
         foreach (var region in s.Regions.Values)
         {

@@ -72,7 +72,7 @@ public static class PlayabilityChecks
             foreach(int seed in new[]{1,42,1337})
             {
                 var dungeon=Regions.Dungeon(seed);a.Region=dungeon.Id;a.Radius=11;
-                foreach(var door in dungeon.Features.Where(x=>x.Value=="lock")) dungeon.OpenDoors.Add(door.Key);
+                foreach(var door in dungeon.Features.Where(x=>RegionState.IsGate(x.Value))) dungeon.OpenDoors.Add(door.Key);
                 w.RegionsById[dungeon.Id]=dungeon;
                 var origin=dungeon.Center(dungeon.Entrance);a.X=origin.X;a.Y=origin.Y;
                 var route=dungeon.Path(origin,dungeon.Center(dungeon.Objective),a);

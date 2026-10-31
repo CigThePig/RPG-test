@@ -1,6 +1,6 @@
 using V=System.Numerics.Vector2;
 namespace Mosslight;
-/// <summary>Deterministic real-input dungeon expedition; setup never crosses a lock.</summary>
+/// <summary>Deterministic real-input dungeon expedition; setup never crosses a lock or seal.</summary>
 public sealed class DungeonTraversalReplay
 {
     readonly World world;
@@ -10,10 +10,12 @@ public sealed class DungeonTraversalReplay
     Queue<V> route=new();
     string action="dodge";
     int target=-1;
-    bool issued;
+    bool issued, litBefore;
     int delay=5;
     public bool Complete { get; private set; }
     public int Unlocks { get; private set; }
+    // Lever pulls and brazier lightings issued through the real Interact touch.
+    public int Mechanisms { get; private set; }
     public HashSet<int> Rooms { get; }=new();
     public DungeonTraversalReplay(World w,Action<string> send)
     {
@@ -47,15 +49,30 @@ public sealed class DungeonTraversalReplay
         }
         while(route.Count>0 && V.Distance(p.Position,route.Peek())<3)route.Dequeue();
         if(route.Count>0)return V.Normalize(route.Peek()-p.Position);
-        if(action is "key" or "gate" or "relic" or "exit")
+        if(action is "key" or "gate" or "relic" or "exit" or "lever" or "brazier")
         {
             if(!issued){tap("interact");issued=true;delay=3;return V.Zero;}
-            bool done=action=="gate"?region.GateAt(target).All(region.OpenDoors.Contains):action=="exit"?p.Region=="reach":region.Depleted.Contains(target);
+            bool done=action switch
+            {
+                "gate"=>region.GateAt(target).All(region.OpenDoors.Contains),
+                "exit"=>p.Region=="reach",
+                "brazier"=>region.Lit.Contains(target)!=litBefore,
+                _=>region.Depleted.Contains(target)
+            };
             if(!done)throw new InvalidOperationException("Dungeon replay interaction failed: "+action+" "+world.InteractionFeedback);
             if(action=="gate"){Unlocks++;gates.Dequeue();}
+            if(action is "lever" or "brazier")Mechanisms++;
             if(action=="exit"){Complete=true;return V.Zero;}
         }
         if(region.Depleted.Contains(region.Objective)){Aim(region.Entrance,"exit");return V.Zero;}
+        // Reachable levers and unsolved brazier rings come first: seals may guard keys or the relic.
+        foreach(var c in DungeonMechanisms.Controls(region))
+        {
+            if(c.Gates.Length==0 || c.Gates.All(region.OpenDoors.Contains))continue;
+            int next=c.Kind=="lever"?c.Controllers[0]:DungeonMechanisms.Solution(region,c.Controllers).FirstOrDefault(-1);
+            if(next<0 || (region.Path(p.Position,region.Center(next),p).Count==0 && region.Index(p.Position)!=next))continue;
+            Aim(next,c.Kind=="lever"?"lever":"brazier");litBefore=region.Lit.Contains(next);return V.Zero;
+        }
         if(gates.Count>0)
         {
             foreach(int key in region.Features.Where(x=>x.Value=="key").Select(x=>x.Key).Order())

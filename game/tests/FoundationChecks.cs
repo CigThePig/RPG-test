@@ -43,6 +43,7 @@ public static class FoundationChecks
             EnvironmentArtChecks.Run(app,Check);
             DungeonChecks.Run(app, Check);
             DungeonEncounterChecks.Run(app, Check);
+            MechanismChecks.Run(app, Check);
             MobileCombatControlsChecks.Run(Check);
             EncounterChecks.Run(app,Check);
             ReviewChecks.Run(app, Check);

@@ -230,5 +230,5 @@ if 'precise' in a.presets.split(',') and not a.realtime:
         sheet.paste(im.resize((320,200)),((i%4)*320,(i//4)*220));draw.text(((i%4)*320+5,(i//4)*220+202),f'dungeon t={index*4:.0f}s',fill='white')
     sheet.save(folder/'contact-sheet.jpg')
     for frame in frames:frame.unlink()
-    (folder/'report.json').write_text(json.dumps({'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'seed':1,'preset':'precise','stateDigest':digest,'deterministicRepeat':True,'movieMode':True,'scope':'Protected traversal fixture: corner, dodge, key, required gate, relic and return. Combat verified separately.'},indent=2))
+    (folder/'report.json').write_text(json.dumps({'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'seed':1,'preset':'precise','stateDigest':digest,'deterministicRepeat':True,'movieMode':True,'scope':'Protected traversal fixture: corner, dodge, brazier ring/light seal, key, required gate, relic and return. Combat verified separately.'},indent=2))
     print('DUNGEON EXPEDITION MOVIE AND DETERMINISTIC REPEAT PASSED')

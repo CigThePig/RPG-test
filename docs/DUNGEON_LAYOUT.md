@@ -25,13 +25,14 @@ Every reciprocal layout connection becomes one three-tile-wide corridor (72 unit
 - The corridor crosses the two ring rows between the blocks on a lane at least `CrossingMargin` (4) tiles from either block corner, so separate passages can never touch.
 - On each side the corridor either runs straight from a flat three-tile door on the room edge, or turns once. A turn keeps one wall between the corridor and its room, and at least two straight tiles before the ring.
 - A locked connection places its gate on the two ring rows across the full three-tile width: six `lock` tiles forming one isolated 2 × 3 gate group. One key opens the whole group.
+- An unlocked connection that the layout grammar marks `LeverLock` or `PuzzleLock` records `DungeonPassage.Mechanism` (`lever` or `puzzle`) and later receives the same 2 × 3 footprint as a `portcullis` or `seal` gate; see `DUNGEON_MECHANISMS.md`.
 - If a corridor cannot be routed, the two rooms it joins are simplified (plain core, then centered core) and the ruin is re-carved. Centered cores always admit a straight corridor, so carving always finishes.
 
 Corridors and wings make the ruin larger than the old fixed grid. Every floor tile, corridor included, is reachable by the largest production footprint (radius 11).
 
 ## Saved state
 
-`RegionState.Rooms` stores each block's kind, core origin, floor rectangles and door mask (N 1, E 2, S 4, W 8). `RegionState.Passages` stores each crossing. Terrain remains the saved tile array. The region generator identity is `rpg-regions-2`; saves made with an earlier generator are rejected on load instead of being migrated.
+`RegionState.Rooms` stores each block's kind, core origin, floor rectangles and door mask (N 1, E 2, S 4, W 8). `RegionState.Passages` stores each crossing and its grammar mechanism. `RegionState.Lit` stores burning braziers. Terrain remains the saved tile array. The region generator identity is `rpg-regions-2`; saves made with an earlier generator are rejected on load instead of being migrated.
 
 ## Landmarks and decoration
 
@@ -39,7 +40,7 @@ Landmark templates stay 9 × 9 and are stamped onto a room's core. `LandmarkRoom
 
 ## Preview and verification
 
-Print ASCII previews of generated ruins (`#` wall, `.` room, `,` corridor or hall, `=` gate, features by initial):
+Print ASCII previews of generated ruins (`#` wall, `.` room, `,` corridor or hall, `=` key gate, `%` portcullis, `~` light seal, features by initial, e.g. `L` lever, `B` brazier). The header counts levers, seals and shortcuts:
 
 ```sh
 godot --headless --path . -- --dump-dungeons=1,42,1337

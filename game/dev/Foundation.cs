@@ -466,6 +466,8 @@ public partial class Foundation : Node2D
             bool selected = target.Value != null && (at == target.Key || feature.GateCells.Contains(target.Key));
             bool spent = region.Depleted.Contains(at) || (feature.GateCells.Length > 0 ? feature.GateCells.All(region.OpenDoors.Contains) : region.OpenDoors.Contains(at));
             if (feature.Spent != spent) { feature.Spent = spent; feature.QueueRedraw(); }
+            bool lit = region.Lit.Contains(at);
+            if (feature.Lit != lit) { feature.Lit = lit; feature.QueueRedraw(); }
             if (feature.Selected != selected) { feature.Selected = selected; feature.QueueRedraw(); }
         }
         if (drawnRegion != player.Region)
@@ -660,15 +662,15 @@ public partial class Foundation : Node2D
         foreach(var decoration in decorations)actors.AddChild(decoration);
         foreach (var feature in features) { actors.RemoveChild(feature); feature.QueueFree(); }
         features.Clear();
-        var gates = r.GateGroups();
+        var gates = new[] { "lock", "portcullis", "seal" }.ToDictionary(k => k, k => r.GateGroups(k));
         foreach (var (at, kind) in r.Features)
         {
-            int[] gate = kind == "lock" ? gates.Single(g => Array.BinarySearch(g, at) >= 0) : Array.Empty<int>();
+            int[] gate = RegionState.IsGate(kind) ? gates[kind].Single(g => Array.BinarySearch(g, at) >= 0) : Array.Empty<int>();
             if (gate.Length > 0 && gate[0] != at) continue;
             var pos = r.Center(at);
             var feature = new FeatureView { Kind = kind, Art = art, VisualSeed = EnvironmentStyle.Hash(r.Seed,at%r.Width,at/r.Width), GateCells = gate, Visible = showCharacters,
                 GateOffsets = gate.Select(cell => GodotConvert.GroundToScreen(r.Center(cell).X-pos.X, r.Center(cell).Y-pos.Y)).ToArray(),
-                Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
+                Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Lit = r.Lit.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
             feature.SetMeta("tile",at);
             actors.AddChild(feature); features.Add(feature);
         }
@@ -759,7 +761,8 @@ public partial class Foundation : Node2D
 
     public void RunAdventure()
     {
-        try { new AdventureRun(this).Run(); GetTree().Quit(0); }
+        var ruin=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--adventure-ruin="))?.Split('=',2)[1];
+        try { new AdventureRun(this){RuinSeed=ruin==null?null:int.Parse(ruin)}.Run(); GetTree().Quit(0); }
         catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 

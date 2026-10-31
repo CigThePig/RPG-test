@@ -24,6 +24,8 @@ public sealed class RegionState
     public Dictionary<int, string> Features { get; set; } = new();
     public HashSet<int> OpenDoors { get; set; } = new();
     public HashSet<int> Depleted { get; set; } = new();
+    // Brazier tiles currently burning. Missing in older saves, which also have no braziers.
+    public HashSet<int> Lit { get; set; } = new();
     public bool ContainersInitialized { get; set; } = true;
     // True defaults preserve historical populations/loot even if no surviving actor remains.
     public bool EncountersInitialized { get; set; } = true;
@@ -39,6 +41,10 @@ public sealed class RegionState
     public DungeonRoom? RoomAt(int x, int y) => Rooms.FirstOrDefault(r => r.X == x / DungeonGeometry.Cell && r.Y == y / DungeonGeometry.Cell);
 
     public const int Tile = 24;
+    // Every gate kind blocks movement and sight until all of its cells are in OpenDoors:
+    // "lock" needs a ruin key, "portcullis" its lever, "seal" its solved brazier ring.
+    public static bool IsGate(string? kind) => kind is "lock" or "portcullis" or "seal";
+    public bool ClosedGate(int index) => Features.TryGetValue(index, out var kind) && IsGate(kind) && !OpenDoors.Contains(index);
     public int Index(Vector2 p) => p.X < 0 || p.Y < 0 || p.X >= Width * Tile || p.Y >= Height * Tile ? -1 : (int)(p.Y / Tile) * Width + (int)(p.X / Tile);
     public Vector2 Center(int index) => new((index % Width + .5f) * Tile, (index / Width + .5f) * Tile);
     // gatesOpen treats every locked gate as unlocked, for placement queries only.
@@ -46,7 +52,7 @@ public sealed class RegionState
     {
         if (index < 0 || index >= Tiles.Length)
             return false;
-        if (!gatesOpen && Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index))
+        if (!gatesOpen && ClosedGate(index))
             return false;
         return Tiles[index] switch
         {
@@ -57,12 +63,12 @@ public sealed class RegionState
         };
     }
 
-    // Gates are isolated cardinally connected lock components. Each locked passage
-    // owns one component; passages keep clear of block corners, so they never touch.
-    // Derived from serialized feature indices.
-    public List<int[]> GateGroups()
+    // Gates are isolated cardinally connected components of one gate kind. Each sealed
+    // passage owns one component; passages keep clear of block corners, so they never touch.
+    // Derived from serialized feature indices. The default kind keeps key-gate semantics.
+    public List<int[]> GateGroups(string kind = "lock")
     {
-        var remaining = Features.Where(x => x.Value == "lock").Select(x => x.Key).ToHashSet();
+        var remaining = Features.Where(x => x.Value == kind).Select(x => x.Key).ToHashSet();
         var groups = new List<int[]>();
         foreach (int start in remaining.Order().ToArray())
         {
@@ -79,9 +85,9 @@ public sealed class RegionState
         return groups;
     }
 
-    public int[] GateAt(int at) => GateGroups().FirstOrDefault(g => Array.BinarySearch(g, at) >= 0) ?? Array.Empty<int>();
+    public int[] GateAt(int at) => IsGate(Features.GetValueOrDefault(at)) ? GateGroups(Features[at]).FirstOrDefault(g => Array.BinarySearch(g, at) >= 0) ?? Array.Empty<int>() : Array.Empty<int>();
 
-    public bool BlocksSight(int index) => index < 0 || index >= Tiles.Length || Tiles[index] is Terrain.Wall or Terrain.Rock || (Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index));
+    public bool BlocksSight(int index) => index < 0 || index >= Tiles.Length || Tiles[index] is Terrain.Wall or Terrain.Rock || ClosedGate(index);
     public bool CanStand(Vector2 p, ActorState a, bool gatesOpen = false) => BlockingCell(p,a,gatesOpen)==-1;
     // -1 means clear; -2 is a boundary/invalid position; otherwise the blocking footprint tile.
     public int BlockingCell(Vector2 p, ActorState a, bool gatesOpen = false)
@@ -261,6 +267,7 @@ public static class Regions
             int columns = cells.GetLength(0), rows = cells.GetLength(1);
             var occupied = new List<(int X, int Y, bool Hall)>();
             var links = new List<DungeonLayout.Link>();
+            var mechanismRooms = new List<(int X, int Y, string Kind)>();
             for (int y = 0; y < rows; y++)
                 for (int x = 0; x < columns; x++)
                 {
@@ -278,7 +285,12 @@ public static class Regions
                             throw new InvalidOperationException($"Dungeon seed {seed}: nonreciprocal connection {x},{y} -> {nx},{ny}");
                         // Each connection is carved once, from its west or north cell.
                         if (dx + dy > 0)
-                            links.Add(new(x, y, nx, ny, door == LG.DoorType.KeyLock || cells[nx, ny].getDoor(dx, dy) == LG.DoorType.KeyLock));
+                        {
+                            var other = cells[nx, ny].getDoor(dx, dy);
+                            bool Is(LG.DoorType t) => door == t || other == t;
+                            // Key locks dominate; the grammar's puzzle and lever doors become seals.
+                            links.Add(new(x, y, nx, ny, Is(LG.DoorType.KeyLock), Is(LG.DoorType.PuzzleLock) ? "puzzle" : Is(LG.DoorType.LeverLock) ? "lever" : ""));
+                        }
                     }
                 }
             // Room sizes, wings and corridor bends use their own hash, never mission RNG draws.
@@ -316,18 +328,23 @@ public static class Regions
                         break;
                     case MG.NodeType.Puzzle:
                         r.Features[mid] = "chest";
+                        mechanismRooms.Add((room.X, room.Y, "puzzle"));
+                        break;
+                    case MG.NodeType.Lever:
+                        // Installed after landmark composition so template selection is unchanged.
+                        mechanismRooms.Add((room.X, room.Y, "lever"));
                         break;
                 }
             }
             // A locked passage gates both boundary rows across its full width.
             foreach (var passage in r.Passages.Where(p => p.Locked))
-                for (int k = 0; k <= 1; k++)
-                    for (int side = -DungeonGeometry.HalfOpening; side <= DungeonGeometry.HalfOpening; side++)
-                        r.Features[(passage.Y + passage.Dy * k + passage.Dx * side) * r.Width + passage.X + passage.Dx * k + passage.Dy * side] = "lock";
+                foreach (int at in passage.GateCells(r.Width))
+                    r.Features[at] = "lock";
 
             if (DungeonValidator.Solvable(r))
             {
                 Landmarks.Compose(r);
+                DungeonMechanisms.Install(r, mechanismRooms);
                 return r;
             }
         }

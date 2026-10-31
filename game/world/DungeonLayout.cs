@@ -46,12 +46,29 @@ public sealed class DungeonPassage
     public int Dx { get; set; }
     public int Dy { get; set; }
     public bool Locked { get; set; }
+    // Mission grammar seal on an unlocked crossing: "" open, "lever" one-way shortcut
+    // (portcullis raised by a lever in an adjacent block), "puzzle" light seal (broken by
+    // solving the adjacent block's brazier ring). Older saves deserialize as "".
+    public string Mechanism { get; set; } = "";
+    /// <summary>The two blocks this crossing joins.</summary>
+    public bool Touches(int blockX, int blockY)
+    {
+        int ax = X / DungeonGeometry.Cell, ay = Y / DungeonGeometry.Cell;
+        return (ax == blockX && ay == blockY) || (ax + Dx == blockX && ay + Dy == blockY);
+    }
+    /// <summary>Both boundary rows across the full corridor width (a 2 x 3 group).</summary>
+    public IEnumerable<int> GateCells(int width)
+    {
+        for (int k = 0; k <= 1; k++)
+            for (int side = -DungeonGeometry.HalfOpening; side <= DungeonGeometry.HalfOpening; side++)
+                yield return (Y + Dy * k + Dx * side) * width + X + Dx * k + Dy * side;
+    }
 }
 
 public static class DungeonLayout
 {
     public const int Revision = 1;
-    public readonly record struct Link(int AX, int AY, int BX, int BY, bool Locked);
+    public readonly record struct Link(int AX, int AY, int BX, int BY, bool Locked, string Mechanism = "");
     public sealed class Result
     {
         public int Width, Height;
@@ -90,6 +107,7 @@ public static class DungeonLayout
                 bool horizontal = link.BX == link.AX + 1;
                 a.Doors |= horizontal ? 2 : 4; b.Doors |= horizontal ? 8 : 1;
                 var passage = Route(seed, tiles, width, a, b, horizontal, link.Locked);
+                if (passage != null) passage.Mechanism = link.Locked ? "" : link.Mechanism;
                 if (passage == null) { failed.Add((link.AX, link.AY)); failed.Add((link.BX, link.BY)); }
                 else passages.Add(passage);
             }
@@ -147,17 +165,17 @@ public static class DungeonLayout
         return room;
     }
 
-    /// <summary>Authoring preview: # wall, . room, , corridor, = gate, features by initial.</summary>
+    /// <summary>Authoring preview: # wall, . room, , corridor, = key gate, % portcullis, ~ light seal, features by initial.</summary>
     public static string Ascii(RegionState r)
     {
-        var text = new System.Text.StringBuilder($"seed={r.Seed} {r.Width}x{r.Height} rooms={r.Rooms.Count(x => x.Kind == "room")} halls={r.Rooms.Count(x => x.Kind == "hall")} passages={r.Passages.Count}\n");
+        var text = new System.Text.StringBuilder($"seed={r.Seed} {r.Width}x{r.Height} rooms={r.Rooms.Count(x => x.Kind == "room")} halls={r.Rooms.Count(x => x.Kind == "hall")} passages={r.Passages.Count} levers={r.Features.Count(f => f.Value == "lever")} seals={r.GateGroups("seal").Count} shortcuts={r.GateGroups("portcullis").Count}\n");
         for (int y = 0; y < r.Height; y++)
         {
             for (int x = 0; x < r.Width; x++)
             {
                 int at = y * r.Width + x;
                 string feature = r.Features.GetValueOrDefault(at, "");
-                text.Append(feature == "lock" ? '=' : feature != "" ? char.ToUpperInvariant(feature[0]) : r.Tiles[at] == Terrain.Wall ? '#' : r.Rooms.Any(c => c.Contains(x, y)) ? '.' : ',');
+                text.Append(feature == "lock" ? '=' : feature == "portcullis" ? '%' : feature == "seal" ? '~' : feature != "" ? char.ToUpperInvariant(feature[0]) : r.Tiles[at] == Terrain.Wall ? '#' : r.Rooms.Any(c => c.Contains(x, y)) ? '.' : ',');
             }
             text.Append('\n');
         }

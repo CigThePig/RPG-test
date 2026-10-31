@@ -36,6 +36,41 @@ public static class DungeonChecks
         check(r.CanStand(p.Position,p),"runtime walk retains footprint at "+target);
     }
 
+    /// <summary>Operates every reachable lever and unsolved brazier ring through production
+    /// interaction, walking to each controller. Returns how many mechanisms were operated.</summary>
+    public static int Operate(World w, RegionState r, Action<bool,string> check, string label)
+    {
+        var p=w.Player;int operated=0;bool progressed=true;
+        while(progressed)
+        {
+            progressed=false;
+            foreach(var c in DungeonMechanisms.Controls(r))
+            {
+                if(c.Gates.Length>0 && c.Gates.All(r.OpenDoors.Contains))continue;
+                if(r.Path(p.Position,r.Center(c.Controllers[0]),p).Count==0 && r.Index(p.Position)!=c.Controllers[0])continue;
+                if(c.Kind=="lever")
+                {
+                    Walk(w,r,c.Controllers[0],check);
+                    check(w.Interact(p) && r.Depleted.Contains(c.Controllers[0]) && c.Gates.All(r.OpenDoors.Contains),"production lever raises its portcullis "+label);
+                }
+                else
+                {
+                    var answer=DungeonMechanisms.Solution(r,c.Controllers);
+                    check(answer.Length>=1,"unsolved brazier ring has a solution "+label);
+                    for(int i=0;i<answer.Length;i++)
+                    {
+                        Walk(w,r,answer[i],check);
+                        check(w.Interact(p),"production brazier kindles "+label);
+                        check(c.Gates.All(r.OpenDoors.Contains)==(i==answer.Length-1),"seal breaks exactly when the ring burns whole "+label);
+                    }
+                    check(c.Controllers.All(r.Depleted.Contains) && !w.InteractionTargets(p).Any(t=>t.Value=="brazier"),"solved braziers stay lit and inert "+label);
+                }
+                operated++;progressed=true;
+            }
+        }
+        return operated;
+    }
+
     public static void Progress(Foundation app, Action<bool,string> check, int seed)
     {
         var w=app.World;string snapshot=Persistence.Capture(w,app.Narrative);
@@ -58,6 +93,7 @@ public static class DungeonChecks
             int count=w.Items.Count(p.Id,"dungeon_key");if(count>0)w.Items.Take(p.Id,"dungeon_key",count);
             foreach(int gate in plan)
             {
+                Operate(w,r,check,seed.ToString());
                 foreach(int key in r.Features.Where(x=>x.Value=="key").Select(x=>x.Key).Order())
                 {
                     if(r.Depleted.Contains(key) || r.Path(p.Position,r.Center(key),p).Count==0)continue;
@@ -72,7 +108,9 @@ public static class DungeonChecks
                 check(w.Items.Count(p.Id,"dungeon_key")==count,"duplicate cannot charge key "+seed);
                 // The next key/objective route must physically walk through opened gates.
             }
+            Operate(w,r,check,seed.ToString());
             Walk(w,r,r.Objective,check);check(w.Interact(p) && r.Depleted.Contains(r.Objective),"relic production interaction "+seed);
+            Operate(w,r,check,seed.ToString()); // A lever behind the relic still opens its shortcut home.
             Walk(w,r,r.Entrance,check);check(w.Interact(p) && p.Region=="reach","return exit production interaction "+seed);
         }
         finally{Persistence.Restore(w,app.Narrative,snapshot);}
@@ -110,13 +148,13 @@ public static class DungeonChecks
                 corridorTiles+=Enumerable.Range(0,r.Tiles.Length).Count(at=>r.Tiles[at]==Terrain.Floor && r.Rooms.All(c=>!c.Contains(at%r.Width,at/r.Width)));
                 bends+=Bends(r);
                 check(true,"validated room cores/wings, sealed block rings, three-wide corridor crossings and graph topology "+seed);
-                foreach(var gate in r.GateGroups())
+                foreach(var gate in new[]{"lock","portcullis","seal"}.SelectMany(kind=>r.GateGroups(kind)))
                 {
                     int xs=gate.Select(i=>i%r.Width).Distinct().Count(),ys=gate.Select(i=>i/r.Width).Distinct().Count();
                     check(gate.Length==6 && ((xs==2&&ys==3)||(xs==3&&ys==2)),"isolated rectangular full-width gate "+seed);
                     check(gate.All(i=>!r.Passable(i,actors[0]) && r.BlocksSight(i)),"gate blocks every lateral lane "+seed);
                 }
-                var open=r.Features.Where(x=>x.Value=="lock").Select(x=>x.Key).ToArray();r.OpenDoors.UnionWith(open);
+                var open=r.Features.Where(x=>RegionState.IsGate(x.Value)).Select(x=>x.Key).ToArray();r.OpenDoors.UnionWith(open);
                 foreach(var a in (seed is 1 or 42 or 1337 ? actors : actors.Take(1)))
                 {
                     var reachable=Reachable(r,a);
@@ -139,7 +177,7 @@ public static class DungeonChecks
                     {
                         long bytes=GC.GetAllocatedBytesForCurrentThread();var timer=Stopwatch.StartNew();var d=Regions.Dungeon(seed);double gen=timer.Elapsed.TotalMilliseconds;long allocated=GC.GetAllocatedBytesForCurrentThread()-bytes;
                         timer.Restart();DungeonValidator.Solvable(d);double validation=timer.Elapsed.TotalMilliseconds;
-                        d.OpenDoors.UnionWith(d.Features.Where(x=>x.Value=="lock").Select(x=>x.Key));
+                        d.OpenDoors.UnionWith(d.Features.Where(x=>RegionState.IsGate(x.Value)).Select(x=>x.Key));
                         timer.Restart();d.Path(d.Center(d.Entrance),d.Center(d.Objective),actors[0]);double nav=timer.Elapsed.TotalMilliseconds;
                         timer.Restart();d.FindPlacement(d.Center(d.Objective),actors[0],Array.Empty<ActorState>());double place=timer.Elapsed.TotalMilliseconds;
                         samples.Add(new{compositionMs=Landmarks.LastComposeMilliseconds,selectionMs=Landmarks.LastSelectionMilliseconds,structuralValidationMs=Landmarks.LastValidationMilliseconds,generationMs=gen,allocatedBytes=allocated,validationMs=validation,navigationMs=nav,placementMs=place});
@@ -176,12 +214,12 @@ public static class DungeonChecks
             {
                 int x=q.X+q.Dx*k+q.Dy*side,y=q.Y+q.Dy*k+q.Dx*side,at=y*r.Width+x;
                 if(r.Tiles[at]!=Terrain.Floor)Fail("passage crossing not open",x,y);
-                if(q.Locked!=(r.Features.GetValueOrDefault(at)=="lock"))Fail("gate does not match passage lock",x,y);
+                if(r.Features.GetValueOrDefault(at,"")!=(q.Locked?"lock":q.Mechanism switch{"lever"=>"portcullis","puzzle"=>"seal",_=>""}))Fail("gate does not match passage lock/mechanism",x,y);
                 crossings.Add(at);
             }
         }
         if(r.Rooms.Sum(c=>BitCount(c.Doors))!=2*r.Passages.Count)throw new InvalidOperationException("room doors and passages disagree");
-        if(r.Features.Any(f=>f.Value=="lock" && !crossings.Contains(f.Key)))throw new InvalidOperationException("gate outside a passage");
+        if(r.Features.Any(f=>RegionState.IsGate(f.Value) && !crossings.Contains(f.Key)))throw new InvalidOperationException("gate outside a passage");
         // Blocks meet only at passage crossings: every other ring tile is solid.
         for(int y=0;y<r.Height;y++)for(int x=0;x<r.Width;x++)
         {

@@ -444,6 +444,8 @@ public static class VisualChecks
         { app.ResumeGame();await DialogueTouchChecks(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--adventure-panels-only"))
         { await AdventurePanels(app);GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--mechanisms-only"))
+        { app.World.Enter(app.World.Player,"ruin");await MechanismVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--landmarks-only"))
         { await LandmarkVisualChecks.Run(app); GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--environment-only"))
@@ -672,6 +674,7 @@ public static class VisualChecks
         app.World.Enter(app.World.Player, "ruin");
         await Capture(app, "dungeon");
         await DungeonVisualChecks.Run(app);
+        await MechanismVisualChecks.Run(app);
         await WallDepthChecks.Run(app);
         await EnvironmentVisualChecks.Run(app);
         await LandmarkVisualChecks.Run(app);

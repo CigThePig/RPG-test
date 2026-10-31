@@ -437,7 +437,7 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         Open("REGION MAP");
-        body.AddChild(new Label { Text = "E entrance · A archive · S shrine · T storeroom · R relic · ● you", AutowrapMode=TextServer.AutowrapMode.WordSmart, CustomMinimumSize=new Vector2(400,36) });
+        body.AddChild(new Label { Text = "E entrance · A archive · S shrine · T storeroom · R relic · L lever · B braziers · gates: gold key, grey portcullis, cyan seal · ● you", AutowrapMode=TextServer.AutowrapMode.WordSmart, CustomMinimumSize=new Vector2(400,36) });
         var map = new RegionMap
         {
             Region = App.World.RegionsById[App.World.Player.Region],
@@ -654,6 +654,23 @@ public partial class RegionMap : Control
             var at = new Vector2((landmark.OriginX+5.5f)*scale,(landmark.OriginY+5.5f)*scale);
             DrawCircle(at, 4, landmark.Roles.Contains("objective") ? Colors.Cyan : Colors.White);
             DrawString(ThemeDB.FallbackFont, at + new Vector2(6,-4), landmark.Template switch { "ruined-entrance"=>"E", "forgotten-archive"=>"A", "abandoned-shrine"=>"S", "collapsed-storeroom"=>"T", "relic-sanctuary"=>"R", _=>"?" }, HorizontalAlignment.Left, -1, 16, Colors.White);
+        }
+        // Explored mechanisms: gates as bars (dimmed once open), levers and brazier rings by letter.
+        foreach (var (at, kind) in Region.Features)
+        {
+            if (Region.Id == "ruin" && !Region.ExploredTiles.Contains(at)) continue;
+            var cell = new Vector2((at % Region.Width) * scale, (at / Region.Width) * scale);
+            if (RegionState.IsGate(kind))
+            {
+                var colour = kind switch { "lock" => new Color("d4b66b"), "portcullis" => new Color("a7b0b2"), _ => new Color("9fe3e6") };
+                DrawRect(new Rect2(cell, new Vector2(scale + 1, scale + 1)), Region.OpenDoors.Contains(at) ? new Color(colour, .35f) : colour);
+            }
+            else if (kind == "lever" || (kind == "brazier" && DungeonMechanisms.RingAt(Region, at).FirstOrDefault() == at))
+            {
+                var centre = kind == "lever" ? cell : new Vector2((at % Region.Width) * scale, (at / Region.Width + 3) * scale);
+                DrawCircle(centre, 3, kind == "lever" ? (Region.Depleted.Contains(at) ? new Color("a7b0b2") : new Color("d4b66b")) : (Region.Depleted.Contains(at) ? new Color("9fe3e6") : new Color("f2a443")));
+                DrawString(ThemeDB.FallbackFont, centre + new Vector2(5, -3), kind == "lever" ? "L" : "B", HorizontalAlignment.Left, -1, 14, Colors.White);
+            }
         }
         var entrance = new Vector2((Region.Entrance % Region.Width+.5f)*scale,(Region.Entrance/Region.Width+.5f)*scale);
         DrawRect(new Rect2(entrance-new Vector2(4,4),new Vector2(8,8)),Colors.LightGreen);

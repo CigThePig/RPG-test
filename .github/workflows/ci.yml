@@ -36,6 +36,8 @@ jobs:
         run: python3 tools/verify.py --headless
       - name: Normal-health complete production adventure
         run: godot --headless --path . -- --adventure-check
+      - name: Normal-health adventure through a brazier light seal and lever shortcut
+        run: godot --headless --path . -- --adventure-check --adventure-ruin=33
       - name: Rendered input, dialogue and UI verification
         run: xvfb-run -a python3 tools/verify.py --visual
       - name: Phone layout and touch UI verification

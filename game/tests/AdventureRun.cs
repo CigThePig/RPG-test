@@ -7,7 +7,9 @@ public sealed class AdventureRun(Foundation app)
 {
     World W => app.World;
     Node N => app.Narrative;
-    int ticks, potions, attacks, spells, dodges, damage;
+    int ticks, potions, attacks, spells, dodges, damage, levers, braziers;
+    // Optional fresh ruin seed; null keeps the world-derived ruin. The overworld is unchanged.
+    public int? RuinSeed { get; set; }
     readonly List<object> checkpoints=new();
     public Action<string>? Checkpoint;
     public bool UseDialogue { get; set; }
@@ -84,6 +86,31 @@ public sealed class AdventureRun(Foundation app)
         foreach(var button in choices.GetChildren().OfType<Button>().Where(b=>b.Text=="Continue").ToArray())button.EmitSignal(Button.SignalName.Pressed);
         for(int frame=0;frame<10;frame++)yield return ticks;
     }
+    // Every reachable lever and unsolved brazier ring, operated through production interaction.
+    IEnumerable<int> Mechanisms(string phase)
+    {
+        var r=W.RegionsById["ruin"];bool progressed=true;
+        while(progressed)
+        {
+            progressed=false;
+            foreach(var c in DungeonMechanisms.Controls(r))
+            {
+                if(c.Gates.Length==0||c.Gates.All(r.OpenDoors.Contains))continue;
+                int first=c.Kind=="lever"?c.Controllers[0]:DungeonMechanisms.Solution(r,c.Controllers).FirstOrDefault(-1);
+                if(first<0||(r.Path(W.Player.Position,r.Center(first),W.Player).Count==0&&r.Index(W.Player.Position)!=first))continue;
+                if(c.Kind=="lever"){foreach(int step in Interact(first))yield return step;levers++;Mark("lever-pulled-"+phase);}
+                else
+                {
+                    Mark("brazier-ring-"+phase);
+                    foreach(int brazier in DungeonMechanisms.Solution(r,c.Controllers)){foreach(int step in Interact(brazier))yield return step;braziers++;}
+                    Mark("light-seal-broken-"+phase);
+                }
+                if(!c.Gates.All(r.OpenDoors.Contains))throw new InvalidOperationException("Mechanism did not open its gates: "+c.Kind);
+                string save=Persistence.Capture(W,N);Persistence.Restore(W,N,save);r=W.RegionsById["ruin"];
+                progressed=true;break; // Controls are rederived from the restored region.
+            }
+        }
+    }
     public void Run() { foreach(int tick in Steps()) { } }
     public IEnumerable<int> Steps()
     {
@@ -108,11 +135,13 @@ public sealed class AdventureRun(Foundation app)
             }
             else if(!N.Call("accept_quest",2).AsBool())throw new InvalidOperationException("Adventure acceptance failed");
             Mark("assignment-accepted");
+            if(RuinSeed is int ruinSeed)W.RegionsById["ruin"]=Mosslight.Regions.Dungeon(ruinSeed);
             var reach=W.RegionsById["reach"];foreach(int step in Interact(reach.Features.Single(f=>f.Value=="portal").Key))yield return step;
             var ruin=W.RegionsById["ruin"];Mark("dungeon-entrance");
             if(!DungeonValidator.TrySolve(ruin,out var gates))throw new InvalidOperationException("No mission witness");
             foreach(int gate in gates)
             {
+                foreach(int step in Mechanisms("approach"))yield return step;ruin=W.RegionsById["ruin"];
                 foreach(int key in ruin.Features.Where(f=>f.Value=="key").Select(f=>f.Key).Order())
                     if(!ruin.Depleted.Contains(key)&&ruin.Path(W.Player.Position,ruin.Center(key),W.Player).Count>0){foreach(int step in Interact(key))yield return step;Mark("key-acquired");}
                 var group=ruin.GateAt(gate);int stand=group.SelectMany(ruin.Neighbours).Distinct().Order().First(at=>ruin.CanStand(ruin.Center(at),W.Player)&&ruin.Path(W.Player.Position,ruin.Center(at),W.Player).Count>0);
@@ -122,11 +151,13 @@ public sealed class AdventureRun(Foundation app)
                 string save=Persistence.Capture(W,N);Persistence.Restore(W,N,save);
                 ruin=W.RegionsById["ruin"]; // Restore is authoritative, keep fresh references.
             }
+            foreach(int step in Mechanisms("approach"))yield return step;ruin=W.RegionsById["ruin"];
             // Discover an actually present optional room and collect its supported cache, if reachable.
             foreach(int chest in ruin.Features.Where(f=>f.Value=="chest").Select(f=>f.Key).Order())
                 if(!ruin.Depleted.Contains(chest)&&ruin.Path(W.Player.Position,ruin.Center(chest),W.Player).Count>0){foreach(int step in Interact(chest))yield return step;Mark("exploration-supplies");break;}
             foreach(int step in Travel(ruin.Objective))yield return step;Mark("relic-sanctuary");foreach(int step in Interact(ruin.Objective))yield return step;Mark("relic-recovered");
             if(N.Call("completed",2).AsBool())throw new InvalidOperationException("Premature adventure completion");
+            foreach(int step in Mechanisms("return"))yield return step; // A lever beyond the relic opens the way home.
             string recovered=Persistence.Capture(W,N);Persistence.Restore(W,N,recovered);ruin=W.RegionsById["ruin"];
             foreach(int step in Interact(ruin.Entrance))yield return step;Mark("returned-to-reach");
             var warden=W.Actors.Values.First(a=>a.Profession=="merchant");
@@ -138,8 +169,14 @@ public sealed class AdventureRun(Foundation app)
             int reward=W.Items.Count("player","potion"),rep=W.Player.Reputation.GetValueOrDefault("wardens");
             string final=Persistence.Capture(W,N);Persistence.Restore(W,N,final);N.Call("claim_pending");
             if(!N.Call("completed",2).AsBool()||reward!=W.Items.Count("player","potion")||rep!=W.Player.Reputation.GetValueOrDefault("wardens"))throw new InvalidOperationException("Completion reload duplicated reward");
-            Directory.CreateDirectory("build/adventure");File.WriteAllText("build/adventure/normal-health.json",System.Text.Json.JsonSerializer.Serialize(new{setup="Fresh production seed 42; original starter equipment, 100 health, 60 mana, 3 potions; production APIs (not UI input)",ticks,potions,attacks,spells,dodges,damage,health=W.Player.Health,checkpoints},Content.Json));
-            GD.Print("NORMAL HEALTH ADVENTURE PASSED ticks="+ticks+" health="+W.Player.Health);
+            // Optional key gates may stay shut; anything reachable in the final state must have been operated.
+            var final_ruin=W.RegionsById["ruin"];var finalReach=DungeonValidator.Reach(final_ruin);
+            int expected=DungeonMechanisms.Controls(final_ruin).Count(c=>c.Gates.Length>0);
+            if(DungeonMechanisms.Controls(final_ruin).Any(c=>c.Gates.Length>0&&c.Controllers.Any(finalReach.Contains)&&!c.Gates.All(final_ruin.OpenDoors.Contains)))throw new InvalidOperationException("Adventure left a reachable mechanism unopened");
+            string file=RuinSeed is int seed?$"build/adventure/normal-health-ruin-{seed}.json":"build/adventure/normal-health.json";
+            string setup=RuinSeed is int fixedRuin?$"Fresh production world seed 42 with fresh ruin seed {fixedRuin}; original starter equipment, 100 health, 60 mana, 3 potions; production APIs (not UI input)":"Fresh production seed 42; original starter equipment, 100 health, 60 mana, 3 potions; production APIs (not UI input)";
+            Directory.CreateDirectory("build/adventure");File.WriteAllText(file,System.Text.Json.JsonSerializer.Serialize(new{setup,ticks,potions,attacks,spells,dodges,damage,levers,braziers,mechanisms=expected,health=W.Player.Health,checkpoints},Content.Json));
+            GD.Print("NORMAL HEALTH ADVENTURE PASSED ticks="+ticks+" health="+W.Player.Health+" levers="+levers+" braziers="+braziers);
         }
         finally{W.Events.Published-=Observe;}
     }

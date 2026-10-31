@@ -67,6 +67,12 @@ func receive(kind: String, actor: String, target: String, value: String, count: 
 		var lore: String = {"forgotten-archive": "The light powered Reach’s road wards before the ruin fell.", "abandoned-shrine": "The shrine asks that the light be carried home to protect travellers.", "collapsed-storeroom": "Expedition supplies may remain among the collapsed shelves."}.get(value, "")
 		if not lore.is_empty(): flags["lore:" + target] = lore
 		notice.emit("Discovered: " + landmark_name(value))
+	if kind == "lever_pulled" or kind == "seal_broken":
+		flags["mechanism:%s:%s:%s" % [kind, target, value]] = true
+	if kind == "lever_pulled" and not flags.has("lore:ruin-levers"):
+		flags["lore:ruin-levers"] = "Old wardens built portcullis shortcuts so the light could be carried out quickly. A pulled lever keeps the way open."
+	if kind == "brazier_kindled" and not flags.has("lore:ruin-braziers"):
+		flags["lore:ruin-braziers"] = "The ruin’s light seals answer its braziers. Each flame you kindle stirs the two beside it; only a ring burning whole breaks the ward."
 	if kind == "defeated":
 		flags["defeated:" + value] = int(flags.get("defeated:" + value, 0)) + maxi(0, count)
 	for q in manager.get_active_quests().duplicate():
@@ -159,6 +165,12 @@ func journal() -> String:
 	for key in flags:
 		if str(key).begins_with("discovery:"): discoveries.append(landmark_name(flags[key]))
 	if not discoveries.is_empty(): lines.append("Explored: " + ", ".join(discoveries))
+	var shortcuts := 0
+	var seals := 0
+	for key in flags:
+		if str(key).begins_with("mechanism:lever_pulled:"): shortcuts += 1
+		if str(key).begins_with("mechanism:seal_broken:"): seals += 1
+	if shortcuts + seals > 0: lines.append("Ruin mechanisms: %d shortcut%s raised · %d light seal%s broken" % [shortcuts, "" if shortcuts == 1 else "s", seals, "" if seals == 1 else "s"])
 	for key in flags:
 		if str(key).begins_with("lore:"): lines.append(flags[key])
 	return "\n\n".join(lines)

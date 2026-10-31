@@ -498,8 +498,9 @@ public sealed class GameplayReplay
         Touch(false);
         var s=scenarios[index]; var p=app.World.Player;
         bool valid=app.World.RegionsById[p.Region].CanStand(p.Position,p);
-        if(s.Id=="dungeon-expedition" && (!dungeonExpedition!.Complete || dungeonExpedition.Unlocks<1 || dungeonExpedition.Rooms.Count<3))
-            throw new InvalidOperationException("Dungeon expedition incomplete: rooms="+dungeonExpedition!.Rooms.Count+" gates="+dungeonExpedition.Unlocks);
+        if(s.Id=="dungeon-expedition" && (!dungeonExpedition!.Complete || dungeonExpedition.Unlocks<1 || dungeonExpedition.Rooms.Count<3 ||
+            (DungeonMechanisms.Controls(app.World.RegionsById["ruin"]).Count>0 && dungeonExpedition.Mechanisms<1)))
+            throw new InvalidOperationException("Dungeon expedition incomplete: rooms="+dungeonExpedition!.Rooms.Count+" gates="+dungeonExpedition.Unlocks+" mechanisms="+dungeonExpedition.Mechanisms);
         bool moved=distance>1;
         results.Add(new {scenario=s.Id,ticks=s.Ticks,groundDistance=distance,projectedDisplacement=GodotConvert.GroundToScreen(p.X-origin.X,p.Y-origin.Y).Length(),x=p.X,y=p.Y,clearance=valid,moved,frame=Engine.GetFramesDrawn(),speed=p.Speed});
         app.Trace.Marker("scenario-end");

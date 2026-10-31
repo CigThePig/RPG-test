@@ -10,14 +10,22 @@ public partial class FeatureView : Node2D
     public Vector2[] GateOffsets { get; set; } = Array.Empty<Vector2>();
     public bool Spent { get; set; }
     public bool Selected { get; set; }
+    // Brazier flame state from RegionState.Lit; presentation only.
+    public bool Lit { get; set; }
+    static readonly Color Iron = new("3b4244"), Flame = new("f2a443"), FlameCore = new("ffe7a3"), Ward = new("9fe3e6");
+    public override void _Ready() => SetProcess(Kind is "brazier" or "seal");
+    // Only lit braziers and intact seals animate; at most a handful exist per ruin.
+    public override void _Process(double delta) { if ((Kind == "brazier" && Lit) || (Kind == "seal" && !Spent)) QueueRedraw(); }
+    float Flicker(float rate, float phase) => .5f + .5f * Mathf.Sin((float)Time.GetTicksMsec() * .001f * rate + phase + VisualSeed % 17);
     static readonly Color Ink = new("263333"), Gold = new("d4b66b"), Wood = new("896448");
     void Box(float x, float y, float w, float h, Color c) => DrawRect(new Rect2(x,y,w,h),c);
     void Gem(Vector2 p, float s, Color c) => DrawColoredPolygon(new[] { p + new Vector2(0,-s), p + new Vector2(s,0), p + new Vector2(0,s), p + new Vector2(-s,0) },c);
     public override void _Draw()
     {
-        if (Spent && Kind != "chest" && Kind != "lock") return;
+        if (Spent && Kind is not ("chest" or "lock" or "lever" or "brazier" or "portcullis" or "seal")) return;
         DrawSetTransform(Vector2.Zero, 0, new Vector2(1,.45f));
-        DrawCircle(new Vector2(0,2), Kind is "portal" or "exit" ? 24 : 17, new Color(0,0,0,.25f));
+        if (Kind is not ("portcullis" or "seal")) DrawCircle(new Vector2(0,2), Kind is "portal" or "exit" ? 24 : 17, new Color(0,0,0,.25f));
+        if (Kind == "brazier" && Lit) DrawCircle(new Vector2(0,2), 34 + Flicker(7,0)*4, new Color(Flame, .10f));
         if (Selected) DrawArc(Vector2.Zero,23,0,Mathf.Tau,24,Gold,2);
         DrawSetTransform(Vector2.Zero);
         switch (Kind)
@@ -59,6 +67,64 @@ public partial class FeatureView : Node2D
             case "relic":
                 Box(-14,-6,28,9,EnvironmentStyle.Shade); Box(-14,-8,28,3,EnvironmentStyle.Cap);
                 Box(-10,-15,20,7,EnvironmentStyle.Stone); Gem(new Vector2(0,-20),12,Gold); Gem(new Vector2(0,-22),6,new Color("b7eee0")); break;
+            case "lever":
+            {
+                // Stone plinth with an iron slot; the handle rests up before the pull, down after.
+                Box(-14,-12,28,13,EnvironmentStyle.Stone); Box(9,-12,5,13,EnvironmentStyle.Shade); Box(-14,-14,28,3,EnvironmentStyle.Cap);
+                Box(-14,-14,28,1,EnvironmentStyle.Highlight); Box(-3,-13,6,3,Ink);
+                var pivot = new Vector2(0,-12);
+                var tip = pivot + (Spent ? new Vector2(15,-9) : new Vector2(-11,-20));
+                DrawLine(pivot, tip, Ink, 5); DrawLine(pivot, tip, Iron.Lightened(.25f), 2);
+                DrawCircle(tip, 4, Spent ? Gold.Darkened(.35f) : Gold); DrawCircle(pivot, 3, Ink);
+                break;
+            }
+            case "brazier":
+            {
+                // Short pedestal and iron bowl; a cold bowl shows ash, a burning one a flame.
+                Box(-5,-14,10,15,EnvironmentStyle.Stone); Box(2,-14,3,15,EnvironmentStyle.Shade); Box(-8,-2,16,3,EnvironmentStyle.Cap);
+                DrawColoredPolygon(new[]{new Vector2(-14,-22),new Vector2(14,-22),new Vector2(9,-14),new Vector2(-9,-14)},Ink);
+                Box(-13,-22,26,2,Iron.Lightened(.3f));
+                if (!Lit) { Box(-9,-24,18,3,new Color("6d6863")); DrawCircle(new Vector2(2,-24),1.5f,new Color("b0583a")); break; }
+                float f = Flicker(9,0), g = Flicker(13,1.7f);
+                var core = Spent ? Ward : FlameCore;
+                DrawColoredPolygon(new[]{new Vector2(-10,-22),new Vector2(-6,-34-f*4),new Vector2(-1,-29),new Vector2(2,-42-g*5),new Vector2(6,-30),new Vector2(9,-36-f*3),new Vector2(11,-22)},Flame);
+                DrawColoredPolygon(new[]{new Vector2(-5,-22),new Vector2(0,-33-g*3),new Vector2(5,-22)},core);
+                break;
+            }
+            case "portcullis":
+            {
+                // Iron bars on every authoritative gate cell; raised, only the teeth show under the lintel.
+                var cells = GateOffsets.Length > 0 ? GateOffsets : new[] { Vector2.Zero };
+                foreach (var offset in cells)
+                {
+                    var foot = offset + new Vector2(0, 2);
+                    Box(foot.X-6,foot.Y-37,12,4,EnvironmentStyle.Shade);
+                    for (int bar = -1; bar <= 1; bar++)
+                    {
+                        var top = foot + new Vector2(bar*4,-34);
+                        var bottom = Spent ? top + new Vector2(0,6) : foot + new Vector2(bar*4,0);
+                        DrawLine(top, bottom, Ink, 3); DrawLine(top+new Vector2(-1,0), bottom+new Vector2(-1,0), Iron.Lightened(.35f), 1);
+                    }
+                    if (!Spent) { DrawLine(foot+new Vector2(-7,-22),foot+new Vector2(7,-22),Ink,3); DrawLine(foot+new Vector2(-7,-10),foot+new Vector2(7,-10),Ink,3); }
+                }
+                break;
+            }
+            case "seal":
+            {
+                // A curtain of pale light over the corridor with one ward rune; broken, a faint glyph stays.
+                var cells = GateOffsets.Length > 0 ? GateOffsets : new[] { Vector2.Zero };
+                var middle = cells.Aggregate(Vector2.Zero, (sum,p) => sum+p) / cells.Length;
+                if (Spent) { DrawSetTransform(middle + new Vector2(0,2), 0, new Vector2(1,.45f)); DrawArc(Vector2.Zero,14,0,Mathf.Tau,20,new Color(Ward,.35f),2); DrawSetTransform(Vector2.Zero); break; }
+                float pulse = Flicker(3,0);
+                foreach (var offset in cells)
+                {
+                    var foot = offset + new Vector2(0, 2);
+                    DrawRect(new Rect2(foot + new Vector2(-12,-38), new Vector2(24,38)), new Color(Ward, .16f + pulse*.08f));
+                    DrawLine(foot + new Vector2(0,-38), foot, new Color(Ward, .45f), 1);
+                }
+                Gem(middle + new Vector2(0,-22), 9, new Color(Ward, .75f)); Gem(middle + new Vector2(0,-22), 4, new Color(1,1,1,.85f));
+                break;
+            }
             case "lock":
                 // One connected barrier spanning every blocking cell, with one
                 // central lock plate rather than six unrelated lock glyphs.
@@ -81,6 +147,15 @@ public partial class FeatureView : Node2D
         }
         if(Kind=="chest" && !Spent) { Box(-12,-8,4,1,new Color("b48c60")); Box(4,-5,3,1,Wood.Darkened(.2f)); }
         if(Kind=="ore") { Gem(new Vector2(-10,-18),3,new Color("c2d1c0")); Gem(new Vector2(6,-12),3,new Color("8ba5a1")); }
-        if (Selected) DrawString(ThemeDB.FallbackFont,new Vector2(-25,-55),Spent ? "Empty chest" : Kind,HorizontalAlignment.Left,-1,13,Gold);
+        if (Selected) DrawString(ThemeDB.FallbackFont,new Vector2(-25,-55),Label(),HorizontalAlignment.Left,-1,13,Gold);
     }
+    string Label() => Kind switch
+    {
+        "chest" when Spent => "Empty chest",
+        "lever" => Spent ? "Pulled lever" : "Lever",
+        "brazier" => Lit ? "Burning brazier" : "Cold brazier",
+        "portcullis" => "Portcullis",
+        "seal" => "Light seal",
+        _ => Kind
+    };
 }

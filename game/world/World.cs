@@ -617,7 +617,7 @@ public sealed class World
             {
                 CollisionAttempts++;
                 int at = r.BlockingCell(a.Position + delta,a);
-                LastBlockedReason = at < 0 ? "Map boundary" : r.Features.GetValueOrDefault(at) == "lock" ? "Locked door" : $"Terrain / footprint: {r.Tiles[at]} at {at%r.Width},{at/r.Width}";
+                LastBlockedReason = at < 0 ? "Map boundary" : r.Features.GetValueOrDefault(at) switch { "lock" => "Locked door", "portcullis" => "Lowered portcullis", "seal" => "Light seal", _ => null } ?? $"Terrain / footprint: {r.Tiles[at]} at {at%r.Width},{at/r.Width}";
             }
             // Advance to contact before sliding. Previously an entire (up to 2px)
             // substep vanished at contact; deterministic bisection retains the valid
@@ -740,7 +740,7 @@ public sealed class World
     public IEnumerable<KeyValuePair<int, string>> InteractionTargets(ActorState a)
     {
         var r = RegionsById[a.Region];
-        return r.Features.Where(x => !r.Depleted.Contains(x.Key) && !r.OpenDoors.Contains(x.Key) && Vector2.Distance(r.Center(x.Key), a.Position) < 48 && VisibleTo(a, r.Center(x.Key), allowBlockedTarget: x.Value == "lock"))
+        return r.Features.Where(x => !r.Depleted.Contains(x.Key) && !r.OpenDoors.Contains(x.Key) && Vector2.Distance(r.Center(x.Key), a.Position) < 48 && VisibleTo(a, r.Center(x.Key), allowBlockedTarget: RegionState.IsGate(x.Value)))
             .OrderBy(x => Vector2.DistanceSquared(r.Center(x.Key), a.Position)).ThenBy(x => x.Key);
     }
 
@@ -756,8 +756,29 @@ public sealed class World
         InteractionFeedback = "No accessible object nearby";
         var nearby = InteractionTargets(a).ToArray();
         bool keyRequired = false;
+        string sealedHint = "";
         foreach (var(at, kind)in nearby)
         {
+            // Mechanism gates never open by hand; explain them, but keep looking for objects in reach.
+            if (kind == "portcullis") { sealedHint = "The portcullis is raised by a lever deeper in the ruin"; continue; }
+            if (kind == "seal") { sealedHint = "A ward of light bars the way — kindle every brazier in the nearby chamber"; continue; }
+            if (kind == "lever")
+            {
+                var raised = DungeonMechanisms.Pull(r, at);
+                if (raised.Length == 0) continue;
+                InteractionFeedback = "Lever pulled — a portcullis grinds open";
+                Events.Publish(new("lever_pulled", a.Id, a.Region, at.ToString()));
+                return true;
+            }
+            if (kind == "brazier")
+            {
+                if (!DungeonMechanisms.Kindle(r, at, out bool solved)) continue;
+                int lit = DungeonMechanisms.RingAt(r, at).Count(r.Lit.Contains);
+                InteractionFeedback = solved ? "Every brazier burns — the light seal breaks" : $"The flames shift: {lit} of {DungeonMechanisms.RingSize} braziers burn";
+                Events.Publish(new("brazier_kindled", a.Id, a.Region, at.ToString(), lit));
+                if (solved) Events.Publish(new("seal_broken", a.Id, a.Region, at.ToString()));
+                return true;
+            }
             if (kind == "lock")
             {
                 if (r.OpenDoors.Contains(at))
@@ -804,6 +825,8 @@ public sealed class World
             if (Items.LootAll(corpse.Id, a.Id)) { InteractionFeedback = "Loot collected"; return true; }
         if (keyRequired)
             InteractionFeedback = "A ruin key is required";
+        else if (sealedHint != "")
+            InteractionFeedback = sealedHint;
         else if (r.Features.Any(x => x.Value == "chest" && r.Depleted.Contains(x.Key) && Vector2.Distance(a.Position,r.Center(x.Key)) < 48 && VisibleTo(a,r.Center(x.Key))))
             InteractionFeedback = "Chest already empty";
         return false;

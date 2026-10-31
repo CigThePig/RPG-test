@@ -10,7 +10,7 @@ public static class DungeonEncounterChecks
         {
             w.RegionsById["ruin"]=Regions.Dungeon(42);w.Enter(w.Player,"ruin");
             var r=w.RegionsById["ruin"];var p=w.Player;
-            r.OpenDoors.UnionWith(r.Features.Where(x=>x.Value=="lock").Select(x=>x.Key));
+            r.OpenDoors.UnionWith(r.Features.Where(x=>RegionState.IsGate(x.Value)).Select(x=>x.Key));
             var enemies=w.Actors.Values.Where(a=>a.Id.StartsWith("ruin:spawn:")).Take(3).ToArray();
             foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
             foreach(var direction in new[]{V.UnitX,V.UnitY})
