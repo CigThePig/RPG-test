@@ -249,7 +249,9 @@ func advance(cue: String) -> void:
 	current_line = next_line
 	advancing = false
 	for child in choices.get_children():
-		choices.remove_child(child)
+		# Input dispatch may still query the pressed button after its signal returns.
+		# Hide now; let SceneTree release it after dispatch instead of detaching it here.
+		if child is Control: child.hide()
 		child.queue_free()
 	if current_line == null:
 		speaking = false

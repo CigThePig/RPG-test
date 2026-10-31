@@ -24,14 +24,15 @@ public static class AdventureVisualRun
             if(checkpoint!=null)
             {
                 string name=checkpoint;checkpoint=null;
-                app.GetViewport().GetTexture().GetImage().SavePng($"build/adventure/frames/{rendered:D5}-{name}.png");
+                string safeName=string.Concat(name.Select(c=>char.IsAsciiLetterOrDigit(c)||c is '-' or '_' ? c : '-'));
+                app.GetViewport().GetTexture().GetImage().SavePng($"build/adventure/frames/{rendered:D5}-{safeName}.png");
                 frames.Add(new{name,frame=rendered,tick=app.World.Tick,health=app.World.Player.Health});
                 if(name is "assignment-accepted" or "relic-recovered" or "quest-completed-rewarded")
                 {
                     app.Ui.Journal();
                     for(int i=0;i<12;i++)await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);
                     await app.ToSignal(RenderingServer.Singleton,RenderingServer.SignalName.FramePostDraw);
-                    app.GetViewport().GetTexture().GetImage().SavePng($"build/adventure/frames/{rendered:D5}-{name}-journal.png");
+                    app.GetViewport().GetTexture().GetImage().SavePng($"build/adventure/frames/{rendered:D5}-{safeName}-journal.png");
                     app.Ui.ClosePanels();
                 }
                 if(name is "exploration-supplies" or "relic-sanctuary")

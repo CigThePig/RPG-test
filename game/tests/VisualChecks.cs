@@ -403,9 +403,45 @@ public static class VisualChecks
         finally {Persistence.Restore(app.World,app.Narrative,original);app.RebuildViews();app.Ui.ClosePanels();}
     }
 
+    static async System.Threading.Tasks.Task TapDialogueButton(Foundation app, Button button)
+    {
+        var point=button.GetGlobalRect().GetCenter();
+        Input.ParseInputEvent(new InputEventMouseButton{ButtonIndex=MouseButton.Left,Pressed=true,Position=point,GlobalPosition=point});
+        Input.FlushBufferedEvents();await Frames(app,1);
+        Input.ParseInputEvent(new InputEventMouseButton{ButtonIndex=MouseButton.Left,Pressed=false,Position=point,GlobalPosition=point});
+        Input.FlushBufferedEvents();await Frames(app,2);
+    }
+    static async System.Threading.Tasks.Task DialogueTouchChecks(Foundation app)
+    {
+        app.Narrative.Call("talk");
+        await Capture(app, "dialogue");
+        // Exercise the real Dialogue Manager choice mutation, not a simulated quest acceptance.
+        var choices = app.Narrative.Get("choices").AsGodotObject() as VBoxContainer ?? throw new InvalidOperationException("Missing dialogue UI");
+        if (choices.GetChildren().OfType<Button>().Any(x => x.Text.Contains("[if")))
+            throw new InvalidOperationException("Dialogue conditions rendered as text");
+        var locked = choices.GetChildren().OfType<Button>().FirstOrDefault(x => x.Text.Contains("buried"));
+        if (locked != null && !locked.Disabled)
+            throw new InvalidOperationException("Dialogue prerequisite option enabled");
+        var response = choices.GetChildren().OfType<Button>().First(x => x.Text.Contains("prowlers"));
+        await TapDialogueButton(app,response);
+        await Frames(app);
+        if (!app.Narrative.Get("flags").AsGodotDictionary().ContainsKey("accepted_1"))
+            throw new InvalidOperationException("Dialogue choice failed to start quest");
+        // Finish the current line through its actual Continue button.
+        foreach (var button in choices.GetChildren().OfType<Button>().ToArray())
+            await TapDialogueButton(app,button);
+        await Frames(app);
+        if(app.Narrative.Get("speaking").AsBool())throw new InvalidOperationException("Dialogue did not close through actual GUI input");
+        app.Ui.Journal();
+        await Capture(app, "journal");
+        app.Ui.ClosePanels();
+    }
+
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
+        if(OS.GetCmdlineUserArgs().Contains("--dialogue-only"))
+        { app.ResumeGame();await DialogueTouchChecks(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--adventure-panels-only"))
         { await AdventurePanels(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--landmarks-only"))
@@ -632,27 +668,7 @@ public static class VisualChecks
         app.Ui.Character();
         await Capture(app, "character");
         app.Ui.ClosePanels();
-        app.Narrative.Call("talk");
-        await Capture(app, "dialogue");
-        // Exercise the real Dialogue Manager choice mutation, not a simulated quest acceptance.
-        var choices = app.Narrative.Get("choices").AsGodotObject() as VBoxContainer ?? throw new InvalidOperationException("Missing dialogue UI");
-        if (choices.GetChildren().OfType<Button>().Any(x => x.Text.Contains("[if")))
-            throw new InvalidOperationException("Dialogue conditions rendered as text");
-        var locked = choices.GetChildren().OfType<Button>().FirstOrDefault(x => x.Text.Contains("buried"));
-        if (locked != null && !locked.Disabled)
-            throw new InvalidOperationException("Dialogue prerequisite option enabled");
-        var response = choices.GetChildren().OfType<Button>().First(x => x.Text.Contains("prowlers"));
-        response.EmitSignal(Button.SignalName.Pressed);
-        await Frames(app);
-        if (!app.Narrative.Get("flags").AsGodotDictionary().ContainsKey("accepted_1"))
-            throw new InvalidOperationException("Dialogue choice failed to start quest");
-        // Finish the current line through its actual Continue button.
-        foreach (var button in choices.GetChildren().OfType<Button>().ToArray())
-            button.EmitSignal(Button.SignalName.Pressed);
-        await Frames(app);
-        app.Ui.Journal();
-        await Capture(app, "journal");
-        app.Ui.ClosePanels();
+        await DialogueTouchChecks(app);
         app.World.Enter(app.World.Player, "ruin");
         await Capture(app, "dungeon");
         await DungeonVisualChecks.Run(app);

@@ -130,3 +130,9 @@ An identical additional diagnostic harness was compiled into separate detached b
 | 128-actor World tick | 1.803 ms | 1.711 ms |
 
 These results replace any inference from the earlier overlapping recordings. They do not establish sustained S25 performance or long-session GPU/texture memory. Three additional file-system regression assertions verify that an older recovery file is retained byte-for-byte, repeated retention cannot overwrite earlier copies, and current-generation saves do not create repeated backups. The complete local integration suite passes 7,918 assertions.
+
+## Installed-touch and evidence-upload follow-up
+
+Candidate `d74cb8b` passed native checks, baseline/precise replay and the rendered normal-health adventure. Installed Android completed its touch scenarios, including real warden acceptance and room discovery, but strict log validation caught `can_process` on a detached pressed dialogue button. Dialogue cleanup now hides and queues old choices for end-of-frame deletion instead of removing them from the tree during input dispatch. Native dialogue checks now dispatch real GUI press/release events, and Android's strict error assertion is retained.
+
+The precise job's gameplay checks succeeded but artifact upload rejected colons in screenshot names derived from actor IDs. Screenshot paths now use portable sanitized names; original actor/marker identities remain intact in JSON. The recording tool clears only its generated frame folder before a new capture. Exact-source reruns remain required; the failed candidate is not advertised as installed-runtime acceptance.
