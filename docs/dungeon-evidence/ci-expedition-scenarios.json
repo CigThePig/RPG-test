@@ -1,0 +1,14 @@
+[
+  {
+    "scenario": "dungeon-expedition",
+    "ticks": 3000,
+    "groundDistance": 4470.68,
+    "projectedDisplacement": 441.23462,
+    "x": 204,
+    "y": 588,
+    "clearance": true,
+    "moved": true,
+    "frame": 3030,
+    "speed": 40
+  }
+]

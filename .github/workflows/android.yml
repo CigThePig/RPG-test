@@ -21,15 +21,15 @@ jobs:
       GODOT_VERSION: 4.6.1
       DOTNET_VERSION: 9.0.203
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: |
             8.0.408
             9.0.203
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
@@ -71,6 +71,10 @@ jobs:
           xvfb-run -a python3 tools/verify.py --visual --mobile
       - name: Export signed ARM64 APK
         shell: bash
+        env:
+          # Only export steps see signing credentials; see tools/configure-android.py.
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: ${{ secrets.ANDROID_DEV_KEYSTORE_BASE64 != '' && secrets.ANDROID_DEV_KEYSTORE_ALIAS || 'androiddebugkey' }}
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_BASE64 != '' && secrets.ANDROID_DEV_KEYSTORE_PASSWORD || 'android' }}
         run: |
           set -euo pipefail
           sha=$(git rev-parse --short=12 HEAD)
@@ -78,7 +82,7 @@ jobs:
           "$GODOT" --headless --path . --export-debug Android "build/android/Mosslight-android-arm64-debug-$sha.apk" 2>&1 | tee build/android/export.log
       - name: Verify package, .NET runtime, resources, ARM64 and signature
         run: python3 tools/verify-apk.py build/android/${{ env.APK_NAME }}.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ env.APK_NAME }}
           path: |
@@ -89,6 +93,10 @@ jobs:
           retention-days: 30
       - name: Export matching x86_64 emulator package
         shell: bash
+        env:
+          # Only export steps see signing credentials; see tools/configure-android.py.
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: ${{ secrets.ANDROID_DEV_KEYSTORE_BASE64 != '' && secrets.ANDROID_DEV_KEYSTORE_ALIAS || 'androiddebugkey' }}
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_BASE64 != '' && secrets.ANDROID_DEV_KEYSTORE_PASSWORD || 'android' }}
         run: |
           set -euo pipefail
           python3 - <<'PYCODE'
@@ -98,13 +106,13 @@ jobs:
           PYCODE
           "$GODOT" --headless --path . --export-debug Android build/android/Mosslight-emulator.apk 2>&1 | tee build/android/export-emulator.log
           apksigner verify build/android/Mosslight-emulator.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: emulator-test-package
           path: build/android/Mosslight-emulator.apk
           if-no-files-found: error
           retention-days: 3
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: android-diagnostics-${{ github.run_id }}
@@ -128,10 +136,10 @@ jobs:
       ANDROID_AVD_HOME: /tmp/mosslight-avds
       ANDROID_USER_HOME: /tmp/mosslight-android
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: emulator-test-package
           path: build/emulator
@@ -144,7 +152,7 @@ jobs:
           "$ANDROID_HOME/emulator/emulator" -list-avds
           "$ANDROID_HOME/emulator/emulator" -list-avds | grep -Fx mosslight
           sudo chmod 666 /dev/kvm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - name: Install pinned video tools without distro updates
@@ -154,7 +162,7 @@ jobs:
         run: python3 tools/test_android_window.py
       - name: Install, launch and exercise exported C# application
         run: python3 tools/android-smoke.py build/emulator/Mosslight-emulator.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: android-runtime-evidence

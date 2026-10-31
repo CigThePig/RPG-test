@@ -1,0 +1,41 @@
+{
+  "source": "b3abe42075b14ed73ca8aeffefd2ea9ecf9fc04e",
+  "workflow": "https://github.com/CigThePig/RPG-test/actions/runs/41021407565",
+  "artifact": "https://github.com/CigThePig/RPG-test/actions/runs/41021407565/artifacts/12961668262",
+  "logs": {
+    "ci-verification-mobile.log": {
+      "sha256": "7e8657263fa4fa8b646ee844bb3660b439b156e4ca71adc98e29df027ca356e7",
+      "bytes": 901,
+      "resultLines": [
+        "MOSSLIGHT_READY actors=9 families=9 framework=.NET 8.0.33 source=local-uncommitted",
+        "PROP DEPTH CHECKS PASSED: covered=2416, front=1332",
+        "WALL DEPTH CHECKS PASSED: foreground pixels=762, visible silhouette=1072, front pixels=1446, doorway changes=0, row nodes=33",
+        "MOSSLIGHT_ENVIRONMENT_READY region=ruin walls=55 decorations=3 atlases=2",
+        "MOSSLIGHT_ENVIRONMENT_READY region=reach walls=0 decorations=43 atlases=2",
+        "ENVIRONMENT VISUAL CHECKS PASSED: references and six region rebuilds",
+        "VISUAL CHECKS PASSED"
+      ]
+    },
+    "ci-verification-integration.log": {
+      "sha256": "f33e23e7312085b39c50b3340bc2c32f207ce665f3bf8e04eefe981623d6af7f",
+      "bytes": 201968,
+      "resultLines": [
+        "MOSSLIGHT_READY actors=9 families=9 framework=.NET 8.0.33 source=local-uncommitted",
+        "FOUNDATION CHECKS PASSED: 4603"
+      ]
+    },
+    "ci-verification-visual.log": {
+      "sha256": "7e8657263fa4fa8b646ee844bb3660b439b156e4ca71adc98e29df027ca356e7",
+      "bytes": 901,
+      "resultLines": [
+        "MOSSLIGHT_READY actors=9 families=9 framework=.NET 8.0.33 source=local-uncommitted",
+        "PROP DEPTH CHECKS PASSED: covered=2416, front=1332",
+        "WALL DEPTH CHECKS PASSED: foreground pixels=762, visible silhouette=1072, front pixels=1446, doorway changes=0, row nodes=33",
+        "MOSSLIGHT_ENVIRONMENT_READY region=ruin walls=55 decorations=3 atlases=2",
+        "MOSSLIGHT_ENVIRONMENT_READY region=reach walls=0 decorations=43 atlases=2",
+        "ENVIRONMENT VISUAL CHECKS PASSED: references and six region rebuilds",
+        "VISUAL CHECKS PASSED"
+      ]
+    }
+  }
+}

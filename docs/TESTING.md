@@ -88,3 +88,7 @@ Android smoke retains control/inventory/interaction checks and uses F9's reversi
 Run dotnet build, import-project.py, verify.py --headless, verify.py --visual, verify.py --visual --mobile and gameplay-verify.py --presets baseline,precise. Rendered commands require an X display. Local constrained hosts can use an explicitly started TCP Xvfb and DISPLAY=127.0.0.1:<display>; CI uses xvfb-run. Never count an old assembly after a failed build as verification of new source.
 
 For a focused rendered control iteration, run Godot with `-- --visual-check --mobile-ui --controls-only`; success prints `MOBILE CONTROLS CHECKS PASSED`. This is additional to, and never replaces, the complete rendered suite.
+
+## PR5 dungeon verification
+
+Run the supported build/import/headless/desktop/mobile/replay commands from the assignment, plus the focused `--replay-only=dungeon-expedition` scenario documented in `GAMEPLAY_VERIFICATION.md`. The room/corridor geometry contract and its checks are in `DUNGEON_LAYOUT.md`. Historical PR5 measurements, CI/APK identity and incomplete physical-device checks are in the `PR5_PART*_HANDOFF.md` files.

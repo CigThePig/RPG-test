@@ -1,0 +1,41 @@
+using Godot;
+using System.Diagnostics;
+using System.Text.Json;
+namespace Mosslight;
+public partial class Foundation
+{
+    public void RunPairedBenchmark()
+    {
+        try
+        {
+            var service=World.Items.Service;
+            World Fresh()
+            {
+                service.Call("import_state","{\"serial\":0,\"bags\":{},\"slots\":{}}");
+                var w=new World(Content.Load(false),service,42){Planner=World.Planner};w.NewGame();return w;
+            }
+            Regions.Dungeon(42);
+            var rows=new List<object>();
+            foreach(int seed in new[]{1,42,1337})for(int repeat=0;repeat<5;repeat++)
+            {
+                var w=Fresh();var timer=Stopwatch.StartNew();var r=Regions.Dungeon(seed);double generation=timer.Elapsed.TotalMilliseconds;
+                w.RegionsById["ruin"]=r;timer.Restart();w.Enter(w.Player,"ruin");double population=timer.Elapsed.TotalMilliseconds;
+                rows.Add(new{seed,repeat,generationMs=generation,populationMs=population,actors=w.Actors.Count});
+            }
+            var simulation=new List<object>();
+            foreach(int count in new[]{16,64,128})for(int repeat=0;repeat<3;repeat++)
+            {
+                var w=Fresh();while(w.Actors.Count<count)
+                {
+                    int i=w.Actors.Count;w.Actors["bench:"+i]=new(){Id="bench:"+i,X=w.Player.X+80+(i%8)*24,Y=w.Player.Y,HomeX=w.Player.X+80,HomeY=w.Player.Y,Faction="wardens",Profile="warden",Profession="merchant"};
+                }
+                GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();
+                var timer=Stopwatch.StartNew();for(int i=0;i<600;i++)w.Step(1f/60);
+                simulation.Add(new{count,repeat,msPerTick=timer.Elapsed.TotalMilliseconds/600,managedBytes=GC.GetTotalMemory(false)});
+            }
+            Directory.CreateDirectory("build");File.WriteAllText("build/paired-benchmark.json",JsonSerializer.Serialize(new{setup="Identical extra benchmark harness; production World/Gloot/GOAP, no presentation/event subscribers; canonical seeds five repeats; 600 ticks three repeats per population",rows,simulation},Content.Json));
+            GD.Print("PAIRED BENCHMARK PASSED");GetTree().Quit(0);
+        }
+        catch(Exception e){GD.PushError(e.ToString());GetTree().Quit(1);}
+    }
+}

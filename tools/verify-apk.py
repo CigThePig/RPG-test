@@ -31,7 +31,7 @@ with zipfile.ZipFile(apk) as z:
         assert all(z.getinfo(n).file_size > 0 for n in hits), f'Empty {suffix}'
         return hits
     for suffix in ['RpgTest.dll', 'GodotSharp.dll', 'System.Private.CoreLib.dll', '.dotnet-publish-manifest',
-                   'game/data/items.json', 'game/data/quests.json', 'game/data/dungeon_rules.json',
+                   'game/data/landmarks/rooms.json', 'game/data/items.json', 'game/data/quests.json', 'game/data/dungeon_rules.json',
                    'game/data/warden.dialogue.import']:
         require(suffix)
     # Godot's DialogueManager importer replaces the source .dialogue with a compiled .tres.

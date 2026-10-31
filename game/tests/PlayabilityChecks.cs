@@ -86,6 +86,13 @@ public static class PlayabilityChecks
                 }
                 check(executed,"dungeon route executes with large footprint after unlocking seed "+seed);
             }
+            // A closer locked gate without a key must not hide another pickup in reach.
+            var gated=new RegionState { Id="gate-test",Width=8,Height=4,Tiles=Enumerable.Repeat(Terrain.Floor,32).ToArray() };
+            w.RegionsById[gated.Id]=gated;
+            int herbAt=1*8+1;gated.Features[1*8+3]="lock";gated.Features[herbAt]="herb";
+            var keyless=new ActorState { Id="keyless-test",Region=gated.Id,X=70,Y=36 };
+            check(w.Interact(keyless) && gated.Depleted.Contains(herbAt) && w.Items.Count(keyless.Id,"herb")==3,"keyless locked gate does not block a farther pickup");
+            check(!w.Interact(keyless) && w.InteractionFeedback=="A ruin key is required","keyless locked gate still explains the missing key");
             Persistence.Restore(w,app.Narrative,saved);
             var reach=w.RegionsById["reach"];
             check(w.Actors.Values.All(b=>reach.CanStand(b.Position,b)),"all initial actors have terrain clearance");

@@ -315,7 +315,9 @@ public sealed class World
         float resistance = type == "physical" ? Stat(target, "defence") : 0;
         float actual = Math.Max(1, amount - resistance);
         target.Health = Math.Max(0, target.Health - actual);
-        target.Invulnerable = .12f;
+        // Only direct hits grant the short post-hit window. A damage-over-time tick
+        // must not make its victim immune to the next sword or projectile.
+        if (!periodic) target.Invulnerable = .12f;
         Cancel(target);
         target.State = target.Alive ? ActionState.Staggered : ActionState.Dead;
         target.StateRemaining = .22f;
@@ -401,6 +403,7 @@ public sealed class World
         if (dt <= 0 || dt > .25f || !float.IsFinite(dt))
             throw new ArgumentOutOfRangeException(nameof(dt));
         Tick++;
+        Exploration.Discover(this);
         Time += dt;
         Spells.Update(dt);
         // Advance before any actor resolves an attack so protection is independent
@@ -752,19 +755,18 @@ public sealed class World
         var r = RegionsById[a.Region];
         InteractionFeedback = "No accessible object nearby";
         var nearby = InteractionTargets(a).ToArray();
+        bool keyRequired = false;
         foreach (var(at, kind)in nearby)
         {
             if (kind == "lock")
             {
                 if (r.OpenDoors.Contains(at))
                     continue;
+                // A closer locked gate must not hide a key, chest or exit also in reach.
                 if (!Items.Take(a.Id, "dungeon_key", 1))
-                { InteractionFeedback = "A ruin key is required"; return false; }
+                { keyRequired = true; continue; }
                 InteractionFeedback = "Door unlocked";
-                r.OpenDoors.Add(at);
-                foreach (var adjacent in r.Neighbours(at))
-                    if (r.Features.GetValueOrDefault(adjacent) == "lock")
-                        r.OpenDoors.Add(adjacent);
+                foreach (int cell in r.GateAt(at)) r.OpenDoors.Add(cell);
                 Events.Publish(new("door_unlocked", a.Id, a.Region, at.ToString()));
                 return true;
             }
@@ -800,7 +802,9 @@ public sealed class World
         var corpses = LootTargets(a);
         foreach (var corpse in corpses)
             if (Items.LootAll(corpse.Id, a.Id)) { InteractionFeedback = "Loot collected"; return true; }
-        if (r.Features.Any(x => x.Value == "chest" && r.Depleted.Contains(x.Key) && Vector2.Distance(a.Position,r.Center(x.Key)) < 48 && VisibleTo(a,r.Center(x.Key))))
+        if (keyRequired)
+            InteractionFeedback = "A ruin key is required";
+        else if (r.Features.Any(x => x.Value == "chest" && r.Depleted.Contains(x.Key) && Vector2.Distance(a.Position,r.Center(x.Key)) < 48 && VisibleTo(a,r.Center(x.Key))))
             InteractionFeedback = "Chest already empty";
         return false;
     }
@@ -813,8 +817,18 @@ public sealed class World
         a.Region = region;
         var r = RegionsById[region];
         var pos = r.Center(r.Entrance);
+        // The entrance tile also owns the return marker. Arrive on nearby
+        // reachable floor, clear of that feature and surviving inhabitants.
+        // Loading a snapshot never enters here or relocates saved actors.
+        if (region == "ruin")
+        {
+            // Placement only refines arrival; without a clear stand, keep the entrance tile.
+            try { pos = r.FindPlacement(pos + new Vector2(RegionState.Tile * 2, RegionState.Tile), a, Actors.Values); }
+            catch (InvalidOperationException) { }
+        }
         a.X = pos.X;
         a.Y = pos.Y;
+        Exploration.PrepareCache(r);
         InitializeContainers(r);
         PopulateRegion(region);
         Events.Publish(new("region_entered", a.Id, "", region));
@@ -822,19 +836,18 @@ public sealed class World
 
     void PopulateRegion(string region)
     {
-        if (region != "ruin" || Actors.Keys.Any(id => id.StartsWith("ruin:spawn:")))
+        if (region != "ruin" || RegionsById[region].EncountersInitialized)
             return;
         using var json = System.Text.Json.JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://game/data/spawns.json"));
         var def = json.RootElement.GetProperty(region);
         int count = def.GetProperty("count").GetInt32();
         var archetypes = def.GetProperty("archetypes").EnumerateArray().ToArray();
         var r = RegionsById[region];
-        var random = new Random(Seed ^ 773);
-        var valid = Enumerable.Range(0, r.Tiles.Length).Where(at => r.Tiles[at] == Terrain.Floor && !r.Features.ContainsKey(at) && Vector2.Distance(r.Center(at), r.Center(r.Entrance)) > 100).OrderBy(_ => random.Next()).Take(count).ToArray();
-        for (int i = 0; i < valid.Length; i++)
+        r.EncountersInitialized = true;
+        for (int i = 0; i < count; i++)
         {
-            var pos = r.Center(valid[i]);
-            var archetype = archetypes[i % archetypes.Length];
+            var pos = r.Center(r.Objective);
+            var archetype = archetypes[(i + 1) % archetypes.Length];
             string combatId = archetype.GetProperty("profile").GetString()!;
             var combat = Content.CombatProfiles.Single(p => p.Id == combatId);
             var actor = new ActorState
@@ -854,13 +867,16 @@ public sealed class World
                 Y = pos.Y,
                 HomeX = pos.X,
                 HomeY = pos.Y,
-                Grasps = false,
                 Abilities = combat.Priorities.Keys.OrderBy(x => x, StringComparer.Ordinal).ToList()
             };
             AnatomyAdapter.Apply(actor);
             actor.Speed = archetype.GetProperty("speed").GetSingle();
             actor.Health = actor.MaxHealth = archetype.GetProperty("health").GetSingle();
-            var placed = r.FindPlacement(actor.Position, actor, Actors.Values);
+            Vector2 placed;
+            // Seeded floor may lie beyond a locked gate; keep it there. An inhabitant
+            // without any clear stand is skipped rather than aborting region entry.
+            if (!DungeonEncounters.Place(r, actor, Actors.Values, i, out placed)) continue;
+            if (i == 0) actor.Name = "Sanctuary guardian";
             actor.X = actor.HomeX = placed.X; actor.Y = actor.HomeY = placed.Y;
             Actors[actor.Id] = actor;
         }
@@ -965,7 +981,6 @@ public sealed class World
                     Family = p.Family,
                     Seed = (ulong)(Seed + i * 17)
                 },
-                Grasps = p.Family == "biped",
                 Abilities = new()
                 {
                     i < 2 ? "slash" : "bite"

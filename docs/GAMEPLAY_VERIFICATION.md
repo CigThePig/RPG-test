@@ -52,3 +52,41 @@ Headless proves systems, hosted desktop proves a rendered application, emulator 
 ### Combat and menu follow-up
 
 The core replay now includes an eighteenth scenario, `attack-readability`: three actual Attack-button touches, a labeled NPC reposition/bite command, and an assertion that the incoming hit does not reverse player facing. The fixture uses production ability timing/damage/knockback; its frozen, high-health enemy is explicitly controlled, not a test of autonomous AI. The phone visual suite also swipes over main-menu button rows and requires scrolling without activation. The preserved movement presets remain unchanged.
+
+## Dungeon checks
+
+`DungeonChecks` runs within `tools/verify.py --headless`: seeds 0–63 plus 1337, deterministic terrain/features/gates/rooms, the room/corridor geometry contract in [DUNGEON_LAYOUT.md](DUNGEON_LAYOUT.md) (sealed block rings, passage placement and door masks, 9×9 room cores, bare 3×3 halls, legal interior architecture), variety across the sample (room footprints, wings, halls, corridor turns), isolated 2×3 gate groups, reachability of every floor tile, player physical reachability and canonical-seed player/NPC/prowler/brute/spitter clearance. Canonical progression uses `World.Move` and `World.Interact` through keys, required gates, relic and exit; these checks do not teleport through gates. `DungeonEncounterChecks` additionally drives real Prowler/Brute/Spitter AI through horizontal and vertical corridor crossings for eight simulated seconds each, observing melee/cone starts and projectile releases. The suite also checks safe arrival clear of the exit marker, generated-room rolls, enclosing-wall roll/lunge collision, gate projectile collision, eight production spawns, exact save roundtrips and deterministic continuation. Tests capture/restore in memory and do not write user slots.
+
+The default 45-scenario replay remains compatible. `--replay-only=dungeon-expedition` selects an additional focused production-touch fixture (precise preset): seed 1, room dodge, corner waypoint, key, required gate, objective and return. Other actors are isolated in the existing feel-lab during this traversal fixture; normal combat and tactical replays remain separate. Example after build/import:
+
+```sh
+godot --path . --audio-driver Dummy --resolution 1280x800 --fixed-fps 60 -- \
+  --gameplay-check --mobile-ui --preset=precise --replay-only=dungeon-expedition \
+  --evidence=build/dungeon-expedition
+```
+
+The existing `tools/gameplay-verify.py --presets baseline,precise` command also records this focused precise expedition, repeats it independently, compares authoritative digests, transcodes the actual movie and produces a contact sheet. CI runs it through the unchanged gameplay workflow. A fixture reset is explicit and occurs before traversal, never beyond a locked gate. Seed 42 legitimately allows an alternate route, so it is retained for the visual comparison but is not a mandatory-gate replay fixture.
+
+`DungeonVisualChecks` extends desktop/mobile viewport capture with the seed-42 entrance room, a corridor crossing and the corridor beyond it at unchanged 1.5× zoom, closed/open production gate interaction, enemy doorway placement and a mixed room. These composed screenshot fixtures freeze time for comparable captures; they are not a recording of live enemy navigation. Full gameplay replays and collision tests supply temporal evidence. Rendering reports record initial terrain draw cost and 90-frame static-room intervals on the current renderer; software results are not physical-device FPS claims.
+
+## Wall depth regression checks
+
+`WallDepthChecks` runs in both full desktop/mobile viewport suites. It uses a real seed-42 shared wall and doorway with production RegionState, CharacterView and wall meshes. Pixel comparisons reproduce the old below-every-character wall order, then require the normal depth order to restore exact wall pixels over the lower body while keeping the upper silhouette visible. A front-side character must paint over wall pixels. A centered doorway must produce the same pixels with background/normal wall ordering (no invisible rectangle over the gap). Production World.Move crosses the opening and returns without changing collision.
+
+`--visual-check --wall-depth-only` runs this focused scene, and `--mobile-ui` selects its mobile layout. Captures are `wall-depth-old-order-reproduction`, `wall-depth-behind`, `wall-depth-in-front` and `wall-depth-doorway`, with an optional `mobile-` prefix. The old-order reproduction is the current scene with only wall Z order temporarily forced behind actors, not an earlier APK. Normal gameplay uses ordinary ground-foot Y sorting with no per-frame layer toggles or per-tile nodes.
+
+## PR5 Part 2 environment presentation
+
+See [PR5_PART2_HANDOFF.md](PR5_PART2_HANDOFF.md) for the shared floor/wall atlases, cosmetic hashing, PPC natural-art pivots, bounded nonblocking decoration, production reference scenes and exact-source verification. Region/gameplay authority and Part 1 front-edge wall Y sorting remain unchanged. `--visual-check --environment-only` runs focused real-renderer references and repeated region rebuild measurements; add `--mobile-ui` for the phone layout.
+
+The extended installed-Android smoke also uses the F10 developer region-entry shortcut for three generated-ruin Attack/Dodge/return cycles. It requires real completion events with a bounded timeout and stable wall/decoration/atlas counts. F10 delegates to the existing World.Enter/Diagnostics route and leaves the reversible combat course first. This covers exported-region rendering and repeated transitions; the full key/gate/relic expedition remains the separate production-touch movie fixture, and S25 physical acceptance remains manual.
+
+## PR5 Part 3 landmark verification
+
+The full integration suite now includes LandmarkChecks: malformed resource validation; every template with all 15 nonempty masks and four turns; independent resolved generation/serialization on seeds 0..63, 1337 and 1000..1031; natural template/theme coverage; authoritative collision and prop budgets; mutation-state roundtrips; actual movement/roll/melee/projectile checks beside columns. DungeonChecks checks legal interior blockers, protected cross/perimeter lanes, complete footprint reachability across whole room shapes and cardinal combat sweeps from each room core. Existing progression/AI/recent-fix checks remain.
+
+Both full viewport suites include LandmarkVisualChecks. `--visual-check --landmarks-only` runs focused real production captures; optional `--landmark=ID --orientation=0..3 --visual-seed=N` selects a standalone authoring preview. Captures go to `docs/landmark-screenshots/`; timing/resource observations go to `build/dungeon/landmarks-{desktop,mobile}.json`. No user slots are written. Installed Android retains all earlier smoke scenarios, checks the third shared atlas and requires actual generated entrance/sanctuary metadata in exported runtime logs. See [LANDMARK_AUTHORING.md](LANDMARK_AUTHORING.md) for exact commands and data contracts.
+
+## Complete Buried Light adventure
+
+`godot --headless --path . -- --adventure-check` runs a fresh normal-health production API adventure; `xvfb-run -a python3 tools/adventure-verify.py` records its continuous rendered variant with real Dialogue Manager button choices and journal/map views. Playback batches up to three simulation ticks per rendered frame. Neither is claimed as Android OS-touch acceptance. Reports and frames are in `build/adventure/`, uploaded by precise gameplay CI. `AdventureChecks` adds 0–63/1337 encounter/discovery/save/capacity coverage to the headless suite. Existing foundation quest assertions now require recovery, return and deliberate report instead of completion on item pickup. The Part 4 handoff records exact scope and evidence limitations.

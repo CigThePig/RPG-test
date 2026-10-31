@@ -25,18 +25,28 @@ public sealed class RegionState
     public HashSet<int> OpenDoors { get; set; } = new();
     public HashSet<int> Depleted { get; set; } = new();
     public bool ContainersInitialized { get; set; } = true;
+    // True defaults preserve historical populations/loot even if no surviving actor remains.
+    public bool EncountersInitialized { get; set; } = true;
+    public bool ExplorationInitialized { get; set; } = true;
+    public HashSet<int> ExploredTiles { get; set; } = new();
+    public HashSet<string> DiscoveredLandmarks { get; set; } = new(StringComparer.Ordinal);
     public int PlacementRevision { get; set; }
     public int Entrance { get; set; }
     public int Objective { get; set; }
+    public List<LandmarkRoom> Landmarks { get; set; } = new();
+    public List<DungeonRoom> Rooms { get; set; } = new();
+    public List<DungeonPassage> Passages { get; set; } = new();
+    public DungeonRoom? RoomAt(int x, int y) => Rooms.FirstOrDefault(r => r.X == x / DungeonGeometry.Cell && r.Y == y / DungeonGeometry.Cell);
 
     public const int Tile = 24;
     public int Index(Vector2 p) => p.X < 0 || p.Y < 0 || p.X >= Width * Tile || p.Y >= Height * Tile ? -1 : (int)(p.Y / Tile) * Width + (int)(p.X / Tile);
     public Vector2 Center(int index) => new((index % Width + .5f) * Tile, (index / Width + .5f) * Tile);
-    public bool Passable(int index, ActorState a)
+    // gatesOpen treats every locked gate as unlocked, for placement queries only.
+    public bool Passable(int index, ActorState a, bool gatesOpen = false)
     {
         if (index < 0 || index >= Tiles.Length)
             return false;
-        if (Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index))
+        if (!gatesOpen && Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index))
             return false;
         return Tiles[index] switch
         {
@@ -47,10 +57,34 @@ public sealed class RegionState
         };
     }
 
+    // Gates are isolated cardinally connected lock components. Each locked passage
+    // owns one component; passages keep clear of block corners, so they never touch.
+    // Derived from serialized feature indices.
+    public List<int[]> GateGroups()
+    {
+        var remaining = Features.Where(x => x.Value == "lock").Select(x => x.Key).ToHashSet();
+        var groups = new List<int[]>();
+        foreach (int start in remaining.Order().ToArray())
+        {
+            if (!remaining.Remove(start)) continue;
+            var cells = new List<int>(); var queue = new Queue<int>(); queue.Enqueue(start);
+            while (queue.Count > 0)
+            {
+                int at = queue.Dequeue(); cells.Add(at);
+                foreach (int next in Neighbours(at))
+                    if (remaining.Remove(next)) queue.Enqueue(next);
+            }
+            groups.Add(cells.Order().ToArray());
+        }
+        return groups;
+    }
+
+    public int[] GateAt(int at) => GateGroups().FirstOrDefault(g => Array.BinarySearch(g, at) >= 0) ?? Array.Empty<int>();
+
     public bool BlocksSight(int index) => index < 0 || index >= Tiles.Length || Tiles[index] is Terrain.Wall or Terrain.Rock || (Features.GetValueOrDefault(index) == "lock" && !OpenDoors.Contains(index));
-    public bool CanStand(Vector2 p, ActorState a) => BlockingCell(p,a)==-1;
+    public bool CanStand(Vector2 p, ActorState a, bool gatesOpen = false) => BlockingCell(p,a,gatesOpen)==-1;
     // -1 means clear; -2 is a boundary/invalid position; otherwise the blocking footprint tile.
-    public int BlockingCell(Vector2 p, ActorState a)
+    public int BlockingCell(Vector2 p, ActorState a, bool gatesOpen = false)
     {
         if (!float.IsFinite(p.X) || !float.IsFinite(p.Y) || p.X - a.Radius < 0 || p.Y - a.Radius < 0 || p.X + a.Radius >= Width * Tile || p.Y + a.Radius >= Height * Tile)
             return -2;
@@ -59,22 +93,25 @@ public sealed class RegionState
         for (int y = (int)((p.Y - a.Radius) / Tile); y <= (int)((p.Y + a.Radius) / Tile); y++)
             for (int x = (int)((p.X - a.Radius) / Tile); x <= (int)((p.X + a.Radius) / Tile); x++)
             {
-                if (Passable(y * Width + x, a)) continue;
+                if (Passable(y * Width + x, a, gatesOpen)) continue;
                 var nearest = new Vector2(Math.Clamp(p.X, x * Tile, (x + 1) * Tile), Math.Clamp(p.Y, y * Tile, (y + 1) * Tile));
                 if (Vector2.DistanceSquared(p, nearest) < a.Radius * a.Radius) return y * Width + x;
             }
         return -1;
     }
 
-    public bool CanTravel(Vector2 from, Vector2 to, ActorState a)
+    public bool CanTravel(Vector2 from, Vector2 to, ActorState a, bool gatesOpen = false)
     {
         int steps = Math.Max(1, (int)Math.Ceiling(Vector2.Distance(from, to) / Math.Min(2, a.Radius / 2)));
         for (int i = 0; i <= steps; i++)
-            if (!CanStand(Vector2.Lerp(from, to, (float)i / steps), a)) return false;
+            if (!CanStand(Vector2.Lerp(from, to, (float)i / steps), a, gatesOpen)) return false;
         return true;
     }
 
-    public Vector2 FindPlacement(Vector2 preferred, ActorState a, IEnumerable<ActorState> occupants)
+    // throughGates searches the whole mission, so inhabitants may start beyond locked
+    // gates instead of being pulled onto the entrance side. The chosen point still
+    // clears every closed gate, feature and occupant.
+    public Vector2 FindPlacement(Vector2 preferred, ActorState a, IEnumerable<ActorState> occupants, bool throughGates = false)
     {
         var others = occupants.Where(b => b.Region == a.Region && b.Id != a.Id && b.Alive).ToArray();
         var reachable = new HashSet<int> { Entrance };
@@ -83,7 +120,7 @@ public sealed class RegionState
         {
             int at=pending.Dequeue();
             foreach(int next in Neighbours(at))
-                if(!reachable.Contains(next) && CanTravel(Center(at),Center(next),a)) { reachable.Add(next);pending.Enqueue(next); }
+                if(!reachable.Contains(next) && CanTravel(Center(at),Center(next),a,throughGates)) { reachable.Add(next);pending.Enqueue(next); }
         }
         foreach (int at in reachable.OrderBy(i => Vector2.DistanceSquared(Center(i), preferred)).ThenBy(i => i))
         {
@@ -146,7 +183,7 @@ public sealed class RegionState
 
 public static class Regions
 {
-    public const string Version = "rpg-regions-1";
+    public const string Version = "rpg-regions-2";
     public static RegionState Overworld(int seed, int width = 64, int height = 48)
     {
         if (width < 16 || height < 16 || width > 256 || height > 256)
@@ -221,78 +258,78 @@ public static class Regions
             if (layout == null || !ObstacleTowerGeneration.Helper.checkIsSolvable(layout.get2DMap(), layout.getCell(0)))
                 continue;
             var cells = layout.get2DMap();
-            int room = 7, w = cells.GetLength(0) * room, h = cells.GetLength(1) * room;
-            var r = new RegionState
-            {
-                Id = "ruin",
-                Seed = seed,
-            ContainersInitialized = false,
-            PlacementRevision = 1,
-                Width = w,
-                Height = h,
-                Tiles = Enumerable.Repeat(Terrain.Wall, w * h).ToArray()
-            };
-            for (int x = 0; x < cells.GetLength(0); x++)
-                for (int y = 0; y < cells.GetLength(1); y++)
+            int columns = cells.GetLength(0), rows = cells.GetLength(1);
+            var occupied = new List<(int X, int Y, bool Hall)>();
+            var links = new List<DungeonLayout.Link>();
+            for (int y = 0; y < rows; y++)
+                for (int x = 0; x < columns; x++)
                 {
                     var c = cells[x, y];
                     if (c == null)
                         continue;
-                    for (int dx = 1; dx < room - 1; dx++)
-                        for (int dy = 1; dy < room - 1; dy++)
-                            r.Tiles[(y * room + dy) * w + x * room + dx] = Terrain.Floor;
-                    int mid = (y * room + 3) * w + x * room + 3;
-                    if (c.node != null)
-                    {
-                        switch (c.node.type)
-                        {
-                            case MG.NodeType.Start:
-                                r.Entrance = mid;
-                                r.Features[mid] = "exit";
-                                break;
-                            case MG.NodeType.End:
-                                r.Objective = mid;
-                                r.Features[mid] = "relic";
-                                break;
-                            case MG.NodeType.Key:
-                                r.Features[mid] = "key";
-                                break;
-                            case MG.NodeType.Puzzle:
-                                r.Features[mid] = "chest";
-                                break;
-                        }
-                    }
-
-                    foreach (var(dx, dy)in new[]
-                    {
-                        (-1, 0),
-                        (1, 0),
-                        (0, -1),
-                        (0, 1)
-                    }
-
-                    )
+                    occupied.Add((x, y, c.type == LG.CellType.Connection));
+                    foreach (var (dx, dy) in new[] { (-1, 0), (1, 0), (0, -1), (0, 1) })
                     {
                         var door = c.getDoor(-dx, -dy);
                         if ((int)door == 0)
                             continue;
-                        // Half corridor to room boundary. Matching adjacent cell carves the other half.
-                        for (int k = 1; k <= 3; k++)
-                        {
-                            int at = mid + dx * k + dy * k * w;
-                            r.Tiles[at] = Terrain.Floor;
-                        }
-
-                        if (door == LG.DoorType.KeyLock)
-                        {
-                            int at = mid + dx * 3 + dy * 3 * w;
-                            r.Features[at] = "lock";
-                        }
+                        int nx = x + dx, ny = y + dy;
+                        if (nx < 0 || ny < 0 || nx >= columns || ny >= rows || cells[nx, ny] == null || (int)cells[nx, ny].getDoor(dx, dy) == 0)
+                            throw new InvalidOperationException($"Dungeon seed {seed}: nonreciprocal connection {x},{y} -> {nx},{ny}");
+                        // Each connection is carved once, from its west or north cell.
+                        if (dx + dy > 0)
+                            links.Add(new(x, y, nx, ny, door == LG.DoorType.KeyLock || cells[nx, ny].getDoor(dx, dy) == LG.DoorType.KeyLock));
                     }
                 }
+            // Room sizes, wings and corridor bends use their own hash, never mission RNG draws.
+            var carved = DungeonLayout.Carve(seed, columns, rows, occupied, links);
+            var r = new RegionState
+            {
+                Id = "ruin",
+                Seed = seed,
+                EncountersInitialized = false,
+                ExplorationInitialized = false,
+                ContainersInitialized = false,
+                PlacementRevision = 1,
+                Width = carved.Width,
+                Height = carved.Height,
+                Tiles = carved.Tiles,
+                Rooms = carved.Rooms,
+                Passages = carved.Passages
+            };
+            foreach (var room in r.Rooms)
+            {
+                var node = cells[room.X, room.Y].node;
+                int mid = room.CenterY * r.Width + room.CenterX;
+                switch (node?.type)
+                {
+                    case MG.NodeType.Start:
+                        r.Entrance = mid;
+                        r.Features[mid] = "exit";
+                        break;
+                    case MG.NodeType.End:
+                        r.Objective = mid;
+                        r.Features[mid] = "relic";
+                        break;
+                    case MG.NodeType.Key:
+                        r.Features[mid] = "key";
+                        break;
+                    case MG.NodeType.Puzzle:
+                        r.Features[mid] = "chest";
+                        break;
+                }
+            }
+            // A locked passage gates both boundary rows across its full width.
+            foreach (var passage in r.Passages.Where(p => p.Locked))
+                for (int k = 0; k <= 1; k++)
+                    for (int side = -DungeonGeometry.HalfOpening; side <= DungeonGeometry.HalfOpening; side++)
+                        r.Features[(passage.Y + passage.Dy * k + passage.Dx * side) * r.Width + passage.X + passage.Dx * k + passage.Dy * side] = "lock";
 
             if (DungeonValidator.Solvable(r))
+            {
+                Landmarks.Compose(r);
                 return r;
+            }
         }
 
         throw new InvalidOperationException($"Dungeon seed {seed}: exceeded 30 bounded grammar/layout attempts");

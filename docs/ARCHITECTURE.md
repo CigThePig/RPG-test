@@ -57,3 +57,29 @@ Combat sound resources are synthesized once at startup. Eight reusable effects p
 `MobileCombatControls` supplies stable action registration, pure layout geometry and physical-to-logical safe-area conversion. RpgUi owns touch dispatch and panels; Foundation keeps the actual commands. Layout changes and modal/focus transitions synchronously clear finger ownership. Interact emphasis uses Foundation's shared merchant predicate and World.InteractionTargets/LootTargets, the same queries used to dispatch interactions.
 
 `PlayerLocator` is a cosmetic, world-projected small ground ring only while two hostile living bodies are within 48 ground units. It does not change targeting, collision, visibility knowledge, damage or saves. Spit's pale outer rim is also purely cosmetic. The reversible combat lab now supports normal-health and protected single/mixed/crowded fixtures. Existing snapshot restore remains the sole isolation mechanism; temporary actors cannot enter normal progression saves.
+
+## PR5 dungeon spatial adapter
+
+Graph Dungeon Generator owns mission grammar and logical layout. `DungeonLayout` carves it into terrain: each layout cell owns a 17-tile block with a solid ring; mission cells become rooms (a 9×9 core plus optional wings), connection cells become 3×3 halls, and every reciprocal edge becomes a three-tile corridor that may turn once on each side. Shapes and bends come from a separate integer hash, never mission RNG draws. See [DUNGEON_LAYOUT.md](DUNGEON_LAYOUT.md) for the full contract.
+
+A gate occupies both ring rows of its passage across the complete three-tile corridor (six floor cells with `lock` features). `RegionState.GateGroups()` derives sorted cardinal connected components from serialized features. Passages stay four tiles clear of block corners, so different gates cannot touch. Runtime interaction, mission validation and gate presentation share this membership. One key opens every member; opened cells remain in `OpenDoors`. The validator can return a deterministic gate-plan witness and accepts an existing key balance for validating mutated saved states.
+
+Saved regions store their full tile arrays plus `Rooms` and `Passages`; no restore path calls the dungeon generator. The generator identity is `rpg-regions-2`; saves from an earlier generator are rejected rather than migrated. No collision radii, tile size, controls, movement/combat timing, enemy profiles or spawn counts are retuned. The existing placement/path algorithms remain authoritative. Ruin entry uses FindPlacement to stand clear of the return marker and surviving actors; snapshot restore preserves saved actor positions.
+
+### Wall depth correction after Part 1 phone feedback
+
+Raised `Terrain.Wall` geometry is no longer part of the background terrain mesh. `TerrainWallRow` creates one mesh/node per nonempty tile row in the same Y-sorted container as CharacterView and FeatureView. Its sorting anchor is the projected front ground edge `(row + 1) * Tile`, independent of the 14-pixel cap rise. A character behind that edge is drawn before the opaque wall; a character in front is drawn afterward. Each mesh contains only actual wall columns, retaining doorway gaps. Floors remain batched in the background; natural-rock rendering remains unchanged.
+
+This is presentation only: no terrain, footprint, actor position, movement, gate or persistence rule changes. Row meshes are built on region presentation rebuild, bounded by region height, and removed on region transitions. Hiding characters for verification leaves wall meshes visible. Terrain construction measurements include both the floor batch and wall-row mesh construction.
+
+## PR5 Part 2 environment presentation
+
+See [PR5_PART2_HANDOFF.md](PR5_PART2_HANDOFF.md) for the shared floor/wall atlases, cosmetic hashing, PPC natural-art pivots, bounded nonblocking decoration, production reference scenes and exact-source verification. Region/gameplay authority and Part 1 front-edge wall Y sorting remain unchanged. `--visual-check --environment-only` runs focused real-renderer references and repeated region rebuild measurements; add `--mobile-ui` for the phone layout.
+
+## PR5 Part 3 room composition
+
+`Landmarks` applies validated JSON room compositions after the existing graph/layout/solvability pass, inside new dungeon generation only. Independent revisioned integer hashes select compatible role/mask/orientation candidates, without consuming upstream RNG. Protected cross/perimeter lanes, real radius-11 sweeps, feature clearance, bounded candidate rollback and safe-open fallback preserve traversal. Mission landmarks reserve architecture nodes first. RegionState stores the resolved composition alongside authoritative tiles; restoration never reruns templates. Renderer-only theme tints reuse floor/wall atlases; one shared prop atlas and static ground-details mesh extend the Part 2 pipeline. See [LANDMARK_AUTHORING.md](LANDMARK_AUTHORING.md) and [PR5_PART3_HANDOFF.md](PR5_PART3_HANDOFF.md).
+
+## PR5 Part 4 adventure integration
+
+See [PR5_PART4_HANDOFF.md](PR5_PART4_HANDOFF.md). EventQuest retains QuestSystem pools and adds authored ordered stage matchers/cursors. Successful relic collection advances to return, while deliberate warden dialogue completes the assignment. A synchronous Gloot delivery adapter commits reward/reputation only after confirmed whole delivery; full bags leave a persistent pending claim. This supersedes the earlier reward-request signal description above. RegionState owns discovery/map sets and explicit once-only encounter/exploration initialization flags; old current-generator saves default initialized to preserve content. Saved actual-room rectangles drive discovery and room-aware placement. No renderer owns gameplay state.

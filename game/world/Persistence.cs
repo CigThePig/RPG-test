@@ -25,12 +25,19 @@ public static class Persistence
     {
         var s = JsonSerializer.Deserialize<SaveData>(json, Content.Json) ?? throw new InvalidDataException("Empty save");
         if (s.Schema != 1 || s.Generator != Mosslight.Regions.Version)
-            throw new InvalidDataException("Incompatible save schema or region generator; retain the older executable to read this slot");
+            throw new InvalidDataException("This save needs an older Mosslight build. Start a new game in another slot; this file has been kept.");
         if (!s.Actors.ContainsKey("player") || s.Time < 0 || !double.IsFinite(s.Time) || s.Tick < 0 || s.Events.Count > 100)
             throw new InvalidDataException("Invalid world state");
         foreach (var(id, r)in s.Regions)
             if (r.Id != id || r.Width < 1 || r.Height < 1 || r.Width > 512 || r.Height > 512 || r.Tiles.Length != r.Width * r.Height || r.Features.Keys.Any(k => k < 0 || k >= r.Tiles.Length) || r.Tiles.Any(t => !Enum.IsDefined(t)) || r.OpenDoors.Any(k => !r.Features.ContainsKey(k)) || r.Depleted.Any(k => !r.Features.ContainsKey(k)))
                 throw new InvalidDataException($"Invalid region {id}");
+        foreach (var region in s.Regions.Values)
+        {
+            Landmarks.ValidateSaved(region);
+            if(region.DiscoveredLandmarks == null || region.ExploredTiles == null || region.ExploredTiles.Any(at=>at<0||at>=region.Tiles.Length) ||
+                region.DiscoveredLandmarks.Any(id=>!region.Landmarks.Any(l=>Exploration.Identity(region,l)==id)))
+                throw new InvalidDataException("Invalid saved exploration state");
+        }
         foreach (var(id, a)in s.Actors)
         {
             if (a.Id != id || !s.Regions.TryGetValue(a.Region, out var r) || !float.IsFinite(a.X) || !float.IsFinite(a.Y) || a.X < 0 || a.Y < 0 || a.X >= r.Width * 24 || a.Y >= r.Height * 24 || a.Health < 0 || a.Health > a.MaxHealth || !float.IsFinite(a.Health) || !float.IsFinite(a.Mana) || !float.IsFinite(a.MaxMana) || !float.IsFinite(a.MaxHealth) || !float.IsFinite(a.Strength) || !float.IsFinite(a.Defence) || !float.IsFinite(a.Speed) || !float.IsFinite(a.Radius) || !float.IsFinite(a.MotionX) || !float.IsFinite(a.MotionY) || !float.IsFinite(a.StateRemaining) || a.MaxHealth <= 0 || a.Radius <= 0 || a.Speed < 0 || !Enum.IsDefined(a.State) || a.Mana < 0 || a.Mana > a.MaxMana || a.Level < 1 || a.Experience < 0 || a.SkillPoints < 0 || a.SkillRanks.Any(x => !content.Skills.Any(d => d.Id == x.Key) || x.Value < 0) || a.Abilities.Any(k => !content.Abilities.Any(d => d.Id == k)) || a.Statuses.Any(x => !content.Statuses.Any(d => d.Id == x.Id) || x.Stacks < 1 || !float.IsFinite(x.Remaining)) || a.Cooldowns.Any(x => !float.IsFinite(x.Value) || x.Value < 0))
@@ -133,6 +140,7 @@ public static class Persistence
         w.RegionsById = s.Regions;
         w.Projectiles = s.Projectiles;
         w.Events.Recent = s.Events;
+        narrative.Call("reconcile_world", w.Player.Region);
         foreach (var actor in w.Actors.Values)
             w.Items.Reconcile(actor);
 
@@ -148,9 +156,40 @@ public static class Persistence
 
     public static double LastSaveMilliseconds { get; private set; }
     public static string AutosavePath => ProjectSettings.GlobalizePath("user://autosave.json");
-    public static void SaveAutosave(World w, Node narrative) => WriteSnapshot(w, narrative, AutosavePath);
+    public static void SaveAutosave(World w, Node narrative)
+    {
+        PreserveOlderBackgroundSave(AutosavePath);
+        WriteSnapshot(w,narrative,AutosavePath);
+    }
+    // A new game's recovery file must not erase the only copy of an older adventure.
+    public static void PreserveOlderBackgroundSave(string path)
+    {
+        if(!File.Exists(path))return;
+        bool compatible=false;
+        try
+        {
+            using var old=JsonDocument.Parse(File.ReadAllText(path));
+            compatible=old.RootElement.ValueKind==JsonValueKind.Object&&old.RootElement.TryGetProperty("Generator",out var generator)&&generator.ValueKind==JsonValueKind.String&&generator.GetString()==Mosslight.Regions.Version&&
+                old.RootElement.TryGetProperty("Schema",out var schema)&&schema.TryGetInt32(out int version)&&version==1;
+        }
+        catch(JsonException) { } // Preserve malformed recovery files too, rather than discarding them.
+        if(compatible)return;
+        int suffix=1;string retained;
+        do {retained=path+$".retained-{suffix++}.json";}while(File.Exists(retained));
+        File.Copy(path,retained); // No overwrite; an I/O failure leaves the original untouched.
+    }
     public static void LoadAutosave(World w, Node narrative) => Restore(w, narrative, File.ReadAllText(AutosavePath));
-    public static void Save(World w, Node narrative, int slot) => WriteSnapshot(w, narrative, SlotPath(slot));
+    public static void Save(World w, Node narrative, int slot)
+    {
+        string path=SlotPath(slot);
+        if(File.Exists(path))
+        {
+            using var saved=JsonDocument.Parse(File.ReadAllText(path));
+            if(saved.RootElement.GetProperty("Generator").GetString()!=Mosslight.Regions.Version)
+                throw new InvalidDataException("This slot contains an older adventure. Choose a different slot to keep it safe.");
+        }
+        WriteSnapshot(w,narrative,path);
+    }
     static void WriteSnapshot(World w, Node narrative, string path)
     {
         var timer = System.Diagnostics.Stopwatch.StartNew();

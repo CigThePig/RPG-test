@@ -1,0 +1,30 @@
+[
+  {
+    "legacy": true,
+    "seed": 42,
+    "cell": 7,
+    "interior": 5,
+    "passage": 1,
+    "zoom": 1.5,
+    "width": 28,
+    "height": 21,
+    "terrainBuildMs": 0.8318,
+    "p50ms": 12.236099999999993,
+    "p95ms": 13.52940000000001,
+    "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)"
+  },
+  {
+    "legacy": false,
+    "seed": 42,
+    "cell": 11,
+    "interior": 9,
+    "passage": 3,
+    "zoom": 1.5,
+    "width": 44,
+    "height": 33,
+    "terrainBuildMs": 1.4867,
+    "p50ms": 20.033699999999953,
+    "p95ms": 20.9237,
+    "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)"
+  }
+]

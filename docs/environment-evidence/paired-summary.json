@@ -1,0 +1,46 @@
+{
+  "scope": "Three alternating fresh-process mobile-layout runs on one local host/display/renderer. Expanded seed 42, 1.5x zoom, unchanged production DungeonVisualChecks measurements. Part 1 dispatch-only verification hook added to call the existing fixture; production renderer unchanged. After source: b3abe42075b14ed73ca8aeffefd2ea9ecf9fc04e; C# identical to bb24fc8. Software observations, not S25 benchmarks.",
+  "samples": [
+    {
+      "sample": 1,
+      "part1": {
+        "combinedBuildMs": 3.2629,
+        "p50ms": 11.591299999999933,
+        "p95ms": 15.372099999999996
+      },
+      "part2": {
+        "combinedBuildMs": 2.7037,
+        "p50ms": 11.510700000000043,
+        "p95ms": 15.55359999999996
+      }
+    },
+    {
+      "sample": 2,
+      "part1": {
+        "combinedBuildMs": 16.0018,
+        "p50ms": 10.756299999999982,
+        "p95ms": 12.852100000000007
+      },
+      "part2": {
+        "combinedBuildMs": 10.4164,
+        "p50ms": 11.938499999999976,
+        "p95ms": 16.5625
+      }
+    },
+    {
+      "sample": 3,
+      "part1": {
+        "combinedBuildMs": 2.6909999999999994,
+        "p50ms": 9.562599999999975,
+        "p95ms": 11.12899999999999
+      },
+      "part2": {
+        "combinedBuildMs": 4.143,
+        "p50ms": 11.38839999999999,
+        "p95ms": 18.856099999999998
+      }
+    }
+  ],
+  "medianPart1P95Ms": 12.852100000000007,
+  "medianPart2P95Ms": 16.5625
+}

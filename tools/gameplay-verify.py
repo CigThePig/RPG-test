@@ -5,12 +5,17 @@ from pathlib import Path
 import argparse, json, os, subprocess, statistics, math, hashlib, time
 from PIL import Image, ImageChops, ImageStat, ImageDraw
 root=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('--presets',default='baseline,precise,soft,explore');p.add_argument('--realtime',action='store_true');p.add_argument('--output',default='build/gameplay');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--presets',default='baseline,precise,soft,explore');p.add_argument('--realtime',action='store_true');p.add_argument('--dungeon-only',action='store_true');p.add_argument('--output',default='build/gameplay');a=p.parse_args()
 out=root/a.output;out.mkdir(parents=True,exist_ok=True)
 def run(command,**kw):return subprocess.run(command,check=True,timeout=360,**kw)
 def percentile(items,q):return sorted(items)[int((len(items)-1)*q)]
 summary={}
-for preset in a.presets.split(','):
+def state_digest(trace):
+    # Exclude rendering/time/environment. Keep received analog, authoritative
+    # position/state, collision and scenario for each physics iteration.
+    state=[(r['scenario'],r['tick'],round(r['x'],4),round(r['y'],4),round(r['analog'],4),r['action'],r['blocked']) for r in trace if r['kind']=='sample']
+    return hashlib.sha256(json.dumps(state).encode()).hexdigest()
+for preset in ([] if a.dungeon_only else a.presets.split(',')):
     folder=out/preset;folder.mkdir(exist_ok=True)
     command=[os.environ.get('GODOT','godot'),'--path',str(root),'--audio-driver','Dummy','--resolution','1280x800']
     if not a.realtime: command+=['--write-movie',str(folder/'gameplay.avi'),'--fixed-fps','60']
@@ -29,11 +34,6 @@ for preset in a.presets.split(','):
     if result.returncode or 'GAMEPLAY REPLAY PASSED' not in logs or 'ERROR:' in logs:raise RuntimeError(logs[-6000:])
     rows=[json.loads(line) for line in (folder/'trace.jsonl').read_text(encoding='utf-8-sig').splitlines()]
     samples=[r for r in rows if r['kind']=='sample'];assert samples
-    def state_digest(trace):
-        # Exclude rendering/time/environment. Keep received analog, authoritative
-        # position/state, collision and scenario for each physics iteration.
-        state=[(r['scenario'],r['tick'],round(r['x'],4),round(r['y'],4),round(r['analog'],4),r['action'],r['blocked']) for r in trace if r['kind']=='sample']
-        return hashlib.sha256(json.dumps(state).encode()).hexdigest()
     digest=state_digest(rows)
     repeat=folder/'repeat';repeat.mkdir(exist_ok=True)
     repeat_command=[os.environ.get('GODOT','godot'),'--resolution','1280x800','--path',str(root),'--audio-driver','Dummy','--fixed-fps','60','--','--gameplay-check','--mobile-ui',f'--preset={preset}',f'--evidence={repeat}']
@@ -203,3 +203,32 @@ for preset in a.presets.split(','):
     report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(status),'statusEntries':status,'preset':preset,'stateDigest':digest,'deterministicRepeat':True,'movieMode':not a.realtime,'captureStartUnix':capture_utc,'environment':session,'renderWallPacing':pacing,'distinctIndexedCreatureFrames':pose_evidence,'simulationSeconds':(samples[-1]['tick']-samples[0]['tick'])/60,'wallSeconds':(samples[-1]['wallMs']-samples[0]['wallMs'])/1000,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}
     (folder/'report.json').write_text(json.dumps(report,indent=2));summary[preset]=metrics
 (out/'comparison.json').write_text(json.dumps(summary,indent=2));print(json.dumps(summary,indent=2))
+
+# Full expedition is a focused precise-preset fixture: baseline movement is
+# intentionally much slower. Keep ordinary preset comparisons unchanged.
+if 'precise' in a.presets.split(',') and not a.realtime:
+    folder=out/'dungeon-expedition';folder.mkdir(exist_ok=True)
+    def expedition(destination,movie=False):
+        destination.mkdir(exist_ok=True)
+        command=[os.environ.get('GODOT','godot'),'--path',str(root),'--audio-driver','Dummy','--resolution','1280x800','--fixed-fps','60']
+        if movie:command+=['--write-movie',str(destination/'gameplay.avi')]
+        command+=['--','--gameplay-check','--mobile-ui','--preset=precise','--replay-only=dungeon-expedition',f'--evidence={destination}']
+        result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=300)
+        logs=result.stdout+result.stderr;(destination/'engine.log').write_text(logs)
+        if result.returncode or 'GAMEPLAY REPLAY PASSED' not in logs or 'ERROR:' in logs:raise RuntimeError(logs[-6000:])
+        rows=[json.loads(line) for line in (destination/'trace.jsonl').read_text(encoding='utf-8-sig').splitlines()]
+        return state_digest(rows)
+    digest=expedition(folder,True)
+    assert expedition(folder/'repeat')==digest,'Dungeon expedition is not deterministic'
+    run(['ffmpeg','-v','error','-y','-i',str(folder/'gameplay.avi'),'-c:v','libx264','-preset','fast','-crf','24','-pix_fmt','yuv420p','-an',str(folder/'gameplay.mp4')])
+    (folder/'gameplay.avi').unlink()
+    run(['ffmpeg','-v','error','-i',str(folder/'gameplay.mp4'),'-vf','fps=1/4,scale=640:400',str(folder/'frame-%03d.png')])
+    frames=sorted(folder.glob('frame-*.png'));assert len(frames)>=10,'Dungeon movie is incomplete'
+    sheet=Image.new('RGB',(4*320,3*220));draw=ImageDraw.Draw(sheet)
+    for i,index in enumerate(round(n*(len(frames)-1)/11) for n in range(12)):
+        im=Image.open(frames[index]).convert('RGB');assert len(im.getcolors(im.width*im.height))>100,'Blank dungeon rendering'
+        sheet.paste(im.resize((320,200)),((i%4)*320,(i//4)*220));draw.text(((i%4)*320+5,(i//4)*220+202),f'dungeon t={index*4:.0f}s',fill='white')
+    sheet.save(folder/'contact-sheet.jpg')
+    for frame in frames:frame.unlink()
+    (folder/'report.json').write_text(json.dumps({'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'seed':1,'preset':'precise','stateDigest':digest,'deterministicRepeat':True,'movieMode':True,'scope':'Protected traversal fixture: corner, dodge, key, required gate, relic and return. Combat verified separately.'},indent=2))
+    print('DUNGEON EXPEDITION MOVIE AND DETERMINISTIC REPEAT PASSED')

@@ -6,7 +6,7 @@ Godot **4.6.1 .NET** / **.NET SDK 9.0.203** (desktop net8.0 / Android net9.0). O
 
 ## Play on Android
 
-[Download, install and play from your phone](docs/ANDROID_DEVELOPMENT.md). GitHub Actions builds a signed ARM64 APK for each PR/branch update. No desktop setup is required for phone testing.
+[Download, install and play from your phone](docs/ANDROID_DEVELOPMENT.md). GitHub Actions builds a signed ARM64 APK for every pull request update and every push to `main`. No desktop setup is required for phone testing.
 
 ## Start
 
