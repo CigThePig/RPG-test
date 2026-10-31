@@ -102,6 +102,11 @@ public static class AdventureChecks
             int rep=w.Player.Reputation.GetValueOrDefault("wardens");
             n.Call("claim_reward",3);check(w.Player.Reputation.GetValueOrDefault("wardens")==rep,"repeated completed reward is idempotent");
             Persistence.Restore(w,n,original);
+            foreach(string room in new[]{"ruin:1,1:forgotten-archive@1:0","ruin:3,1:forgotten-archive@1:1"})
+                n.Call("receive","landmark_discovered","player",room,"forgotten-archive",1);
+            string journal=n.Call("journal").AsString();
+            check(journal.Split("Forgotten Archive").Length==2&&journal.Split("road wards").Length==2,"repeated landmark templates list discovery and lore once");
+            Persistence.Restore(w,n,original);
             // Gloot can reject a later item if a synchronous observer changes capacity.
             // Exercise rollback after an actual partial delivery, not just preflight refusal.
             var transactionBag=w.Items.Service.Call("bag","player").AsGodotObject() as Node;
@@ -155,6 +160,18 @@ public static class AdventureChecks
                 check(File.ReadAllText(recovery+".retained-1.json")==oldRecovery&&File.Exists(recovery+".retained-2.json"),"older background backup never overwrites prior retained copy");
                 File.WriteAllText(recovery,"{\"Schema\":1,\"Generator\":\"rpg-regions-2\"}");Persistence.PreserveOlderBackgroundSave(recovery);
                 check(!File.Exists(recovery+".retained-3.json"),"current-generation background saves do not create repeated backups");
+                const string oldSlot="{\"Schema\":1,\"Generator\":\"rpg-regions-1\"}";
+                foreach(string older in new[]{oldSlot,"{not json","{\"Schema\":1}"})
+                {
+                    foreach(string file in Directory.GetFiles(Path.GetDirectoryName(recovery)!,Path.GetFileName(recovery)+"*"))File.Delete(file);
+                    File.WriteAllText(recovery,older);
+                    bool refused=false;try{Persistence.SaveTo(w,n,recovery);}catch(OlderSaveSlotException){refused=true;}
+                    check(refused&&File.ReadAllText(recovery)==older,"older or unreadable manual slot is never replaced silently");
+                    Persistence.SaveTo(w,n,recovery,true);
+                    check(File.ReadAllText(recovery+".retained-1.json")==older&&Persistence.Parse(File.ReadAllText(recovery),w.Content).Generator==Regions.Version,"confirmed manual save keeps a backup and remains writable");
+                    Persistence.SaveTo(w,n,recovery);
+                    check(!File.Exists(recovery+".retained-2.json"),"current-generation manual slot overwrites without confirmation");
+                }
             }
             finally {foreach(string file in Directory.GetFiles(Path.GetDirectoryName(recovery)!,Path.GetFileName(recovery)+"*"))File.Delete(file);}
             Directory.CreateDirectory("build/adventure");File.WriteAllText("build/adventure/seed-measurements.json",JsonSerializer.Serialize(rows,Content.Json));

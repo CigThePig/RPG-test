@@ -155,12 +155,15 @@ func journal() -> String:
 		else:
 			lines.append("%s · %s\n%s (%d/%d)" % [q.quest_name, status, q.quest_objective, q.progress, q.required])
 		if completed(q.id) and not q.rewarded: lines.append("Reward pending — speak to the warden after making pack space.")
+	# Templates repeat across rooms; each discovery and lore entry is listed once.
 	var discoveries := PackedStringArray()
 	for key in flags:
-		if str(key).begins_with("discovery:"): discoveries.append(landmark_name(flags[key]))
+		if str(key).begins_with("discovery:") and not discoveries.has(landmark_name(flags[key])): discoveries.append(landmark_name(flags[key]))
 	if not discoveries.is_empty(): lines.append("Explored: " + ", ".join(discoveries))
+	var lore := PackedStringArray()
 	for key in flags:
-		if str(key).begins_with("lore:"): lines.append(flags[key])
+		if str(key).begins_with("lore:") and not lore.has(flags[key]): lore.append(flags[key])
+	lines.append_array(lore)
 	return "\n\n".join(lines)
 
 func export_state() -> String:
@@ -265,14 +268,22 @@ func advance(cue: String) -> void:
 		button.pressed.connect(func(): advance(current_line.next_id))
 		choices.add_child(button)
 	else:
+		var shown := 0
 		for response in current_line.responses:
 			if not response.is_allowed: continue
 			var button := Button.new()
 			button.custom_minimum_size.y = 64
 			button.text = response.text
-			button.disabled = not response.is_allowed
 			button.pressed.connect(func(): advance(response.next_id))
 			choices.add_child(button)
+			shown += 1
+		# Hidden responses must never leave the modal dialogue without a way out.
+		if shown == 0:
+			var leave := Button.new()
+			leave.custom_minimum_size.y = 64
+			leave.text = "Goodbye."
+			leave.pressed.connect(func(): advance(DMConstants.ID_END))
+			choices.add_child(leave)
 	if OS.has_feature("android"):
 		await get_tree().process_frame
 		if epoch != dialogue_epoch: return

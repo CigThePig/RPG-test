@@ -29,6 +29,8 @@ public partial class RpgUi : CanvasLayer
     public bool SettingsOpen { get; private set; }
     public bool Muted { get; private set; }
     public int SaveSlot { get; private set; } = 1;
+    // Slot whose older save the player was warned about; a second Save replaces it.
+    int confirmReplaceSlot;
 
     public override void _Ready()
     {
@@ -437,7 +439,8 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         Open("REGION MAP");
-        body.AddChild(new Label { Text = "E entrance · A archive · S shrine · T storeroom · R relic · ● you", AutowrapMode=TextServer.AutowrapMode.WordSmart, CustomMinimumSize=new Vector2(400,36) });
+        if (App.World.RegionsById[App.World.Player.Region].Landmarks.Count > 0)
+            body.AddChild(new Label { Text = "E entrance · A archive · S shrine · T storeroom · R relic · ● you", AutowrapMode=TextServer.AutowrapMode.WordSmart, CustomMinimumSize=new Vector2(400,36) });
         var map = new RegionMap
         {
             Region = App.World.RegionsById[App.World.Player.Region],
@@ -487,6 +490,7 @@ public partial class RpgUi : CanvasLayer
         Button(box, $"Save slot: {SaveSlot} (click to cycle)", () =>
         {
             SaveSlot = SaveSlot % 3 + 1;
+            confirmReplaceSlot = 0;
             BuildMenu();
         });
         Button(box, "Save", () =>
@@ -494,8 +498,15 @@ public partial class RpgUi : CanvasLayer
             try
             {
                 if(App.InFeelCourse)throw new InvalidOperationException("Return from the controlled course before saving");
-                Persistence.Save(App.World, App.Narrative, SaveSlot);
-                Notify("Saved slot " + SaveSlot);
+                bool replace = confirmReplaceSlot == SaveSlot;
+                confirmReplaceSlot = 0;
+                Persistence.Save(App.World, App.Narrative, SaveSlot, replace);
+                Notify(replace ? $"Saved slot {SaveSlot}; the older save was kept as a backup" : "Saved slot " + SaveSlot);
+            }
+            catch (OlderSaveSlotException e)
+            {
+                confirmReplaceSlot = SaveSlot;
+                Notify(e.Message);
             }
             catch (Exception e)
             {

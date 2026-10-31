@@ -18,6 +18,8 @@ public sealed class SaveData
     public string Narrative { get; set; } = "";
 }
 
+public sealed class OlderSaveSlotException(string message) : InvalidOperationException(message);
+
 public static class Persistence
 {
     public static string Capture(World w, Node narrative) => JsonSerializer.Serialize(new SaveData { Seed = w.Seed, Tick = w.Tick, Time = w.Time, Actors = w.Actors, Regions = w.RegionsById, Projectiles = w.Projectiles, Events = w.Events.Recent, Items = w.Items.Service.Call("export_state").AsString(), Narrative = narrative.Call("export_state").AsString() }, Content.Json);
@@ -164,29 +166,34 @@ public static class Persistence
     // A new game's recovery file must not erase the only copy of an older adventure.
     public static void PreserveOlderBackgroundSave(string path)
     {
-        if(!File.Exists(path))return;
-        bool compatible=false;
-        try
-        {
-            using var old=JsonDocument.Parse(File.ReadAllText(path));
-            compatible=old.RootElement.ValueKind==JsonValueKind.Object&&old.RootElement.TryGetProperty("Generator",out var generator)&&generator.ValueKind==JsonValueKind.String&&generator.GetString()==Mosslight.Regions.Version&&
-                old.RootElement.TryGetProperty("Schema",out var schema)&&schema.TryGetInt32(out int version)&&version==1;
-        }
-        catch(JsonException) { } // Preserve malformed recovery files too, rather than discarding them.
-        if(compatible)return;
+        if(!File.Exists(path) || IsCurrentGeneration(path))return;
         int suffix=1;string retained;
         do {retained=path+$".retained-{suffix++}.json";}while(File.Exists(retained));
         File.Copy(path,retained); // No overwrite; an I/O failure leaves the original untouched.
     }
-    public static void LoadAutosave(World w, Node narrative) => Restore(w, narrative, File.ReadAllText(AutosavePath));
-    public static void Save(World w, Node narrative, int slot)
+    // Malformed files count as older too: they are preserved rather than discarded.
+    static bool IsCurrentGeneration(string path)
     {
-        string path=SlotPath(slot);
-        if(File.Exists(path))
+        try
         {
-            using var saved=JsonDocument.Parse(File.ReadAllText(path));
-            if(saved.RootElement.GetProperty("Generator").GetString()!=Mosslight.Regions.Version)
-                throw new InvalidDataException("This slot contains an older adventure. Choose a different slot to keep it safe.");
+            using var old=JsonDocument.Parse(File.ReadAllText(path));
+            return old.RootElement.ValueKind==JsonValueKind.Object&&old.RootElement.TryGetProperty("Generator",out var generator)&&generator.ValueKind==JsonValueKind.String&&generator.GetString()==Mosslight.Regions.Version&&
+                old.RootElement.TryGetProperty("Schema",out var schema)&&schema.TryGetInt32(out int version)&&version==1;
+        }
+        catch(JsonException) { return false; }
+    }
+    public static void LoadAutosave(World w, Node narrative) => Restore(w, narrative, File.ReadAllText(AutosavePath));
+    // An older or unreadable slot is never replaced silently. With only three slots,
+    // refusing forever would lock players out of manual saves, so an explicit
+    // confirmation replaces it after keeping a retained copy beside it.
+    public static void Save(World w, Node narrative, int slot, bool replaceOlder = false) => SaveTo(w, narrative, SlotPath(slot), replaceOlder, $"Slot {slot}");
+    public static void SaveTo(World w, Node narrative, string path, bool replaceOlder = false, string label = "This slot")
+    {
+        if(File.Exists(path) && !IsCurrentGeneration(path))
+        {
+            if(!replaceOlder)
+                throw new OlderSaveSlotException($"{label} holds an older or unreadable adventure. Press Save again to replace it; a backup copy will be kept.");
+            PreserveOlderBackgroundSave(path);
         }
         WriteSnapshot(w,narrative,path);
     }
