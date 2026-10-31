@@ -264,5 +264,8 @@ func reward_add(owner: String, prototype: String, count: int) -> bool:
 	if not has_space(owner, prototype, count): return false
 	var before := export_state()
 	if add(owner, prototype, count): return true
-	assert(import_state(before), "Reward rollback failed")
+	# Assertions are omitted from release builds; restoration must always execute.
+	var restored := import_state(before)
+	assert(restored, "Reward rollback failed")
+	if not restored: push_error("Reward rollback failed")
 	return false

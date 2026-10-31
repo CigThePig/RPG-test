@@ -102,6 +102,26 @@ public static class AdventureChecks
             int rep=w.Player.Reputation.GetValueOrDefault("wardens");
             n.Call("claim_reward",3);check(w.Player.Reputation.GetValueOrDefault("wardens")==rep,"repeated completed reward is idempotent");
             Persistence.Restore(w,n,original);
+            // Gloot can reject a later item if a synchronous observer changes capacity.
+            // Exercise rollback after an actual partial delivery, not just preflight refusal.
+            var transactionBag=w.Items.Service.Call("bag","player").AsGodotObject() as Node;
+            string transactionBefore=w.Items.Service.Call("export_state").AsString();
+            var closeCapacity=Callable.From<GodotObject>(_=>
+            {
+                var constraint=GD.Load<GDScript>("res://addons/gloot/core/constraints/item_count_constraint.gd").New().AsGodotObject() as Node;
+                transactionBag!.AddChild(constraint!);
+                constraint!.Set("capacity",transactionBag.Call("get_item_count").AsInt32());
+            });
+            transactionBag!.Connect("item_added",closeCapacity,(uint)GodotObject.ConnectFlags.OneShot);
+            int rewardEvents=0;void RewardEvent(WorldEvent e){if(e.Kind=="item_acquired"&&e.Target=="quest_reward")rewardEvents++;}
+            w.Events.Published+=RewardEvent;
+            try
+            {
+                check(!w.Items.GrantReward("iron_sword",2),"unexpected second-item failure rejects reward");
+                check(w.Items.Service.Call("export_state").AsString()==transactionBefore&&rewardEvents==0,"partial reward rollback restores exact Gloot snapshot and emits no acquisition");
+            }
+            finally{w.Events.Published-=RewardEvent;}
+            Persistence.Restore(w,n,original);
             w.Items.Add("player","coin",999-w.Items.Count("player","coin"));
             var bag=w.Items.Service.Call("bag","player").AsGodotObject() as Node;
             var limit=GD.Load<GDScript>("res://addons/gloot/core/constraints/item_count_constraint.gd").New().AsGodotObject() as Node;
