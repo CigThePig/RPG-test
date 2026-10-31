@@ -211,16 +211,25 @@ try:
     interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
     assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
     capture('exploration.png')
-    # The initial warden stands at ground x=348 after feature-clearance placement.
-    # Move into dialogue range using real touch releases, rather than assuming chest range is enough.
-    for approach in range(12):
+    # Use the same sustained gesture that successfully traverses the chest route.
+    # Short swipes can begin/end between physics frames on a loaded emulator.
+    # x=290..325 is inside the stationary warden's real 65-unit talk range and
+    # outside the other resource interaction bubbles at y=588.
+    for approach in range(20):
         logs=adb('logcat','-d')
         positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
         current_x=float(positions[-1][0]) if positions else 0
-        if 305<=current_x<=330: break
-        end_x=280 if current_x<305 else 50
-        adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(end_x*w/1280)),str(int(640*h/800)),'180')
-        time.sleep(.35)
+        if 290<=current_x<=325: break
+        prior_releases=len(positions)
+        end_x=280 if current_x<290 else 50
+        duration='600' if current_x<290 else '300'
+        adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(end_x*w/1280)),str(int(640*h/800)),duration)
+        deadline=time.monotonic()+8
+        while time.monotonic()<deadline:
+            positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',adb('logcat','-d'))
+            if len(positions)>prior_releases: break
+            time.sleep(.2)
+        else: raise RuntimeError('Warden approach gesture was not processed by the running application')
         ensure_foreground(timeout=10)
     else: raise RuntimeError('OS-touch route never reached the warden dialogue stand')
     capture('warden-approach.png')
