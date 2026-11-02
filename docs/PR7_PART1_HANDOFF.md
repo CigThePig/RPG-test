@@ -25,6 +25,10 @@ Implementation-source workflow entry points (final run URLs/status are recorded 
 - Android: https://github.com/CigThePig/RPG-test/actions/runs/41390646113
 - Gameplay: https://github.com/CigThePig/RPG-test/actions/runs/41390646160
 
+## Android smoke adaptation
+
+The first APK built successfully, but the old Android smoke test tapped a fixed Resume coordinate that now belongs to Pack. It also assumed New Game had no confirmation. The follow-up reports actual physical navigation-button centers after Container layout, consumes these in OS-touch smoke, verifies Android Back cancels the destructive modal, and explicitly confirms reset. Production gameplay and button geometry are unchanged by this test adaptation. Use the final PR head's APK and workflow links, not an earlier build.
+
 ## Boundaries and phone acceptance
 
 HUD/combat layout remains for Part 2; comprehensive RPG-screen presentation for Part 3; dialogue styling, independent preference persistence and developer/player menu separation for Part 4. Existing progression remains accessible. UI state does not alter world save schemas, inventory transactions, quests, dungeon generation, attack geometry or audio hit/miss semantics.

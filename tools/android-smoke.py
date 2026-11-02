@@ -105,9 +105,22 @@ try:
                 return
             if time.monotonic()>=deadline: raise AssertionError(f'{name}: missing rendered world (colors={colors}, terrain_pixels={green})')
             time.sleep(1)
+    def tap_ui(action):
+        # UI layout is responsive: consume the actual physical production rect,
+        # just like the combat controls below, instead of guessing a logical row.
+        deadline=time.monotonic()+10
+        while time.monotonic()<deadline:
+            rows=re.findall(fr'MOSSLIGHT_UI_TARGET version=1 id={action} x=([0-9]+) y=([0-9]+)',adb('logcat','-d'))
+            if rows:
+                x,y=map(int,rows[-1])
+                assert 0<=x<w and 0<=y<h, f'Invalid navigation control center: {action} {x},{y}'
+                adb('shell','input','tap',str(x),str(y))
+                return
+            time.sleep(.25)
+        raise RuntimeError('Missing production navigation target: '+action)
     ensure_foreground()
     capture('start-menu.png',wait=45)
-    tap(640,178) # Center of Enter / Resume; avoid its top edge.
+    tap_ui('resume')
     deadline=time.monotonic()+20
     while time.monotonic()<deadline:
         if 'MOSSLIGHT_SESSION_STARTED' in adb('logcat','-d'): break
@@ -185,7 +198,19 @@ try:
     tap_action('menu')
     time.sleep(1)
     capture('reset-menu.png')
-    tap(640,566) # New game in the initial menu's visible row.
+    tap_ui('new_game')
+    time.sleep(.5)
+    capture('new-game-confirmation.png',wait=10)
+    assert len(re.findall(r'MOSSLIGHT_SESSION_STARTED tick=0',adb('logcat','-d')))==before_reset, 'New game reset before confirmation'
+    # Android system Back cancels only the destructive modal and returns to menu.
+    adb('shell','input','keyevent','4')
+    time.sleep(.5)
+    states=re.findall(r'MOSSLIGHT_UI_STATE menu=(True|False) screen=(True|False) confirmation=(True|False)',adb('logcat','-d'))
+    assert states and states[-1]==('True','False','False'), 'System Back did not cancel confirmation to menu'
+    capture('new-game-canceled.png',wait=10)
+    tap_ui('new_game')
+    time.sleep(.5)
+    tap_ui('confirm_new_game')
     deadline=time.monotonic()+20
     while time.monotonic()<deadline:
         logs=adb('logcat','-d')
@@ -331,7 +356,7 @@ try:
         image_name='resumed-menu.png' if cycle==0 else f'resumed-menu-{cycle+1}.png'
         capture(image_name,wait=20)
         # Resume actual mixed combat between cycles, exercising rebuilt transient views.
-        tap(640,178)
+        tap_ui('resume')
         time.sleep(1)
         capture(f'resumed-combat-{cycle+1}.png',wait=20)
         resumed_pid=adb('shell','pidof',package)
@@ -407,7 +432,7 @@ try:
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. three generated-dungeon entry/attack/roll/return cycles with stable wall/decoration/atlas counts. Warden dialogue and introductory quest accepted with actual OS touches; production entrance discovery observed. Complete relic/return/reward OS-touch adventure is NOT covered. ARM64 physical device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume using production control geometry, destructive confirmation canceled by Android Back then explicitly accepted, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. three generated-dungeon entry/attack/roll/return cycles with stable wall/decoration/atlas counts. Warden dialogue and introductory quest accepted with actual OS touches; production entrance discovery observed. Complete relic/return/reward OS-touch adventure is NOT covered. ARM64 physical device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     # Preserve the real surface recording on failure as well as success. ADB

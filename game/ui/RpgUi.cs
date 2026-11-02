@@ -8,6 +8,8 @@ public partial class RpgUi : CanvasLayer
 
     readonly Dictionary<string, Button> abilityButtons = new();
     readonly Dictionary<string, Button> actions = new();
+    readonly Dictionary<string, Button> navigationTargets = new();
+    int layoutTraceFrames;
     public Button ActionControl(string id) => actions[id];
     internal Rect2 StatusRect => health.GetGlobalRect();
     internal Rect2? VerificationSafeArea { get; set; }
@@ -109,6 +111,7 @@ public partial class RpgUi : CanvasLayer
         panel = new UiScreenHost { Visible = false };
         root.AddChild(panel);
         panel.Build(Back);
+        navigationTargets["screen_back"] = panel.BackButton;
         body = panel.Body;
         body.ChildEnteredTree += child =>
         {
@@ -224,6 +227,7 @@ public partial class RpgUi : CanvasLayer
             control.CustomMinimumSize = Vector2.Zero; control.Position = rect.Position; control.Size = rect.Size;
         }
         Arrange(panel, 740); Arrange(menu, 560); Arrange(confirmation, 560);
+        layoutTraceFrames = 3;
     }
 
     static Button Button(Node parent, string text, Action action) => UiDesign.Action(parent, text, action);
@@ -243,6 +247,23 @@ public partial class RpgUi : CanvasLayer
         hotbar.Visible = !navigation.Blocked && !App.Narrative.Get("speaking").AsBool();
         if (menu.Visible) menu.FindChildren("*", "Button", true, false).OfType<Button>().FirstOrDefault()?.GrabFocus();
         if (!navigation.Blocked) GetViewport().GuiReleaseFocus();
+        layoutTraceFrames = 3;
+        TraceNavigationState();
+    }
+    void TraceNavigationState()
+    {
+        if (OS.HasFeature("android")) GD.Print($"MOSSLIGHT_UI_STATE menu={menu.Visible} screen={panel.Visible} confirmation={confirmation.Visible}");
+    }
+    void TraceNavigationTargets()
+    {
+        if (!OS.HasFeature("android")) return;
+        TraceNavigationState();
+        foreach (var (id, button) in navigationTargets)
+        {
+            if (!GodotObject.IsInstanceValid(button) || !button.IsVisibleInTree()) continue;
+            var center = GetViewport().GetScreenTransform() * button.GetGlobalRect().GetCenter();
+            GD.Print($"MOSSLIGHT_UI_TARGET version=1 id={id} x={center.X:0} y={center.Y:0}");
+        }
     }
     public void Back()
     {
@@ -261,7 +282,8 @@ public partial class RpgUi : CanvasLayer
         var box = new VBoxContainer(); confirmation.AddChild(box);
         box.AddChild(UiDesign.Text("Start a new game? Unsaved progress will be lost. Saved slots are retained."));
         var cancel = Button(box, "Cancel / Back", Back);
-        Button(box, "Start new game", () => { navigation.CancelConfirmation(); App.Reset(); App.ResumeGame(); SyncNavigation(); });
+        navigationTargets["cancel_new_game"] = cancel;
+        navigationTargets["confirm_new_game"] = Button(box, "Start new game", () => { navigation.CancelConfirmation(); App.Reset(); App.ResumeGame(); SyncNavigation(); });
         SyncNavigation(); cancel.GrabFocus();
     }
 
@@ -282,6 +304,8 @@ public partial class RpgUi : CanvasLayer
 
     public override void _Process(double delta)
     {
+        // Wait for deferred Container sorting before reporting real physical target centers.
+        if (layoutTraceFrames > 0 && --layoutTraceFrames == 0) TraceNavigationTargets();
         frames.Enqueue(delta * 1000);
         while (frames.Count > 600) frames.Dequeue();
     }
@@ -466,7 +490,7 @@ public partial class RpgUi : CanvasLayer
         scroll.AddChild(box);
         box.AddThemeConstantOverride("separation", 8);
         box.AddChild(new Label { Text = "MOSSLIGHT\nRPG FOUNDATION", HorizontalAlignment = HorizontalAlignment.Center });
-        Button(box, "Enter / Resume", () => { if (App.World.Player.Alive) App.ResumeGame(); else Notify("Defeated · Load a save or start a New game to continue"); });
+        navigationTargets["resume"] = Button(box, "Enter / Resume", () => { if (App.World.Player.Alive) App.ResumeGame(); else Notify("Defeated · Load a save or start a New game to continue"); });
         foreach (var entry in new (string, Action)[] { ("Pack", Inventory), ("Journal", Journal), ("Character", Character), ("Map", Map) })
             Button(box, entry.Item1, entry.Item2);
         Button(box, "Recover background autosave", () =>
@@ -474,7 +498,7 @@ public partial class RpgUi : CanvasLayer
             try { if(App.InFeelCourse)throw new InvalidOperationException("Return from the controlled course before loading"); Persistence.LoadAutosave(App.World, App.Narrative); App.RebuildViews(); App.ResumeGame(); Notify("Recovered autosave"); }
             catch (Exception e) { Notify(e.Message); }
         });
-        Button(box, "New game", ConfirmNewGame);
+        navigationTargets["new_game"] = Button(box, "New game", ConfirmNewGame);
         Button(box, $"Text size: {(TextScale > 1 ? "Large" : "Standard")}", () => { SetTextScale(TextScale > 1 ? 1 : 1.3f); BuildMenu(); });
         Button(box, $"Save slot: {SaveSlot} (click to cycle)", () =>
         {
@@ -529,6 +553,7 @@ public partial class RpgUi : CanvasLayer
         });
         Button(box, "Quit", () => GetTree().Quit());
         if (menu.IsVisibleInTree()) box.GetChildren().OfType<Button>().FirstOrDefault()?.GrabFocus();
+        layoutTraceFrames = 3;
     }
 
     public void FeelLab()
