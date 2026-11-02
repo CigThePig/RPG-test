@@ -46,6 +46,7 @@ public static class FoundationChecks
             MechanismChecks.Run(app, Check);
             MobileCombatControlsChecks.Run(Check);
             UiNavigationChecks.Run(Check);
+            HudChecks.Run(app, Check);
             EncounterChecks.Run(app,Check);
             ReviewChecks.Run(app, Check);
             CraftingChecks.Run(app, Check);

@@ -113,6 +113,17 @@ public static class DungeonMechanisms
 
     public static bool Solved(RegionState r, int[] ring) => ring.Length > 0 && ring.All(r.Lit.Contains);
 
+    /// <summary>Read-only: whether <see cref="Pull"/> would raise at least one portcullis.</summary>
+    public static bool CanPull(RegionState r, int lever)
+    {
+        if (r.Features.GetValueOrDefault(lever) != "lever" || r.Depleted.Contains(lever)) return false;
+        var (bx, by) = Block(r, lever);
+        return GatesFor(r, bx, by, "lever").Length > 0;
+    }
+
+    /// <summary>Read-only: whether <see cref="Kindle"/> would change this brazier ring.</summary>
+    public static bool CanKindle(RegionState r, int brazier) => !r.Depleted.Contains(brazier) && Array.IndexOf(RingAt(r, brazier), brazier) >= 0;
+
     /// <summary>Pulls a lever once. Returns the portcullis cells raised.</summary>
     public static int[] Pull(RegionState r, int lever)
     {

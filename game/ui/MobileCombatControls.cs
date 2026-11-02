@@ -4,7 +4,9 @@ namespace Mosslight;
 /// <summary>Fixed action identities and responsive geometry. Commands remain in Foundation.</summary>
 public partial class MobileCombatControls : Control
 {
-    public const int LayoutVersion = 1;
+    // Version 2 (PR #7 Part 2): Interact grows to a primary-action target for its
+    // contextual two-line label. Android smoke consumes this version's diagnostics.
+    public const int LayoutVersion = 2;
     public Dictionary<string, Button> Actions { get; } = new();
     public Rect2 SafeRegion { get; private set; }
     public MobileCombatControls() { MouseFilter = MouseFilterEnum.Ignore; }
@@ -13,7 +15,7 @@ public partial class MobileCombatControls : Control
         Actions.Add(id, button);
         button.Name = "action_" + id;
         button.ClipText = true;
-        button.AddThemeFontSizeOverride("font_size", id == "attack" ? 23 : 18);
+        button.AddThemeFontSizeOverride("font_size", id == "attack" ? 23 : id == "interact" ? 19 : 18);
         var face = new StyleBoxFlat {
             BgColor = new Color(id == "attack" ? "795433" : id == "dodge" ? "355b56" : "263f43"),
             BorderColor = new Color("b0af7e"), BorderWidthLeft=2, BorderWidthRight=2, BorderWidthTop=2, BorderWidthBottom=2,
@@ -50,7 +52,8 @@ public partial class MobileCombatControls : Control
         At("ember",130,292,100,72);
         At("mend",242,292,100,72);
         At("potion",354,292,100,72);
-        At("interact",378,180,100,72);
+        // Primary right-thumb actions: Attack largest, then Dodge and Interact.
+        At("interact",390,190,108,86);
         result["inventory"] = new Rect2(new Vector2(safe.End.X-224*s,safe.Position.Y+20*s), new Vector2(96,60)*s);
         result["menu"] = new Rect2(new Vector2(safe.End.X-116*s,safe.Position.Y+20*s), new Vector2(96,60)*s);
         result["stick"] = new Rect2(new Vector2(safe.Position.X+40*s,safe.End.Y-260*s),new Vector2(200,200)*s);

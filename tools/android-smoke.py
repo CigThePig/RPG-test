@@ -144,7 +144,7 @@ try:
     adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(30*w/1280)),str(int(640*h/800)),'600')
     time.sleep(.4)
     def action_target(action):
-        rows=re.findall(fr'MOSSLIGHT_CONTROL version=1 id={action} x=([0-9]+) y=([0-9]+)',adb('logcat','-d'))
+        rows=re.findall(fr'MOSSLIGHT_CONTROL version=2 id={action} x=([0-9]+) y=([0-9]+)',adb('logcat','-d'))
         assert rows, f'Missing production layout diagnostic for {action}'
         x,y=map(int,rows[-1])
         assert 0<=x<w and 0<=y<h, f'Invalid control center: {action} {x},{y}'

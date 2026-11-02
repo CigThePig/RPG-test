@@ -320,6 +320,8 @@ public partial class Foundation : Node2D
                 GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0}");
             if(Trace.Active && e.Kind is "region_entered" or "resource_depleted" or "ability_started" or "defeated")Trace.Marker(e.Kind+"/"+e.Value);
             Narrative.Call("receive", e.Kind, e.Actor, e.Target, e.Value, e.Count);
+            if (e.Kind == "level_gained" && e.Actor == "player")
+                ui?.Notify($"Level up · now level {e.Value} · a skill point is ready in Character");
             if (e.Kind == "region_entered")
                 RebuildViews();
             if (e.Kind == "item_equipped" && Views.TryGetValue(e.Actor, out var changed))
@@ -560,11 +562,28 @@ public partial class Foundation : Node2D
         var a = World.Player;
         if (ability == "slash")
         {
-            ui.Notify(World.TryStartPlayerSlash(VisualFacing()) ? d.Name : "Cannot attack: action, equipment, mana or cooldown");
+            // Successful actions are minor notices: the swing itself is the feedback and it
+            // must not displace a quest, discovery or loot notice.
+            if (World.TryStartPlayerSlash(VisualFacing())) ui.Notify(d.Name, minor: true);
+            else ui.Notify(CastFailure(a, d));
             return;
         }
         var t = d.Self ? a : World.Actors.Values.Where(x => World.CanActivate(a, x, d)).OrderBy(x => NVector.DistanceSquared(a.Position, x.Position)).FirstOrDefault();
-        ui.Notify(t != null && World.Activate(a.Id, ability, t.Id) ? d.Name : "No valid target, equipment, mana or cooldown");
+        if (t != null && World.Activate(a.Id, ability, t.Id)) ui.Notify(d.Name, minor: true);
+        else ui.Notify(CastFailure(a, d));
+    }
+
+    /// <summary>Specific reason an ability did not start, checked in the order a player can act on.</summary>
+    string CastFailure(ActorState a, AbilityDef d)
+    {
+        if (!a.Alive) return "Defeated";
+        if (!a.Abilities.Contains(d.Id)) return d.Name + " is not learned yet";
+        float cooldown = a.Cooldowns.GetValueOrDefault(d.Id);
+        if (cooldown > 0) return $"{d.Name} recovering · {cooldown:0.0}s";
+        if (a.Mana < d.Cost) return $"{d.Name} needs {d.Cost:0} mana · you have {a.Mana:0}";
+        if (a.State is not (ActionState.Idle or ActionState.Moving)) return "Finish the current action first";
+        if (d.RequiresWeapon && !(a.Grasps && World.Items.Bonus(a, "damage") > 0)) return d.Name + " needs an equipped weapon";
+        return d.Self ? "Cannot use " + d.Name + " right now" : "No target in range for " + d.Name;
     }
 
     public void Dodge()
@@ -589,6 +608,16 @@ public partial class Foundation : Node2D
     // Shared by Interact (dialogue) and the pack (Buy), so both use one range.
     public ActorState? NearbyMerchant() => World.Actors.Values.FirstOrDefault(x => x.Alive && x.Profession == "merchant" && x.Region == World.Player.Region && NVector.Distance(x.Position, World.Player.Position) < 65 && !World.Hostile(World.Player, x) && World.LineOfSight(World.Player, x));
     public bool HasInteraction() => World.InteractionTargets(World.Player).Any() || World.LootTargets(World.Player).Any() || NearbyMerchant() != null;
+
+    static readonly InteractionPreview TalkPreview = new("Talk", "Speak with the warden", true);
+    /// <summary>Read-only label source for the contextual Interact control; mirrors Interact's precedence.</summary>
+    public InteractionPreview PreviewInteract()
+    {
+        var a = World.Player;
+        if (!a.Alive) return InteractionPreview.None;
+        if (NearbyMerchant() != null && !World.InteractionTargets(a).Any() && !World.LootTargets(a).Any()) return TalkPreview;
+        return World.PreviewInteraction(a);
+    }
 
     public void Interact()
     {

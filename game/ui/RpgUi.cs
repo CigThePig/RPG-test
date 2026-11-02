@@ -13,13 +13,20 @@ public partial class RpgUi : CanvasLayer
     bool? lastSystemBackFromKey;
     ulong lastSystemBackAt;
     public Button ActionControl(string id) => actions[id];
-    internal Rect2 StatusRect => health.GetGlobalRect();
+    internal Rect2 StatusRect => hud.GetGlobalRect();
+    public GameplayHud Hud => hud;
+    public InteractionPreview InteractionLabel { get; private set; } = InteractionPreview.None;
+    public string NoticeText => message.Text;
     internal Rect2 NoticeRect => message.GetGlobalRect();
     internal bool NoticeVisible => message.Visible;
     internal IEnumerable<Control> HotbarControls => hotbar.GetChildren().OfType<Control>().Where(c => c.IsVisibleInTree()).Append(Stick);
     internal Rect2? VerificationSafeArea { get; set; }
     public MobileCombatControls? CombatControls => hotbar as MobileCombatControls;
-    Label health = null !, message = null !, title = null !;
+    Label message = null !;
+    GameplayHud hud = null!;
+    readonly Dictionary<string, ColorRect> cooldownShades = new();
+    readonly Dictionary<string, int> actionKeys = new();
+    readonly Dictionary<Button, string> unavailableReasons = new();
     UiScreenHost panel = null!;
     PanelContainer menu = null!, confirmation = null!;
     readonly UiNavigation navigation = new();
@@ -52,19 +59,8 @@ public partial class RpgUi : CanvasLayer
         };
         AddChild(root);
         root.Theme = UiDesign.Theme(TextScale);
-        title = new Label
-        {
-            Text = "MOSSLIGHT  /  THE REACH",
-            Position = new Vector2(24, 18),
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
-        root.AddChild(title);
-        health = new Label
-        {
-            Position = new Vector2(24, 48),
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
-        root.AddChild(health);
+        hud = new GameplayHud { Name = "GameplayHud" };
+        root.AddChild(hud);
         message = new Label
         {
             Visible = false,
@@ -73,6 +69,9 @@ public partial class RpgUi : CanvasLayer
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         message.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        message.MaxLinesVisible = 2;
+        message.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        message.AddThemeFontSizeOverride("font_size", 17);
         message.AddThemeStyleboxOverride("normal", UiDesign.Notification());
         root.AddChild(message);
         hotbar = MobileLayout ? new MobileCombatControls() : new GridContainer { Columns = 5 };
@@ -99,12 +98,25 @@ public partial class RpgUi : CanvasLayer
             if (MobileLayout && actionId is "journal" or "character" or "map") continue;
             if (!MobileLayout && actionId == "dodge") continue;
             var button = Button(hotbar, MobileLayout ? text.Split(" · ").Last() : text, action);
-            if (!MobileLayout) button.CustomMinimumSize = new Vector2(140, UiDesign.Target);
+            if (!MobileLayout)
+            {
+                // Fixed face: contextual labels and cooldowns never resize the grid cells.
+                // Two label lines fit without growth (72 = 2 × 16px lines + face margins).
+                button.CustomMinimumSize = new Vector2(140, 72);
+                button.AutowrapMode = TextServer.AutowrapMode.Off; button.ClipText = true;
+                button.AddThemeFontSizeOverride("font_size", 16);
+            }
             actions[actionId] = button;
             button.Name = "action_" + actionId;
             if (hotbar is MobileCombatControls mobile) mobile.Register(actionId, button);
             if (actionId == "dodge") abilityButtons["dodge"] = button;
             var id = actionId switch { "attack" => "slash", "ember" => "ember", "mend" => "mend", _ => "" };
+            if (actionId is "attack" or "dodge" or "ember" or "mend")
+            {
+                // Cooldown shade is a child, so it never changes the button's touch rectangle.
+                var shade = new ColorRect { Color = new Color(0, 0, 0, .45f), MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+                button.AddChild(shade); cooldownShades[actionId == "attack" ? "slash" : actionId] = shade;
+            }
             if (id != "")
             {
                 abilityButtons[id] = button;
@@ -165,8 +177,16 @@ public partial class RpgUi : CanvasLayer
         }
         if (touch.Pressed)
         {
-            var button = hotbar.GetChildren().OfType<Button>().FirstOrDefault(b => b.IsVisibleInTree() && !b.Disabled && b.GetGlobalRect().HasPoint(touch.Position));
+            var button = hotbar.GetChildren().OfType<Button>().FirstOrDefault(b => b.IsVisibleInTree() && b.GetGlobalRect().HasPoint(touch.Position));
             if (button == null) return;
+            if (button.Disabled)
+            {
+                // A disabled control never dispatches; it explains itself instead and does
+                // not take finger ownership, so its release cannot fire anything later.
+                if (unavailableReasons.TryGetValue(button, out var reason)) Notify(reason, minor: true);
+                GetViewport().SetInputAsHandled();
+                return;
+            }
             touchButtons[touch.Index] = button;
             button.Modulate=new Color(.7f,.8f,.8f);
             GetViewport().SetInputAsHandled();
@@ -199,8 +219,9 @@ public partial class RpgUi : CanvasLayer
         hotbar.Size = MobileLayout ? size : new Vector2(740, 140);
         Stick.Position = new Vector2(40, size.Y - 260);
         // Desktop notices sit left of the hotbar instead of underneath its second row.
-        message.Position = new Vector2(24, size.Y - 80);
-        message.Size = new Vector2(Math.Max(240, hotbar.Position.X - 48), 64);
+        message.Position = new Vector2(24, size.Y - 84);
+        message.Size = new Vector2(Math.Max(240, hotbar.Position.X - 48), 72);
+        hud.Arrange(new Vector2(24, 18), GameplayHud.MaxWidth);
         metrics.Position = new Vector2(size.X - 480, 100);
         if (hotbar is MobileCombatControls mobile)
         {
@@ -211,16 +232,15 @@ public partial class RpgUi : CanvasLayer
             mobile.Arrange(safe);
             var pad = MobileCombatControls.Geometry(safe)["stick"];
             Stick.Position=pad.Position; Stick.Size=pad.Size;
-            title.Position=safe.Position+new Vector2(24,18);
-            health.Position=safe.Position+new Vector2(24,48);
-            health.AutowrapMode=TextServer.AutowrapMode.WordSmart;
-            health.Size=new Vector2(Math.Max(200,safe.Size.X-280),100);
+            // HUD stays top-left, clear of the top-right utilities and the lower action cluster.
+            var utilities = MobileCombatControls.Geometry(safe)["inventory"];
+            hud.Arrange(safe.Position+new Vector2(20,14), utilities.Position.X-safe.Position.X-44);
             // Keep notices in the bottom gap between the stick and Attack so the
             // panel never covers a control or its touch feedback.
             var attack = MobileCombatControls.Geometry(safe)["attack"];
             float noticeLeft = pad.End.X + UiDesign.Gap, noticeRight = attack.Position.X - UiDesign.Gap;
-            message.Position=new Vector2(noticeLeft,safe.End.Y-80);
-            message.Size=new Vector2(Math.Max(160,noticeRight-noticeLeft),64);
+            message.Position=new Vector2(noticeLeft,safe.End.Y-84);
+            message.Size=new Vector2(Math.Max(160,noticeRight-noticeLeft),72);
             if(OS.HasFeature("android"))
                 foreach(var (id, button) in actions)
                 {
@@ -336,19 +356,37 @@ public partial class RpgUi : CanvasLayer
         while (frames.Count > 600) frames.Dequeue();
     }
 
-    double interactionEmphasisUntil;
-    long interactionCheckTick = -1;
+    long refreshFrame;
     bool defeatAnnounced, dialogueActive;
     // Notices are transient so the world stays visible; the defeat notice persists
     // while the player remains defeated because it names the only recovery path.
-    const ulong NoticeMilliseconds = 4500;
+    const ulong NoticeMilliseconds = 4500, NoticeMergeMilliseconds = 1500;
     const string DefeatNotice = "Defeated · open the menu to load a save or start a new game";
-    ulong noticeUntil;
-    public void Notify(string text)
+    ulong noticeUntil, noticeShownAt;
+    bool noticeMinor;
+    string? previousNotice;
+    /// <summary>
+    /// Shows a concise notice. Minor notices (routine action confirmations) never displace
+    /// an important one. Important notices arriving together, such as a quest stage and the
+    /// loot that caused it, are shown as two lines instead of overwriting each other.
+    /// </summary>
+    public void Notify(string text, bool minor = false)
     {
-        message.Text = text; message.Visible = !string.IsNullOrWhiteSpace(text);
-        noticeUntil = Time.GetTicksMsec() + NoticeMilliseconds;
+        if (string.IsNullOrWhiteSpace(text)) { message.Visible = false; previousNotice = null; return; }
+        ulong now = Time.GetTicksMsec();
+        bool active = message.Visible && (now < noticeUntil || message.Text.Contains(DefeatNotice));
+        if (minor && active && !noticeMinor) return;
+        bool merge = !minor && active && !noticeMinor && now - noticeShownAt < NoticeMergeMilliseconds && previousNotice != null && previousNotice != text;
+        message.Text = merge ? previousNotice + "\n" + text : text;
+        previousNotice = text; noticeMinor = minor;
+        message.Visible = true;
+        noticeShownAt = now; noticeUntil = now + NoticeMilliseconds;
+        objectiveDirty = true;
     }
+    bool objectiveDirty = true;
+    int objectivePolls;
+    /// <summary>Forces the next HUD update to re-read objective, interaction and item state (load, reset, tests).</summary>
+    public void InvalidateHud() { objectiveDirty = true; refreshFrame = 0; actionKeys.Clear(); }
     public void Update()
     {
         hotbar.Visible = !BlocksInput && !App.Narrative.Get("speaking").AsBool();
@@ -359,7 +397,7 @@ public partial class RpgUi : CanvasLayer
         if (dialogueActive != speaking) { dialogueActive = speaking; SyncNavigation(); }
         if (defeated && !defeatAnnounced) Notify(DefeatNotice);
         // A restored or reset player must not keep the stale recovery instruction.
-        if (!defeated && defeatAnnounced && message.Text == DefeatNotice) message.Visible = false;
+        if (!defeated && defeatAnnounced && message.Text.Contains(DefeatNotice)) message.Visible = false;
         defeatAnnounced = defeated;
         if (message.Visible && !defeated && Time.GetTicksMsec() > noticeUntil) message.Visible = false;
         Stick.Visible = MobileLayout && !App.GameplayBlocked;
@@ -376,29 +414,121 @@ public partial class RpgUi : CanvasLayer
             metrics.Text = $"Target {nearby}\nXY {App.World.Player.X:0},{App.World.Player.Y:0} · tile {App.World.RegionsById[App.World.Player.Region].Index(App.World.Player.Position)} · stand {App.World.RegionsById[App.World.Player.Region].CanStand(App.World.Player.Position,App.World.Player)}\nInput {App.World.LastInput.Length():0.00} · velocity {App.World.ActualVelocity.Length():0.0} · sim {App.SimulationMs:0.00}ms\nBlocked {App.World.LastBlockedReason}\nFPS {Engine.GetFramesPerSecond()} · p50/p95/p99 {sorted[(int)((sorted.Length - 1) * .5)]:0.0}/{sorted[(int)((sorted.Length - 1) * .95)]:0.0}/{sorted[(int)((sorted.Length - 1) * .99)]:0.0} ms\nActors {App.Views.Values.Count(v => v.Visible)}/{App.World.Actors.Count} · managed {GC.GetTotalMemory(false)/1048576.0:0} MB\nRaster {PixelCreatures.Runtime.CreatureRenderQueue.LastRasterMs:0.0} ms · upload {PixelCreatures.Runtime.CreatureRenderQueue.LastUploadMs:0.0} ms · save {Persistence.LastSaveMilliseconds:0.0} ms";
         }
         var a = App.World.Player;
-        if (MobileLayout && App.World.Tick != interactionCheckTick && App.World.Tick % 6 == 0)
+        hud.Refresh(a, a.Region, App.World.Time);
+        // Queries that cross into Gloot/GDScript or scan actors run every sixth frame;
+        // per-frame work only compares cached keys and touches changed controls.
+        bool slow = refreshFrame-- <= 0;
+        if (slow)
         {
-            interactionCheckTick=App.World.Tick;
-            if(App.HasInteraction()) interactionEmphasisUntil=Time.GetTicksMsec()+350;
-            actions["interact"].SelfModulate=Time.GetTicksMsec()<interactionEmphasisUntil ? new Color(1.3f,1.3f,1.05f) : new Color(.75f,.8f,.8f);
+            refreshFrame = 5;
+            // Quest notices mark the objective dirty; otherwise re-read about twice a second
+            // so load, reset and dialogue outcomes are reflected without event plumbing.
+            if (objectiveDirty || ++objectivePolls >= 5) { hud.ShowObjective(QuestObjective.Read(App.Narrative)); objectiveDirty = false; objectivePolls = 0; }
+            RefreshInteract();
+            RefreshPotion(a);
         }
-        health.Text = $"{a.Name}   ♥ {a.Health:0}/{a.MaxHealth}    Mana {a.Mana:0}/{a.MaxMana}    Lv {a.Level} · XP {a.Experience}/{a.Level * 100}    {a.State}\n{a.Region} · {(int)(App.World.Time / 60) % 24:00}:{(int)App.World.Time % 60:00}";
-        foreach (var(id, button)in abilityButtons)
+        RefreshAbilities(a, slow);
+    }
+
+    // Short labels fit the fixed mobile buttons; a space becomes a line break there.
+    string ButtonLabel(string binding, string name, string detail) => MobileLayout
+        ? (detail == "" ? name.Replace(' ', '\n') : name + "\n" + detail)
+        : binding + " · " + name + (detail == "" ? "" : "\n" + detail);
+
+    void RefreshInteract()
+    {
+        var preview = App.PreviewInteract();
+        var button = actions["interact"];
+        // Never disabled: pressing an unavailable Interact still explains why through the
+        // authoritative interaction feedback. The dimmed face and label say so in advance.
+        button.SelfModulate = preview.Available ? new Color(1.25f, 1.25f, 1.05f) : new Color(.7f, .74f, .74f);
+        if (preview == InteractionLabel && actionKeys.ContainsKey("interact")) return;
+        InteractionLabel = preview; actionKeys["interact"] = 1;
+        button.Text = ButtonLabel("E", preview.Label, "");
+        button.TooltipText = preview.Reason;
+    }
+
+    void RefreshPotion(ActorState a)
+    {
+        var button = actions["potion"];
+        int count = App.World.Items.Count("player", "potion");
+        int key = HashCode.Combine(count, a.Alive);
+        if (actionKeys.TryGetValue("potion", out int old) && old == key) return;
+        actionKeys["potion"] = key;
+        button.Disabled = count <= 0 || !a.Alive;
+        button.Text = ButtonLabel("4", "Draught", count > 0 ? "×" + count : "none");
+        SetUnavailable(button, count <= 0 ? "No draughts left · craft one from silverleaf in the Pack" : !a.Alive ? "Defeated" : null);
+    }
+
+    void SetUnavailable(Button button, string? reason)
+    {
+        if (reason == null) unavailableReasons.Remove(button); else unavailableReasons[button] = reason;
+    }
+
+    readonly Dictionary<string, AbilityDef> abilityDefs = new();
+    object? abilityContent;
+    AbilityDef Ability(string id)
+    {
+        // Reset/load replaces World and its Content; re-resolve definitions then.
+        if (!ReferenceEquals(abilityContent, App.World.Content)) { abilityDefs.Clear(); abilityContent = App.World.Content; }
+        if (!abilityDefs.TryGetValue(id, out var def)) abilityDefs[id] = def = App.World.Content.Abilities.Single(d => d.Id == id);
+        return def;
+    }
+    /// <summary>Why a visible action control is currently disabled, or null when it is usable.</summary>
+    public string? UnavailableReason(string actionId) => unavailableReasons.GetValueOrDefault(actions[actionId]);
+
+    void RefreshAbilities(ActorState a, bool slow)
+    {
+        foreach (var (id, button) in abilityButtons)
         {
             float cooldown = a.Cooldowns.GetValueOrDefault(id);
-            if (id == "dodge")
+            var def = id == "dodge" ? null : Ability(id);
+            float total = def == null ? CombatTuning.DodgeCooldown : def.Cooldown;
+            if (cooldownShades.TryGetValue(id, out var shade))
             {
-                button.Disabled = cooldown > 0 || !a.Alive;
-                string dodgeLabel = MobileLayout ? "Dodge" : "Space · Dodge";
-                button.Text = cooldown > 0 ? dodgeLabel + (MobileLayout ? "\n" : " ") + $"{cooldown:0.0}s" : dodgeLabel;
-                continue;
+                shade.Visible = cooldown > 0;
+                if (shade.Visible) { float ratio = Math.Clamp(cooldown / Math.Max(total, cooldown), 0, 1); shade.Position = Vector2.Zero; shade.Size = new Vector2(button.Size.X, button.Size.Y * ratio); }
             }
-            var def = App.World.Content.Abilities.Single(d => d.Id == id);
-            button.Disabled = cooldown > 0 || a.Mana < def.Cost || !a.Alive;
-            string binding = id == "slash" ? "1" : id == "ember" ? "2" : "3";
-            string label = MobileLayout ? (id == "slash" ? "Attack" : def.Name.Split(' ')[0]) : $"{binding} · {def.Name}";
-            button.Text = cooldown > 0 ? label + (MobileLayout ? "\n" : " ") + $"{cooldown:0.0}s" : MobileLayout && id != "slash" ? label + $"\n{def.Cost:0} mana" : label;
+            bool lowMana = def != null && a.Mana < def.Cost;
+            // Target availability is advisory: the button stays enabled and Cast reports the reason.
+            bool noTarget = def != null && !def.Self && id != "slash" && (slow ? !HasTarget(a, def) : actionKeys.GetValueOrDefault(id + ":target") == 1);
+            if (slow && def != null && !def.Self && id != "slash") actionKeys[id + ":target"] = noTarget ? 1 : 0;
+            int state = !a.Alive ? 4 : cooldown > 0 ? 1 : lowMana ? 2 : noTarget ? 3 : 0;
+            int tenths = cooldown > 0 ? (int)Math.Ceiling(cooldown * 10) : 0;
+            int key = HashCode.Combine(state, tenths);
+            if (actionKeys.TryGetValue(id, out int old) && old == key) continue;
+            actionKeys[id] = key;
+            button.Disabled = state is 1 or 2 or 4;
+            string name = id == "dodge" ? "Dodge" : id == "slash" ? (MobileLayout ? "Attack" : def!.Name) : MobileLayout ? def!.Name.Split(' ')[0] : def!.Name;
+            string binding = id switch { "slash" => "1", "ember" => "2", "mend" => "3", _ => "Space" };
+            string detail = state switch
+            {
+                1 => $"{cooldown:0.0}s",
+                2 => "low mana",
+                3 => "no target",
+                _ => def != null && id != "slash" && MobileLayout ? $"{def.Cost:0} mana" : ""
+            };
+            button.Text = ButtonLabel(binding, name, detail);
+            SetUnavailable(button, state switch
+            {
+                1 => $"{name} recovering · {cooldown:0.0}s",
+                2 => $"{name} needs {def!.Cost:0} mana · you have {a.Mana:0}",
+                4 => "Defeated",
+                _ => null
+            });
         }
+    }
+
+    // Presentation-only: a living hostile in range and sight. Cooldown, mana and action
+    // state are reported separately so "no target" never flickers during an attack.
+    bool HasTarget(ActorState a, AbilityDef def)
+    {
+        var world = App.World;
+        foreach (var other in world.Actors.Values)
+            if (other.Alive && other.Region == a.Region && world.Hostile(a, other)
+                && System.Numerics.Vector2.Distance(a.Position, other.Position) <= def.Range + a.NaturalReach && world.LineOfSight(a, other))
+                return true;
+        return false;
     }
 
     public void PauseForVerification()

@@ -175,6 +175,37 @@ func journal() -> String:
 		if str(key).begins_with("lore:"): lines.append(flags[key])
 	return "\n\n".join(lines)
 
+## Read-only structured objective for the gameplay HUD. Never mutates quest state;
+## callers must not parse journal(). Returns {} when nothing needs tracking.
+## Priority: first active quest, then an unclaimed reward, then the next quest the
+## warden can offer (definition order throughout).
+func objective() -> Dictionary:
+	for q in definitions:
+		if manager.is_quest_active(q) and not q.failed: return objective_row(q, "active")
+	for q in definitions:
+		if completed(q.id) and not q.rewarded: return objective_row(q, "reward_pending")
+	for q in definitions:
+		if q.failed or manager.is_quest_active(q) or manager.is_quest_completed(q) or accepted(q.id): continue
+		if q.prerequisite > 0 and not completed(q.prerequisite): continue
+		return objective_row(q, "available")
+	return {}
+
+func objective_row(q: Quest, status: String) -> Dictionary:
+	var staged: bool = not q.stages.is_empty()
+	var stage: int = mini(q.stage_index, q.stages.size() - 1) if staged else 0
+	var text: String = q.quest_objective
+	if status == "available": text = "Speak to the warden in Reach."
+	elif status == "reward_pending": text = "Reward waiting — make pack space, then speak to the warden."
+	elif staged: text = q.stages[stage].text
+	return {
+		"id": q.id, "title": q.quest_name, "status": status, "objective": text,
+		"staged": staged, "stage_id": str(q.stages[stage].id) if staged else "",
+		"progress": q.stage_index if staged else q.progress,
+		"required": q.stages.size() if staged else q.required,
+		"pending_reward": completed(q.id) and not q.rewarded,
+		"reward": "%s ×%d" % [q.reward_item, q.reward_count],
+	}
+
 func export_state() -> String:
 	return JSON.stringify({"flags": flags, "pools": manager.pool_state_as_dict(), "quests": manager.serialize_quests()})
 
