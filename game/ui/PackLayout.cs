@@ -136,40 +136,94 @@ public partial class PackLayout : VBoxContainer
 
     void BuildGear(VBoxContainer column)
     {
-        var intro = UiDesign.Card(column, "wayfarer_portrait_mount");
+        // The fixed two-slot equipment composition stays visible at wide sizes.
+        // On a short single-pane view, its contents can scroll so neither action
+        // is pushed outside the playable safe area at 140% text size.
+        VBoxContainer content = column;
+        if (Mode == LayoutKind.Single)
+        {
+            var scroll = new TouchScroll { Name = "equipment_scroll",
+                SizeFlagsVertical = SizeFlags.ExpandFill,
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+                HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+                VerticalScrollMode = ScrollContainer.ScrollMode.Reserve,
+                ScrollDeadzone = 12 };
+            column.AddChild(scroll);
+            content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            content.AddThemeConstantOverride("separation", 8);
+            scroll.AddChild(content);
+        }
+
+        var intro = UiDesign.Card(content, "wayfarer_portrait_mount");
         UiDesign.Heading(intro, "WAYFARER");
-        UiDesign.Note(intro, "Travel-ready equipment");
-        UiDesign.Note(intro, "Weapon and body armour");
+        UiDesign.Note(intro, "Your travelling equipment");
         foreach (var slot in new[] { "weapon", "body" })
         {
             var current = equipped.GetValueOrDefault(slot);
             var card = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-            card.AddThemeConstantOverride("separation", 2);
-            column.AddChild(card);
-            var button = UiDesign.Action(card,
-                (slot == "weapon" ? "WEAPON" : "BODY") + "  ·  " + (current?.Title ?? "Empty"),
-                () =>
+            card.AddThemeConstantOverride("separation", 4);
+            content.AddChild(card);
+            var button = UiDesign.Action(card, "", () =>
+            {
+                if (current == null)
                 {
-                    if (current == null) { ui.Notify(slot == "weapon" ? "Weapon slot is empty" : "Body slot is empty", minor: true); return; }
-                    state.SelectEquipped(slot, current.Selector);
-                    state.DetailOpen = true;
-                    UpdateSelection(); UpdateInspector(); UpdateVisibility();
-                });
+                    ui.Notify(slot == "weapon" ? "Weapon slot is empty" : "Body slot is empty", minor: true);
+                    return;
+                }
+                state.SelectEquipped(slot, current.Selector);
+                state.DetailOpen = true;
+                UpdateSelection(); UpdateInspector(); UpdateVisibility();
+            });
             button.Name = "inspect_" + slot;
-            button.Alignment = HorizontalAlignment.Left;
+            button.CustomMinimumSize = new Vector2(0, 80 * ui.TextScale);
             button.TooltipText = current == null ? slot + " is empty" : current.Title + " (equipped)";
             gearButtons[slot] = button;
+            var padding = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            padding.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+            padding.AddThemeConstantOverride("margin_left", 8);
+            padding.AddThemeConstantOverride("margin_right", 8);
+            padding.AddThemeConstantOverride("margin_top", 4);
+            padding.AddThemeConstantOverride("margin_bottom", 4);
+            button.AddChild(padding);
+            var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            row.AddThemeConstantOverride("separation", 8);
+            padding.AddChild(row);
             if (current != null)
             {
-                var stats = PackScreen.Stats(current);
-                if (stats != "") UiDesign.Note(card, stats);
-                var unequip = UiDesign.Action(card, "Unequip " + current.Title, () => Unequip(slot, current));
-                unequip.Name = "unequip_" + slot; unequip.Alignment = HorizontalAlignment.Left;
-                if (!ui.App.World.Items.CanUnequip(ui.App.World.Player.Id, slot))
-                {
-                    unequip.Disabled = true;
-                    UiDesign.Note(card, "Pack full · make room to unequip");
-                }
+                row.AddChild(new TextureRect { Texture = ItemIconAtlas.Get(current.Id),
+                    TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+                    CustomMinimumSize = new Vector2(48 * ui.TextScale, 48 * ui.TextScale),
+                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                    MouseFilter = Control.MouseFilterEnum.Ignore });
+            }
+            else
+            {
+                var empty = UiDesign.Text("◇");
+                empty.CustomMinimumSize = new Vector2(48 * ui.TextScale, 48 * ui.TextScale);
+                empty.HorizontalAlignment = HorizontalAlignment.Center;
+                empty.VerticalAlignment = VerticalAlignment.Center;
+                row.AddChild(empty);
+            }
+            var identity = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill,
+                MouseFilter = Control.MouseFilterEnum.Ignore };
+            identity.AddThemeConstantOverride("separation", 3);
+            row.AddChild(identity);
+            var caption = UiDesign.Heading(identity, slot == "weapon" ? "WEAPON" : "BODY");
+            caption.AddThemeFontSizeOverride("font_size", (int)(14 * ui.TextScale));
+            var itemName = UiDesign.Text(current?.Title ?? "Empty slot");
+            itemName.AddThemeFontSizeOverride("font_size", (int)(17 * ui.TextScale));
+            identity.AddChild(itemName);
+            if (current == null) continue;
+            var stats = PackScreen.Stats(current);
+            if (stats != "") UiDesign.Note(card, stats);
+            var unequip = UiDesign.Action(card, "Unequip " + current.Title, () => Unequip(slot, current));
+            unequip.Name = "unequip_" + slot;
+            unequip.Alignment = HorizontalAlignment.Left;
+            if (!ui.App.World.Items.CanUnequip(ui.App.World.Player.Id, slot))
+            {
+                unequip.Disabled = true;
+                UiDesign.Note(card, "Pack full · make room to unequip");
             }
         }
     }
@@ -190,7 +244,7 @@ public partial class PackLayout : VBoxContainer
         float scale = ui.TextScale;
         float usableWidth = Math.Max(220, ui.ScreenRect.Size.X - 64);
         float share = Mode switch { LayoutKind.Wide => .41f, LayoutKind.Compact => .64f, _ => 1f };
-        int columns = Math.Clamp((int)((usableWidth * share - 22) / (96 * scale + 8)), 2, 6);
+        int columns = Math.Clamp((int)((usableWidth * share - 28 + 7) / (96 * scale + 7)), 2, 6);
         var grid = new GridContainer { Name = "item_grid", Columns = columns,
             SizeFlagsHorizontal = SizeFlags.ExpandFill };
         grid.AddThemeConstantOverride("h_separation", 7);

@@ -130,7 +130,7 @@ public static class UiDesign
         column.AddThemeConstantOverride("separation", 7);
         panel.AddChild(column);
         var title = Heading(column, heading);
-        title.AddThemeFontSizeOverride("font_size", 18);
+        // Screen theme supplies accessible text scale; do not hard-code a smaller font.
         return column;
     }
 
