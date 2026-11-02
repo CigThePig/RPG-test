@@ -13,17 +13,22 @@ public static class UiDesign
         CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8, CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8,
         ContentMarginLeft = 16, ContentMarginRight = 16, ContentMarginTop = 12, ContentMarginBottom = 12
     };
-    public static StyleBoxFlat Notification() => Box(Surface, Bronze);
+    /// <summary>High-contrast preference: opaque surfaces, brighter borders and secondary text. Read when controls are built.</summary>
+    public static bool HighContrast { get; set; }
+    public static Color Border => HighContrast ? Ink : Bronze;
+    public static StyleBoxFlat Notification() => Box(HighContrast ? new Color("0b1312") : Surface, Border);
     public static Theme Theme(float scale)
     {
         var theme = new Theme { DefaultFontSize = (int)(20 * scale) };
-        theme.SetStylebox("panel", "PanelContainer", Box(Surface, Bronze));
+        theme.SetStylebox("panel", "PanelContainer", Box(HighContrast ? new Color("0b1312") : Surface, Border));
         foreach (var type in new[] { "Label", "Button" }) theme.SetColor("font_color", type, Ink);
-        theme.SetStylebox("normal", "Button", Box(new Color("263c36"), new Color("71816c")));
+        theme.SetStylebox("normal", "Button", Box(HighContrast ? new Color("1a2a26") : new Color("263c36"), HighContrast ? Bronze : new Color("71816c")));
         theme.SetStylebox("hover", "Button", Box(new Color("365347"), Bronze));
         theme.SetStylebox("pressed", "Button", Box(new Color("101c1a"), Bronze));
         theme.SetStylebox("focus", "Button", Box(new Color(0,0,0,0), new Color("ffdf8c"), 3));
         theme.SetColor("font_disabled_color", "Button", new Color("b6b8b0"));
+        // Disabled: flatter face and dim border; a written reason always accompanies it.
+        theme.SetStylebox("disabled", "Button", Box(new Color("1c2a27"), new Color("4a5550")));
         theme.SetConstant("separation", "VBoxContainer", Gap);
         // ScrollContainer reserves the scrollbar's theme minimum width, not its
         // CustomMinimumSize. Give the track a real 28px minimum so content is laid
@@ -49,7 +54,7 @@ public static class UiDesign
         button.Pressed += action; parent.AddChild(button); return button;
     }
     /// <summary>Secondary text (reasons, hints). Lighter ivory keeps 4.5:1 on the surface; meaning is in words.</summary>
-    public static readonly Color Muted = new("c9c6b6");
+    public static Color Muted => HighContrast ? Ink : new Color("c9c6b6");
     public static Label Note(Node parent, string text)
     {
         var label = Text(text); label.AddThemeColorOverride("font_color", Muted); parent.AddChild(label); return label;
@@ -63,7 +68,7 @@ public static class UiDesign
     {
         var card = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Pass };
         if (name != null) card.Name = name;
-        var style = Box(new Color("1d2f2b"), new Color("4f6158"));
+        var style = Box(HighContrast ? new Color("0f1a18") : new Color("1d2f2b"), HighContrast ? Bronze : new Color("4f6158"));
         style.ContentMarginTop = style.ContentMarginBottom = 10; style.ContentMarginLeft = style.ContentMarginRight = 12;
         card.AddThemeStyleboxOverride("panel", style);
         parent.AddChild(card);

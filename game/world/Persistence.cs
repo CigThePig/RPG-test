@@ -147,11 +147,13 @@ public static class Persistence
         w.RebuildSpells();
     }
 
+    /// <summary>Where manual slots live. Verification runs redirect this so they never touch a player's saves.</summary>
+    public static string SlotDirectory { get; set; } = "user://";
     public static string SlotPath(int slot)
     {
         if (slot < 1 || slot > 3)
             throw new ArgumentOutOfRangeException(nameof(slot));
-        return ProjectSettings.GlobalizePath($"user://slot-{slot}.json");
+        return ProjectSettings.GlobalizePath($"{SlotDirectory}slot-{slot}.json");
     }
 
     public static double LastSaveMilliseconds { get; private set; }
@@ -201,4 +203,69 @@ public static class Persistence
     }
 
     public static void Load(World w, Node narrative, int slot) => Restore(w, narrative, File.ReadAllText(SlotPath(slot)));
+
+    /// <summary>
+    /// Read-only description of a save file for the Save & Load screen. Uses the same
+    /// validation as loading (<see cref="Parse"/>), so "Ready" means Load will accept it.
+    /// Never modifies, moves or deletes the file.
+    /// </summary>
+    public static SlotSummary Inspect(string path, Content content)
+    {
+        if (!File.Exists(path)) return new(SlotState.Empty, "Empty", 0, "", 0, 0, null);
+        DateTime? saved = File.GetLastWriteTime(path);
+        string text;
+        try { text = File.ReadAllText(path); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return new(SlotState.Damaged, "Cannot read this file", 0, "", 0, 0, saved); }
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return new(SlotState.Damaged, "Damaged save file", 0, "", 0, 0, saved);
+            bool current = root.TryGetProperty("Generator", out var generator) && generator.ValueKind == JsonValueKind.String && generator.GetString() == Mosslight.Regions.Version
+                && root.TryGetProperty("Schema", out var schema) && schema.TryGetInt32(out int version) && version == 1;
+            if (!current) return new(SlotState.Incompatible, "From an older Mosslight build · kept safe, cannot be loaded here", 0, "", 0, 0, saved);
+        }
+        catch (JsonException) { return new(SlotState.Damaged, "Damaged save file", 0, "", 0, 0, saved); }
+        try
+        {
+            var data = Parse(text, content);
+            var player = data.Actors["player"];
+            return new(SlotState.Ready, "Ready", player.Level, player.Region, data.Time, data.Tick, saved);
+        }
+        catch (Exception e) when (e is InvalidDataException or JsonException or KeyNotFoundException or ArgumentException or NotSupportedException)
+        {
+            return new(SlotState.Damaged, "Damaged save file · " + e.Message, 0, "", 0, 0, saved);
+        }
+    }
+
+    /// <summary>
+    /// Explicitly replaces a damaged slot. The damaged file is first copied aside
+    /// (never deleted), then the slot is written normally.
+    /// </summary>
+    public static void ReplaceDamaged(World w, Node narrative, int slot)
+    {
+        string path = SlotPath(slot);
+        if (Inspect(path, w.Content).State != SlotState.Damaged) throw new InvalidOperationException("Only a damaged slot can be replaced");
+        int suffix = 1; string retained;
+        do { retained = path + $".damaged-{suffix++}.json"; } while (File.Exists(retained));
+        File.Copy(path, retained);
+        WriteSnapshot(w, narrative, path);
+    }
+}
+
+public enum SlotState { Empty, Ready, Incompatible, Damaged }
+
+/// <summary>Presentation summary of one save file. Not save data.</summary>
+public sealed record SlotSummary(SlotState State, string Message, int Level, string Region, double Time, long Tick, DateTime? Saved)
+{
+    public string Describe()
+    {
+        string when = Saved is { } at ? " · saved " + at.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) : "";
+        return State switch
+        {
+            SlotState.Ready => $"Level {Level} · {(Region == "ruin" ? "the ruin" : Region == "reach" ? "the Reach" : Region)} · day time {(int)(Time / 60) % 24:00}:{(int)Time % 60:00}{when}",
+            SlotState.Empty => "Empty",
+            _ => Message + when
+        };
+    }
 }

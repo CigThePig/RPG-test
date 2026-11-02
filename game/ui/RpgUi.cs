@@ -33,6 +33,7 @@ public partial class RpgUi : CanvasLayer
     public UiNavigation Navigation => navigation;
     public float TextScale { get; private set; } = 1;
     public Rect2 ScreenRect => panel.GetGlobalRect();
+    public Rect2 DialogueRect { get; private set; }
     public Button ScreenBack => panel.BackButton;
     VBoxContainer body = null !;
     Control root = null !;
@@ -47,7 +48,7 @@ public partial class RpgUi : CanvasLayer
     public bool MenuOpen => menu.Visible;
     public bool BlocksInput => navigation.Blocked;
     public bool SettingsOpen { get; private set; }
-    public bool Muted { get; private set; }
+    public bool Muted => Preferences.Muted;
     public int SaveSlot { get; private set; } = 1;
 
     public override void _Ready()
@@ -58,6 +59,21 @@ public partial class RpgUi : CanvasLayer
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         AddChild(root);
+        // Verification runs use their own preferences file and always start from defaults,
+        // so a developer's settings can neither change test evidence nor be overwritten.
+        if (App.VerificationMode)
+        {
+            // Separate folders per layout: desktop and phone suites may run at the same time.
+            string verification = "user://verification/" + (MobileLayout ? "mobile/" : "desktop/");
+            UiPreferences.FilePath = verification + "ui_preferences.json";
+            Persistence.SlotDirectory = verification;
+            string verificationPreferences = ProjectSettings.GlobalizePath(UiPreferences.FilePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(verificationPreferences)!);
+            try { File.Delete(verificationPreferences); } catch (IOException) { }
+        }
+        Preferences = UiPreferences.Load(out var preferencesProblem);
+        PreferencesProblem = preferencesProblem;
+        UiDesign.HighContrast = Preferences.HighContrast;
         root.Theme = UiDesign.Theme(TextScale);
         hud = new GameplayHud { Name = "GameplayHud" };
         root.AddChild(hud);
@@ -151,6 +167,7 @@ public partial class RpgUi : CanvasLayer
         marker.Position=new Vector2(1040,110); marker.Visible=false;
         GetViewport().SizeChanged += Layout;
         Layout();
+        ApplyPreferences(Preferences, persist: false);
     }
 
     readonly Dictionary<int, Button> touchButtons = new();
@@ -257,6 +274,11 @@ public partial class RpgUi : CanvasLayer
             control.CustomMinimumSize = Vector2.Zero; control.Position = rect.Position; control.Size = rect.Size;
         }
         Arrange(panel, 740); Arrange(menu, 560); Arrange(confirmation, 560);
+        // Dialogue: lower part of the safe area, never wider than a comfortable line.
+        float dialogueWidth = Math.Min(900, overlaySafe.Size.X - 32);
+        float dialogueHeight = Math.Clamp(overlaySafe.Size.Y * .52f, Math.Min(260, overlaySafe.Size.Y - 32), 420);
+        DialogueRect = new Rect2(overlaySafe.Position.X + (overlaySafe.Size.X - dialogueWidth) / 2, overlaySafe.End.Y - 16 - dialogueHeight, dialogueWidth, dialogueHeight);
+        App.Narrative.Call("present", UiDesign.Theme(TextScale), DialogueRect);
         layoutTraceFrames = 3;
     }
 
@@ -276,7 +298,8 @@ public partial class RpgUi : CanvasLayer
         confirmation.Visible = navigation.Confirmation && !dialogue;
         hotbar.Visible = !navigation.Blocked && !App.Narrative.Get("speaking").AsBool();
         if (menu.Visible) menu.FindChildren("*", "Button", true, false).OfType<Button>().FirstOrDefault()?.GrabFocus();
-        if (!navigation.Blocked) GetViewport().GuiReleaseFocus();
+        // Dialogue owns focus (its first response); only release focus for plain gameplay.
+        if (!navigation.Blocked && !dialogue) GetViewport().GuiReleaseFocus();
         layoutTraceFrames = 3;
         TraceNavigationState();
     }
@@ -319,6 +342,8 @@ public partial class RpgUi : CanvasLayer
     {
         TextScale = Math.Clamp(scale, 1, 1.4f);
         panel.Theme = menu.Theme = confirmation.Theme = UiDesign.Theme(TextScale); Layout();
+        // Notices follow text size, capped so two lines still fit the notification region.
+        message.AddThemeFontSizeOverride("font_size", (int)Math.Min(20, 17 * TextScale));
     }
     void ConfirmNewGame()
     {
@@ -364,6 +389,8 @@ public partial class RpgUi : CanvasLayer
             case "QUEST JOURNAL": Journal(); break;
             case "CHARACTER · WAYFARER": Character(); break;
             case "REGION MAP": Map(); break;
+            case "SAVE & LOAD": SaveLoad(); break;
+            case "SETTINGS": Settings(); break;
         }
     }
 
@@ -632,71 +659,159 @@ public partial class RpgUi : CanvasLayer
         box.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         scroll.AddChild(box);
         box.AddThemeConstantOverride("separation", 8);
-        box.AddChild(new Label { Text = "MOSSLIGHT\nRPG FOUNDATION", HorizontalAlignment = HorizontalAlignment.Center });
+        box.AddChild(new Label { Text = "MOSSLIGHT", HorizontalAlignment = HorizontalAlignment.Center });
         navigationTargets["resume"] = Button(box, "Enter / Resume", () => { if (App.World.Player.Alive) App.ResumeGame(); else Notify("Defeated · Load a save or start a New game to continue"); });
-        foreach (var entry in new (string, Action)[] { ("Pack", Inventory), ("Journal", Journal), ("Character", Character), ("Map", Map) })
-            Button(box, entry.Item1, entry.Item2);
-        Button(box, "Recover background autosave", () =>
-        {
-            try { if(App.InFeelCourse)throw new InvalidOperationException("Return from the controlled course before loading"); Persistence.LoadAutosave(App.World, App.Narrative); App.RebuildViews(); App.ResumeGame(); Notify("Recovered autosave"); }
-            catch (Exception e) { Notify(e.Message); }
-        });
+        foreach (var entry in new (string, Action)[] { ("Pack", Inventory), ("Journal", Journal), ("Character", Character), ("Map", Map), ("Save & load", SaveLoad), ("Settings", Settings) })
+            Button(box, entry.Item1, entry.Item2).Name = "menu_" + entry.Item1.ToLowerInvariant().Replace(" & ", "_");
         navigationTargets["new_game"] = Button(box, "New game", ConfirmNewGame);
-        Button(box, $"Text size: {(TextScale > 1 ? "Large" : "Standard")}", () => { SetTextScale(TextScale > 1 ? 1 : 1.3f); BuildMenu(); });
-        Button(box, $"Save slot: {SaveSlot} (click to cycle)", () =>
-        {
-            SaveSlot = SaveSlot % 3 + 1;
-            BuildMenu();
-        });
-        Button(box, "Save", () =>
-        {
-            try
-            {
-                if(App.InFeelCourse)throw new InvalidOperationException("Return from the controlled course before saving");
-                Persistence.Save(App.World, App.Narrative, SaveSlot);
-                Notify("Saved slot " + SaveSlot);
-            }
-            catch (Exception e)
-            {
-                Notify(e.Message);
-            }
-        });
-        Button(box, "Load", () =>
-        {
-            try
-            {
-                if(App.InFeelCourse)throw new InvalidOperationException("Return from the controlled course before loading");
-                Persistence.Load(App.World, App.Narrative, SaveSlot);
-                App.RebuildViews();
-                App.ResumeGame();
-                Notify("Loaded slot " + SaveSlot);
-            }
-            catch (Exception e)
-            {
-                Notify(e.Message);
-            }
-        });
-        Button(box, "Audio: " + (Muted ? "Muted" : "On"), () =>
-        {
-            Muted = !Muted;
-            AudioServer.SetBusMute(0, Muted);
-            BuildMenu();
-        });
-        Button(box, "Pixel scale / camera zoom", () => App.CycleZoom());
-        Button(box, "Creature workshop", () =>
-        {
-            Workshop();
-        });
-        Button(box, "Collision / navigation overlay: " + (App.CollisionDebug ? "On" : "Off"), () => { App.CollisionDebug = !App.CollisionDebug; BuildMenu(); });
-        Button(box, "Performance overlay: " + (showMetrics ? "On" : "Off"), () => { showMetrics = !showMetrics; BuildMenu(); });
-        Button(box, "Game-feel lab / record playtest", FeelLab);
-        Button(box, "Developer diagnostics", () =>
-        {
-            Diagnostics();
-        });
+        // Test, tuning and diagnostic tools stay reachable, but behind one explicit entry.
+        Button(box, "Developer tools", Developer).Name = "menu_developer";
         Button(box, "Quit", () => GetTree().Quit());
         if (menu.IsVisibleInTree()) box.GetChildren().OfType<Button>().FirstOrDefault()?.GrabFocus();
         layoutTraceFrames = 3;
+    }
+
+    // ---- Save & load (PR #7 Part 4) ----
+    string? FeelCourseBlocker(string verb) => App.InFeelCourse ? $"Return from the controlled course before {verb}" : null;
+
+    public void SaveLoad()
+    {
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        if (!Open("SAVE & LOAD")) return;
+        UiDesign.Note(body, "Three slots plus a background autosave. Saves from older Mosslight builds are kept but cannot be loaded here. Settings are stored separately and never change when you load.");
+        for (int slot = 1; slot <= 3; slot++)
+        {
+            int index = slot;
+            string path = Persistence.SlotPath(slot);
+            var info = Persistence.Inspect(path, App.World.Content);
+            var card = UiDesign.Card(body, "slot_" + slot);
+            UiDesign.Heading(card, $"SLOT {slot}  ·  {info.State switch { SlotState.Ready => "Saved game", SlotState.Empty => "Empty", SlotState.Incompatible => "Older version", _ => "Damaged" }}");
+            card.AddChild(UiDesign.Text(info.Describe()));
+            string? saveBlocker = FeelCourseBlocker("saving") ?? (!App.World.Player.Alive ? "Cannot save while defeated" : info.State == SlotState.Incompatible ? "Kept safe · choose another slot to save" : null);
+            var save = Button(card, info.State == SlotState.Damaged ? "Replace damaged file (a copy is kept)" : info.State == SlotState.Ready ? $"Overwrite slot {slot}" : $"Save to slot {slot}", () =>
+            {
+                void Write()
+                {
+                    try
+                    {
+                        if (Persistence.Inspect(path, App.World.Content).State == SlotState.Damaged) Persistence.ReplaceDamaged(App.World, App.Narrative, index);
+                        else Persistence.Save(App.World, App.Narrative, index);
+                        SaveSlot = index; Notify("Saved slot " + index);
+                    }
+                    catch (Exception e) { Notify(e.Message); }
+                }
+                if (info.State == SlotState.Empty) { Write(); SaveLoad(); }
+                else Confirm(info.State == SlotState.Damaged
+                        ? $"Replace the damaged file in slot {index}? The damaged file is copied aside, not deleted."
+                        : $"Overwrite slot {index}? The saved game there ({info.Describe()}) will be replaced.",
+                    info.State == SlotState.Damaged ? "Replace" : "Overwrite", Write, "save_" + index);
+            });
+            save.Name = "save_" + slot;
+            if (saveBlocker != null) { save.Disabled = true; UiDesign.Note(card, saveBlocker); }
+            string? loadBlocker = FeelCourseBlocker("loading") ?? info.State switch
+            {
+                SlotState.Empty => "Nothing saved here yet", SlotState.Incompatible => "Needs an older Mosslight build", SlotState.Damaged => "This file cannot be loaded", _ => null
+            };
+            var load = Button(card, $"Load slot {slot}", () => Confirm($"Load slot {index}? Progress since your last save will be lost.", "Load", () => LoadSlot(index), "load_" + index));
+            load.Name = "load_" + slot;
+            if (loadBlocker != null) { load.Disabled = true; UiDesign.Note(card, loadBlocker); }
+        }
+        var auto = Persistence.Inspect(Persistence.AutosavePath, App.World.Content);
+        var autoCard = UiDesign.Card(body, "slot_autosave");
+        UiDesign.Heading(autoCard, "BACKGROUND AUTOSAVE");
+        autoCard.AddChild(UiDesign.Text(auto.State == SlotState.Empty ? "None yet · written when the app goes to the background" : auto.Describe()));
+        var recover = Button(autoCard, "Recover background autosave", () => Confirm("Recover the background autosave? Progress since then will be lost.", "Recover", () =>
+        {
+            try { if (App.InFeelCourse) throw new InvalidOperationException("Return from the controlled course before loading"); Persistence.LoadAutosave(App.World, App.Narrative); App.RebuildViews(); App.ResumeGame(); Notify("Recovered autosave"); }
+            catch (Exception e) { Notify(e.Message); }
+        }, "load_autosave"));
+        recover.Name = "load_autosave";
+        string? autoBlocker = FeelCourseBlocker("loading") ?? (auto.State == SlotState.Ready ? null : auto.State == SlotState.Empty ? "No autosave yet" : auto.Message);
+        if (autoBlocker != null) { recover.Disabled = true; UiDesign.Note(autoCard, autoBlocker); }
+    }
+
+    void LoadSlot(int slot)
+    {
+        try
+        {
+            if (App.InFeelCourse) throw new InvalidOperationException("Return from the controlled course before loading");
+            Persistence.Load(App.World, App.Narrative, slot);
+            SaveSlot = slot;
+            App.RebuildViews();
+            App.ResumeGame();
+            InvalidateHud();
+            Notify("Loaded slot " + slot);
+        }
+        catch (Exception e) { Notify(e.Message); }
+    }
+
+    // ---- Settings (PR #7 Part 4) ----
+    public UiPreferences Preferences { get; private set; } = new();
+    public string? PreferencesProblem { get; private set; }
+
+    /// <summary>Applies preferences to presentation only. Never touches world state or saves.</summary>
+    public void ApplyPreferences(UiPreferences preferences, bool persist)
+    {
+        Preferences = preferences.Copy();
+        UiDesign.HighContrast = Preferences.HighContrast;
+        AudioServer.SetBusMute(0, Preferences.Muted);
+        App.CombatCamera.Strength = Preferences.ReducedMotion ? 0 : 1;
+        if (Preferences.ReducedMotion) App.CombatCamera.Reset();
+        hud?.ApplyContrast(Preferences.HighContrast);
+        message?.AddThemeStyleboxOverride("normal", UiDesign.Notification());
+        if (persist)
+        {
+            try { Preferences.Save(); PreferencesProblem = null; }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Notify("Settings could not be saved: " + e.Message); }
+        }
+        SetTextScale(Preferences.TextScale);
+        BuildMenu();
+    }
+
+    void ChangePreference(Action<UiPreferences> change)
+    {
+        var next = Preferences.Copy(); change(next);
+        ApplyPreferences(next, persist: true);
+        Settings();
+    }
+
+    public void Settings()
+    {
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        if (!Open("SETTINGS")) return;
+        UiDesign.Note(body, "Saved on this device, separately from game saves. Loading a game never changes them.");
+        if (PreferencesProblem != null) UiDesign.Note(body, PreferencesProblem);
+        void Option(string name, string title, string state, string explanation, Action<UiPreferences> change)
+        {
+            var card = UiDesign.Card(body, "setting_" + name);
+            UiDesign.Heading(card, title.ToUpperInvariant());
+            UiDesign.Note(card, explanation);
+            Button(card, $"{title}: {state} · tap to change", () => ChangePreference(change)).Name = "set_" + name;
+        }
+        Option("text", "Text size", Preferences.TextSizeName, "Menus, screens, dialogue and notices. The HUD keeps a fixed size so it never covers controls.",
+            p => p.TextSize = (p.TextSize + 1) % UiPreferences.TextScales.Length);
+        Option("sound", "Sound", Preferences.Muted ? "Off" : "On", "Combat and interface sounds.", p => p.Muted = !p.Muted);
+        Option("motion", "Reduced motion", Preferences.ReducedMotion ? "On" : "Off", "Removes the camera nudge on impacts. Combat timing, sounds and hit cues are unchanged.", p => p.ReducedMotion = !p.ReducedMotion);
+        Option("contrast", "High contrast", Preferences.HighContrast ? "On" : "Off", "Opaque panels, ivory borders and brighter secondary text.", p => p.HighContrast = !p.HighContrast);
+        var zoom = UiDesign.Card(body, "setting_zoom");
+        UiDesign.Heading(zoom, "CAMERA ZOOM");
+        UiDesign.Note(zoom, "Pixel scale of the world view for this session.");
+        Button(zoom, "Change camera zoom", () => App.CycleZoom()).Name = "set_zoom";
+        var reset = Button(body, "Restore default settings", () => Confirm("Restore default settings? Text size, sound, motion and contrast return to their defaults.", "Restore defaults", () => ApplyPreferences(new UiPreferences(), persist: true), "reset_settings"));
+        reset.Name = "set_reset";
+    }
+
+    // ---- Developer tools: separated from player navigation, still reachable ----
+    public void Developer()
+    {
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        if (!Open("DEVELOPER TOOLS")) return;
+        UiDesign.Note(body, "Testing, tuning and diagnostic tools. Not part of normal play.");
+        Button(body, "Creature workshop", Workshop).Name = "dev_workshop";
+        Button(body, "Collision / navigation overlay: " + (App.CollisionDebug ? "On" : "Off"), () => { App.CollisionDebug = !App.CollisionDebug; Developer(); }).Name = "dev_collision";
+        Button(body, "Performance overlay: " + (showMetrics ? "On" : "Off"), () => { showMetrics = !showMetrics; Developer(); }).Name = "dev_metrics";
+        Button(body, "Game-feel lab / record playtest", FeelLab).Name = "dev_feel";
+        Button(body, "Developer diagnostics", Diagnostics).Name = "dev_diagnostics";
     }
 
     public void FeelLab()

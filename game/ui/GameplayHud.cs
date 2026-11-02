@@ -47,6 +47,13 @@ public partial class GameplayHud : Control
     public string ObjectiveText => tracker.Visible ? objectiveText.Text : "";
     public Rect2 TrackerRect => tracker.GetGlobalRect();
     int identityKey = int.MinValue;
+    StyleBoxFlat trackerStyle = null!;
+    /// <summary>High contrast makes the tracker opaque with an ivory border; otherwise the world shows through.</summary>
+    public void ApplyContrast(bool high)
+    {
+        trackerStyle.BgColor = high ? new Color("0b1312") : new Color(UiDesign.Surface, .86f);
+        trackerStyle.BorderColor = high ? UiDesign.Ink : UiDesign.Bronze;
+    }
 
     public GameplayHud() { MouseFilter = MouseFilterEnum.Ignore; }
 
@@ -60,6 +67,7 @@ public partial class GameplayHud : Control
         tracker = new PanelContainer { MouseFilter = MouseFilterEnum.Ignore, Position = new Vector2(0, 106), Size = new Vector2(MaxWidth, 88), ClipContents = true };
         var style = UiDesign.Notification();
         style.BgColor = new Color(UiDesign.Surface, .86f);
+        trackerStyle = style;
         style.ContentMarginTop = style.ContentMarginBottom = 6; style.ContentMarginLeft = style.ContentMarginRight = 10;
         tracker.AddThemeStyleboxOverride("panel", style);
         AddChild(tracker);

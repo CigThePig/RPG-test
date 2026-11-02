@@ -71,6 +71,22 @@ Priority: dialogue > confirmation > pause menu > information screen > gameplay. 
 - Screens never cache gameplay state: each build reads Gloot (`Items.View`), Narrative (`journal_rows`, `journal_extras`, `objective`) and RegionState. Only the tab, selection and map zoom are UI state, and they are never saved.
 - `RpgUi.Confirm(question, label, action)` is the single modal for irreversible choices; New Game uses it with its existing Android target names.
 
+## Dialogue, menu, save/load and settings (Part 4)
+
+| Surface / trigger | Result | Input/focus |
+| --- | --- | --- |
+| Dialogue begins | Themed panel in lower safe area, own canvas layer | Focus first response; gameplay touches ignored |
+| Dialogue / Back, Escape | Nothing | Dialogue cannot be dismissed by Back |
+| Dialogue / focus out, background | Dialogue stays open | Resume returns to the same line |
+| Menu / Save & load, Settings, Developer tools | Screen | Back returns to menu |
+| Save & load / Save to empty slot | Saved immediately | Notice; screen rebuilt |
+| Save & load / Overwrite, Load, Recover autosave, Replace damaged | Confirmation | Cancel/Back: nothing changes; Confirm: action once |
+| Settings / any option | Applied and saved immediately | Same screen rebuilt with the new text size/contrast |
+
+- Menu holds player entries only; developer and test tools sit behind "Developer tools".
+- Save-slot state uses the same validation as Load. Older-generator files are never loadable or overwritable here; damaged files are replaced only explicitly, with a copy kept.
+- `UiPreferences` (text size, sound, reduced motion, high contrast) live in `user://ui_preferences.json`, never in world saves; loading or New Game never changes them. Verification uses `user://verification/{desktop,mobile}/`.
+
 ## Verification and phone checklist
 
 UiNavigationChecks exercises state transitions in the native suite and actual rendered controls, focus, touch Back, Escape, WM Back, New Game cancellation, lifecycle pause, and Character at 1280×800, 1280×720, 1920×864, 1024×768 and 900×560 with large text and nonzero insets. Existing MobileCombatControlsChecks remain enabled, including transformed safe area and real input ownership checks. Screenshots are emitted to docs/native-screenshots/*ui-character*.

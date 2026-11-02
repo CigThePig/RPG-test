@@ -296,30 +296,64 @@ func talk() -> void:
 	ui.show()
 	advance("warden")
 
+## Presentation supplied by RpgUi: the shared theme and a safe-area rectangle. Dialogue
+## advancement, conditions and flags stay here; only layout and styling come from outside.
+var ui_theme: Theme
+var ui_rect := Rect2()
+var speaker_label: Label
+var choice_scroll: ScrollContainer
+
+func present(theme: Theme, rect: Rect2) -> void:
+	ui_theme = theme
+	ui_rect = rect
+	apply_presentation()
+
+func apply_presentation() -> void:
+	if ui == null: return
+	if ui_theme != null: ui.theme = ui_theme
+	if ui_rect.has_area():
+		ui.position = ui_rect.position
+		ui.size = ui_rect.size
+		ui.custom_minimum_size = Vector2.ZERO
+
 func build_ui() -> void:
 	var layer := CanvasLayer.new()
+	# Above the gameplay UI layer: dialogue owns presentation while it is active.
+	layer.layer = 2
 	add_child(layer)
 	ui = PanelContainer.new()
-	var theme := Theme.new()
-	theme.default_font_size = 22
-	ui.theme = theme
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.065, 0.1, 0.1, 0.98)
-	style.border_color = Color(0.48, 0.52, 0.34)
-	style.set_border_width_all(2)
-	style.set_content_margin_all(18)
-	ui.add_theme_stylebox_override("panel", style)
+	ui.name = "DialoguePanel"
+	if ui_theme == null:
+		var theme := Theme.new()
+		theme.default_font_size = 22
+		ui.theme = theme
 	ui.position = Vector2(180, 300)
 	ui.custom_minimum_size = Vector2(920, 240)
 	layer.add_child(ui)
 	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
 	ui.add_child(box)
+	speaker_label = Label.new()
+	speaker_label.name = "Speaker"
+	speaker_label.add_theme_color_override("font_color", Color("d6c99e"))
+	box.add_child(speaker_label)
 	text_label = Label.new()
+	text_label.name = "Line"
 	text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	text_label.custom_minimum_size = Vector2(660, 70)
+	text_label.custom_minimum_size = Vector2(0, 56)
 	box.add_child(text_label)
+	# Touch-owned scrolling: a swipe over responses never selects one.
+	choice_scroll = load("res://game/ui/TouchScroll.cs").new()
+	choice_scroll.name = "Responses"
+	choice_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	choice_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	choice_scroll.scroll_deadzone = 12
+	box.add_child(choice_scroll)
 	choices = VBoxContainer.new()
-	box.add_child(choices)
+	choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	choices.add_theme_constant_override("separation", 10)
+	choice_scroll.add_child(choices)
+	apply_presentation()
 
 func advance(cue: String) -> void:
 	if advancing: return
@@ -340,10 +374,13 @@ func advance(cue: String) -> void:
 		speaking = false
 		ui.hide()
 		return
-	text_label.text = current_line.character + ": " + current_line.text
+	speaker_label.text = current_line.character.to_upper()
+	text_label.text = current_line.text
+	choice_scroll.scroll_vertical = 0
 	if current_line.responses.is_empty():
 		var button := Button.new()
 		button.custom_minimum_size.y = 64
+		button.name = "Continue"
 		button.text = "Continue"
 		button.pressed.connect(func(): advance(current_line.next_id))
 		choices.add_child(button)
@@ -352,10 +389,16 @@ func advance(cue: String) -> void:
 			if not response.is_allowed: continue
 			var button := Button.new()
 			button.custom_minimum_size.y = 64
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			button.text = response.text
 			button.disabled = not response.is_allowed
 			button.pressed.connect(func(): advance(response.next_id))
 			choices.add_child(button)
+	# Keyboard/controller focus starts on the first response; Back cannot dismiss dialogue.
+	for child in choices.get_children():
+		if child is Button and child.visible and not child.disabled:
+			child.call_deferred("grab_focus")
+			break
 	if OS.has_feature("android"):
 		await get_tree().process_frame
 		if epoch != dialogue_epoch: return

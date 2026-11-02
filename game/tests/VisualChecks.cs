@@ -458,6 +458,8 @@ public static class VisualChecks
         {
             await WallDepthChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return;
         }
+        if(OS.GetCmdlineUserArgs().Contains("--part4-only"))
+        { await AccessibilityChecks.Rendered(app); await UiNavigationChecks.Rendered(app); GD.Print("VISUAL CHECKS PASSED"); return; }
         if(OS.GetCmdlineUserArgs().Contains("--screens-only"))
         { await RpgScreensChecks.Rendered(app); await UiNavigationChecks.Rendered(app); GD.Print("VISUAL CHECKS PASSED"); return; }
         if(OS.GetCmdlineUserArgs().Contains("--hud-only"))
@@ -489,6 +491,7 @@ public static class VisualChecks
         await UiNavigationChecks.Rendered(app);
         await HudChecks.Rendered(app);
         await RpgScreensChecks.Rendered(app);
+        await AccessibilityChecks.Rendered(app);
         await MobileCombatControlsChecks.Rendered(app);
         await MobileCombatControlsChecks.InputPipeline(app);
         await Capture(app, "menu");
@@ -505,7 +508,10 @@ public static class VisualChecks
             }
             Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=false,Position=start-new Vector2(0,180)});
             await Frames(app,2);
-            if(scroller.ScrollVertical<60 || !app.Ui.MenuOpen)throw new InvalidOperationException("Menu swipe over button rows did not scroll safely");
+            // Part 4 moved developer rows off the menu, so it may scroll less than before.
+            // Require the swipe to scroll as far as it can (up to 60) without activating a row.
+            float scrollable=(float)(scroller.GetVScrollBar().MaxValue-scroller.GetVScrollBar().Page);
+            if(scrollable<1 || scroller.ScrollVertical<Math.Min(60,scrollable)-1 || !app.Ui.MenuOpen)throw new InvalidOperationException($"Menu swipe over button rows did not scroll safely ({scroller.ScrollVertical}/{scrollable})");
             scroller.ScrollVertical=0;
             await Frames(app,3);
             var enter=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Enter / Resume");
