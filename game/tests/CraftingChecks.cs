@@ -6,6 +6,38 @@ namespace Mosslight;
 /// <summary>Exercise real Gloot constraints and transactional crafting on isolated bags.</summary>
 public static class CraftingChecks
 {
+    // JSON object property order is not gameplay state: Gloot restores a parsed
+    // dictionary and may serialize its keys in a different insertion order.
+    private static bool SameJson(JsonElement a, JsonElement b)
+    {
+        if (a.ValueKind != b.ValueKind) return false;
+        switch (a.ValueKind)
+        {
+            case JsonValueKind.Object:
+                if (a.EnumerateObject().Count() != b.EnumerateObject().Count()) return false;
+                foreach (var property in a.EnumerateObject())
+                    if (!b.TryGetProperty(property.Name, out var other) || !SameJson(property.Value, other))
+                        return false;
+                return true;
+            case JsonValueKind.Array:
+                if (a.GetArrayLength() != b.GetArrayLength()) return false;
+                for (int i = 0; i < a.GetArrayLength(); i++)
+                    if (!SameJson(a[i], b[i])) return false;
+                return true;
+            case JsonValueKind.String:
+                return a.GetString() == b.GetString();
+            case JsonValueKind.Number:
+                return a.GetDouble().Equals(b.GetDouble());
+            case JsonValueKind.True:
+            case JsonValueKind.False:
+            case JsonValueKind.Null:
+            case JsonValueKind.Undefined:
+                return true;
+            default:
+                return a.GetRawText() == b.GetRawText();
+        }
+    }
+
     public static void Run(Foundation app, Action<bool, string> check)
     {
         var world = app.World;
@@ -53,7 +85,7 @@ public static class CraftingChecks
             using (var beforeDoc = JsonDocument.Parse(fullBefore))
             using (var afterDoc = JsonDocument.Parse(fullAfter))
             {
-                bool same = JsonElement.DeepEquals(beforeDoc.RootElement, afterDoc.RootElement);
+                bool same = SameJson(beforeDoc.RootElement, afterDoc.RootElement);
                 if (!same)
                 {
                     var b = beforeDoc.RootElement;
@@ -84,7 +116,7 @@ public static class CraftingChecks
                 "multi-stack output exceeding freed capacity rejects any partial grant");
             using (var beforeDoc = JsonDocument.Parse(batchBefore))
             using (var afterDoc = JsonDocument.Parse(batchAfter))
-                check(JsonElement.DeepEquals(beforeDoc.RootElement, afterDoc.RootElement),
+                check(SameJson(beforeDoc.RootElement, afterDoc.RootElement),
                     "oversized output rollback restores full Gloot state and serial");
 
             const string equipment = "craft-test:equipment";
