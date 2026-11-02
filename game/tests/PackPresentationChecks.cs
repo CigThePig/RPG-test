@@ -116,7 +116,7 @@ public static class PackPresentationChecks
             ui.PackState.DetailOpen=false;
             await Resize(1024,768);
             Require(Find<PackLayout>("wayfarers_kit")?.Mode == PackLayout.LayoutKind.Compact,
-                "1024x768 uses compact two-region arrangement");
+                "1024x768 uses compact two-region arrangement; actual " + Find<PackLayout>("wayfarers_kit")?.Mode + " panel " + ui.ScreenRect.Size + " viewport " + app.GetViewport().GetVisibleRect().Size + " scale " + ui.TextScale);
             var selected=Find<ItemTile>("item_potion");
             Require(selected!=null,"compact backpack shows real items");
             selected!.EmitSignal(Button.SignalName.Pressed);await Frames();
