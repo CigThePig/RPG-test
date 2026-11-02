@@ -103,6 +103,37 @@ public static class UiDesign
         return row;
     }
 
+    /// <summary>Distinct recessed, selected and momentary-pressed tile faces.</summary>
+    public static StyleBoxFlat InventoryTile(bool selected, bool pressed = false)
+    {
+        var border = selected ? (HighContrast ? Ink : Bronze) : (HighContrast ? new Color("9baca0") : new Color("4b6157"));
+        var face = pressed ? new Color("0c1715") :
+            selected ? new Color("33463a") : new Color("12211f");
+        var style = Box(face, border, selected ? 3 : 1);
+        style.ContentMarginLeft = style.ContentMarginRight = 5;
+        style.ContentMarginTop = style.ContentMarginBottom = 5;
+        return style;
+    }
+
+    /// <summary>Reusable fixed-height RPG region with a flexible interior.</summary>
+    public static VBoxContainer InventoryPanel(Node parent, string name, string heading)
+    {
+        var panel = new PanelContainer { Name = name, SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Pass };
+        var style = Box(HighContrast ? new Color("0d1917") : new Color("20332e"), Border, HighContrast ? 2 : 1);
+        style.ContentMarginLeft = style.ContentMarginRight = 10;
+        style.ContentMarginTop = style.ContentMarginBottom = 8;
+        panel.AddThemeStyleboxOverride("panel", style);
+        parent.AddChild(panel);
+        var column = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill };
+        column.AddThemeConstantOverride("separation", 7);
+        panel.AddChild(column);
+        var title = Heading(column, heading);
+        title.AddThemeFontSizeOverride("font_size", 18);
+        return column;
+    }
+
     public static Rect2 Overlay(Rect2 safe, float width) => new(
         safe.Position + new Vector2((safe.Size.X - Math.Min(width, safe.Size.X - 32)) / 2, 16),
         new Vector2(Math.Min(width, safe.Size.X - 32), safe.Size.Y - 112));
