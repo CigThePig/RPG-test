@@ -1,6 +1,6 @@
 # PR #7 Part 1 handoff
 
-Implementation: `422cecba2ceff7a9d0e2e7b131713985fb550cd3` on `feat/mobile-ui-ux-overhaul`. This document changes no production source. Keep PR #7 draft. Parts 2–4 and physical S25 acceptance remain outstanding.
+Implementation: `422cecba2ceff7a9d0e2e7b131713985fb550cd3` on `feat/mobile-ui-ux-overhaul`. A follow-up preserves the screen caller across inventory Use/refresh; see the final PR head for this fix and its regression. Keep PR #7 draft. Parts 2–4 and physical S25 acceptance remain outstanding.
 
 ## Delivered
 
@@ -16,7 +16,7 @@ Implementation: `422cecba2ceff7a9d0e2e7b131713985fb550cd3` on `feat/mobile-ui-ux
 
 `UiNavigationChecks.Run` is registered in FoundationChecks. `UiNavigationChecks.Rendered` runs in both full rendered suites and can be isolated with `--visual-check --ui-only` (add `--mobile-ui` for the phone layout). Existing MobileCombatControlsChecks are preserved.
 
-Local verification before this handoff: .NET 9.0.203 build succeeds with existing addon warnings; Godot 4.6.1 import exits 0; headless suite passes 8,750 assertions; full desktop and mobile rendered suites pass. A final repeat against the committed production source is in progress. Local Godot import also emits an EditorSettings shutdown diagnostic during editor teardown; no runtime verification errors were accepted. Hosted workflows remain the authority for pinned .NET 8 engine hosting and Android export.
+Local verification before this handoff: .NET 9.0.203 build succeeds with existing addon warnings; Godot 4.6.1 import exits 0; headless suite passes 8,750 assertions; full desktop and mobile rendered suites pass. The final-source repeat of headless, full desktop and full mobile suites also passes. A subsequent focused fix preserves the Pack menu caller across potion use; actual production-item rendered regressions pass in desktop and mobile layouts. Exact final-head hosted workflows are tracked in PR #7. Local Godot import also emits an EditorSettings shutdown diagnostic during editor teardown; no runtime verification errors were accepted. Hosted workflows remain the authority for pinned .NET 8 engine hosting and Android export.
 
 Rendered coverage: five viewport sizes (1280×800, 1280×720, 1920×864, 1024×768, 900×560), large screen text and nonzero safe insets, real touch Back, keyboard Escape, WM Back, focus, destructive cancellation and lifecycle pause. The native suite retains translated/scaled safe-area conversion and combat/touch ownership assertions. Pilot baselines are emitted to `docs/native-screenshots/*ui-character*`; full suites also emit standard Character/menu, dialogue, combat and adventure evidence.
 

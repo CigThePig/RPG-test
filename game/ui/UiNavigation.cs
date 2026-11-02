@@ -7,6 +7,7 @@ public sealed class UiNavigation
     public bool Menu { get; private set; } = true;
     public bool Confirmation { get; private set; }
     bool returnToMenu;
+    public bool ReturnsToMenu => returnToMenu;
     public bool Blocked => Menu || Screen != null || Confirmation;
     public void Open(string screen)
     {

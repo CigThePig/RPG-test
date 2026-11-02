@@ -369,8 +369,10 @@ public partial class RpgUi : CanvasLayer
             if (row.GetProperty("healing").GetSingle() > 0)
                 Button(body, "Use · " + title, () =>
                 {
+                    bool returnToMenu = navigation.ReturnsToMenu;
                     ClosePanels();
                     App.UseQuickItem(selector);
+                    if (returnToMenu) navigation.Pause();
                     Inventory();
                 });
         }
