@@ -10,6 +10,11 @@ public partial class TouchScroll : ScrollContainer
     bool dragging, suppressMouse;
     int mouseReleaseGraceFrames;
     Button? pressed;
+    bool NativeTouchTarget(Vector2 position) =>
+        GetVScrollBar().GetGlobalRect().HasPoint(position) ||
+        FindChildren("*","Control",true,false).OfType<Control>().Any(c =>
+            c.IsVisibleInTree() && c.GetGlobalRect().HasPoint(position) &&
+            (c is Slider || c is OptionButton));
     public void CancelGesture() => Cancel();
     void Cancel()
     {
@@ -19,7 +24,12 @@ public partial class TouchScroll : ScrollContainer
     public override void _Input(InputEvent e)
     {
         if(!IsVisibleInTree()){Cancel();suppressMouse=false;return;}
-        if(e is InputEventMouse mouse && mouse.Device==InputEvent.DeviceIdEmulation && suppressMouse)
+        // Emulated mouse-down may precede the matching screen-touch press on
+        // Android. Intercept it at the scroll surface even before finger ownership
+        // is established, or Button can remain natively pressed when we later
+        // consume its emulated mouse-up. Real mouse input is unaffected.
+        if(e is InputEventMouse mouse && mouse.Device==InputEvent.DeviceIdEmulation &&
+            (suppressMouse || (GetGlobalRect().HasPoint(mouse.Position) && !NativeTouchTarget(mouse.Position))))
         {
             // Godot can deliver the emulated mouse-up before the screen-touch release.
             // Do not let that mouse-up end suppression while the finger still owns the
@@ -47,8 +57,7 @@ public partial class TouchScroll : ScrollContainer
             {
                 // The scrollbar remains directly draggable. Range controls and popup selectors
                 // must receive native GUI events rather than being treated as menu buttons.
-                if(GetVScrollBar().GetGlobalRect().HasPoint(touch.Position)) {suppressMouse=false;return;}
-                if(FindChildren("*","Control",true,false).OfType<Control>().Any(c=>c.IsVisibleInTree() && c.GetGlobalRect().HasPoint(touch.Position) && (c is Slider || c is OptionButton))) {suppressMouse=false;return;}
+                if(NativeTouchTarget(touch.Position)) {suppressMouse=false;return;}
                 finger=touch.Index;start=touch.Position;initialScroll=ScrollVertical;dragging=false;suppressMouse=true;mouseReleaseGraceFrames=0;
                 pressed=FindChildren("*","Button",true,false).OfType<Button>().LastOrDefault(b=>b.IsVisibleInTree() && !b.Disabled && b.GetGlobalRect().HasPoint(touch.Position));
                 if(pressed!=null)pressed.Modulate=new Color(.75f,.85f,.85f);
