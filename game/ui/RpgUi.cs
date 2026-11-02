@@ -33,6 +33,7 @@ public partial class RpgUi : CanvasLayer
     public UiNavigation Navigation => navigation;
     public float TextScale { get; private set; } = 1;
     public Rect2 ScreenRect => panel.GetGlobalRect();
+    internal Vector2 PackAvailableSize { get; private set; }
     public Rect2 DialogueRect { get; private set; }
     public Button ScreenBack => panel.BackButton;
     internal PackViewState PackState { get; } = new();
@@ -270,6 +271,7 @@ public partial class RpgUi : CanvasLayer
         var overlaySafe = new Rect2(Vector2.Zero, size);
         if (OS.HasFeature("android")) overlaySafe = MobileCombatControls.ToLogicalSafeArea(overlaySafe, DisplayServer.GetDisplaySafeArea(), GetViewport().GetScreenTransform());
         overlaySafe = VerificationSafeArea ?? overlaySafe;
+        PackAvailableSize = new Vector2(Math.Max(0, overlaySafe.Size.X - 32), Math.Max(0, overlaySafe.Size.Y - 32));
         void Arrange(Control control, float width)
         {
             var rect = UiDesign.Overlay(overlaySafe, width);

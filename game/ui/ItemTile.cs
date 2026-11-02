@@ -13,7 +13,7 @@ public partial class ItemTile : Button
     {
         Item = item;
         Name = "item_" + item.Selector.ToLowerInvariant().Replace(':', '_');
-        CustomMinimumSize = new Vector2(96 * scale, 110 * scale);
+        CustomMinimumSize = new Vector2(78 * scale, 104 * scale);
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         MouseFilter = MouseFilterEnum.Pass;
         FocusMode = FocusModeEnum.All;
@@ -26,7 +26,7 @@ public partial class ItemTile : Button
         content.AddThemeConstantOverride("separation", 2);
         AddChild(content);
         var icon = new TextureRect {
-            Texture = ItemIconAtlas.Get(item.Id), CustomMinimumSize = new Vector2(50 * scale, 50 * scale),
+            Texture = ItemIconAtlas.Get(item.Id), CustomMinimumSize = new Vector2(46 * scale, 46 * scale),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             TextureFilter = CanvasItem.TextureFilterEnum.Nearest, MouseFilter = MouseFilterEnum.Ignore
         };

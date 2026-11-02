@@ -67,7 +67,10 @@ public partial class PackLayout : VBoxContainer
         equipped = snapshot.Where(v => v.Equipped && v.EquippedSlot is "weapon" or "body")
             .GroupBy(v => v.EquippedSlot).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         state.Reconcile(snapshot);
-        Mode = ChooseMode(ui.ScreenRect.Size - new Vector2(32, 72), ui.TextScale);
+        // Use the intended logical safe area, not the current Container minimum size.
+        // The previous three-pane children may still be influencing the panel's
+        // measured rectangle when the viewport contracts in this same frame.
+        Mode = ChooseMode(ui.PackAvailableSize - new Vector2(32, 72), ui.TextScale);
 
         var top = UiDesign.Tabs(this, PackScreen.Tabs, 0, tab =>
         {
@@ -242,9 +245,9 @@ public partial class PackLayout : VBoxContainer
         column.AddChild(bagScroll);
 
         float scale = ui.TextScale;
-        float usableWidth = Math.Max(220, ui.ScreenRect.Size.X - 64);
+        float usableWidth = Math.Max(220, ui.PackAvailableSize.X - 32);
         float share = Mode switch { LayoutKind.Wide => .41f, LayoutKind.Compact => .64f, _ => 1f };
-        int columns = Math.Clamp((int)((usableWidth * share - 28 + 7) / (96 * scale + 7)), 2, 6);
+        int columns = Math.Clamp((int)((usableWidth * share - 24 + 7) / (78 * scale + 7)), 2, 6);
         var grid = new GridContainer { Name = "item_grid", Columns = columns,
             SizeFlagsHorizontal = SizeFlags.ExpandFill };
         grid.AddThemeConstantOverride("h_separation", 7);
