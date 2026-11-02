@@ -74,9 +74,12 @@ public static class PackPresentationChecks
         {
             window.Size=new Vector2I(w,h);
             await Frames();
+            // Under Xvfb the root Godot viewport can remain at 1280x800 even
+            // after Window.Size changes. Exercise the requested logical safe
+            // rectangle explicitly rather than re-reading the stale root size.
             var visible=app.GetViewport().GetVisibleRect();
             ui.VerificationSafeArea=new Rect2(visible.Position+new Vector2(60,28),
-                visible.Size-new Vector2(120,56));
+                new Vector2(w-120,h-56));
             ui.SetTextScale(scale);
             ui.PackTab=0;ui.Inventory();
             await Frames(8);
