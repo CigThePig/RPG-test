@@ -95,8 +95,14 @@ public sealed class Items(Node service, EventStream events)
         if (price < 0) return TradeFailure.Invalid;
         if (Count(merchant, item) < 1) return TradeFailure.OutOfStock;
         if (Count(buyer, "coin") < price) return TradeFailure.InsufficientFunds;
-        if (!HasSpace(buyer, item)) return TradeFailure.PackFull;
-        return TradeFailure.None;
+        // Payment can free a stack. Preview both transfers on isolated Gloot bags,
+        // using their real constraints and item properties without touching live state.
+        return service.Call("trade_delivery_preview", buyer, merchant, item, price).AsString() switch
+        {
+            "ready" => TradeFailure.None,
+            "pack_full" => TradeFailure.PackFull,
+            _ => TradeFailure.Failed
+        };
     }
 
     public void Reconcile(ActorState actor) => service.Call("reconcile_equipment", actor.Id, actor.Grasps);

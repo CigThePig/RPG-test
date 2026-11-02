@@ -315,3 +315,15 @@ func unequip(owner: String, slot_name: String) -> bool:
 func prototype_title(prototype: String) -> String:
 	if not protos.data.has(prototype): return ""
 	return str(protos.data[prototype].get("name", prototype))
+
+## Read-only trade preflight on disposable copies of the two authoritative bags.
+## Use the same transfer order as Items.Trade: payment can free the output slot.
+func trade_delivery_preview(buyer: String, merchant: String, prototype: String, price: int) -> String:
+	var staged := ItemServiceFactory()
+	var copied: bool = staged.bag(buyer).deserialize(bag(buyer).serialize())
+	copied = copied and staged.bag(merchant).deserialize(bag(merchant).serialize())
+	var result := "failed"
+	if copied and (price == 0 or staged.transfer(buyer, merchant, "coin", price)):
+		result = "ready" if staged.transfer(merchant, buyer, prototype, 1) else "pack_full"
+	staged.free()
+	return result

@@ -147,7 +147,7 @@ public static class Persistence
         w.RebuildSpells();
     }
 
-    /// <summary>Where manual slots live. Verification runs redirect this so they never touch a player's saves.</summary>
+    /// <summary>Where manual slots and recovery autosaves live. Verification redirects both away from player saves.</summary>
     public static string SlotDirectory { get; set; } = "user://";
     public static string SlotPath(int slot)
     {
@@ -157,7 +157,7 @@ public static class Persistence
     }
 
     public static double LastSaveMilliseconds { get; private set; }
-    public static string AutosavePath => ProjectSettings.GlobalizePath("user://autosave.json");
+    public static string AutosavePath => ProjectSettings.GlobalizePath($"{SlotDirectory}autosave.json");
     public static void SaveAutosave(World w, Node narrative)
     {
         PreserveOlderBackgroundSave(AutosavePath);
@@ -172,7 +172,7 @@ public static class Persistence
         {
             using var old=JsonDocument.Parse(File.ReadAllText(path));
             compatible=old.RootElement.ValueKind==JsonValueKind.Object&&old.RootElement.TryGetProperty("Generator",out var generator)&&generator.ValueKind==JsonValueKind.String&&generator.GetString()==Mosslight.Regions.Version&&
-                old.RootElement.TryGetProperty("Schema",out var schema)&&schema.TryGetInt32(out int version)&&version==1;
+                old.RootElement.TryGetProperty("Schema",out var schema)&&schema.ValueKind == JsonValueKind.Number && schema.TryGetInt32(out int version)&&version==1;
         }
         catch(JsonException) { } // Preserve malformed recovery files too, rather than discarding them.
         if(compatible)return;
@@ -221,8 +221,10 @@ public static class Persistence
             using var doc = JsonDocument.Parse(text);
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return new(SlotState.Damaged, "Damaged save file", 0, "", 0, 0, saved);
-            bool current = root.TryGetProperty("Generator", out var generator) && generator.ValueKind == JsonValueKind.String && generator.GetString() == Mosslight.Regions.Version
-                && root.TryGetProperty("Schema", out var schema) && schema.TryGetInt32(out int version) && version == 1;
+            if (!root.TryGetProperty("Generator", out var generator) || generator.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(generator.GetString())
+                || !root.TryGetProperty("Schema", out var schema) || schema.ValueKind != JsonValueKind.Number || !schema.TryGetInt32(out int version))
+                return new(SlotState.Damaged, "Damaged save metadata", 0, "", 0, 0, saved);
+            bool current = generator.GetString() == Mosslight.Regions.Version && version == 1;
             if (!current) return new(SlotState.Incompatible, "From an older Mosslight build · kept safe, cannot be loaded here", 0, "", 0, 0, saved);
         }
         catch (JsonException) { return new(SlotState.Damaged, "Damaged save file", 0, "", 0, 0, saved); }
@@ -232,7 +234,7 @@ public static class Persistence
             var player = data.Actors["player"];
             return new(SlotState.Ready, "Ready", player.Level, player.Region, data.Time, data.Tick, saved);
         }
-        catch (Exception e) when (e is InvalidDataException or JsonException or KeyNotFoundException or ArgumentException or NotSupportedException)
+        catch (Exception e) when (e is InvalidDataException or JsonException or KeyNotFoundException or ArgumentException or NotSupportedException or NullReferenceException or InvalidOperationException or OverflowException)
         {
             return new(SlotState.Damaged, "Damaged save file · " + e.Message, 0, "", 0, 0, saved);
         }

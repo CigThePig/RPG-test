@@ -70,7 +70,7 @@ Builds on Parts 1–3. With this part, all four planned parts of PR #7 are imple
 - The Android smoke test still taps dialogue responses at the logical coordinates `Narrative.gd` logs (unchanged behaviour). Its menu target names are unchanged, but the menu no longer contains Save/Load/Audio rows. Check the hosted Android run.
 - There is no control remapping, HUD scaling, control-opacity setting or colour-blind palette. Information never depends on colour alone, so none was required for correctness, but players may still want them.
 - Logical units are not dp. Thumb comfort, physical readability and OS font scaling on the S25 are unverified.
-- Hosted workflows (pinned .NET 8 engine host, Android export and emulator smoke) have not run on these commits because they are on the session branch, not the PR branch.
+- All four parts are on the PR branch. Current hosted run URLs and results are tracked in the PR description; physical acceptance is still pending.
 
 ## Final phone acceptance checklist (Samsung Galaxy S25, ARM64 APK)
 
@@ -84,3 +84,11 @@ Builds on Parts 1–3. With this part, all four planned parts of PR #7 are imple
 8. **Settings:** Largest text everywhere, high contrast and reduced motion; check that sound off persists.
 9. **The integrated adventure:** play The Buried Light end to end (combat, ruin keys/gates/levers/braziers, journal, map, relic, return, reward) on the phone.
 10. Record observed issues in the PR. Fix high-severity UX defects before marking the PR ready.
+
+## PR #7 review corrections
+
+- **Autosave isolation:** recovery autosaves now use `Persistence.SlotDirectory` alongside manual slots. Production still defaults to `user://`; every verification layout writes its recovery files to its own verification folder. A rendered lifecycle regression checks the normal recovery file byte-for-byte (or verifies it remains absent), without seeding or modifying it, and requires the isolated autosave to load successfully.
+- **Damaged save inspection:** malformed/missing metadata is reported as damaged, while recognised older generator/schema versions remain protected. Wrong-type schema fields and null collections no longer abort slot inspection. Malformed recovery metadata is also preserved before a new autosave is written. Added native regressions plus malformed-metadata coverage in the actual Save & load screen.
+- **Trade capacity:** read-only preflight now uses disposable Gloot copies of the two bags and the same payment-then-delivery transfers as production. Spending the final coin stack can free a slot; leftover coins still block an item that cannot fit. Regressions require agreement with the real transaction, unchanged preview state/events, and exact inventory restoration on failure.
+
+Local verification uses Godot 4.6.1, SDK 9.0.203 and the .NET 8.0.15 engine host. Build and full headless verification pass (8,878 assertions). Rendered and hosted verification results are recorded in the PR description. Import exits successfully with the pre-existing Dialogue Manager editor `is_importing` and EditorSettings shutdown diagnostics; runtime verification rejects script/engine errors.

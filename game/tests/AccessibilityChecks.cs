@@ -72,12 +72,40 @@ public static class AccessibilityChecks
             check(refused && File.ReadAllText(Persistence.SlotPath(2)) == oldText, "older adventure is never overwritten");
             File.WriteAllText(Persistence.SlotPath(3), "{\"Schema\":1,\"Generator\":\"" + Regions.Version + "\",\"Actors\":{}}");
             check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Damaged, "current-version file failing validation is damaged");
+            // Valid JSON can still contain invalid types/nulls. Inspection must
+            // classify it as damaged instead of aborting the entire slot screen.
+            string validSave = File.ReadAllText(Persistence.SlotPath(1));
+            foreach (string malformed in new[]
+            {
+                "{\"Generator\":\"" + Regions.Version + "\",\"Schema\":\"one\"}",
+                "{\"Generator\":\"" + Regions.Version + "\",\"Schema\":null}",
+                "{}"
+            })
+            {
+                File.WriteAllText(Persistence.SlotPath(3), malformed);
+                check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Damaged
+                    && File.ReadAllText(Persistence.SlotPath(3)) == malformed, "malformed metadata is damaged and unchanged");
+            }
+            foreach (string property in new[] { "Actors", "Regions", "Events", "Projectiles" })
+            {
+                var malformed = System.Text.Json.Nodes.JsonNode.Parse(validSave)!;
+                malformed[property] = null;
+                File.WriteAllText(Persistence.SlotPath(3), malformed.ToJsonString());
+                check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Damaged,
+                    "null " + property + " is damaged instead of throwing");
+            }
             File.WriteAllText(Persistence.SlotPath(3), "{truncated");
             check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Damaged && File.ReadAllText(Persistence.SlotPath(3)) == "{truncated", "corrupt file is damaged and untouched by inspection");
             Persistence.ReplaceDamaged(app.World, app.Narrative, 3);
             check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Ready && File.ReadAllText(Persistence.SlotPath(3) + ".damaged-1.json") == "{truncated", "replacing a damaged slot keeps a copy of it");
             refused = false; try { Persistence.ReplaceDamaged(app.World, app.Narrative, 1); } catch (InvalidOperationException) { refused = true; }
             check(refused, "only damaged slots can be replaced without confirmation of overwrite");
+            string malformedRecovery = "{\"Generator\":\"" + Regions.Version + "\",\"Schema\":\"broken\"}";
+            File.WriteAllText(Persistence.AutosavePath, malformedRecovery);
+            Persistence.SaveAutosave(app.World, app.Narrative);
+            check(Persistence.Inspect(Persistence.AutosavePath, content).State == SlotState.Ready
+                && File.ReadAllText(Persistence.AutosavePath + ".retained-1.json") == malformedRecovery,
+                "malformed autosave metadata is retained before writing a usable recovery save");
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); Persistence.SlotDirectory = previousSlots; }
     }
@@ -183,7 +211,7 @@ public static class AccessibilityChecks
             Require(w.Player.Level == level && !ui.BlocksInput, "confirmed load restores the slot and resumes play");
             var old = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Persistence.SlotPath(1)))!; old["Generator"] = "older-generator";
             File.WriteAllText(Persistence.SlotPath(2), old.ToJsonString());
-            File.WriteAllText(Persistence.SlotPath(3), "{truncated");
+            File.WriteAllText(Persistence.SlotPath(3), "{\"Generator\":\"" + Regions.Version + "\",\"Schema\":\"broken\"}");
             ui.PauseForVerification(); ui.SaveLoad(); await Frames();
             Require(Find("load_2").Disabled && Find("save_2").Disabled, "older-version slot can be neither loaded nor overwritten");
             Require(Find("load_3").Disabled && Find("save_3").Text.StartsWith("Replace damaged"), "damaged slot cannot load and offers an explicit replacement");
@@ -193,6 +221,19 @@ public static class AccessibilityChecks
             await Accept();
             Require(Persistence.Inspect(Persistence.SlotPath(3), w.Content).State == SlotState.Ready && File.Exists(Persistence.SlotPath(3) + ".damaged-1.json"), "damaged slot replaced, original kept");
             ui.Back(); await Frames();
+
+            // A real lifecycle pause must write only to the verification folder.
+            // Never seed, replace or delete a player's actual recovery file, even in a test.
+            string playerAutosave = ProjectSettings.GlobalizePath("user://autosave.json");
+            byte[]? previousAutosave = File.Exists(playerAutosave) ? File.ReadAllBytes(playerAutosave) : null;
+            Require(Persistence.AutosavePath.StartsWith(slotDir, StringComparison.Ordinal), "autosave is inside the isolated slot directory");
+            app.ResumeGame();
+            app._Notification((int)Node.NotificationApplicationFocusOut);
+            app._Notification((int)Node.NotificationApplicationFocusIn);
+            Require(previousAutosave == null ? !File.Exists(playerAutosave)
+                : File.Exists(playerAutosave) && File.ReadAllBytes(playerAutosave).SequenceEqual(previousAutosave),
+                "lifecycle pause preserves the player's real recovery save");
+            Require(Persistence.Inspect(Persistence.AutosavePath, w.Content).State == SlotState.Ready, "lifecycle pause writes an isolated usable autosave");
 
             // Dialogue: themed, safe, focusable, uninterruptible by Back, blocks gameplay input.
             app.ResumeGame(); await Frames();

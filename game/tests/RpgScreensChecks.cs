@@ -96,6 +96,32 @@ public static class RpgScreensChecks
             int owned = items.Count("player", stock.Id);
             check(items.Trade("player", merchant.Id, stock.Id, price) && items.LastTradeFailure == TradeFailure.None && items.Count("player", stock.Id) == owned + 1 && items.Count("player", "coin") == 0, "successful trade moves goods and payment");
 
+            // A full bag may accept goods after its final payment stack leaves.
+            const string buyer = "trade-review:buyer", seller = "trade-review:merchant";
+            items.Add(buyer, "coin", price);
+            items.Add(seller, "potion", 2);
+            var tradeLimit = CapacityLimit(w, buyer);
+            try
+            {
+                string beforePreview = items.Service.Call("export_state").AsString();
+                int eventsBefore = w.Events.Recent.Count;
+                check(items.TradePreview(buyer, seller, "potion", price) == TradeFailure.None,
+                    "trade preview allows payment to free the only slot");
+                check(items.Service.Call("export_state").AsString() == beforePreview && w.Events.Recent.Count == eventsBefore,
+                    "trade preview leaves Gloot identities, serial, constraints and events unchanged");
+                check(items.Trade(buyer, seller, "potion", price) && items.Count(buyer, "coin") == 0 && items.Count(buyer, "potion") == 1,
+                    "trade advertised by the preview completes after freeing payment slot");
+                // Leftover coins keep the only slot occupied; no potion stack exists to merge into.
+                items.Take(buyer, "potion", 1); items.Add(buyer, "coin", price + 1);
+                beforePreview = items.Service.Call("export_state").AsString();
+                check(items.TradePreview(buyer, seller, "potion", price) == TradeFailure.PackFull,
+                    "trade preview rejects a bag still full after payment");
+                check(!items.Trade(buyer, seller, "potion", price) && items.LastTradeFailure == TradeFailure.PackFull
+                    && items.Service.Call("export_state").AsString() == beforePreview,
+                    "rejected trade returns full payment and preserves exact inventories");
+            }
+            finally { Release(tradeLimit); }
+
             // Journal rows: status, stages, prerequisites, without mutation.
             Persistence.Restore(w, n, original);
             n.Call("import_state", "{\"flags\":{},\"pools\":{},\"quests\":{}}");
