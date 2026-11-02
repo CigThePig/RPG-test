@@ -1,5 +1,5 @@
 # PR #7: Mobile UI and RPG experience overhaul
-Status: Parts 1 and 2 are implemented on this branch (Part 1: shared theme, navigation/screen host, Character pilot; Part 2: gameplay HUD, structured quest objective, contextual Interact and action availability). Automated verification and physical acceptance for each part are tracked in the PR, `PR7_PART1_HANDOFF.md` and `PR7_PART2_HANDOFF.md`. Parts 3-4 are **not yet implemented**. The crafting regression fix remains implemented. Keep the pull request in draft until all four parts and physical Galaxy S25 acceptance are completed.
+Status: Parts 1–3 are implemented on this branch (Part 1: shared theme, navigation/screen host, Character pilot; Part 2: gameplay HUD, structured quest objective, contextual Interact and action availability; Part 3: Pack items/equipment/crafting/trading, Character progression with confirmations, structured Journal and Map). Automated verification and physical acceptance for each part are tracked in the PR and `PR7_PART1_HANDOFF.md`, `PR7_PART2_HANDOFF.md` and `PR7_PART3_HANDOFF.md`. Part 4 is **not yet implemented**. The crafting regression fix remains implemented. Keep the pull request in draft until all four parts and physical Galaxy S25 acceptance are completed.
 
 ## Goal and design priorities
 

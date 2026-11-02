@@ -56,6 +56,21 @@ Priority: dialogue > confirmation > pause menu > information screen > gameplay. 
 - Notices: up to two lines in the existing notification region (17 px). Routine action confirmations (ability names) are minor and never displace an important notice. Two important notices within 1.5 s (a quest stage and the loot that caused it) are shown together rather than overwriting. Failed casts name the first actionable reason (not learned, cooldown, mana, busy, weapon, no target). Level-ups are announced.
 - Mobile geometry is layout version 2: only Interact changed (100×72 → 108×86, moved inward). All other action rectangles, IDs and touch ownership rules are unchanged; Android smoke reads `MOSSLIGHT_CONTROL version=2`.
 
+## RPG screens (Part 3)
+
+| Surface / trigger | Result | Input/focus |
+| --- | --- | --- |
+| Pack / tab Items, Craft, Trade | Same screen, other tab | Rebuild from Gloot; scroll resets only when the tab changes |
+| Pack Items / row | Row selected, detail card below it | Tap again to collapse; swipes never select |
+| Pack / Equip, Unequip, Use, Craft, Buy | Action through Items/Foundation; same screen rebuilt | Scroll position kept; result in notification region |
+| Character / Learn or Train | Confirmation modal over the screen | Focus Cancel; Back/Cancel returns to Character unchanged |
+| Confirmation / Confirm | Action runs once; Character rebuilt | Screen caller (menu or gameplay) preserved |
+| Map / Whole map, Around you | Same screen, other view | Presentation only |
+
+- Disabled actions always have a visible reason next to them (not tooltip-only). The open tab and the selected row are marked in words or brackets as well as by outline.
+- Screens never cache gameplay state: each build reads Gloot (`Items.View`), Narrative (`journal_rows`, `journal_extras`, `objective`) and RegionState. Only the tab, selection and map zoom are UI state, and they are never saved.
+- `RpgUi.Confirm(question, label, action)` is the single modal for irreversible choices; New Game uses it with its existing Android target names.
+
 ## Verification and phone checklist
 
 UiNavigationChecks exercises state transitions in the native suite and actual rendered controls, focus, touch Back, Escape, WM Back, New Game cancellation, lifecycle pause, and Character at 1280×800, 1280×720, 1920×864, 1024×768 and 900×560 with large text and nonzero insets. Existing MobileCombatControlsChecks remain enabled, including transformed safe area and real input ownership checks. Screenshots are emitted to docs/native-screenshots/*ui-character*.

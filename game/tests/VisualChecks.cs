@@ -458,6 +458,8 @@ public static class VisualChecks
         {
             await WallDepthChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return;
         }
+        if(OS.GetCmdlineUserArgs().Contains("--screens-only"))
+        { await RpgScreensChecks.Rendered(app); await UiNavigationChecks.Rendered(app); GD.Print("VISUAL CHECKS PASSED"); return; }
         if(OS.GetCmdlineUserArgs().Contains("--hud-only"))
         { await HudChecks.Rendered(app); await MobileCombatControlsChecks.Rendered(app); await MobileCombatControlsChecks.InputPipeline(app); GD.Print("VISUAL CHECKS PASSED"); return; }
         if(OS.GetCmdlineUserArgs().Contains("--ui-only"))
@@ -486,6 +488,7 @@ public static class VisualChecks
         }
         await UiNavigationChecks.Rendered(app);
         await HudChecks.Rendered(app);
+        await RpgScreensChecks.Rendered(app);
         await MobileCombatControlsChecks.Rendered(app);
         await MobileCombatControlsChecks.InputPipeline(app);
         await Capture(app, "menu");

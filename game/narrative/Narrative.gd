@@ -206,6 +206,46 @@ func objective_row(q: Quest, status: String) -> Dictionary:
 		"reward": "%s ×%d" % [q.reward_item, q.reward_count],
 	}
 
+## Read-only journal rows for the Journal screen (PR #7 Part 3). One row per quest
+## in definition order, with stage history, prerequisites and reward state.
+## Never mutates; journal() remains for compatibility.
+func journal_rows() -> Array:
+	var rows: Array = []
+	for q in definitions:
+		var status: String = "completed" if manager.is_quest_completed(q) else "failed" if q.failed else "active" if manager.is_quest_active(q) else "available"
+		var prerequisite_met: bool = q.prerequisite <= 0 or completed(q.prerequisite)
+		if status == "available" and (accepted(q.id) or not prerequisite_met): status = "locked"
+		var stages: Array = []
+		for i in q.stages.size():
+			stages.append({"id": str(q.stages[i].id), "text": q.stages[i].text,
+				"done": i < q.stage_index or status == "completed", "current": status == "active" and i == q.stage_index})
+		var prerequisite_title := ""
+		if q.prerequisite > 0:
+			var p = manager._get_quest_by_id(q.prerequisite)
+			if p != null: prerequisite_title = p.quest_name
+		rows.append({"id": q.id, "title": q.quest_name, "description": q.quest_description, "status": status,
+			"objective": q.quest_objective, "staged": not q.stages.is_empty(), "stages": stages,
+			"progress": q.stage_index if not q.stages.is_empty() else q.progress,
+			"required": q.stages.size() if not q.stages.is_empty() else q.required,
+			"prerequisite": q.prerequisite, "prerequisite_title": prerequisite_title, "prerequisite_met": prerequisite_met,
+			"reward": "%s ×%d" % [q.reward_item, q.reward_count], "reward_item": q.reward_item, "reward_count": q.reward_count,
+			"rewarded": q.rewarded, "pending_reward": status == "completed" and not q.rewarded})
+	return rows
+
+## Read-only discoveries, mechanism counts and lore gathered from flags.
+func journal_extras() -> Dictionary:
+	var discoveries: Array = []
+	var lore: Array = []
+	var shortcuts := 0
+	var seals := 0
+	for key in flags:
+		var k := str(key)
+		if k.begins_with("discovery:"): discoveries.append(landmark_name(flags[key]))
+		elif k.begins_with("lore:"): lore.append(flags[key])
+		elif k.begins_with("mechanism:lever_pulled:"): shortcuts += 1
+		elif k.begins_with("mechanism:seal_broken:"): seals += 1
+	return {"discoveries": discoveries, "lore": lore, "shortcuts": shortcuts, "seals": seals}
+
 func export_state() -> String:
 	return JSON.stringify({"flags": flags, "pools": manager.pool_state_as_dict(), "quests": manager.serialize_quests()})
 

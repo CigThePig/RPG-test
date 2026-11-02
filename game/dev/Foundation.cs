@@ -324,7 +324,7 @@ public partial class Foundation : Node2D
                 ui?.Notify($"Level up · now level {e.Value} · a skill point is ready in Character");
             if (e.Kind == "region_entered")
                 RebuildViews();
-            if (e.Kind == "item_equipped" && Views.TryGetValue(e.Actor, out var changed))
+            if (e.Kind is "item_equipped" or "item_unequipped" && Views.TryGetValue(e.Actor, out var changed))
             {
                 changed.Equipment(items.Call("equipment_appearance", e.Actor).AsString());
                 changed.RestoreWindup(World);

@@ -48,6 +48,56 @@ public static class UiDesign
             AutowrapMode = TextServer.AutowrapMode.WordSmart, MouseFilter = Control.MouseFilterEnum.Pass };
         button.Pressed += action; parent.AddChild(button); return button;
     }
+    /// <summary>Secondary text (reasons, hints). Lighter ivory keeps 4.5:1 on the surface; meaning is in words.</summary>
+    public static readonly Color Muted = new("c9c6b6");
+    public static Label Note(Node parent, string text)
+    {
+        var label = Text(text); label.AddThemeColorOverride("font_color", Muted); parent.AddChild(label); return label;
+    }
+    public static Label Heading(Node parent, string text)
+    {
+        var label = Text(text); label.AddThemeColorOverride("font_color", Bronze.Lightened(.25f)); parent.AddChild(label); return label;
+    }
+    /// <summary>Bordered card with a vertical column for its content.</summary>
+    public static VBoxContainer Card(Node parent, string? name = null)
+    {
+        var card = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Pass };
+        if (name != null) card.Name = name;
+        var style = Box(new Color("1d2f2b"), new Color("4f6158"));
+        style.ContentMarginTop = style.ContentMarginBottom = 10; style.ContentMarginLeft = style.ContentMarginRight = 12;
+        card.AddThemeStyleboxOverride("panel", style);
+        parent.AddChild(card);
+        var column = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        column.AddThemeConstantOverride("separation", 8);
+        card.AddChild(column);
+        return column;
+    }
+    /// <summary>
+    /// Segmented tab row. The selected tab is marked by words ("· open") and a thick
+    /// bronze outline and [brackets], not colour alone, and does not dispatch again.
+    /// </summary>
+    public static HBoxContainer Tabs(Node parent, IReadOnlyList<string> labels, int selected, Action<int> select, string namePrefix = "tab_")
+    {
+        var row = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        row.AddThemeConstantOverride("separation", 8);
+        parent.AddChild(row);
+        for (int i = 0; i < labels.Count; i++)
+        {
+            int index = i;
+            var tab = Action(row, labels[i], () => { if (index != selected) select(index); });
+            tab.Name = namePrefix + labels[i].ToLowerInvariant();
+            tab.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            if (i == selected)
+            {
+                var face = Box(new Color("365347"), new Color("ffdf8c"), 4);
+                tab.AddThemeStyleboxOverride("normal", face); tab.AddThemeStyleboxOverride("hover", face);
+                tab.TooltipText = labels[i] + " (open)";
+                tab.Text = "[" + labels[i] + "]";
+            }
+        }
+        return row;
+    }
+
     public static Rect2 Overlay(Rect2 safe, float width) => new(
         safe.Position + new Vector2((safe.Size.X - Math.Min(width, safe.Size.X - 32)) / 2, 16),
         new Vector2(Math.Min(width, safe.Size.X - 32), safe.Size.Y - 112));

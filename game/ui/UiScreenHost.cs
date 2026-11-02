@@ -21,10 +21,18 @@ public partial class UiScreenHost : PanelContainer
         column.AddChild(Scroll);
         Body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; Scroll.AddChild(Body);
     }
-    public void Present(string title)
+    int restoreScroll = -1, restoreFrames;
+    public void Present(string title, bool keepScroll = false)
     {
+        // Rebuilt content is laid out next frame; restore the position once it exists.
+        restoreScroll = keepScroll ? Scroll.ScrollVertical : -1; restoreFrames = 2;
         Scroll.CancelGesture(); Scroll.ScrollVertical = 0;
         foreach (var child in Body.GetChildren()) { Body.RemoveChild(child); child.QueueFree(); }
         heading.Text = title; Show(); BackButton.GrabFocus();
+    }
+    public override void _Process(double delta)
+    {
+        if (restoreScroll < 0 || --restoreFrames > 0) return;
+        Scroll.ScrollVertical = restoreScroll; restoreScroll = -1;
     }
 }

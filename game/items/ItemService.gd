@@ -269,3 +269,49 @@ func reward_add(owner: String, prototype: String, count: int) -> bool:
 	assert(restored, "Reward rollback failed")
 	if not restored: push_error("Reward rollback failed")
 	return false
+
+## Read-only structured inventory for the UI (PR #7 Part 3). Bag stacks and
+## equipped items, with actual Gloot selectors/instance IDs and properties.
+## Never mutates; callers must not cache it as authority.
+func inventory_view(owner: String) -> String:
+	var rows: Array = []
+	for item in bag(owner).get_items():
+		rows.append(item_row(item, false, ""))
+	for key in slots:
+		if not key.begins_with(owner + ":"): continue
+		var item: InventoryItem = slots[key].get_item()
+		if item != null: rows.append(item_row(item, true, key.get_slice(":", 1)))
+	return JSON.stringify(rows)
+
+func item_row(item: InventoryItem, equipped: bool, slot_name: String) -> Dictionary:
+	var id: String = item.get_prototype().get_prototype_id()
+	var props := {}
+	for property in ["material", "quality", "condition", "damage", "defence", "power", "mass", "healing"]:
+		if item.has_property(property): props[property] = item.get_property(property)
+	return {"selector": item.get_property("instance_id", id), "instance": item.get_property("instance_id", ""),
+		"id": id, "title": item.get_title(), "count": item.get_stack_size(), "max_stack": item.get_max_stack_size(),
+		"slot": item.get_property("slot", ""), "equipped": equipped, "equipped_slot": slot_name, "properties": props}
+
+## Read-only: what a slot currently holds ("" when empty).
+func equipped_selector(owner: String, slot_name: String) -> String:
+	var key := owner + ":" + slot_name
+	if not slots.has(key) or slots[key].get_item() == null: return ""
+	var item: InventoryItem = slots[key].get_item()
+	return item.get_property("instance_id", item.get_prototype().get_prototype_id())
+
+## Read-only: whether the bag could take this slot's item back.
+func can_unequip(owner: String, slot_name: String) -> bool:
+	var key := owner + ":" + slot_name
+	return slots.has(key) and slots[key].get_item() != null and bag(owner).can_add_item(slots[key].get_item())
+
+func unequip(owner: String, slot_name: String) -> bool:
+	if not can_unequip(owner, slot_name): return false
+	var key := owner + ":" + slot_name
+	var item: InventoryItem = slots[key].get_item()
+	slots[key]._inventory.remove_item(item)
+	return bag(owner).add_item(item)
+
+## Read-only display name of a prototype ("" when unknown).
+func prototype_title(prototype: String) -> String:
+	if not protos.data.has(prototype): return ""
+	return str(protos.data[prototype].get("name", prototype))

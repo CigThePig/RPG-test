@@ -322,14 +322,49 @@ public partial class RpgUi : CanvasLayer
     }
     void ConfirmNewGame()
     {
+        Confirm("Start a new game? Unsaved progress will be lost. Saved slots are retained.", "Start new game",
+            () => { App.Reset(); App.ResumeGame(); }, "new_game", refreshScreen: false);
+    }
+
+    /// <summary>
+    /// Modal confirmation for destructive or irreversible choices. Cancel/Back returns to
+    /// the surface underneath (menu or screen) with nothing changed. Confirm runs the action
+    /// and, when a screen was underneath, rebuilds it from production state.
+    /// </summary>
+    public void Confirm(string question, string confirmLabel, Action action, string target = "action", bool refreshScreen = true)
+    {
+        if (App.Narrative.Get("speaking").AsBool()) return;
         lastSystemBackFromKey = null;
         CancelGestures(); navigation.Confirm(); Clear(confirmation);
         var box = new VBoxContainer(); confirmation.AddChild(box);
-        box.AddChild(UiDesign.Text("Start a new game? Unsaved progress will be lost. Saved slots are retained."));
+        box.AddChild(UiDesign.Text(question));
         var cancel = Button(box, "Cancel / Back", Back);
-        navigationTargets["cancel_new_game"] = cancel;
-        navigationTargets["confirm_new_game"] = Button(box, "Start new game", () => { navigation.CancelConfirmation(); App.Reset(); App.ResumeGame(); SyncNavigation(); });
+        cancel.Name = "confirm_cancel";
+        navigationTargets["cancel_" + target] = cancel;
+        var accept = Button(box, confirmLabel, () =>
+        {
+            string? screen = navigation.Screen;
+            navigation.CancelConfirmation();
+            action();
+            SyncNavigation();
+            if (refreshScreen && screen != null && navigation.Screen == screen) RefreshScreen(screen);
+        });
+        accept.Name = "confirm_accept";
+        navigationTargets["confirm_" + target] = accept;
         SyncNavigation(); cancel.GrabFocus();
+    }
+    public string ConfirmationText => confirmation.GetChildCount() > 0 && confirmation.GetChild(0).GetChildCount() > 0 ? ((Label)confirmation.GetChild(0).GetChild(0)).Text : "";
+    public Button? ConfirmationButton(string name) => navigation.Confirmation ? confirmation.FindChild(name, true, false) as Button : null;
+
+    void RefreshScreen(string screen)
+    {
+        switch (screen)
+        {
+            case "PACK & EQUIPMENT": Inventory(); break;
+            case "QUEST JOURNAL": Journal(); break;
+            case "CHARACTER · WAYFARER": Character(); break;
+            case "REGION MAP": Map(); break;
+        }
     }
 
     void Clear(Node node)
@@ -345,7 +380,9 @@ public partial class RpgUi : CanvasLayer
     {
         if (navigation.Confirmation || App.Narrative.Get("speaking").AsBool()) return false;
         lastSystemBackFromKey = null;
-        CancelGestures(); navigation.Open(heading); panel.Present(heading); SyncNavigation(); return true;
+        // Rebuilding the same screen after an action keeps the reader's scroll position.
+        bool refresh = navigation.Screen == heading && panel.Visible;
+        CancelGestures(); navigation.Open(heading); panel.Present(heading, refresh); SyncNavigation(); return true;
     }
 
     public override void _Process(double delta)
@@ -538,112 +575,49 @@ public partial class RpgUi : CanvasLayer
     }
     public void HideMenu() { lastSystemBackFromKey = null; CancelGestures(); navigation.Resume(); SyncNavigation(); }
     public void ClosePanels() { lastSystemBackFromKey = null; CancelGestures(); navigation.Resume(); SyncNavigation(); }
+    /// <summary>Selected Pack tab (0 Items, 1 Craft, 2 Trade). Presentation state only.</summary>
+    public int PackTab { get; set; }
+    /// <summary>Selected bag row's Gloot selector (instance ID or prototype). Presentation state only.</summary>
+    public string? PackSelection { get; set; }
+    public bool MapZoomed { get; set; }
+
     public void Inventory()
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         if (!Open("PACK & EQUIPMENT")) return;
-        body.AddChild(new Label { Text = App.World.Items.Describe("player") });
-        using var catalog = JsonDocument.Parse(App.World.Items.Service.Call("catalog", "player").AsString());
-        foreach (var row in catalog.RootElement.EnumerateArray())
-        {
-            string selector = row.GetProperty("selector").GetString()!;
-            string slot = row.GetProperty("slot").GetString()!;
-            string title = row.GetProperty("title").GetString()!;
-            if (slot != "")
-            {
-                var button = Button(body, "Equip · " + title, () =>
-                {
-                    App.ManageItem(() => App.World.Items.Equip(App.World.Player, selector, slot));
-                    Inventory();
-                });
-                button.TooltipText = row.GetProperty("properties").GetString();
-            }
+        PackScreen.Populate(body, this);
+    }
 
-            if (row.GetProperty("healing").GetSingle() > 0)
-                Button(body, "Use · " + title, () =>
-                {
-                    bool returnToMenu = navigation.ReturnsToMenu;
-                    ClosePanels();
-                    App.UseQuickItem(selector);
-                    if (returnToMenu) navigation.Pause();
-                    Inventory();
-                });
-        }
-
-        foreach (var recipe in App.World.Content.Recipes)
-            Button(body, "Craft · " + System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(recipe.Id.Replace("_", " ")), () =>
-            {
-                Notify(App.ManageItem(() => App.World.Items.Craft("player", recipe)) ? "Crafted " + recipe.Output : "Missing ingredients");
-                Inventory();
-            });
-        var merchant = App.NearbyMerchant();
-        if (merchant != null)
-        {
-            using var stock = JsonDocument.Parse(App.World.Items.Service.Call("catalog", merchant.Id).AsString());
-            foreach (var row in stock.RootElement.EnumerateArray())
-            {
-                string id = row.GetProperty("id").GetString()!;
-                // Coins received from earlier sales are payment, not stock for sale.
-                if (id == "coin") continue;
-                string title = row.GetProperty("title").GetString()!;
-                Button(body, "Buy · " + title + " · 5 crowns", () =>
-                {
-                    Notify(App.ManageItem(() => App.World.Items.Trade("player", merchant.Id, id, 5)) ? "Purchase complete" : "Insufficient funds or stock");
-                    Inventory();
-                });
-            }
-        }
+    /// <summary>Uses a consumable through the gameplay path, then restores the Pack and its caller.</summary>
+    public void UseFromPack(string selector)
+    {
+        bool returnToMenu = navigation.ReturnsToMenu;
+        ClosePanels();
+        bool used = App.UseQuickItem(selector);
+        if (returnToMenu) navigation.Pause();
+        Inventory();
+        Notify(used ? "Used " + App.World.Items.Title(selector) : App.World.Player.Alive ? "Finish your current action first" : "Defeated");
     }
 
     public void Journal()
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         if (!Open("QUEST JOURNAL")) return;
-        body.AddChild(new Label { Text = App.Narrative.Call("journal").AsString(), AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(400, 300) });
+        JournalScreen.Populate(body, App);
     }
 
     public void Character()
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
-        if (!Open("CHARACTER · WAYFARER")) return; CharacterOverview.Populate(body, App);
-        var actor = App.World.Player;
-        body.AddChild(UiDesign.Text("TRAINING & ABILITIES · existing progression controls"));
-        foreach (var ability in App.World.Content.Abilities.Where(a => a.PlayerLearnable || actor.Abilities.Contains(a.Id)))
-        {
-            if (actor.Abilities.Contains(ability.Id))
-                Button(body, "Use · " + ability.Name, () =>
-                {
-                    ClosePanels();
-                    App.Cast(ability.Id);
-                });
-            else
-                Button(body, $"Learn · {ability.Name} (level {ability.UnlockLevel} / {ability.UnlockCost} points)", () =>
-                {
-                    Notify(App.ManageItem(() => Progression.Unlock(App.World, actor, ability.Id)) ? "Ability learned" : "Requirements not met");
-                    Character();
-                });
-        }
-
-        foreach (var skill in App.World.Content.Skills)
-            Button(body, $"Train · {skill.Id} [{actor.SkillRanks.GetValueOrDefault(skill.Id)}/{skill.MaxRank}]", () =>
-            {
-                App.ManageItem(() => Progression.Train(App.World, actor, skill.Id));
-                Character();
-            });
+        if (!Open("CHARACTER · WAYFARER")) return;
+        CharacterOverview.Populate(body, App, this);
     }
 
     public void Map()
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         if (!Open("REGION MAP")) return;
-        body.AddChild(new Label { Text = "E entrance · A archive · S shrine · T storeroom · R relic · L lever · B braziers · gates: gold key, grey portcullis, cyan seal · ● you", AutowrapMode=TextServer.AutowrapMode.WordSmart, CustomMinimumSize=new Vector2(400,36) });
-        var map = new RegionMap
-        {
-            Region = App.World.RegionsById[App.World.Player.Region],
-            Player = App.World.Player,
-            CustomMinimumSize = new Vector2(400, 320)
-        };
-        body.AddChild(map);
+        MapScreen.Populate(body, this);
     }
 
     public void Menu() => Back();
@@ -814,51 +788,5 @@ public partial class RpgUi : CanvasLayer
             App.RunChecks();
             ClosePanels();
         });
-    }
-}
-
-public partial class RegionMap : Control
-{
-    public RegionState Region { get; set; } = null !;
-    public ActorState Player { get; set; } = null !;
-
-    public override void _Draw()
-    {
-        float scale = Math.Min(Size.X / Region.Width, Size.Y / Region.Height);
-        for (int y = 0; y < Region.Height; y++)
-            for (int x = 0; x < Region.Width; x++)
-            {
-                if (Region.Id == "ruin" && !Region.ExploredTiles.Contains(y*Region.Width+x)) continue;
-                var t = Region.Tiles[y * Region.Width + x];
-                DrawRect(new Rect2(x * scale, y * scale, scale + 1, scale + 1), t is Terrain.Wall or Terrain.Rock ? new Color(.2f, .24f, .22f) : t == Terrain.Water ? new Color(.2f, .4f, .46f) : new Color(.48f, .55f, .34f));
-            }
-
-        foreach (var landmark in Region.Landmarks)
-        {
-            if (!Region.DiscoveredLandmarks.Contains(Exploration.Identity(Region, landmark))) continue;
-            var at = new Vector2((landmark.OriginX+5.5f)*scale,(landmark.OriginY+5.5f)*scale);
-            DrawCircle(at, 4, landmark.Roles.Contains("objective") ? Colors.Cyan : Colors.White);
-            DrawString(ThemeDB.FallbackFont, at + new Vector2(6,-4), landmark.Template switch { "ruined-entrance"=>"E", "forgotten-archive"=>"A", "abandoned-shrine"=>"S", "collapsed-storeroom"=>"T", "relic-sanctuary"=>"R", _=>"?" }, HorizontalAlignment.Left, -1, 16, Colors.White);
-        }
-        // Explored mechanisms: gates as bars (dimmed once open), levers and brazier rings by letter.
-        foreach (var (at, kind) in Region.Features)
-        {
-            if (Region.Id == "ruin" && !Region.ExploredTiles.Contains(at)) continue;
-            var cell = new Vector2((at % Region.Width) * scale, (at / Region.Width) * scale);
-            if (RegionState.IsGate(kind))
-            {
-                var colour = kind switch { "lock" => new Color("d4b66b"), "portcullis" => new Color("a7b0b2"), _ => new Color("9fe3e6") };
-                DrawRect(new Rect2(cell, new Vector2(scale + 1, scale + 1)), Region.OpenDoors.Contains(at) ? new Color(colour, .35f) : colour);
-            }
-            else if (kind == "lever" || (kind == "brazier" && DungeonMechanisms.RingAt(Region, at).FirstOrDefault() == at))
-            {
-                var centre = kind == "lever" ? cell : new Vector2((at % Region.Width) * scale, (at / Region.Width + 3) * scale);
-                DrawCircle(centre, 3, kind == "lever" ? (Region.Depleted.Contains(at) ? new Color("a7b0b2") : new Color("d4b66b")) : (Region.Depleted.Contains(at) ? new Color("9fe3e6") : new Color("f2a443")));
-                DrawString(ThemeDB.FallbackFont, centre + new Vector2(5, -3), kind == "lever" ? "L" : "B", HorizontalAlignment.Left, -1, 14, Colors.White);
-            }
-        }
-        var entrance = new Vector2((Region.Entrance % Region.Width+.5f)*scale,(Region.Entrance/Region.Width+.5f)*scale);
-        DrawRect(new Rect2(entrance-new Vector2(4,4),new Vector2(8,8)),Colors.LightGreen);
-        DrawCircle(new Vector2(Player.X / 24 * scale, Player.Y / 24 * scale), 4, Colors.Gold);
     }
 }

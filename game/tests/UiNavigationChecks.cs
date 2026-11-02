@@ -40,9 +40,9 @@ public static class UiNavigationChecks
             Require(!app.Ui.MenuOpen && app.Ui.Navigation.Screen != null && app.GameplayBlocked, "menu to Character atomic input block");
             Require(app.GetViewport().GuiGetFocusOwner()==app.Ui.ScreenBack, "screen focus starts on persistent Back");
             Tap(app.Ui.ScreenBack); await Frames(); Require(app.Ui.MenuOpen,"touch Back returns to menu");
-            app.Ui.Inventory(); await Frames();
+            app.Ui.PackTab = 0; app.Ui.PackSelection = "potion"; app.Ui.Inventory(); await Frames();
             int potions = app.World.Items.Count("player", "potion");
-            var use = app.Ui.FindChildren("*", "Button", true, false).OfType<Button>().First(b=>b.Text.StartsWith("Use · "));
+            var use = app.Ui.FindChildren("use", "Button", true, false).OfType<Button>().First(b=>b.IsVisibleInTree());
             use.EmitSignal(Button.SignalName.Pressed); await Frames();
             Require(app.World.Items.Count("player", "potion") == potions - 1, "inventory use dispatches production item action");
             app.Ui.Back(); await Frames(); Require(app.Ui.MenuOpen, "inventory refresh after Use preserves menu caller");
