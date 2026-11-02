@@ -36,6 +36,36 @@ public static class UiNavigationChecks
         {
             app.Ui.PauseForVerification(); await Frames();
             var character = app.Ui.FindChildren("*", "Button", true, false).OfType<Button>().First(b=>b.Text=="Character");
+            var menuScroll = app.Ui.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>().First(s=>s.IsVisibleInTree());
+            var pack = app.Ui.FindChildren("*", "Button", true, false).OfType<Button>().First(b=>b.Text=="Pack");
+            // Real Android swipe regression: a drag beginning over a row must not
+            // leave that row dark/focused or activate it. Repeat on a second row
+            // because the device failure moved the stuck state between buttons.
+            async System.Threading.Tasks.Task SwipeRow(Button row, float dy)
+            {
+                menuScroll.EnsureControlVisible(row); await Frames(3);
+                var at = row.GetGlobalRect().GetCenter();
+                Input.ParseInputEvent(new InputEventScreenTouch { Index=21, Pressed=true, Position=at });
+                // Exercise the case where Godot delivers the emulated mouse-up
+                // before the owning screen-touch has ended.
+                Input.ParseInputEvent(new InputEventMouseButton { Device=InputEvent.DeviceIdEmulation,
+                    ButtonIndex=MouseButton.Left, Pressed=true, Position=at });
+                Input.ParseInputEvent(new InputEventMouseButton { Device=InputEvent.DeviceIdEmulation,
+                    ButtonIndex=MouseButton.Left, Pressed=false, Position=at });
+                row.GrabFocus(); // native touch may focus a pressed row
+                var moved = at + new Vector2(0,dy);
+                Input.ParseInputEvent(new InputEventScreenDrag { Index=21, Position=moved, Relative=new Vector2(0,dy) });
+                Input.ParseInputEvent(new InputEventScreenTouch { Index=21, Pressed=false, Position=moved });
+                await Frames(3);
+                Require(!row.HasFocus() && row.Modulate == Colors.White, "swiping clears row focus and touch tint");
+                Require(app.Ui.MenuOpen && app.Ui.Navigation.Screen == null, "swipe never activates a menu row");
+            }
+            int beforeSwipe = menuScroll.ScrollVertical;
+            await SwipeRow(character, -75);
+            Require(menuScroll.ScrollVertical > beforeSwipe, "finger drag over Character actually scrolls");
+            await SwipeRow(pack, 75);
+            Require(!character.HasFocus() && !pack.HasFocus(), "successive swipes cannot leave either row selected");
+            menuScroll.ScrollVertical=0; await Frames(3);
             Tap(character); await Frames();
             Require(!app.Ui.MenuOpen && app.Ui.Navigation.Screen != null && app.GameplayBlocked, "menu to Character atomic input block");
             Require(app.GetViewport().GuiGetFocusOwner()==app.Ui.ScreenBack, "screen focus starts on persistent Back");
