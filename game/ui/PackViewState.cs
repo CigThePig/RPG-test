@@ -11,6 +11,7 @@ public sealed class PackViewState
     public string? Selector { get; private set; }
     public string? EquippedSlot { get; private set; }
     public bool DetailOpen { get; set; }
+    public bool GearOpen { get; set; }
     public int BagScroll { get; set; }
 
     public void SelectBag(string? selector)
