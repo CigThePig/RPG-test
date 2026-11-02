@@ -8,6 +8,7 @@ public partial class TouchScroll : ScrollContainer
     Vector2 start;
     int initialScroll;
     bool dragging, suppressMouse;
+    int mouseReleaseGraceFrames;
     Button? pressed;
     public void CancelGesture() => Cancel();
     void Cancel()
@@ -20,15 +21,26 @@ public partial class TouchScroll : ScrollContainer
         if(!IsVisibleInTree()){Cancel();suppressMouse=false;return;}
         if(e is InputEventMouse mouse && mouse.Device==InputEvent.DeviceIdEmulation && suppressMouse)
         {
+            // Godot can deliver the emulated mouse-up before the screen-touch release.
+            // Do not let that mouse-up end suppression while the finger still owns the
+            // gesture: subsequent emulated events could leave a Button visually down.
             GetViewport().SetInputAsHandled();
-            if(mouse is InputEventMouseButton b && !b.Pressed)suppressMouse=false;
+            if(mouse is InputEventMouseButton b && !b.Pressed && finger<0)
+            {
+                suppressMouse=false;
+                mouseReleaseGraceFrames=0;
+            }
             return;
         }
         if(e is InputEventScreenTouch touch)
         {
             if(touch.Canceled)
             {
-                if(touch.Index==finger){Cancel();GetViewport().SetInputAsHandled();}
+                if(touch.Index==finger)
+                {
+                    Cancel(); mouseReleaseGraceFrames=2;
+                    GetViewport().SetInputAsHandled();
+                }
                 return;
             }
             if(touch.Pressed && finger<0 && GetGlobalRect().HasPoint(touch.Position))
@@ -37,7 +49,7 @@ public partial class TouchScroll : ScrollContainer
                 // must receive native GUI events rather than being treated as menu buttons.
                 if(GetVScrollBar().GetGlobalRect().HasPoint(touch.Position)) {suppressMouse=false;return;}
                 if(FindChildren("*","Control",true,false).OfType<Control>().Any(c=>c.IsVisibleInTree() && c.GetGlobalRect().HasPoint(touch.Position) && (c is Slider || c is OptionButton))) {suppressMouse=false;return;}
-                finger=touch.Index;start=touch.Position;initialScroll=ScrollVertical;dragging=false;suppressMouse=true;
+                finger=touch.Index;start=touch.Position;initialScroll=ScrollVertical;dragging=false;suppressMouse=true;mouseReleaseGraceFrames=0;
                 pressed=FindChildren("*","Button",true,false).OfType<Button>().LastOrDefault(b=>b.IsVisibleInTree() && !b.Disabled && b.GetGlobalRect().HasPoint(touch.Position));
                 if(pressed!=null)pressed.Modulate=new Color(.75f,.85f,.85f);
                 GetViewport().SetInputAsHandled();
@@ -45,13 +57,22 @@ public partial class TouchScroll : ScrollContainer
             else if(touch.Index==finger && (!touch.Pressed || touch.Canceled))
             {
                 var activate=!touch.Canceled && !dragging && GodotObject.IsInstanceValid(pressed) && !pressed!.Disabled && pressed.GetGlobalRect().HasPoint(touch.Position) ? pressed : null;
-                Cancel();GetViewport().SetInputAsHandled();
+                Cancel(); mouseReleaseGraceFrames=2;
+                GetViewport().SetInputAsHandled();
                 activate?.EmitSignal(Button.SignalName.Pressed);
             }
         }
         if(e is InputEventScreenDrag drag && drag.Index==finger)
         {
-            if(Math.Abs(drag.Position.Y-start.Y)>ScrollDeadzone)dragging=true;
+            if(!dragging && Math.Abs(drag.Position.Y-start.Y)>ScrollDeadzone)
+            {
+                dragging=true;
+                // A swipe is not a button selection. Clear any focus assigned by
+                // the touchscreen's native/emulated GUI path, but preserve focus on
+                // controls outside this scroll area (e.g. the fixed Back button).
+                var focus=GetViewport().GuiGetFocusOwner();
+                if(focus!=null && IsAncestorOf(focus))focus.ReleaseFocus();
+            }
             if(dragging)
             {
                 if(GodotObject.IsInstanceValid(pressed))pressed!.Modulate=Colors.White;
@@ -60,8 +81,15 @@ public partial class TouchScroll : ScrollContainer
             GetViewport().SetInputAsHandled();
         }
     }
+    public override void _Process(double delta)
+    {
+        // Covers the release-order race without swallowing a future, unrelated
+        // emulated click. Genuine desktop mouse input is never suppressed.
+        if(finger<0 && mouseReleaseGraceFrames>0 && --mouseReleaseGraceFrames==0)
+            suppressMouse=false;
+    }
     public override void _Notification(int what)
     {
-        if(what==(int)NotificationApplicationPaused || what==(int)NotificationApplicationFocusOut || what==NotificationExitTree) {Cancel();suppressMouse=false;}
+        if(what==(int)NotificationApplicationPaused || what==(int)NotificationApplicationFocusOut || what==NotificationExitTree) {Cancel();suppressMouse=false;mouseReleaseGraceFrames=0;}
     }
 }
