@@ -1,4 +1,5 @@
 using Godot;
+using System.Text.Json;
 
 namespace Mosslight;
 
@@ -42,11 +43,28 @@ public static class CraftingChecks
                 "craft fixture fills both slots while leaving one herb after consumption");
             LimitStacks(remainsFull, 2);
             string fullBefore = service.Call("export_state").AsString();
-            check(!items.Craft(remainsFull, draught) &&
-                service.Call("export_state").AsString() == fullBefore &&
-                items.Count(remainsFull, "herb") == 3 &&
-                items.Count(remainsFull, "potion") == 0,
-                "craft with no post-consumption room restores exact inventory and serial");
+            bool fullCrafted = items.Craft(remainsFull, draught);
+            string fullAfter = service.Call("export_state").AsString();
+            check(!fullCrafted, "craft with no post-consumption room is rejected");
+            check(items.Count(remainsFull, "herb") == 3 &&
+                items.Count(remainsFull, "potion") == 0 &&
+                items.Count(remainsFull, "iron_sword") == 1,
+                "rejected craft leaves its ingredient and other item stacks intact");
+            using (var beforeDoc = JsonDocument.Parse(fullBefore))
+            using (var afterDoc = JsonDocument.Parse(fullAfter))
+            {
+                bool same = JsonElement.DeepEquals(beforeDoc.RootElement, afterDoc.RootElement);
+                if (!same)
+                {
+                    var b = beforeDoc.RootElement;
+                    var a = afterDoc.RootElement;
+                    GD.Print("CRAFT_ROLLBACK_DIAGNOSTIC serial_before=", b.GetProperty("serial").GetRawText(),
+                        " serial_after=", a.GetProperty("serial").GetRawText(),
+                        " bag_before=", b.GetProperty("bags").GetProperty(remainsFull).GetRawText(),
+                        " bag_after=", a.GetProperty("bags").GetProperty(remainsFull).GetRawText());
+                }
+                check(same, "failed craft restores the full semantic Gloot snapshot including serial");
+            }
 
             const string tooMany = "craft-test:batch-overflow";
             check(items.Add(tooMany, "herb", 2), "batch craft fixture receives ingredients");
@@ -59,10 +77,15 @@ public static class CraftingChecks
                 Output = "potion",
                 Count = 21
             };
-            check(!items.Craft(tooMany, largeBatch) &&
-                service.Call("export_state").AsString() == batchBefore &&
-                items.Count(tooMany, "herb") == 2,
-                "multi-stack output that exceeds freed capacity rolls back without partial grants");
+            bool oversizedCrafted = items.Craft(tooMany, largeBatch);
+            string batchAfter = service.Call("export_state").AsString();
+            check(!oversizedCrafted && items.Count(tooMany, "herb") == 2 &&
+                items.Count(tooMany, "potion") == 0,
+                "multi-stack output exceeding freed capacity rejects any partial grant");
+            using (var beforeDoc = JsonDocument.Parse(batchBefore))
+            using (var afterDoc = JsonDocument.Parse(batchAfter))
+                check(JsonElement.DeepEquals(beforeDoc.RootElement, afterDoc.RootElement),
+                    "oversized output rollback restores full Gloot state and serial");
 
             const string equipment = "craft-test:equipment";
             check(items.Add(equipment, "ore", 3) && items.Add(equipment, "wood", 1),
