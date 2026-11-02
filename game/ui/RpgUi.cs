@@ -13,7 +13,13 @@ public partial class RpgUi : CanvasLayer
     internal Rect2? VerificationSafeArea { get; set; }
     public MobileCombatControls? CombatControls => hotbar as MobileCombatControls;
     Label health = null !, message = null !, title = null !;
-    PanelContainer panel = null !, menu = null !;
+    UiScreenHost panel = null!;
+    PanelContainer menu = null!, confirmation = null!;
+    readonly UiNavigation navigation = new();
+    public UiNavigation Navigation => navigation;
+    public float TextScale { get; private set; } = 1;
+    public Rect2 ScreenRect => panel.GetGlobalRect();
+    public Button ScreenBack => panel.BackButton;
     VBoxContainer body = null !;
     Control root = null !;
     Control hotbar = null !;
@@ -25,7 +31,7 @@ public partial class RpgUi : CanvasLayer
     public bool MobileLayout { get; set; } = OS.HasFeature("mobile") || OS.GetCmdlineUserArgs().Contains("--mobile-ui");
     readonly Queue<double> frames = new();
     public bool MenuOpen => menu.Visible;
-    public bool BlocksInput => panel.Visible || menu.Visible;
+    public bool BlocksInput => navigation.Blocked;
     public bool SettingsOpen { get; private set; }
     public bool Muted { get; private set; }
     public int SaveSlot { get; private set; } = 1;
@@ -38,24 +44,7 @@ public partial class RpgUi : CanvasLayer
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
         AddChild(root);
-        var theme = new Theme();
-        theme.DefaultFontSize = 20;
-        var style = new StyleBoxFlat
-        {
-            BgColor = new Color(.065f, .1f, .1f, .96f),
-            BorderColor = new Color(.48f, .52f, .34f),
-            BorderWidthBottom = 2,
-            BorderWidthTop = 2,
-            BorderWidthLeft = 2,
-            BorderWidthRight = 2,
-            ContentMarginLeft = 20,
-            ContentMarginRight = 20,
-            ContentMarginTop = 16,
-            ContentMarginBottom = 16
-        };
-        theme.SetStylebox("panel", "PanelContainer", style);
-        theme.SetColor("font_color", "Label", new Color(.87f, .9f, .78f));
-        root.Theme = theme;
+        root.Theme = UiDesign.Theme(TextScale);
         title = new Label
         {
             Text = "MOSSLIGHT  /  THE REACH",
@@ -71,10 +60,13 @@ public partial class RpgUi : CanvasLayer
         root.AddChild(health);
         message = new Label
         {
+            Visible = false,
             Position = new Vector2(24, 730),
             Size = new Vector2(1200, 40),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
+        message.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        message.AddThemeStyleboxOverride("normal", UiDesign.Notification());
         root.AddChild(message);
         hotbar = MobileLayout ? new MobileCombatControls() : new GridContainer { Columns = 5 };
         hotbar.Position = new Vector2(500, 640);
@@ -100,6 +92,7 @@ public partial class RpgUi : CanvasLayer
             if (MobileLayout && actionId is "journal" or "character" or "map") continue;
             if (!MobileLayout && actionId == "dodge") continue;
             var button = Button(hotbar, MobileLayout ? text.Split(" · ").Last() : text, action);
+            if (!MobileLayout) button.CustomMinimumSize = new Vector2(140, UiDesign.Target);
             actions[actionId] = button;
             button.Name = "action_" + actionId;
             if (hotbar is MobileCombatControls mobile) mobile.Register(actionId, button);
@@ -113,23 +106,14 @@ public partial class RpgUi : CanvasLayer
             }
         }
 
-        panel = new PanelContainer
-        {
-            Position = new Vector2(780, 100),
-            CustomMinimumSize = new Vector2(740, 510),
-            Visible = false
-        };
+        panel = new UiScreenHost { Visible = false };
         root.AddChild(panel);
-        body = new VBoxContainer();
-        var scroll = new TouchScroll
+        panel.Build(Back);
+        body = panel.Body;
+        body.ChildEnteredTree += child =>
         {
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
-            ScrollDeadzone = 12
+            if (child is Label label) { label.AutowrapMode = TextServer.AutowrapMode.WordSmart; label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; }
         };
-        panel.AddChild(scroll);
-        scroll.AddChild(body);
-        body.CustomMinimumSize = new Vector2(400, 0);
         menu = new PanelContainer
         {
             Position = new Vector2(380, 160),
@@ -137,6 +121,8 @@ public partial class RpgUi : CanvasLayer
         };
         root.AddChild(menu);
         BuildMenu();
+        confirmation = new PanelContainer { Visible = false };
+        root.AddChild(confirmation);
         Stick = new TouchStick { App = App, Size = new Vector2(200, 200) };
         root.AddChild(Stick);
         metrics = new Label { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
@@ -150,6 +136,8 @@ public partial class RpgUi : CanvasLayer
     readonly Dictionary<int, Button> touchButtons = new();
     public override void _Input(InputEvent e)
     {
+        if (e is InputEventKey key && key.Pressed && !key.Echo && (key.Keycode == Key.Escape || key.PhysicalKeycode == Key.Escape || key.Keycode == Key.Back))
+        { Back(); GetViewport().SetInputAsHandled(); return; }
         // Hotbar touches are dispatched below for independent multitouch ownership.
         // Godot also synthesizes a mouse click for the same finger; consuming that
         // event prevents a second native Button.Pressed without disabling mouse
@@ -198,17 +186,12 @@ public partial class RpgUi : CanvasLayer
     public void Layout()
     {
         var size = GetViewport().GetVisibleRect().Size;
-        CancelActionTouches();
-        Stick.Cancel();
+        CancelGestures();
         hotbar.Position = MobileLayout ? Vector2.Zero : new Vector2(size.X - 760, size.Y - 160);
-        if (MobileLayout) hotbar.Size = size;
+        hotbar.Size = MobileLayout ? size : new Vector2(740, 140);
         Stick.Position = new Vector2(40, size.Y - 260);
-        message.Position = new Vector2(24, size.Y - 45);
-        message.Size = new Vector2(size.X - 48, 40);
-        panel.Position = new Vector2((size.X - 740) / 2, 90);
-        panel.Size = panel.CustomMinimumSize = new Vector2(740, size.Y - 290);
-        menu.Position = new Vector2((size.X - 560) / 2, 70);
-        menu.Size = new Vector2(560, size.Y - 140);
+        message.Position = new Vector2(24, size.Y - 80);
+        message.Size = new Vector2(size.X - 48, 64);
         metrics.Position = new Vector2(size.X - 480, 100);
         if (hotbar is MobileCombatControls mobile)
         {
@@ -217,20 +200,14 @@ public partial class RpgUi : CanvasLayer
                 safe = MobileCombatControls.ToLogicalSafeArea(safe, DisplayServer.GetDisplaySafeArea(), GetViewport().GetScreenTransform());
             safe=VerificationSafeArea ?? safe;
             mobile.Arrange(safe);
-            float panelWidth=Math.Min(740,safe.Size.X-48);
-            panel.Position=new Vector2(safe.Position.X+(safe.Size.X-panelWidth)/2,safe.Position.Y+90);
-            panel.Size=panel.CustomMinimumSize=new Vector2(panelWidth,Math.Max(200,safe.Size.Y-160));
-            float menuWidth=Math.Min(560,safe.Size.X-48);
-            menu.Position=new Vector2(safe.Position.X+(safe.Size.X-menuWidth)/2,safe.Position.Y+70);
-            menu.Size=menu.CustomMinimumSize=new Vector2(menuWidth,Math.Max(200,safe.Size.Y-140));
             var pad = MobileCombatControls.Geometry(safe)["stick"];
             Stick.Position=pad.Position; Stick.Size=pad.Size;
             title.Position=safe.Position+new Vector2(24,18);
             health.Position=safe.Position+new Vector2(24,48);
             health.AutowrapMode=TextServer.AutowrapMode.WordSmart;
             health.Size=new Vector2(Math.Max(200,safe.Size.X-280),100);
-            message.Position=new Vector2(safe.Position.X+24,safe.End.Y-42);
-            message.Size=new Vector2(safe.Size.X-48,40);
+            message.Position=new Vector2(safe.Position.X+24,safe.End.Y-80);
+            message.Size=new Vector2(safe.Size.X-48,64);
             if(OS.HasFeature("android"))
                 foreach(var (id, button) in actions)
                 {
@@ -238,19 +215,54 @@ public partial class RpgUi : CanvasLayer
                     GD.Print($"MOSSLIGHT_CONTROL version={MobileCombatControls.LayoutVersion} id={id} x={center.X:0} y={center.Y:0}");
                 }
         }
+        var overlaySafe = new Rect2(Vector2.Zero, size);
+        if (OS.HasFeature("android")) overlaySafe = MobileCombatControls.ToLogicalSafeArea(overlaySafe, DisplayServer.GetDisplaySafeArea(), GetViewport().GetScreenTransform());
+        overlaySafe = VerificationSafeArea ?? overlaySafe;
+        void Arrange(Control control, float width)
+        {
+            var rect = UiDesign.Overlay(overlaySafe, width);
+            control.CustomMinimumSize = Vector2.Zero; control.Position = rect.Position; control.Size = rect.Size;
+        }
+        Arrange(panel, 740); Arrange(menu, 560); Arrange(confirmation, 560);
     }
 
-    static Button Button(Node parent, string text, Action action)
+    static Button Button(Node parent, string text, Action action) => UiDesign.Action(parent, text, action);
+
+    void CancelGestures()
     {
-        var b = new Button
-        {
-            Text = text,
-            MouseFilter = Control.MouseFilterEnum.Pass,
-            CustomMinimumSize = new Vector2(0, 56)
-        };
-        b.Pressed += action;
-        parent.AddChild(b);
-        return b;
+        CancelActionTouches(); Stick.Cancel(); App.TouchMovement = Vector2.Zero;
+        App.World.CancelPlayerDodge();
+        foreach (var scroll in root.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>()) scroll.CancelGesture();
+    }
+    void SyncNavigation()
+    {
+        bool dialogue = App.Narrative.Get("speaking").AsBool();
+        panel.Visible = navigation.Screen != null && !navigation.Confirmation && !dialogue;
+        menu.Visible = navigation.Menu && !navigation.Confirmation && !dialogue;
+        confirmation.Visible = navigation.Confirmation && !dialogue;
+        hotbar.Visible = !navigation.Blocked && !App.Narrative.Get("speaking").AsBool();
+        if (menu.Visible) menu.FindChildren("*", "Button", true, false).OfType<Button>().FirstOrDefault()?.GrabFocus();
+        if (!navigation.Blocked) GetViewport().GuiReleaseFocus();
+    }
+    public void Back()
+    {
+        CancelGestures();
+        navigation.Back(App.Narrative.Get("speaking").AsBool(), App.World.Player.Alive);
+        SyncNavigation();
+    }
+    public void SetTextScale(float scale)
+    {
+        TextScale = Math.Clamp(scale, 1, 1.4f);
+        panel.Theme = menu.Theme = confirmation.Theme = UiDesign.Theme(TextScale); Layout();
+    }
+    void ConfirmNewGame()
+    {
+        CancelGestures(); navigation.Confirm(); Clear(confirmation);
+        var box = new VBoxContainer(); confirmation.AddChild(box);
+        box.AddChild(UiDesign.Text("Start a new game? Unsaved progress will be lost. Saved slots are retained."));
+        var cancel = Button(box, "Cancel / Back", Back);
+        Button(box, "Start new game", () => { navigation.CancelConfirmation(); App.Reset(); App.ResumeGame(); SyncNavigation(); });
+        SyncNavigation(); cancel.GrabFocus();
     }
 
     void Clear(Node node)
@@ -262,17 +274,10 @@ public partial class RpgUi : CanvasLayer
         }
     }
 
-    void Open(string heading)
+    bool Open(string heading)
     {
-        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
-        CancelActionTouches();
-        Stick.Cancel();
-        App.TouchMovement = Vector2.Zero;
-        App.World.CancelPlayerDodge();
-        Clear(body);
-        panel.Visible = true;
-        body.AddChild(new Label { Text = heading });
-        Button(body, "Close", () => panel.Hide());
+        if (navigation.Confirmation || App.Narrative.Get("speaking").AsBool()) return false;
+        CancelGestures(); navigation.Open(heading); panel.Present(heading); SyncNavigation(); return true;
     }
 
     public override void _Process(double delta)
@@ -283,13 +288,16 @@ public partial class RpgUi : CanvasLayer
 
     double interactionEmphasisUntil;
     long interactionCheckTick = -1;
-    bool defeatAnnounced;
-    public void Notify(string text) => message.Text = text;
+    bool defeatAnnounced, dialogueActive;
+    public void Notify(string text) { message.Text = text; message.Visible = !string.IsNullOrWhiteSpace(text); }
     public void Update()
     {
         hotbar.Visible = !BlocksInput && !App.Narrative.Get("speaking").AsBool();
         if (!hotbar.Visible || App.PresentationBlocked) CancelActionTouches();
+        bool speaking = App.Narrative.Get("speaking").AsBool();
         bool defeated = !App.World.Player.Alive;
+        if ((speaking && !dialogueActive) || (defeated && !defeatAnnounced)) CancelGestures();
+        if (dialogueActive != speaking) { dialogueActive = speaking; SyncNavigation(); }
         if (defeated && !defeatAnnounced) Notify("Defeated · open the menu to load a save or start a new game");
         defeatAnnounced = defeated;
         Stick.Visible = MobileLayout && !App.GameplayBlocked;
@@ -333,18 +341,14 @@ public partial class RpgUi : CanvasLayer
 
     public void PauseForVerification()
     {
-        CancelActionTouches();
-        Stick.Cancel();
-        panel.Hide();
-        menu.Show();
+        CancelGestures(); navigation.Pause(); SyncNavigation();
     }
-
-    public void HideMenu() => menu.Hide();
-    public void ClosePanels() => panel.Hide();
+    public void HideMenu() { CancelGestures(); navigation.Resume(); SyncNavigation(); }
+    public void ClosePanels() { CancelGestures(); navigation.Resume(); SyncNavigation(); }
     public void Inventory()
     {
-        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
-        Open("PACK & EQUIPMENT");
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        if (!Open("PACK & EQUIPMENT")) return;
         body.AddChild(new Label { Text = App.World.Items.Describe("player") });
         using var catalog = JsonDocument.Parse(App.World.Items.Service.Call("catalog", "player").AsString());
         foreach (var row in catalog.RootElement.EnumerateArray())
@@ -398,17 +402,17 @@ public partial class RpgUi : CanvasLayer
 
     public void Journal()
     {
-        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
-        Open("QUEST JOURNAL");
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        if (!Open("QUEST JOURNAL")) return;
         body.AddChild(new Label { Text = App.Narrative.Call("journal").AsString(), AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(400, 300) });
     }
 
     public void Character()
     {
-        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        if (!Open("CHARACTER · WAYFARER")) return; CharacterOverview.Populate(body, App);
         var actor = App.World.Player;
-        Open("WAYFARER");
-        body.AddChild(new Label { Text = $"Level {actor.Level} · skill points {actor.SkillPoints}\nStrength {App.World.Stat(actor, "strength")}\nDefence {App.World.Stat(actor, "defence")}\nWeapon damage {App.World.Items.Bonus(actor, "damage")}\nFamily {actor.Appearance.Family} · seed {actor.Appearance.Seed}\nFlight {actor.Flies} · Swimming {actor.Swims} · Grasping {actor.Grasps}\nWarden reputation {actor.Reputation.GetValueOrDefault("wardens")}" });
+        body.AddChild(UiDesign.Text("TRAINING & ABILITIES · existing progression controls"));
         foreach (var ability in App.World.Content.Abilities.Where(a => a.PlayerLearnable || actor.Abilities.Contains(a.Id)))
         {
             if (actor.Abilities.Contains(ability.Id))
@@ -435,8 +439,8 @@ public partial class RpgUi : CanvasLayer
 
     public void Map()
     {
-        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
-        Open("REGION MAP");
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        if (!Open("REGION MAP")) return;
         body.AddChild(new Label { Text = "E entrance · A archive · S shrine · T storeroom · R relic · L lever · B braziers · gates: gold key, grey portcullis, cyan seal · ● you", AutowrapMode=TextServer.AutowrapMode.WordSmart, CustomMinimumSize=new Vector2(400,36) });
         var map = new RegionMap
         {
@@ -447,18 +451,7 @@ public partial class RpgUi : CanvasLayer
         body.AddChild(map);
     }
 
-    public void Menu()
-    {
-        if (App.Narrative.Get("speaking").AsBool()) return;
-        CancelActionTouches();
-        Stick.Cancel();
-        App.TouchMovement = Vector2.Zero;
-        App.World.CancelPlayerDodge();
-        panel.Hide();
-        menu.Visible = !menu.Visible;
-        if (menu.Visible)
-            BuildMenu();
-    }
+    public void Menu() => Back();
 
     void BuildMenu()
     {
@@ -471,19 +464,16 @@ public partial class RpgUi : CanvasLayer
         scroll.AddChild(box);
         box.AddThemeConstantOverride("separation", 8);
         box.AddChild(new Label { Text = "MOSSLIGHT\nRPG FOUNDATION", HorizontalAlignment = HorizontalAlignment.Center });
-        Button(box, "Enter / Resume", App.ResumeGame);
+        Button(box, "Enter / Resume", () => { if (App.World.Player.Alive) App.ResumeGame(); else Notify("Defeated · Load a save or start a New game to continue"); });
         foreach (var entry in new (string, Action)[] { ("Pack", Inventory), ("Journal", Journal), ("Character", Character), ("Map", Map) })
-            Button(box, entry.Item1, () => { menu.Hide(); entry.Item2(); });
+            Button(box, entry.Item1, entry.Item2);
         Button(box, "Recover background autosave", () =>
         {
             try { if(App.InFeelCourse)throw new InvalidOperationException("Return from the controlled course before loading"); Persistence.LoadAutosave(App.World, App.Narrative); App.RebuildViews(); App.ResumeGame(); Notify("Recovered autosave"); }
             catch (Exception e) { Notify(e.Message); }
         });
-        Button(box, "New game", () =>
-        {
-            App.Reset();
-            App.ResumeGame();
-        });
+        Button(box, "New game", ConfirmNewGame);
+        Button(box, $"Text size: {(TextScale > 1 ? "Large" : "Standard")}", () => { SetTextScale(TextScale > 1 ? 1 : 1.3f); BuildMenu(); });
         Button(box, $"Save slot: {SaveSlot} (click to cycle)", () =>
         {
             SaveSlot = SaveSlot % 3 + 1;
@@ -526,23 +516,22 @@ public partial class RpgUi : CanvasLayer
         Button(box, "Pixel scale / camera zoom", () => App.CycleZoom());
         Button(box, "Creature workshop", () =>
         {
-            menu.Hide();
             Workshop();
         });
         Button(box, "Collision / navigation overlay: " + (App.CollisionDebug ? "On" : "Off"), () => { App.CollisionDebug = !App.CollisionDebug; BuildMenu(); });
         Button(box, "Performance overlay: " + (showMetrics ? "On" : "Off"), () => { showMetrics = !showMetrics; BuildMenu(); });
-        Button(box, "Game-feel lab / record playtest", () => { menu.Hide(); FeelLab(); });
+        Button(box, "Game-feel lab / record playtest", FeelLab);
         Button(box, "Developer diagnostics", () =>
         {
-            menu.Hide();
             Diagnostics();
         });
         Button(box, "Quit", () => GetTree().Quit());
+        if (menu.IsVisibleInTree()) box.GetChildren().OfType<Button>().FirstOrDefault()?.GrabFocus();
     }
 
     public void FeelLab()
     {
-        Open("GAME-FEEL LAB · development tools");
+        if (!Open("GAME-FEEL LAB · development tools")) return;
         labVisible=true;
         body.AddChild(new Label { Text=$"Active: {App.Feel.Id} · baseline restores original controls\nCompare the same settlement chest → road → ruin route.\nRecording stays local; use Android Screen recorder for video." });
         Button(body,"Start / reset controlled obstacle course (normal progress preserved)",App.BeginFeelCourse);
@@ -575,8 +564,8 @@ public partial class RpgUi : CanvasLayer
 
     public void Workshop()
     {
-        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
-        Open("PROCEDURAL CREATURE WORKSHOP");
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        if (!Open("PROCEDURAL CREATURE WORKSHOP")) return;
         var family = new OptionButton();
         foreach (var f in PixelCreatures.Runtime.CreatureRuntime.Registry.Families)
             family.AddItem(f.Id);
@@ -603,18 +592,18 @@ public partial class RpgUi : CanvasLayer
 
     public void Diagnostics()
     {
-        if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
-        Open("DEVELOPER TOOLS");
+        if (App.Narrative.Get("speaking").AsBool()) return;
+        if (!Open("DEVELOPER TOOLS")) return;
         body.AddChild(new Label { Text = $"Tick {App.World.Tick}\nActors {App.World.Actors.Count}\nRegions {App.World.RegionsById.Count}\nProjectiles {App.World.Projectiles.Count}\nManaged memory {GC.GetTotalMemory(false) / 1048576.0:0.0} MB\nFPS {Engine.GetFramesPerSecond()}\nEvents:\n" + string.Join("\n", App.World.Events.Recent.TakeLast(8).Select(e => $"{e.Kind}: {e.Actor} {e.Value}")) });
         Button(body, "Enter generated dungeon", () =>
         {
             App.World.Enter(App.World.Player, "ruin");
-            panel.Hide();
+            ClosePanels();
         });
         Button(body, "Return to settlement", () =>
         {
             App.World.Enter(App.World.Player, "reach");
-            panel.Hide();
+            ClosePanels();
         });
         Button(body, "Combat archetypes test encounter (F9)", App.BeginCombatCourse);
         foreach(var encounter in new[]{"prowler","brute","spitter","two melee","mixed","four mixed","projectiles","crowd"})
@@ -627,7 +616,7 @@ public partial class RpgUi : CanvasLayer
         Button(body, "Complete integration checks", () =>
         {
             App.RunChecks();
-            panel.Hide();
+            ClosePanels();
         });
     }
 }

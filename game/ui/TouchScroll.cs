@@ -9,6 +9,7 @@ public partial class TouchScroll : ScrollContainer
     int initialScroll;
     bool dragging, suppressMouse;
     Button? pressed;
+    public void CancelGesture() => Cancel();
     void Cancel()
     {
         if(GodotObject.IsInstanceValid(pressed))pressed!.Modulate=Colors.White;

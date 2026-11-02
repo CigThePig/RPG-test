@@ -610,6 +610,7 @@ public partial class Foundation : Node2D
 
     public override void _Notification(int what)
     {
+        if (what == NotificationWMGoBackRequest) { ui?.Back(); return; }
         if (what == NotificationApplicationPaused || what == NotificationApplicationFocusOut)
         {
             Trace?.Marker("lifecycle/pause"); Trace?.Flush();

@@ -458,6 +458,8 @@ public static class VisualChecks
         {
             await WallDepthChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return;
         }
+        if(OS.GetCmdlineUserArgs().Contains("--ui-only"))
+        { await UiNavigationChecks.Rendered(app); GD.Print("VISUAL CHECKS PASSED"); return; }
         if(OS.GetCmdlineUserArgs().Contains("--controls-only"))
         {
             await MobileCombatControlsChecks.Rendered(app);
@@ -480,6 +482,7 @@ public static class VisualChecks
                     throw new InvalidOperationException("Missing synthesized combat audio sample: " + cue);
             }
         }
+        await UiNavigationChecks.Rendered(app);
         await MobileCombatControlsChecks.Rendered(app);
         await MobileCombatControlsChecks.InputPipeline(app);
         await Capture(app, "menu");
