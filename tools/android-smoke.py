@@ -90,6 +90,14 @@ try:
     time.sleep(2)
     # Readiness is CPU-side; shader failure can leave a fully running game blank.
     adb_path = os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb')
+    def screenrecord_pids():
+        # screenrecord exits by itself at its 180-second limit. No matching PID
+        # (exit 1 with empty output) is normal; other ADB failures remain fatal.
+        result=subprocess.run([adb_path,'shell','pidof','screenrecord'],
+            stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=20)
+        if result.returncode==1 and not result.stdout.strip(): return []
+        result.check_returncode()
+        return result.stdout.split()
     def capture(name, wait=0):
         deadline=time.monotonic()+wait
         while True:
@@ -301,7 +309,7 @@ try:
     tap_action('inventory')
     time.sleep(1)
     capture('inventory.png')
-    pids=adb('shell','pidof','screenrecord').split()
+    pids=screenrecord_pids()
     for pid in pids:
         if pid.isdigit(): adb('shell','kill','-2',pid)
     stdout,stderr=recorder.communicate(timeout=15)
@@ -439,7 +447,7 @@ finally:
     # process termination alone can leave screenrecord running with an unclosed MP4.
     if recorder is not None and recorder.poll() is None:
         try:
-            for pid in adb('shell','pidof','screenrecord').split():
+            for pid in screenrecord_pids():
                 if pid.isdigit(): adb('shell','kill','-2',pid)
             recorder.communicate(timeout=15)
             adb('pull','/sdcard/mosslight-playtest.mp4',str(out/'gameplay-failure.mp4'))
