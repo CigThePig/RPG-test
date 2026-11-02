@@ -4,18 +4,22 @@ namespace Mosslight;
 /// Sliders, option popups, scrollbars and real mouse input retain native GUI handling.</summary>
 public partial class TouchScroll : ScrollContainer
 {
-    int finger=-1;
+    int finger=-1, nativeFinger=-1;
     Vector2 start;
     int initialScroll;
     bool dragging, suppressMouse;
-    int mouseReleaseGraceFrames;
+    int mouseReleaseGraceFrames, nativeMouseGraceFrames;
     Button? pressed;
     bool NativeTouchTarget(Vector2 position) =>
         GetVScrollBar().GetGlobalRect().HasPoint(position) ||
         FindChildren("*","Control",true,false).OfType<Control>().Any(c =>
             c.IsVisibleInTree() && c.GetGlobalRect().HasPoint(position) &&
             (c is Slider || c is OptionButton));
-    public void CancelGesture() => Cancel();
+    public void CancelGesture()
+    {
+        Cancel();
+        nativeFinger=-1;nativeMouseGraceFrames=0;
+    }
     void Cancel()
     {
         if(GodotObject.IsInstanceValid(pressed))pressed!.Modulate=Colors.White;
@@ -23,7 +27,16 @@ public partial class TouchScroll : ScrollContainer
     }
     public override void _Input(InputEvent e)
     {
-        if(!IsVisibleInTree()){Cancel();suppressMouse=false;return;}
+        if(!IsVisibleInTree()){CancelGesture();suppressMouse=false;mouseReleaseGraceFrames=0;return;}
+        // Native scrollbar/slider/popup gestures keep their mouse input even when
+        // their drag moves across ordinary rows.
+        if(e is InputEventMouse nativeMouse && nativeMouse.Device==InputEvent.DeviceIdEmulation &&
+            (nativeFinger>=0 || nativeMouseGraceFrames>0))
+        {
+            if(nativeFinger<0 && nativeMouse is InputEventMouseButton release && !release.Pressed)
+                nativeMouseGraceFrames=0;
+            return;
+        }
         // Emulated mouse-down may precede the matching screen-touch press on
         // Android. Intercept it at the scroll surface even before finger ownership
         // is established, or Button can remain natively pressed when we later
@@ -44,6 +57,11 @@ public partial class TouchScroll : ScrollContainer
         }
         if(e is InputEventScreenTouch touch)
         {
+            if(touch.Index==nativeFinger && (touch.Canceled || !touch.Pressed))
+            {
+                nativeFinger=-1;nativeMouseGraceFrames=2;
+                return;
+            }
             if(touch.Canceled)
             {
                 if(touch.Index==finger)
@@ -57,7 +75,11 @@ public partial class TouchScroll : ScrollContainer
             {
                 // The scrollbar remains directly draggable. Range controls and popup selectors
                 // must receive native GUI events rather than being treated as menu buttons.
-                if(NativeTouchTarget(touch.Position)) {suppressMouse=false;return;}
+                if(NativeTouchTarget(touch.Position))
+                {
+                    nativeFinger=touch.Index;nativeMouseGraceFrames=0;
+                    suppressMouse=false;return;
+                }
                 finger=touch.Index;start=touch.Position;initialScroll=ScrollVertical;dragging=false;suppressMouse=true;mouseReleaseGraceFrames=0;
                 pressed=FindChildren("*","Button",true,false).OfType<Button>().LastOrDefault(b=>b.IsVisibleInTree() && !b.Disabled && b.GetGlobalRect().HasPoint(touch.Position));
                 if(pressed!=null)pressed.Modulate=new Color(.75f,.85f,.85f);
@@ -96,9 +118,10 @@ public partial class TouchScroll : ScrollContainer
         // emulated click. Genuine desktop mouse input is never suppressed.
         if(finger<0 && mouseReleaseGraceFrames>0 && --mouseReleaseGraceFrames==0)
             suppressMouse=false;
+        if(nativeFinger<0 && nativeMouseGraceFrames>0)--nativeMouseGraceFrames;
     }
     public override void _Notification(int what)
     {
-        if(what==(int)NotificationApplicationPaused || what==(int)NotificationApplicationFocusOut || what==NotificationExitTree) {Cancel();suppressMouse=false;mouseReleaseGraceFrames=0;}
+        if(what==(int)NotificationApplicationPaused || what==(int)NotificationApplicationFocusOut || what==NotificationExitTree) {CancelGesture();suppressMouse=false;mouseReleaseGraceFrames=0;}
     }
 }
