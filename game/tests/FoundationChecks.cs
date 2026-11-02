@@ -48,6 +48,7 @@ public static class FoundationChecks
             UiNavigationChecks.Run(Check);
             HudChecks.Run(app, Check);
             RpgScreensChecks.Run(app, Check);
+            PackPresentationChecks.Run(app, Check);
             AccessibilityChecks.Run(app, Check);
             EncounterChecks.Run(app,Check);
             ReviewChecks.Run(app, Check);
