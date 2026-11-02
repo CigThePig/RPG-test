@@ -2,7 +2,7 @@
 
 **Goal:** replace the ad-hoc `RpgUi` panel/menu with a themed, safe-area-aware, stack-based screen system that Parts 2–4 build on. Visible gameplay behaviour should not change, apart from a cleaner Pause menu, a tabbed Book shell, Android Back that no longer quits, and readable sizes.
 
-Read first: [README.md](README.md) §5 (contracts), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md). Mockups: [`08-pause.svg`](mockups/08-pause.svg) (pause layout), [`02-book-pack.svg`](mockups/02-book-pack.svg) (Book shell: header, tabs, close).
+Read first: [README.md](README.md) §5, [CREATIVE_DIRECTION.md](CREATIVE_DIRECTION.md) (C1 title screen and C2 generated UI skin belong to this part, and the decisions are resolved there), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md). Mockups: [`08-pause.svg`](mockups/08-pause.svg) (pause layout), [`02-book-pack.svg`](mockups/02-book-pack.svg) (Book shell: header, tabs, close).
 
 ## Scope
 
@@ -149,6 +149,11 @@ Assert, using the production `RpgUi` and real screens:
 9. `CanManageItems` is false while Pause is open and true while only the Book is open (alive, not speaking).
 
 Keep all existing checks passing, including the menu-scroll swipe. If the new Pause list no longer overflows at 1280×800, move that swipe check to the Developer screen's Feel-lab page, which always overflows.
+
+### Step 9b — Creative layer (CREATIVE_DIRECTION C1, C2)
+1. **C2 skin** right after Step 2: `UiSkinGenerator` + `StyleBoxTexture` variants wired into `UiTheme.Build` (flat recipes stay as the high-contrast fallback). Add the region swap hook (`UiTheme.SetRegion("reach"|"ruin")`).
+2. **C1 title screen** after Step 7: `TitleScreen` replaces the boot-time Pause. `PauseForVerification()` still shows Pause once a session has started; before that, focus loss returns to the title. Add "Return to title" (confirm) to Pause. Update `ReviewChecks`' initial-menu loop and the Android smoke (`title_continue` / `title_new`) in the same commit.
+3. Captures: `title.png`, `title-no-save.png`, and skinned `pause.png`/`book-*.png`.
 
 ### Step 10 — Evidence and handoff
 - Run `python3 tools/verify.py --headless`, `--visual`, and `--visual --mobile`. Replace `docs/native-screenshots/{menu,inventory,character,journal}.png` and the mobile equivalents with the new captures, and add `pause.png`/`developer.png`.

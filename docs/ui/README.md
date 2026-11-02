@@ -1,6 +1,6 @@
 # PR #7 — Mosslight mobile UI & RPG experience: design package
 
-This folder is the design and implementation brief for PR #7's four UX milestones. It is written for the agent who will implement them. Read this file first, then [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), then the guide for the part you are working on.
+This folder is the design and implementation brief for PR #7's four UX milestones. It is written for the agent who will implement them. Read this file first, then [CREATIVE_DIRECTION.md](CREATIVE_DIRECTION.md) (the vision, signature features and resolved decisions; **it overrides the part guides where they differ**), then [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), then the guide for the part you are working on.
 
 | Part | Guide | Delivers |
 |---|---|---|
@@ -8,6 +8,7 @@ This folder is the design and implementation brief for PR #7's four UX milestone
 | 2 | [PART2_HUD.md](PART2_HUD.md) | Vitals (health/mana/XP), action buttons v2 with cooldowns, context-sensitive Interact, quest tracker, notifications, desktop hotbar |
 | 3 | [PART3_SCREENS.md](PART3_SCREENS.md) | The Adventurer's Book: Pack (bag, equipment, item details), Crafting, Trade, Hero (stats/abilities/skills), Journal (quest stages, lore), Map |
 | 4 | [PART4_DIALOGUE_SETTINGS_VERIFICATION.md](PART4_DIALOGUE_SETTINGS_VERIFICATION.md) | Dialogue Manager presentation, pause/save/load, settings, accessibility, defeat flow, developer tools separation, visual regression and phone acceptance |
+| ★ | [CREATIVE_DIRECTION.md](CREATIVE_DIRECTION.md) | Living title screen, generated pixel-art UI skin, minimap HUD, combat text, action-bar loadout, live creature portraits and try-on, merchant economy, Codex, quest ceremony, death recap, coach marks, gamepad |
 
 Mockups (1280×800 logical canvas, Touch density) live in [`mockups/`](mockups/). They are the visual target; the guides hold the numbers. If a mockup and a guide disagree, **the guide wins**. Regenerate mockups with `python3 docs/ui/mockups/build_mockups.py`.
 
@@ -18,6 +19,9 @@ Mockups (1280×800 logical canvas, Touch density) live in [`mockups/`](mockups/)
 | ![Journal](mockups/05-book-journal.svg) | ![Map](mockups/06-book-map.svg) |
 | ![Dialogue](mockups/07-dialogue.svg) | ![Pause](mockups/08-pause.svg) |
 | ![Settings](mockups/09-settings.svg) | ![Desktop HUD](mockups/10-hud-desktop.svg) |
+| ![Title](mockups/11-title.svg) | ![Codex](mockups/12-codex.svg) |
+| ![Trade](mockups/13-trade.svg) | ![Fallen](mockups/14-defeat.svg) |
+| ![Quest complete](mockups/15-quest-complete.svg) | |
 
 ---
 
@@ -121,11 +125,11 @@ game/narrative/DialogueBalloon.gd   (Part 4) presentation for Narrative.gd's dia
 game/settings/UserSettings.cs       (Part 4) user://settings.cfg; never part of game saves
 ```
 
-C# namespace stays `Mosslight`. Build every control in code, as the project already does; there are no `.tscn` UI scenes and you should not add any. Keep each file focused (target < 300 lines).
+C# namespace stays `Mosslight`. Default to building controls in code, as the project already does. `.tscn` scenes are allowed where they genuinely simplify a layout (D6). Keep each file focused (target < 300 lines).
 
-## 5. Contracts the redesign must preserve
+## 5. Current dependencies (change freely, but deliberately)
 
-These are relied upon by `game/tests/*`, `tools/android-smoke.py`, `tools/verify.py` and CI. If one has to change, change the consumer **in the same commit**, keep the same intent, and record it in that part's handoff.
+These are relied upon by `game/tests/*`, `tools/android-smoke.py`, `tools/verify.py` and CI. None of them is a creative limit. Any of them may change when the design calls for it (CREATIVE_DIRECTION does change several). When one changes, update its consumer **in the same commit** so it checks the new intent, and record the change in that part's handoff.
 
 **Engine and project**
 - Godot 4.6.1 .NET, .NET SDK 9.0.203, GL Compatibility renderer, landscape, `canvas_items` stretch, 1280×800 base. Android ARM64 build and x86_64 emulator smoke must stay green.
@@ -166,7 +170,9 @@ Part 3 ─► Part 2 (quest tracker reuses Narrative.journal_entries() added in 
 
 Recommended order: 1 → 2 → 3 → 4, each as a series of small commits on `feat/mobile-ui-ux-overhaul`. Each part ends with a green `tools/verify.py --headless`, a refreshed `--visual` capture set (desktop and `--mobile`) and a handoff file `docs/PR7_PARTn_HANDOFF.md` written in the same style as `docs/PR5_PART4_HANDOFF.md`: what changed, what authority is unchanged, actual verification results, and known limits. Do not tick a PR milestone until its handoff exists.
 
-## 7. Open decisions (recommendations included; confirm with Ross before Part 1 merges)
+## 7. Decisions
+
+**All resolved; see [CREATIVE_DIRECTION.md § Resolved decisions](CREATIVE_DIRECTION.md#resolved-decisions-replaces-readme-7).** The original recommendations are kept below for context. D3 now uses the v3 IDs and D5 is reversed: selling is in.
 
 | # | Decision | Recommendation |
 |---|---|---|

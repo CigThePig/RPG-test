@@ -177,7 +177,9 @@ Author **monochrome SVG** icons on a 24×24 grid in `game/ui/icons/<name>.svg`: 
 
 Required set (name → meaning):
 
-`sword` attack · `flame` ember · `leaf-heart` mend · `ward` bark ward · `dash` dodge · `flask` draught/potion · `hand` interact (generic) · `chat` talk · `chest` open · `gather` herb/ore/wood · `key` key/unlock · `lock` locked · `lever` pull · `brazier` kindle · `portal` enter ruin · `door` exit/return · `eye` inspect · `skull` loot/defeat · `bag` pack · `menu` pause · `book` journal/Book · `person` hero · `map` map · `close` · `back` · `check` · `warning` · `info` · `star` level up · `coin` crowns · `relic` · `herb` · `ore` · `wood` · `staff` · `coat` · `scroll` quest · `pin` track quest · `gear` settings · `save` · `load` · `sound-on` · `sound-off` · `vibrate` · `hammer` craft · `scale` trade · `plus` · `minus` · `target` objective · `bug` developer.
+`sword` attack · `flame` ember · `leaf-heart` mend · `ward` bark ward · `dash` dodge · `flask` draught/potion · `hand` interact (generic) · `chat` talk · `chest` open · `gather` herb/ore/wood · `key` key/unlock · `lock` locked · `lever` pull · `brazier` kindle · `portal` enter ruin · `door` exit/return · `eye` inspect · `skull` loot/defeat · `bag` pack · `menu` pause · `book` journal/Book · `person` hero · `map` map · `close` · `back` · `check` · `warning` · `info` · `star` level up · `next` chevron · `coin` crowns · `relic` · `herb` · `ore` · `wood` · `staff` · `coat` · `scroll` quest · `pin` track quest · `gear` settings · `save` · `load` · `sound-on` · `sound-off` · `vibrate` · `hammer` craft · `scale` trade · `plus` · `minus` · `target` objective · `bug` developer.
+
+Creative-layer additions (CREATIVE_DIRECTION): `compass` minimap N-notch, `swap` action-bar assign, `codex` creatures, `skull-tip` counterplay tips, controller face-button glyphs (drawn, not trademarked art).
 
 Item and ability icons are chosen by ID through one lookup table in `UiIcons` (`ItemIcon(prototypeId)`, `AbilityIcon(abilityId)`, `InteractionIcon(kind)`), with a `fallback` icon. Content authors then add new items without touching screens.
 

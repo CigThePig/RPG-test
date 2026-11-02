@@ -2,6 +2,8 @@
 
 **Goal:** turn Pack, Character, Journal and Map into real RPG screens: an item grid with details and comparisons, equipment slots, crafting and trading with clear requirements, a Hero sheet with abilities and skills, a stage-based journal, and an icon map with quest markers. **Gloot, QuestSystem/Narrative and World stay authoritative.** Every page is a view that rebuilds from live queries after each command.
 
+> **Creative layer ([CREATIVE_DIRECTION.md](CREATIVE_DIRECTION.md)) owned by this part:** **C5** Hero ▸ Action bar (Hero's segmented control becomes Abilities | Skills | Action bar); **C6** live portraits (Hero profile, Pack equipped column); **C7** try-on; **C8** the merchant economy (**replaces §4 Trade below**: values, selling, buyback, reputation prices, two-column layout); **C9** the Codex (Journal's segmented control becomes Quests | Codex | Lore). Mockups 04, 12 and 13 show them.
+
 Prerequisites: Part 1 (Book shell, components). Part 2's `journal_entries()` and `ability3` slot. If Part 3 lands first, build `journal_entries()` here and keep Hero's "Use" buttons until `ability3` exists. Mockups: [`02-book-pack.svg`](mockups/02-book-pack.svg), [`03-book-craft.svg`](mockups/03-book-craft.svg), [`04-book-hero.svg`](mockups/04-book-hero.svg), [`05-book-journal.svg`](mockups/05-book-journal.svg), [`06-book-map.svg`](mockups/06-book-map.svg).
 
 ## 0. Book frame recap (from Part 1)
@@ -169,7 +171,8 @@ Layout: the map canvas (rest) plus a sidebar (300 lp; on Touch it can collapse t
 5. Journal (Quests, Lore) and the tracker → Journal deep link.
 6. Map rewrite, quest markers, Journal → Map deep link.
 7. Responsive two-column fallback at < 980 lp.
-8. Evidence and handoff.
+8. Creative layer: C6 `CreaturePortrait` (live and snapshot cache) → C7 try-on → C5 Action bar page → C8 economy (`Prices`, `Items.Sell`, purses, two-column Trade) → C9 Codex recording and pages.
+9. Evidence and handoff.
 
 ## 9. Tests (`game/tests/BookChecks.cs`)
 
@@ -185,6 +188,7 @@ Use isolated owners and restore state in `finally`, as `CraftingChecks` does.
 8. **Map markers:** in a generated ruin, the relic marker is unresolved until the sanctuary is discovered, then resolves to the relic tile. In Reach during `enter_ruin`, the portal is marked. In the ruin during `report_warden`, the exit is marked as the transition.
 9. **Touch sizes and safe area** (mobile): reuse the Part 1 check for every Book tab and segment.
 10. **Authority:** after a sequence of Book operations (equip, unequip, craft, buy, learn, train), `Persistence.Capture` round-trips, and the UI holds no item/quest state. Assert that no page caches the catalog across a `Refresh()` (for example, mutate Gloot directly, call `Refresh()`, and see the change).
+11. **Creative layer:** the C8 economy tests listed in CREATIVE_DIRECTION; the Codex records a creature once on sighting, survives save/load, and lists unseen profiles as silhouettes; at most 3 live `CreaturePortrait`s exist while any Book page is open; try-on never changes Gloot state (semantic `export_state` compare).
 
 ## 10. Evidence and handoff
 

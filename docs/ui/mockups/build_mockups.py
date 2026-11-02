@@ -114,6 +114,8 @@ ICONS = {
     "warning": "M12 2l11 20H1zM11 9v6h2V9zm0 8v2h2v-2z",
     "ward": "M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z",
     "next": "M9 3l-3 3 6 6-6 6 3 3 9-9z",
+    "info": "M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1 8v8h2v-8zm0-4v2h2V6z",
+    "staff": "M17 2l3 3-2 2-1-1-11 14-2-2L18 7l-1-1z",
     "bug": "M9 4h6v3H9zM6 8h12v10a6 6 0 0 1-12 0zM2 10h4v2H2zM18 10h4v2h-4zM2 16h4v2H2zM18 16h4v2h-4z",
 }
 
@@ -210,7 +212,7 @@ def tile(svg, x, y, ic, count=None, pips=0, equipped=False, selected=False, s=96
 
 
 def book_frame(svg, active, crowns="20"):
-    svg.rect(16, 16, 1248, 768, fill=T["s1"], r=18, stroke=T["frame"], op=.97, shadow=True)
+    skin_frame(svg, 16, 16, 1248, 768)
     svg.text(44, 74, "Adventurer's Book", 32, T["text"], bold=True, font=HEAD)
     tabs = [("Pack", "bag"), ("Hero", "person"), ("Journal", "scroll"), ("Map", "map")]
     x0, tw = 392, 140
@@ -333,17 +335,105 @@ def stick(svg):
     svg.circle(140, 640, 30, fill="#A6BA80", op=.85)
 
 
+
+
+# ---------------------------------------------------------------- creative layer helpers (C2 skin, C6 portraits)
+CREATURES = {
+    # 16x16 pixel bitmaps: . empty, o outline, a body, b shade, c accent, e eye
+    "wayfarer": [
+        "......oooo......", ".....oaaaao.....", "....oaaaaaao....", "....oaeaaeao....", "....oaaaaaao....", ".....obbbbo.....",
+        "...ooccccccoo...", "..occccccccco...", "..oacccccccao...", "..oacccccccao...", "...occcccco.....", "....obbobbo.....",
+        "....oaaoaao.....", "....oaaoaao.....", "...oooo.oooo....", "................"],
+    "prowler": [
+        "................", "................", "..oo........oo..", ".oaao......oaao.", ".oaaaoooooaaeao.", "..oaaaaaaaaaaao.", "..oaaaccccaaaoo.",
+        ".oaaaccccccaao..", "oaaaacccccaao...", "obboaaaaaaabo...", ".ob.obboobbo....", ".o..ob.oo.bo....", "....oo..o..o....",
+        "................", "................", "................"],
+    "brute": [
+        "................", "....oooooooo....", "...oaaaaaaaao...", "..oaaeaaaaeaao..", "..oaaaaaaaaaao..", ".ooaaccccccaaoo.", "oaaaccccccccaaao",
+        "oaaacccccccccaao", "oaaaccccccccaaao", ".oobaaaaaaaaboo.", "...obbaaaabbo...", "...oaao..oaao...", "...oaao..oaao...",
+        "..ooooo..ooooo..", "................", "................"],
+}
+PAL = {"wayfarer": ("#C77FA6", "#8E4F73", "#5B6B42"), "prowler": ("#6F8F3A", "#4A6427", "#A9C46A"), "brute": ("#3F5368", "#2A3847", "#7A8FA8"),
+       "silhouette": ("#1E2A28", "#18211F", "#1E2A28")}
+
+
+def creature(svg, kind, x, y, px, pal=None, eye="#F2E6B8"):
+    a, b, c = PAL[pal or kind]
+    cols = {"o": "#0A0F0E", "a": a, "b": b, "c": c, "e": eye if pal != "silhouette" else a}
+    for j, row in enumerate(CREATURES[kind]):
+        for i, ch in enumerate(row):
+            if ch != ".": svg.rect(x + i * px, y + j * px, px, px, fill=cols[ch])
+
+
+def skin_frame(svg, x, y, w, h, region="reach", fill=None, op=.97):
+    """Approximates the C2 generated 9-slice frame (2 lp per texel)."""
+    rim_l, rim_d = ("#E8CF8A", "#7A6232") if region == "reach" else ("#B7C2BE", "#3D4643")
+    svg.rect(x, y, w, h, fill=fill or T["s1"], r=6, op=op, shadow=True)
+    svg.rect(x, y, w, h, r=6, stroke="#0A0F0E", sw=4)
+    svg.add(f'<path d="M{x + 4} {y + h - 6} V{y + 6} H{x + w - 6}" fill="none" stroke="{rim_l}" stroke-width="3"/>')
+    svg.add(f'<path d="M{x + w - 4} {y + 6} V{y + h - 4} H{x + 6}" fill="none" stroke="{rim_d}" stroke-width="3"/>')
+    for cx, cy in [(x + 4, y + 4), (x + w - 14, y + 4), (x + 4, y + h - 14), (x + w - 14, y + h - 14)]:
+        svg.rect(cx, cy, 10, 10, fill=rim_l); svg.rect(cx + 3, cy + 3, 4, 4, fill="#0A0F0E")
+    if region == "reach":
+        for tx in (x + 22, x + 34, x + w - 46, x + w - 30):
+            for dx, dy, col in [(0, -4, "#5E8A3A"), (2, -6, "#8DB65A"), (4, -4, "#5E8A3A"), (2, -2, "#5E8A3A"), (6, -2, "#8DB65A")]:
+                svg.rect(tx + dx, y + dy, 2, 2, fill=col)
+    else:
+        for tx in (x + 30, x + w - 36):
+            svg.rect(tx, y + 1, 4, 4, fill=T["lumen"])
+
+
+def minimap(svg, x, y, size):
+    svg.rect(x, y, size, size, fill=T["sunken"], r=14, op=.92)
+    t = size / 24
+    for j in range(24):
+        for i in range(24):
+            c = "#5B6B42"
+            if (i - 5) ** 2 + (j - 6) ** 2 < 14 or (i - 18) ** 2 / 2 + (j - 18) ** 2 < 12: c = "#2E5560"
+            if j in (0, 23) or i in (0, 23) or (14 <= i <= 17 and 3 <= j <= 9): c = "#26302D"
+            if (i + 2 * j) % 11 == 0 and c == "#5B6B42": c = "#526239"
+            svg.rect(x + i * t, y + j * t, t + .3, t + .3, fill=c)
+    svg.rect(x, y, size, size, r=14, stroke=T["bright"], sw=3)
+    svg.rect(x + size / 2 - 10, y - 4, 20, 14, fill=T["s1"], r=4); svg.text(x + size / 2, y + 8, "N", 12, T["gold"], bold=True, anchor="middle")
+    cx, cy = x + size / 2, y + size / 2
+    svg.add(f'<path d="M{cx} {cy - 9} L{cx + 7} {cy + 7} L{cx} {cy + 3} L{cx - 7} {cy + 7} Z" fill="{T["gold"]}" stroke="#000" stroke-width="1.5"/>')
+    for (dx, dy) in [(40, -30), (52, -12), (-50, 40)]:
+        svg.add(f'<path d="M{cx + dx} {cy + dy - 6} L{cx + dx + 6} {cy + dy + 5} L{cx + dx - 6} {cy + dy + 5} Z" fill="{T["dfill"]}" stroke="#000" stroke-width="1"/>')
+    svg.circle(cx - 30, cy - 20, 5, fill=T["gold"], stroke="#000", sw=1)
+    svg.circle(x + size - 10, cy + 10, 8, stroke=T["gold"], sw=3); svg.add(f'<path d="M{x + size - 2} {cy + 10} l-6 -5 v10 z" fill="{T["gold"]}"/>')
+
+
+def float_text(svg, x, y, txt, size, fill, outline="#000"):
+    svg.add(f'<text x="{x}" y="{y}" font-family="{BODY}" font-size="{size}" font-weight="700" fill="{fill}" text-anchor="middle" stroke="{outline}" stroke-width="4" paint-order="stroke">{esc(txt)}</text>')
+
+
+def nameplate(svg, cx, y, name, frac):
+    svg.text(cx, y, name, 16, T["text"], bold=True, anchor="middle", outline=True)
+    svg.rect(cx - 24, y + 5, 48, 6, fill="#2A1312", r=3); svg.rect(cx - 24, y + 5, 48 * frac, 6, fill=T["dfill"], r=3)
+
+
 # ================================================================ screens
 def hud_mobile():
-    s = Svg("HUD — mobile (Touch)")
+    s = Svg("HUD v3 — mobile (Touch)")
     world(s)
-    # chest + target highlight
-    s.rect(600, 300, 40, 30, fill="#7B5A33", r=4, stroke="#3A2A18"); s.add('<path d="M612 282l8 8 8-8" fill="none" stroke="#D9BC6E" stroke-width="4" stroke-linecap="round"/>')
+    # world: enemies with nameplates and combat text, chest with target highlight
+    creature(s, "prowler", 690, 330, 3); nameplate(s, 714, 320, "Mire prowler", .45)
+    float_text(s, 740, 300, "14", 30, T["text"], outline=T["ember"])
+    float_text(s, 612, 352, "dodged", 18, T["lumen"])
+    creature(s, "wayfarer", 560, 360, 3)
+    s.rect(470, 300, 40, 30, fill="#7B5A33", r=4, stroke="#3A2A18"); s.add('<path d="M482 282l8 8 8-8" fill="none" stroke="#D9BC6E" stroke-width="4" stroke-linecap="round"/>')
     vitals(s)
-    toast(s, 472, 20, 408, "herb", "Silverleaf", "Added to your pack", T["gold"], "×3")
-    toast(s, 472, 100, 408, "scroll", "New objective", "Enter the ruins east of Reach.", T["gold"])
-    util_buttons(s); tracker(s); stick(s); cluster(s)
-    s.text(24, 790, "01 · HUD (Touch) — geometry v2, see PART2_HUD.md §1–§2", 16, T["text2"], outline=True)
+    # tracker under vitals (C3)
+    tracker(s, x=24, y=146)
+    toast(s, 472, 20, 500, "herb", "Silverleaf", "Added to your pack", T["gold"], "×3")
+    # minimap + stacked utilities
+    minimap(s, 1080, 16, 176)
+    for (yy, ic, label) in [(20, "bag", "Pack"), (112, "menu", "Menu")]:
+        s.rect(988, yy, 80, 80, fill=T["plate"], r=14, op=.72, stroke=T["bright"]); icon(s, ic, 1012, yy + 10, 32)
+        s.text(1028, yy + 68, label, 18, T["text"], bold=True, anchor="middle")
+    s.circle(1060, 26, 9, fill=T["gold"], stroke=T["s1"])
+    stick(s); cluster(s)
+    s.text(24, 790, "01 · HUD v3 (Touch) — CREATIVE_DIRECTION C3/C4/C5; tall tier", 16, T["text2"], outline=True)
     s.save("01-hud-mobile.svg")
 
 
@@ -408,31 +498,36 @@ def book_craft():
 
 
 def book_hero():
-    s = Svg("Book — Hero")
+    s = Svg("Book — Hero (portrait + action bar)")
     world(s, dim=.55); book_frame(s, "Hero")
-    # profile column
-    s.circle(110, 210, 60, fill=T["s2"], stroke=T["frame"]); s.circle(110, 210, 52, stroke=T["sunken"], sw=8); s.arc(110, 210, 52, .4, T["gold"], 8)
-    s.text(110, 224, "3", 40, T["text"], bold=True, anchor="middle", outline=True)
-    s.text(190, 196, "Wayfarer", 32, T["text"], bold=True, font=HEAD); s.text(190, 230, "Biped", 22, T["text2"])
-    statbar(s, 40, 288, 340, 10, .4, T["gold"], T["xp_track"]); s.text(40, 324, "120 / 300 XP to level 4", 22, T["text2"])
-    chip(s, 40, 340, "1 skill point to spend", T["gold"], ic="star", size=20)
-    stats = [("Health", "84 / 110"), ("Mana", "42 / 60"), ("Strength", "10  (+2 Blades)"), ("Defence", "5"), ("Weapon damage", "+8"), ("Speed", "72")]
+    # live portrait (C6)
+    s.rect(40, 136, 340, 260, fill=T["sunken"], r=12, stroke=T["subtle"])
+    s.add('<ellipse cx="210" cy="372" rx="70" ry="12" fill="#000" fill-opacity=".35"/>')
+    creature(s, "wayfarer", 146, 196, 8)
+    s.add('<path d="M70 372 q-14 -14 0 -28" fill="none" stroke="#AFBB9E" stroke-width="3"/><path d="M350 344 q14 14 0 28" fill="none" stroke="#AFBB9E" stroke-width="3"/>')
+    s.circle(84, 178, 30, fill=T["s2"], stroke=T["gold"], sw=2); s.text(84, 189, "3", 30, T["text"], bold=True, anchor="middle")
+    s.text(40, 432, "Wayfarer", 30, T["text"], bold=True, font=HEAD); s.text(370, 432, "Biped", 22, T["text2"], anchor="end")
+    statbar(s, 40, 448, 340, 10, .4, T["gold"], T["xp_track"]); s.text(40, 484, "120 / 300 XP to level 4", 22, T["text2"])
+    stats = [("Health", "84 / 110"), ("Strength", "10  (+2)"), ("Defence", "5"), ("Weapon", "+8")]
     for i, (k, v) in enumerate(stats):
-        y = 418 + i * 42
-        s.text(40, y, k, 24, T["text2"]); s.text(380, y, v, 24, T["text"], bold=True, anchor="end"); s.rect(40, y + 14, 340, 1, fill=T["subtle"])
-    x = 40
-    for t in ["Grasps", "Swims"]: x += chip(s, x, 682, t, T["text2"], size=20) + 8
-    s.text(40, 752, "Wardens · Friendly (25)", 22, T["text2"])
-    # growth
-    segmented(s, 424, 136, ["Abilities", "Skills"], "Abilities", w_each=180)
-    def known(lbl):
-        def f(x, y): chip(s, x - 250, y - 16, "Known", T["moss"], ic="check", size=18); s.text(x - 20, y + 8, lbl, 20, T["text2"], anchor="end")
+        y = 528 + i * 40
+        s.text(40, y, k, 24, T["text2"]); s.text(380, y, v, 24, T["text"], bold=True, anchor="end"); s.rect(40, y + 12, 340, 1, fill=T["subtle"])
+    chip(s, 40, 704, "1 skill point to spend", T["gold"], ic="star", size=20)
+    # growth: action bar segment
+    segmented(s, 424, 136, ["Abilities", "Skills", "Action bar"], "Action bar", w_each=200)
+    s.text(424, 258, "Tap a slot, then an ability", 22, T["text2"])
+    slots = [("2", "flame", "Ember bolt", False), ("3", "leaf", "Mend", False), ("4", "ward", "Bark ward", True)]
+    for i, (key, ic, name, sel) in enumerate(slots):
+        x = 424 + i * 276
+        s.rect(x, 276, 260, 150, fill=T["s3"] if sel else T["s2"], r=12, stroke=T["gold"] if sel else T["subtle"], sw=3 if sel else 1.5)
+        s.circle(x + 60, 351, 44, fill=T["s1"], stroke=T["bright"]); icon(s, ic, x + 40, 331, 40, T["gold"] if sel else T["text"])
+        s.text(x + 120, 340, name, 24, T["text"], bold=True); s.text(x + 120, 372, f"Slot {i + 1} · key {key}", 20, T["text2"])
+    s.text(424, 478, "Known abilities", 26, T["text"], bold=True); s.rect(424, 488, 816, 2, fill=T["subtle"])
+    def assign(lbl, on=False):
+        def f(x, y): button(s, x - 200, y - 32, 180, 64, lbl, "primary" if on else "secondary", size=22)
         return f
-    def learn(x, y): button(s, x - 220, y - 36, 200, 72, "Learn · 1 pt", "primary", size=22)
-    listrow(s, 424, 236, 816, 112, "sword", "Sword arc", "No cost · 0.65 s cooldown · range 44", known("Button 1"))
-    listrow(s, 424, 360, 816, 112, "flame", "Ember bolt", "9 mana · 1.5 s cooldown · range 240", known("Button 2"))
-    listrow(s, 424, 484, 816, 112, "leaf", "Mend", "12 mana · 4 s cooldown", known("Button 3"))
-    listrow(s, 424, 608, 816, 112, "ward", "Bark ward", "8 mana · 8 s cooldown · requires level 2", learn, icol=T["gold"])
+    listrow(s, 424, 504, 816, 96, "ward", "Bark ward", "8 mana · 8 s cooldown · self", assign("In slot 3", True), selected=True, icol=T["gold"])
+    listrow(s, 424, 612, 816, 96, "flame", "Ember bolt", "9 mana · 1.5 s · range 240", assign("Swap here"))
     s.save("04-book-hero.svg")
 
 
@@ -521,7 +616,7 @@ def dialogue():
     vitals(s); toast(s, 472, 20, 408, "scroll", "Quest accepted", "Trouble in the Reach", T["gold"])
     s.rect(24, 324, 1232, 452, fill=T["s1"], r=18, stroke=T["frame"], op=.97, shadow=True)
     s.rect(56, 300, 200, 52, fill=T["gold"], r=10); s.text(156, 336, "Warden", 30, T["onacc"], bold=True, font=HEAD, anchor="middle")
-    s.circle(112, 432, 56, fill=T["s2"], stroke=T["gold"], sw=3); icon(s, "person", 80, 400, 64, T["text2"])
+    s.circle(112, 432, 56, fill=T["s2"], stroke=T["gold"], sw=3); creature(s, "wayfarer", 80, 396, 4)
     s.text(196, 400, "The old light kept these roads safe. Something in the", 26, T["text"])
     s.text(196, 436, "ruins has stirred.", 26, T["text"])
     rows = [("scroll", "I can help with the prowlers.", T["gold"], True), ("scroll", "I want to learn alchemy.", T["gold"], True),
@@ -592,12 +687,12 @@ def settings():
 def hud_desktop():
     s = Svg("HUD — desktop")
     world(s)
-    vitals(s); tracker(s, x=896, y=84)
+    vitals(s); tracker(s, x=24, y=146); minimap(s, 1104, 76, 152)
     for i, (ic, key) in enumerate([("bag", "I"), ("person", "C"), ("scroll", "J"), ("map", "M"), ("menu", "Esc")]):
         bx = 984 + i * 56
         s.rect(bx, 20, 48, 48, fill=T["plate"], r=10, op=.8, stroke=T["bright"]); icon(s, ic, bx + 12, 32, 24)
     s.text(1256, 16, "", 10)
-    slots = [("sword", "1", T["attack"]), ("flame", "2", T["s2"]), ("leaf", "3", T["s2"]), ("flask", "4", T["s2"]), ("leaf", "5", T["s2"]), ("dash", "Space", T["dodge"])]
+    slots = [("sword", "1", T["attack"]), ("flame", "2", T["s2"]), ("leaf", "3", T["s2"]), ("ward", "4", T["s2"]), ("flask", "Q", T["s2"]), ("dash", "Space", T["dodge"])]
     total = len(slots) * 72 + 160
     x0 = 640 - total / 2
     for i, (ic, key, fill) in enumerate(slots):
@@ -615,7 +710,132 @@ def hud_desktop():
     s.save("10-hud-desktop.svg")
 
 
+def title():
+    s = Svg("Title — The Lantern Gate")
+    world(s)
+    s.add('<defs><radialGradient id="vig" cx="62%" cy="45%" r="75%"><stop offset="0" stop-color="#050A0A" stop-opacity="0"/><stop offset="1" stop-color="#050A0A" stop-opacity=".88"/></radialGradient>'
+          '<radialGradient id="glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#9FE3E6" stop-opacity=".35"/><stop offset="1" stop-color="#9FE3E6" stop-opacity="0"/></radialGradient></defs>')
+    creature(s, "wayfarer", 820, 380, 4); creature(s, "brute", 960, 360, 4)
+    s.rect(0, 0, W, H, fill="url(#vig)")
+    s.rect(0, 0, 620, H, fill="#050A0A", op=.45)
+    s.add('<ellipse cx="290" cy="150" rx="260" ry="90" fill="url(#glow)"/>')
+    s.add(f'<text x="80" y="176" font-family="{HEAD}" font-size="76" font-weight="700" fill="{T["gold"]}" stroke="#0A0F0E" stroke-width="4" paint-order="stroke">Mosslight</text>')
+    s.text(84, 214, "A light lies buried beneath the Reach.", 24, T["text2"])
+    skin_frame(s, 80, 260, 460, 132, fill=T["s2"])
+    s.rect(96, 276, 100, 100, fill=T["sunken"], r=8); creature(s, "wayfarer", 106, 284, 5)
+    s.text(212, 306, "Continue", 30, T["gold"], bold=True)
+    s.text(212, 338, "Wayfarer · Level 3 · The Sealed Ruin", 20, T["text"])
+    s.text(212, 366, "Recover the relic · 2 Nov, 14:32", 20, T["text2"])
+    for i, (ic, lab) in enumerate([("star", "New adventure"), ("book", "Load game"), ("gear", "Settings"), ("close", "Quit")]):
+        y = 408 + i * 96
+        s.rect(80, y, 460, 84, fill=T["s2"], r=12, stroke=T["subtle"], op=.9); icon(s, ic, 104, y + 26, 32); s.text(152, y + 52, lab, 26, T["text"], bold=True)
+    s.text(1256, 788, "build 3f9c2ab", 16, T["text2"], anchor="end")
+    s.save("11-title.svg")
+
+
+def codex():
+    s = Svg("Book — Journal ▸ Codex")
+    world(s, dim=.55); book_frame(s, "Journal")
+    segmented(s, 40, 136, ["Quests", "Codex", "Lore"], "Codex", w_each=170)
+    x = 580
+    for i, (lab, on) in enumerate([("Creatures 3/5", True), ("Places 4", False), ("Items 9", False)]):
+        x += chip(s, x, 156, lab, T["gold"] if on else T["text2"], size=20) + 10
+    cards = [("prowler", "Mire prowler", "Defeated ×6", None), ("brute", "Ruin brute", "Defeated ×2", None), ("wayfarer", "Reach warden", "Met in Reach", None),
+             ("brute", "???", "Not yet encountered", "silhouette"), ("prowler", "???", "Not yet encountered", "silhouette")]
+    for i, (kind, name, sub, pal) in enumerate(cards):
+        cx, cy = 40 + (i % 3) * 176, 236 + (i // 3) * 264
+        sel = i == 1
+        s.rect(cx, cy, 164, 248, fill=T["s3"] if sel else T["s2"], r=12, stroke=T["gold"] if sel else T["subtle"], sw=3 if sel else 1.5)
+        s.rect(cx + 10, cy + 10, 144, 144, fill=T["sunken"], r=8)
+        creature(s, kind, cx + 18, cy + 18, 8, pal)
+        s.text(cx + 82, cy + 190, name, 22, T["text"] if pal is None else T["dis"], bold=True, anchor="middle")
+        s.text(cx + 82, cy + 222, sub, 18, T["text2"], anchor="middle")
+    s.rect(580, 236, 660, 532, fill=T["s2"], r=14, stroke=T["subtle"])
+    s.rect(604, 260, 200, 200, fill=T["sunken"], r=10); creature(s, "brute", 612, 268, 11)
+    s.text(828, 300, "Ruin brute", 32, T["text"], bold=True, font=HEAD)
+    s.text(828, 336, "The Sealed Ruin · deep halls", 22, T["text2"])
+    s.text(828, 372, "Defeated ×2 · first seen day 1", 22, T["text2"])
+    s.text(604, 512, "Known attacks", 26, T["text"], bold=True); s.rect(604, 522, 612, 2, fill=T["subtle"])
+    s.rect(604, 540, 612, 112, fill=T["s1"], r=12, stroke=T["amber"])
+    icon(s, "warning", 624, 560, 28, T["amber"]); s.text(668, 582, "Crushing sweep", 24, T["text"], bold=True)
+    s.text(668, 614, "Brutes commit to the sweep — step out of the", 22, T["text2"])
+    s.text(668, 640, "cone or dodge through it.", 22, T["text2"])
+    s.text(604, 700, "Bite · Acid droplet — not yet observed", 22, T["dis"])
+    s.save("12-codex.svg")
+
+
+def trade():
+    s = Svg("Book — Pack ▸ Trade (buy and sell)")
+    world(s, dim=.55); book_frame(s, "Pack")
+    segmented(s, 40, 136, ["Bag", "Craft", "Trade"], "Trade")
+    chip(s, 560, 154, "Friendly · 5% off", T["moss"], ic="star", size=20)
+    s.text(1240, 182, "You 20 · Warden 80", 24, T["gold"], bold=True, anchor="end")
+    def price(p, col=None):
+        def f(x, y): chip(s, x - 130, y - 16, f"{p}", col or T["gold"], ic="coin", size=20)
+        return f
+    s.text(40, 252, "Warden's supplies", 26, T["text"], bold=True); s.rect(40, 262, 590, 2, fill=T["subtle"])
+    listrow(s, 40, 276, 590, 88, "coat", "Leather coat", "Defence 4", price(15), selected=True)
+    listrow(s, 40, 372, 590, 88, "flask", "Restorative draught", "×5 in stock", price(6))
+    listrow(s, 40, 468, 590, 88, "ore", "Bog iron  · Sold by you", "Buy back at sell price", price(1, T["moss"]))
+    s.text(650, 252, "Your pack", 26, T["text"], bold=True); s.rect(650, 262, 590, 2, fill=T["subtle"])
+    listrow(s, 650, 276, 590, 88, "staff" if "staff" in ICONS else "wood", "Oak staff", "Sell for", price(7))
+    listrow(s, 650, 372, 590, 88, "herb", "Silverleaf ×4", "Sell for", price(1))
+    listrow(s, 650, 468, 590, 88, "relic", "Reach relic", "Quest item — can't be sold", None, tcol=T["text2"])
+    # details strip
+    s.rect(40, 572, 1200, 196, fill=T["s2"], r=14, stroke=T["subtle"])
+    s.rect(60, 592, 156, 156, fill=T["sunken"], r=10); creature(s, "wayfarer", 74, 606, 8)
+    chip(s, 66, 598, "Preview", T["lumen"], size=16)
+    s.text(240, 630, "Leather coat", 28, T["text"], bold=True); s.text(240, 662, "Leather · Armour · Common", 22, T["text2"])
+    s.text(240, 708, "Defence", 24, T["text2"]); s.text(420, 708, "4", 24, T["text"], bold=True, anchor="end"); s.text(500, 708, "▲ +4", 22, T["moss"], bold=True, anchor="end")
+    button(s, 900, 640, 316, 96, "Buy · 15 crowns", "primary", ic="coin")
+    s.save("13-trade.svg")
+
+
+def defeat():
+    s = Svg("Fallen — death recap")
+    world(s, ruin=True)
+    s.rect(0, 0, W, H, fill="#2A2A2A", op=.55)
+    skin_frame(s, 240, 60, 800, 680, region="ruin")
+    s.text(640, 140, "You have fallen", 48, T["dtext"], bold=True, font=HEAD, anchor="middle")
+    s.rect(280, 176, 180, 180, fill=T["sunken"], r=10); creature(s, "brute", 290, 186, 10)
+    s.text(488, 222, "Slain by a Ruin brute", 28, T["text"], bold=True)
+    s.text(488, 258, "Crushing sweep · 23 damage", 22, T["text2"])
+    s.rect(488, 280, 512, 76, fill=T["s1"], r=12, stroke=T["amber"])
+    icon(s, "info", 504, 300, 26, T["amber"]); s.text(544, 314, "Brutes commit to the sweep. Step out", 21, T["text"])
+    s.text(544, 342, "of the cone or dodge through it.", 21, T["text"])
+    for i, (k, v) in enumerate([("Foes defeated", "5"), ("Rooms explored", "7"), ("Time this life", "12 min")]):
+        x = 280 + i * 250
+        s.text(x, 410, v, 32, T["gold"], bold=True); s.text(x, 440, k, 20, T["text2"])
+    button(s, 280, 480, 720, 96, "Load last save · slot 2, 4 min ago", "primary", ic="book")
+    button(s, 280, 592, 352, 88, "Recover autosave", "secondary")
+    button(s, 648, 592, 352, 88, "New adventure", "secondary")
+    s.text(640, 716, "Return to title", 22, T["text2"], anchor="middle")
+    s.save("14-defeat.svg")
+
+
+def quest_complete():
+    s = Svg("Ceremony — quest complete")
+    world(s)
+    vitals(s); minimap(s, 1080, 16, 176)
+    for (yy, ic) in [(20, "bag"), (112, "menu")]:
+        s.rect(988, yy, 80, 80, fill=T["plate"], r=14, op=.72, stroke=T["bright"]); icon(s, ic, 1012, yy + 18, 40)
+    s.circle(1060, 26, 9, fill=T["gold"], stroke=T["s1"])
+    skin_frame(s, 380, 150, 520, 230, fill=T["s1"])
+    s.text(640, 214, "Quest complete", 40, T["gold"], bold=True, font=HEAD, anchor="middle")
+    s.text(640, 252, "The Buried Light", 26, T["text"], bold=True, anchor="middle")
+    tile(s, 516, 276, "flask", "3", s=72); tile(s, 604, 276, "coin", "15", s=72, color=T["gold"]); tile(s, 692, 276, "star", None, s=72, color=T["gold"])
+    s.text(728, 368, "+5 Wardens", 18, T["moss"], bold=True, anchor="middle")
+    # flight arc to the pack button
+    s.add(f'<path d="M904 300 Q 960 150 1024 64" fill="none" stroke="{T["gold"]}" stroke-width="3" stroke-dasharray="4 8" stroke-linecap="round"/>')
+    for (fx, fy, op) in [(926, 238, .5), (958, 160, .75), (996, 100, 1)]:
+        s.circle(fx, fy, 18, fill=T["s2"], stroke=T["gold"], op=op); icon(s, "flask", fx - 12, fy - 12, 24, T["text"], op=op)
+    creature(s, "wayfarer", 600, 470, 4)
+    s.text(24, 790, "15 · C10 ceremony — non-blocking; rewards fly to the Pack button after 1.8 s", 16, T["text2"], outline=True)
+    s.save("15-quest-complete.svg")
+
+
 if __name__ == "__main__":
-    for f in (hud_mobile, book_pack, book_craft, book_hero, book_journal, book_map, dialogue, pause, settings, hud_desktop):
+    for f in (hud_mobile, book_pack, book_craft, book_hero, book_journal, book_map, dialogue, pause, settings, hud_desktop,
+              title, codex, trade, defeat, quest_complete):
         f()
     print("mockups written to", OUT)

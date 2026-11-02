@@ -2,6 +2,8 @@
 
 **Goal:** finish the experience. That means a themed Dialogue Manager presentation, a proper Pause with Save/Load cards and Settings, accessibility options that actually change behaviour, a clear defeat flow, developer tools fully separated from player UI, and a verification layer that catches UI regressions automatically and hands Ross a precise phone checklist.
 
+> **Creative layer ([CREATIVE_DIRECTION.md](CREATIVE_DIRECTION.md)) owned by this part:** **C11 Fallen** (the death recap screen **replaces the non-blocking defeat banner in §2**; update `MobileCombatControlsChecks` as described there), **C12** coach marks, **C13** gamepad. Dialogue portraits are live creature portraits of the actual speaker (C6). Settings gain: Display ▸ *Combat numbers* and *Enemy nameplates* toggles; Accessibility ▸ *Reset tutorial hints*; Controls ▸ *Controller glyphs* (Auto / Keyboard / Gamepad). Pause gains *Return to title* (C1).
+
 Prerequisites: Parts 1–3. Mockups: [`07-dialogue.svg`](mockups/07-dialogue.svg), [`08-pause.svg`](mockups/08-pause.svg), [`09-settings.svg`](mockups/09-settings.svg).
 
 ## 1. Dialogue presentation
@@ -186,7 +188,8 @@ Record the new screenshots and log extracts in the runtime-evidence artifact.
 4. Developer separation and `UiDev`; the About section.
 5. Lifecycle fixes (dialogue focus loss, `FinishTransitions`).
 6. `AccessibilityChecks`, UI captures + `ui-diff.py` + CI wiring, Android smoke additions, performance measurement.
-7. Docs: `docs/PR7_PART4_HANDOFF.md`; update `README.md` (controls text: Back, settings), `docs/TESTING.md` (UI regression), `docs/ANDROID_PLAYTESTING.md` (S25 checklist), `docs/ROADMAP.md` (PR #7 milestone state), and tick the PR checklist **only** for items with recorded evidence.
+7. Creative layer: C11 recap, C12 coach marks, C13 gamepad (InputMap joypad events, focus navigation, glyph switching), with tests: recap shows killer and tip from a real presentation event; each coach mark triggers once and never during dialogue, combat or verification; joypad events drive attack, dodge and Book navigation.
+8. Docs: `docs/PR7_PART4_HANDOFF.md`; update `README.md` (controls text: Back, settings), `docs/TESTING.md` (UI regression), `docs/ANDROID_PLAYTESTING.md` (S25 checklist), `docs/ROADMAP.md` (PR #7 milestone state), and tick the PR checklist **only** for items with recorded evidence.
 
 ## Acceptance criteria
 - [ ] Dialogue is themed, safe-area aware, typewriter-skippable, double-tap safe and tag-iconified, with every Narrative/test/smoke contract intact.

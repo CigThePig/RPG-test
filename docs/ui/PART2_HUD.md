@@ -2,6 +2,8 @@
 
 **Goal:** a combat-readable HUD with graphic vitals, icon action buttons with cooldown sweeps, a context-sensitive Interact button, a quest tracker and a non-destructive notification system. The input ownership model from PR #4 Part 4 stays exactly as it is.
 
+> **Superseded in part by [CREATIVE_DIRECTION.md](CREATIVE_DIRECTION.md):** the §1 layout table becomes **C3 (HUD v3: minimap top-right, tracker under the vitals, tall/short tiers, `LayoutVersion = 3`)**. The action IDs `ember`/`mend`/`ability3` become **`skill1`/`skill2`/`skill3`** bound to the player's action bar (C5; legacy aliases kept in `ActionControl`). Everything else in this guide (button states, interact preview, toasts, vitals, desktop hotbar) still applies to those slots. This part also owns **C4** (combat text, nameplates), **C10** (quest ceremony, loot flight) and **C14** (ambience). Run `python3 docs/ui/mockups/check_geometry.py` after any geometry change.
+
 Prerequisite: Part 1 (tokens, components, icons, `UiFrame`, `ScreenHost`). Mockups: [`01-hud-mobile.svg`](mockups/01-hud-mobile.svg), [`10-hud-desktop.svg`](mockups/10-hud-desktop.svg).
 
 ## Scope
@@ -211,7 +213,8 @@ func tracked_quest() -> int        # flags value if still active; else the highe
 5. `VitalsPanel` (`StatusRect` → its global rect), low-health vignette, `QuestTracker`, `ToastLane`, `Banner`. Wire `World.Events.Published` and `Narrative.notice_typed` in `RpgUi` (unsubscribe in `_ExitTree`).
 6. Desktop hotbar and utilities.
 7. Optional: target highlight overlay and enemy health bars (36 × 5 lp above hostiles damaged in the last 5 s, max 8, presentation-only `Node2D`).
-8. Evidence and handoff.
+8. Creative layer: C5 data (`ActorState.ActionBar`, `World.SetActionBar`, auto-placement on unlock) and `skill1..3` HUD binding; C3 minimap + tier switch; C4 `CombatTextLayer` + nameplates; C10 quest card, loot flight, new-item dots; C14 if time allows.
+9. Evidence and handoff.
 
 ## 10. Tests (`game/tests/HudChecks.cs`, registered in `FoundationChecks`)
 
@@ -222,6 +225,7 @@ func tracked_quest() -> int        # flags value if still active; else the highe
 5. **Tracker:** with no active quest it is hidden. After accepting quest 1 it shows "Trouble in the Reach" and "0/2". `track_quest(3)` switches it. The tracked id survives `Persistence.Capture/Restore`.
 6. **StatusRect:** inside the safe area, not intersecting `menu`/`inventory`/`quest` (extends the existing check).
 7. **Verification determinism:** title cards and toasts render at full opacity immediately in verification mode, so captures are stable.
+8. **C3/C5/C4/C10:** the 160-layout geometry table; a legacy save without `ActionBar` loads with the default bar; unlocking `ward` fills `skill3` and the HUD shows it; `SetActionBar` rejects unknown abilities and `slash`; the minimap texture rebuilds only on region or explored-count change (count rebuilds across 120 ticks of idle play = 0); combat text appears for hit, miss and dodge observations, with at most 24 live entries; the quest card appears on completion and its fly-to-pack ends at the Book button's rect.
 
 Keep the existing input-pipeline checks (`MobileCombatControlsChecks.InputPipeline`) and the Android smoke attack/dodge/interact assertions passing.
 
