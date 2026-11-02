@@ -45,11 +45,11 @@ public static class UiNavigationChecks
             {
                 menuScroll.EnsureControlVisible(row); await Frames(3);
                 var at = row.GetGlobalRect().GetCenter();
-                Input.ParseInputEvent(new InputEventScreenTouch { Index=21, Pressed=true, Position=at });
-                // Exercise the case where Godot delivers the emulated mouse-up
-                // before the owning screen-touch has ended.
+                // Emulated mouse-down can arrive before touch-down; mouse-up may
+                // then precede the end of the swipe. Neither may select the row.
                 Input.ParseInputEvent(new InputEventMouseButton { Device=InputEvent.DeviceIdEmulation,
                     ButtonIndex=MouseButton.Left, Pressed=true, Position=at });
+                Input.ParseInputEvent(new InputEventScreenTouch { Index=21, Pressed=true, Position=at });
                 Input.ParseInputEvent(new InputEventMouseButton { Device=InputEvent.DeviceIdEmulation,
                     ButtonIndex=MouseButton.Left, Pressed=false, Position=at });
                 row.GrabFocus(); // native touch may focus a pressed row
