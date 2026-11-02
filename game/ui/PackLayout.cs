@@ -95,23 +95,29 @@ public partial class PackLayout : VBoxContainer
             (bag.Count == 1 ? " stack" : " stacks"));
         if (Mode == LayoutKind.Single)
         {
+            // Preserve a full tile row on small phones: keep the two local view
+            // switches beside the currency summary instead of spending a second
+            // full-height row underneath it.
             var switcher = new HBoxContainer { Name = "single_region_switcher",
-                SizeFlagsHorizontal = SizeFlags.ExpandFill };
-            AddChild(switcher);
+                SizeFlagsHorizontal = SizeFlags.ShrinkEnd };
+            switcher.AddThemeConstantOverride("separation", 6);
+            summary.AddChild(switcher);
             var backpack = UiDesign.Action(switcher, state.GearOpen ? "Backpack" : "[Backpack]", () =>
             {
                 state.GearOpen = false; state.DetailOpen = false; UpdateVisibility();
                 switcher.GetChild<Button>(0).Text = "[Backpack]";
                 switcher.GetChild<Button>(1).Text = "Equipment";
             });
-            backpack.Name = "view_backpack"; backpack.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            backpack.Name = "view_backpack"; backpack.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
+            backpack.CustomMinimumSize = new Vector2(118 * ui.TextScale, UiDesign.Target);
             var equipment = UiDesign.Action(switcher, state.GearOpen ? "[Equipment]" : "Equipment", () =>
             {
                 state.GearOpen = true; state.DetailOpen = false; UpdateVisibility();
                 switcher.GetChild<Button>(0).Text = "Backpack";
                 switcher.GetChild<Button>(1).Text = "[Equipment]";
             });
-            equipment.Name = "view_equipment"; equipment.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            equipment.Name = "view_equipment"; equipment.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
+            equipment.CustomMinimumSize = new Vector2(130 * ui.TextScale, UiDesign.Target);
         }
         var regions = new HBoxContainer { Name = "pack_regions",
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
