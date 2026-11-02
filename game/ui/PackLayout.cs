@@ -82,6 +82,26 @@ public partial class PackLayout : VBoxContainer
         int coins = bag.Where(v => v.Id == "coin").Sum(v => v.Count);
         UiDesign.Note(summary, "CROWNS  " + coins + "    ·    " + bag.Count +
             (bag.Count == 1 ? " stack" : " stacks"));
+        if (Mode == LayoutKind.Single)
+        {
+            var switcher = new HBoxContainer { Name = "single_region_switcher",
+                SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            AddChild(switcher);
+            var backpack = UiDesign.Action(switcher, state.GearOpen ? "Backpack" : "[Backpack]", () =>
+            {
+                state.GearOpen = false; state.DetailOpen = false; UpdateVisibility();
+                switcher.GetChild<Button>(0).Text = "[Backpack]";
+                switcher.GetChild<Button>(1).Text = "Equipment";
+            });
+            backpack.Name = "view_backpack"; backpack.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            var equipment = UiDesign.Action(switcher, state.GearOpen ? "[Equipment]" : "Equipment", () =>
+            {
+                state.GearOpen = true; state.DetailOpen = false; UpdateVisibility();
+                switcher.GetChild<Button>(0).Text = "Backpack";
+                switcher.GetChild<Button>(1).Text = "[Equipment]";
+            });
+            equipment.Name = "view_equipment"; equipment.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        }
         var regions = new HBoxContainer { Name = "pack_regions",
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill };
