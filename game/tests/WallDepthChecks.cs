@@ -1,0 +1,159 @@
+using Godot;
+using PixelCreatures.Runtime;
+using V = System.Numerics.Vector2;
+namespace Mosslight;
+/// <summary>Actual viewport pixels, not just Y-sort flags: a foreground wall must
+/// restore its exact pixels over the actor, and a front actor must cover the wall.</summary>
+public static class WallDepthChecks
+{
+    static async System.Threading.Tasks.Task Frames(Foundation app, int count=4)
+    {
+        // Time is frozen, so smoothing never moves the camera: snap it to each new fixture.
+        for(int i=0;i<count;i++){await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);app.Camera.ResetSmoothing();}
+    }
+    static async System.Threading.Tasks.Task<Image> Image(Foundation app, string? name=null)
+    {
+        await Frames(app);await app.ToSignal(RenderingServer.Singleton,RenderingServer.SignalName.FramePostDraw);
+        var image=app.GetViewport().GetTexture().GetImage();
+        if(name!=null)
+        {
+            Directory.CreateDirectory("docs/native-screenshots");
+            image.SavePng("docs/native-screenshots/"+(app.Ui.MobileLayout?"mobile-":"")+"wall-depth-"+name+".png");
+        }
+        return image;
+    }
+    static bool Different(Color a,Color b) => Math.Abs(a.R-b.R)+Math.Abs(a.G-b.G)+Math.Abs(a.B-b.B)>.015f;
+    public static async System.Threading.Tasks.Task Run(Foundation app)
+    {
+        var w=app.World;string snapshot=Persistence.Capture(w,app.Narrative);double scale=Engine.TimeScale;
+        try
+        {
+            Engine.TimeScale=0;w.Projectiles.Clear();w.Cancel(w.Player);
+            var p=w.Player;
+            // A real two-row wall with safe floor on either side, from the first seed that has one.
+            bool Fixture(RegionState region,int at) => at%region.Width is >2 && at%region.Width<region.Width-3 && region.Tiles[at]==Terrain.Wall && region.Tiles[at+region.Width]==Terrain.Wall &&
+                region.Tiles[at-region.Width]==Terrain.Floor && region.Tiles[at+2*region.Width]==Terrain.Floor &&
+                region.CanStand(new V(region.Center(at).X,at/region.Width*24-p.Radius-1),p) &&
+                region.CanStand(new V(region.Center(at).X,(at/region.Width+2)*24+p.Radius+1),p);
+            var r=Enumerable.Range(42,64).Select(Regions.Dungeon).First(region=>Enumerable.Range(region.Width*2,region.Tiles.Length-region.Width*4).Any(at=>Fixture(region,at)));
+            r.Id="wall-depth";r.Features.Clear();r.OpenDoors.Clear();
+            w.RegionsById[r.Id]=r;p.Region=r.Id;
+            foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
+            int wall=Enumerable.Range(r.Width*2,r.Tiles.Length-r.Width*4).First(at=>Fixture(r,at));
+            float x=r.Center(wall).X,y=wall/r.Width*24;
+            void Place(V point){p.X=point.X;p.Y=point.Y;app.Views["player"].SnapPosition();}
+            p.X=x;p.Y=y-p.Radius-1;app.RebuildViews();app.ResumeGame();await Frames(app,16);
+            var rows=app.Views["player"].GetParent().GetChildren().OfType<TerrainWallRow>().ToArray();
+            if(rows.Length>r.Height || rows.Sum(row=>row.Columns.Length)!=r.Tiles.Count(t=>t==Terrain.Wall) || !rows.All(row=>row.ZIndex==0))
+                throw new InvalidOperationException("Walls must be complete bounded row meshes in the shared actor depth layer");
+            var parent=(Node2D)app.Views["player"].GetParent();
+            if(!parent.YSortEnabled || rows.Any(row=>row.GetParent()!=parent))throw new InvalidOperationException("Walls and characters do not share Y sorting");
+            // Isolate wall ordering from independently Y-sorted tall architecture.
+            // The column suite checks those props separately with the real geometry.
+            foreach(var decoration in parent.GetChildren().OfType<EnvironmentDecoration>())decoration.Visible=false;
+            app.ShowCharacters(false);
+            var wallOnly=await Image(app);
+            var foregroundRows=rows.Where(row=>row.Row==wall/r.Width || row.Row==wall/r.Width+1).ToArray();
+            foreach(var row in foregroundRows)row.Visible=false;
+            var floorOnly=await Image(app);
+            foreach(var row in foregroundRows){row.Visible=true;row.ZIndex=-1;}
+            app.ShowCharacters(true);
+            var broken=await Image(app,"old-order-reproduction");
+            foreach(var row in foregroundRows)row.ZIndex=0;
+            var behind=await Image(app,"behind");
+            var view=app.Views["player"];
+            var screen=view.GetGlobalTransformWithCanvas().Origin;
+            var zoom=app.GetViewport().GetCamera2D().Zoom;
+            var bounds=new Rect2I((int)(screen.X-48*zoom.X),(int)(screen.Y-70*zoom.Y),(int)(96*zoom.X),(int)(110*zoom.Y));
+            int occluded=0,visibleAbove=0;
+            void Pixels(Action<int,int> visit)
+            {
+                for(int py=Math.Max(0,bounds.Position.Y);py<Math.Min(behind.GetHeight(),bounds.End.Y);py++)
+                    for(int px=Math.Max(0,bounds.Position.X);px<Math.Min(behind.GetWidth(),bounds.End.X);px++)visit(px,py);
+            }
+            Pixels((px,py)=>
+            {
+                bool wallPixel=Different(wallOnly.GetPixel(px,py),floorOnly.GetPixel(px,py));
+                bool actorPixel=Different(broken.GetPixel(px,py),wallOnly.GetPixel(px,py));
+                if(wallPixel&&actorPixel)
+                {
+                    if(Different(behind.GetPixel(px,py),wallOnly.GetPixel(px,py)))throw new InvalidOperationException("Foreground wall failed to cover actor pixel");
+                    occluded++;
+                }
+                if(!wallPixel&&Different(behind.GetPixel(px,py),wallOnly.GetPixel(px,py)))visibleAbove++;
+            });
+            if(occluded<20 || visibleAbove<20)throw new InvalidOperationException($"Missing partial wall occlusion: hidden={occluded} visible={visibleAbove}");
+            // Actor standing south/in front must paint over the same wall art.
+            Place(new V(x,y+48+p.Radius+1));await Frames(app,8);
+            var front=await Image(app,"in-front");
+            foreach(var row in rows)row.ZIndex=1;
+            var incorrectlyAbove=await Image(app);
+            int frontPixels=0;Pixels((px,py)=>{if(Different(front.GetPixel(px,py),incorrectlyAbove.GetPixel(px,py)))frontPixels++;});
+            if(frontPixels<20)throw new InvalidOperationException("Actor in front was incorrectly hidden by the wall");
+            foreach(var row in rows)row.ZIndex=0;
+            // A north/south corridor crossing's three-tile opening stays visibly open.
+            var southward=r.Passages.First(q=>q.Dy==1);
+            float doorX=(southward.X+.5f)*24;y=(southward.Y+1)*24-24;
+            var doorway=new V(doorX,y+24);
+            if(!r.CanStand(doorway,p))throw new InvalidOperationException("Depth fixture doorway is not traversable");
+            Place(doorway);await Frames(app,8);
+            var doorwayFixed=await Image(app,"doorway");
+            foreach(var row in rows)row.ZIndex=-1;
+            var doorwayLegacy=await Image(app);
+            int doorwayChanges=0;
+            for(int py=0;py<doorwayFixed.GetHeight();py++)for(int px=0;px<doorwayFixed.GetWidth();px++)
+                if(Different(doorwayFixed.GetPixel(px,py),doorwayLegacy.GetPixel(px,py)))doorwayChanges++;
+            if(doorwayChanges!=0)throw new InvalidOperationException("Wall row paints over clear doorway: "+doorwayChanges);
+            foreach(var row in rows)row.ZIndex=0;
+            // Actual collision-safe movement through the opening and back.
+            Place(new V(doorX,y-48));
+            var start=p.Position;w.Move(p,new V(0,144));w.Move(p,new V(0,-144));
+            if(!r.CanStand(p.Position,p)||V.Distance(start,p.Position)>.1f)throw new InvalidOperationException("Depth fix changed doorway traversal");
+            // East/west connection: assert its actual ground strip remains clear,
+            // even though a tall head can legitimately extend behind its north wall.
+            var eastward=r.Passages.First(q=>q.Dx==1);int horizontal=eastward.Y*r.Width+eastward.X;
+            var crossing=r.Center(horizontal)+new V(12,0);Place(crossing);await Frames(app,8);
+            await Image(app,"horizontal-doorway");
+            app.ShowCharacters(false);var horizontalWalls=await Image(app);
+            foreach(var row in rows)row.Visible=false;
+            var horizontalFloor=await Image(app);
+            var foot=view.GetGlobalTransformWithCanvas().Origin;
+            for(int py=(int)foot.Y-3;py<(int)foot.Y+3;py++)for(int px=(int)foot.X-5;px<(int)foot.X+5;px++)
+                if(Different(horizontalWalls.GetPixel(px,py),horizontalFloor.GetPixel(px,py)))
+                    throw new InvalidOperationException("Wall covers horizontal doorway ground strip");
+            foreach(var row in rows)row.Visible=true;app.ShowCharacters(true);
+            Place(crossing-new V(48,0));var horizontalStart=p.Position;
+            w.Move(p,new V(96,0));w.Move(p,new V(-96,0));
+            if(V.Distance(horizontalStart,p.Position)>.1f)throw new InvalidOperationException("Horizontal doorway traversal changed");
+            // A real production tree view shares the same ground-contact sorting.
+            // A room core away from the map edges, so the camera frames the whole tree.
+            var treeRoom=r.Rooms.Where(c=>c.Kind=="room").OrderBy(c=>Math.Abs(c.CenterX-r.Width/2)+Math.Abs(c.CenterY-r.Height/2)).First();
+            var treePoint=r.Center(treeRoom.CenterY*r.Width+treeRoom.CenterX);
+            var tree=new FeatureView {Kind="wood",Art=new Dictionary<string,Texture2D>{{"tree1",GD.Load<Texture2D>("res://game/art/tree1.png")}},
+                Position=GodotConvert.GroundToScreen(treePoint.X,treePoint.Y)};
+            parent.AddChild(tree);
+            try
+            {
+                Place(treePoint-new V(0,12));await Frames(app,8);
+                view.Visible=false;var treeOnly=await Image(app);
+                view.Visible=true;tree.ZIndex=-1;var treeBroken=await Image(app);
+                tree.ZIndex=0;var treeBehind=await Image(app,"tree-behind");
+                int covered=0;
+                for(int py=0;py<treeBehind.GetHeight();py++)for(int px=0;px<treeBehind.GetWidth();px++)
+                    if(Different(treeBroken.GetPixel(px,py),treeOnly.GetPixel(px,py)) &&
+                        !Different(treeBehind.GetPixel(px,py),treeOnly.GetPixel(px,py)))covered++;
+                if(covered<20)throw new InvalidOperationException("Tall prop does not cover behind actor");
+                Place(treePoint+new V(0,12));await Frames(app,8);
+                var treeFront=await Image(app,"tree-front");tree.ZIndex=1;var treeWrong=await Image(app);
+                int revealed=0;
+                for(int py=0;py<treeFront.GetHeight();py++)for(int px=0;px<treeFront.GetWidth();px++)
+                    if(Different(treeFront.GetPixel(px,py),treeWrong.GetPixel(px,py)))revealed++;
+                if(revealed<20)throw new InvalidOperationException("Tall prop hides front actor");
+                GD.Print($"PROP DEPTH CHECKS PASSED: covered={covered}, front={revealed}");
+            }
+            finally {parent.RemoveChild(tree);tree.QueueFree();view.Visible=true;}
+            GD.Print($"WALL DEPTH CHECKS PASSED: foreground pixels={occluded}, visible silhouette={visibleAbove}, front pixels={frontPixels}, doorway changes={doorwayChanges}, row nodes={rows.Length}");
+        }
+        finally{app.ShowCharacters(true);Engine.TimeScale=scale;Persistence.Restore(w,app.Narrative,snapshot);app.RebuildViews();app.ResumeGame();}
+    }
+}

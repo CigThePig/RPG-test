@@ -1,14 +1,28 @@
 ~ warden
-Warden: The causeway is open, but the old ruin is still dangerous.
-- I can help with the prowlers. [if not flags.get("accepted_1", false) /]
+Warden: The old light kept these roads safe. Something in the ruins has stirred.
+- I can help with the prowlers. [if not accepted(1) /]
 	do accept_quest(1)
-	Warden: Defeat two. We will hear of it when it is done.
+	Warden: Defeat two mire prowlers on the causeway. Then we can discuss the ruins.
 	=> END
-- Tell me about the buried light. [if completed(1) /]
+- Tell me about the buried light. [if completed(1) and not accepted(2) /]
 	do accept_quest(2)
-	Warden: Follow the causeway east. Keys in the ruin open its sealed passages.
+	Warden: Recover the sanctuary relic so we can restore the road's ward. Travel east, search for keys to the sealed passages, and bring the light back to me.
 	=> END
-- I want to learn alchemy.
+- About my assignment... [if accepted(2) and not completed(2) and not ready_to_report() /]
+	Warden: Search the sealed ruin for the light. The archive may explain its history; the storeroom may hold supplies. Return here with the relic.
+	=> END
+- I brought back the light. [if ready_to_report() /]
+	do report_to_warden()
+	Warden: You have given Reach a chance to rebuild its ward. Keep the light safe, and take these supplies with our thanks.
+	=> END
+- My reward is still waiting. [if has_pending() /]
+	do claim_pending()
+	Warden: Make room in your pack if you cannot carry it all. Your reward will wait.
+	=> END
+- Is the light safe now? [if completed(2) /]
+	Warden: Thanks to you. The paths you opened remain open, should you explore again.
+	=> END
+- I want to learn alchemy. [if not accepted(3) /]
 	do accept_quest(3)
 	Warden: Two silverleaf sprigs make one restorative draught.
 	=> END

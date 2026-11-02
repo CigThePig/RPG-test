@@ -1,0 +1,182 @@
+[
+  {
+    "seed": 1,
+    "width": 44,
+    "height": 44,
+    "tiles": 1936,
+    "walkable": 731,
+    "tileArrayBytes": 7744,
+    "samples": [
+      {
+        "compositionMs": 0.5303,
+        "selectionMs": 0.0322,
+        "structuralValidationMs": 0.30870000000000003,
+        "generationMs": 2.8938,
+        "allocatedBytes": 4088776,
+        "validationMs": 0.11,
+        "navigationMs": 0.5219,
+        "placementMs": 0.7126
+      },
+      {
+        "compositionMs": 0.5772,
+        "selectionMs": 0.038,
+        "structuralValidationMs": 0.33660000000000007,
+        "generationMs": 11.5053,
+        "allocatedBytes": 4088776,
+        "validationMs": 0.1219,
+        "navigationMs": 0.5166,
+        "placementMs": 0.6525
+      },
+      {
+        "compositionMs": 0.4958,
+        "selectionMs": 0.0313,
+        "structuralValidationMs": 0.28490000000000004,
+        "generationMs": 2.7634,
+        "allocatedBytes": 4089648,
+        "validationMs": 0.1073,
+        "navigationMs": 0.4852,
+        "placementMs": 0.6358
+      },
+      {
+        "compositionMs": 0.5127,
+        "selectionMs": 0.0298,
+        "structuralValidationMs": 0.3108,
+        "generationMs": 2.5884,
+        "allocatedBytes": 4088776,
+        "validationMs": 0.104,
+        "navigationMs": 2.3475,
+        "placementMs": 0.6879
+      },
+      {
+        "compositionMs": 0.4987,
+        "selectionMs": 0.03439999999999999,
+        "structuralValidationMs": 0.26940000000000003,
+        "generationMs": 2.6588,
+        "allocatedBytes": 4088776,
+        "validationMs": 0.1282,
+        "navigationMs": 0.5833,
+        "placementMs": 0.7063
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "width": 44,
+    "height": 33,
+    "tiles": 1452,
+    "walkable": 901,
+    "tileArrayBytes": 5808,
+    "samples": [
+      {
+        "compositionMs": 0.6514,
+        "selectionMs": 0.0462,
+        "structuralValidationMs": 0.4438,
+        "generationMs": 21.0215,
+        "allocatedBytes": 6722936,
+        "validationMs": 0.0739,
+        "navigationMs": 0.3359,
+        "placementMs": 1.3672
+      },
+      {
+        "compositionMs": 0.6398,
+        "selectionMs": 0.048100000000000004,
+        "structuralValidationMs": 0.3694,
+        "generationMs": 5.1835,
+        "allocatedBytes": 6723792,
+        "validationMs": 0.0802,
+        "navigationMs": 0.3086,
+        "placementMs": 0.7112
+      },
+      {
+        "compositionMs": 0.5551,
+        "selectionMs": 0.037099999999999994,
+        "structuralValidationMs": 0.37670000000000003,
+        "generationMs": 4.8847,
+        "allocatedBytes": 6722920,
+        "validationMs": 0.0729,
+        "navigationMs": 0.2767,
+        "placementMs": 0.7427
+      },
+      {
+        "compositionMs": 0.5042,
+        "selectionMs": 0.037500000000000006,
+        "structuralValidationMs": 0.3293,
+        "generationMs": 4.2273,
+        "allocatedBytes": 6723792,
+        "validationMs": 0.0765,
+        "navigationMs": 0.3047,
+        "placementMs": 0.6726
+      },
+      {
+        "compositionMs": 1.1354,
+        "selectionMs": 0.0419,
+        "structuralValidationMs": 0.5347999999999999,
+        "generationMs": 5.0591,
+        "allocatedBytes": 6722920,
+        "validationMs": 0.1665,
+        "navigationMs": 0.3674,
+        "placementMs": 0.8502
+      }
+    ]
+  },
+  {
+    "seed": 1337,
+    "width": 66,
+    "height": 44,
+    "tiles": 2904,
+    "walkable": 733,
+    "tileArrayBytes": 11616,
+    "samples": [
+      {
+        "compositionMs": 0.6284,
+        "selectionMs": 0.0448,
+        "structuralValidationMs": 0.2632,
+        "generationMs": 15.1798,
+        "allocatedBytes": 12272728,
+        "validationMs": 0.1367,
+        "navigationMs": 0.4924,
+        "placementMs": 1.0424
+      },
+      {
+        "compositionMs": 0.4949,
+        "selectionMs": 0.041,
+        "structuralValidationMs": 0.2676,
+        "generationMs": 33.0044,
+        "allocatedBytes": 12271896,
+        "validationMs": 0.0911,
+        "navigationMs": 0.5871,
+        "placementMs": 0.9428
+      },
+      {
+        "compositionMs": 0.7016,
+        "selectionMs": 0.1536,
+        "structuralValidationMs": 0.27030000000000004,
+        "generationMs": 9.2178,
+        "allocatedBytes": 12272728,
+        "validationMs": 0.1737,
+        "navigationMs": 0.5478,
+        "placementMs": 4.0515
+      },
+      {
+        "compositionMs": 0.6889,
+        "selectionMs": 0.1197,
+        "structuralValidationMs": 0.3669,
+        "generationMs": 15.3471,
+        "allocatedBytes": 12272728,
+        "validationMs": 0.2414,
+        "navigationMs": 0.4715,
+        "placementMs": 1.0383
+      },
+      {
+        "compositionMs": 0.6793,
+        "selectionMs": 0.0505,
+        "structuralValidationMs": 0.33179999999999993,
+        "generationMs": 21.362,
+        "allocatedBytes": 12272728,
+        "validationMs": 0.1935,
+        "navigationMs": 0.5775,
+        "placementMs": 0.6349
+      }
+    ]
+  }
+]

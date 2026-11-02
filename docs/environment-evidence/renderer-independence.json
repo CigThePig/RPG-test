@@ -1,0 +1,13 @@
+{
+  "beforeSource": "42b74baf210a6a7eb5ac99af86a3347cfe4e5a06",
+  "afterTree": "6e2fe43d3572dbd3047e6c5e18add096c71ce48b",
+  "preset": "baseline",
+  "samples": 5890,
+  "sameAuthoritativeStates": true,
+  "sha256": "8505cd21cbbc6375b14d0c70b162da44d7d8022072304d8ef6683cb3e8b36d45",
+  "scope": "Independent real rendered production-touch replay, unchanged scenario/tick/position/analog/action/collision for all 45 scenarios. No pixel comparisons or frame-time equivalence implied.",
+  "intermediateAfterSource": "c80b3a4d38ff0e40b39fcab459e1eeea2e408caf",
+  "finalSource": "b3abe42075b14ed73ca8aeffefd2ea9ecf9fc04e",
+  "finalHostedDigestMatched": true,
+  "finalHostedBaselineArtifact": "https://github.com/CigThePig/RPG-test/actions/runs/41021407593/artifacts/12961773480"
+}

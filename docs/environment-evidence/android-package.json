@@ -1,0 +1,13 @@
+{
+  "commit": "b3abe42075b14ed73ca8aeffefd2ea9ecf9fc04e",
+  "engine": "4.6.1 .NET",
+  "dotnet": "9.0.203",
+  "framework": "net9.0",
+  "package": "com.cigthepig.mosslight.dev",
+  "filename": "Mosslight-android-arm64-debug-b3abe42075b1.apk",
+  "bytes": 104438891,
+  "sha256": "0dd7b454a77f5a012236f9f832bf6c156f5d6dbf32b1513abfb1b2cc5e9175f4",
+  "signing": "ephemeral-debug-key-uninstall-required-between-runs",
+  "verification": "desktop integration and visual checks; APK metadata/signature/resources/runtime/ELF passed",
+  "android_runtime": "Installation and launch NOT exercised by package verification"
+}

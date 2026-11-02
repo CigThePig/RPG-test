@@ -29,15 +29,15 @@ jobs:
         preset: ${{ fromJSON(inputs.extended && '["baseline","precise","soft","explore"]' || '["baseline","precise"]') }}
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: |
             8.0.408
             9.0.203
-      - uses: chickensoft-games/setup-godot@v2
+      - uses: chickensoft-games/setup-godot@ac93246ea68518a384c1c280a496e5989341f2f6 # v2
         with:
           version: 4.6.1
           use-dotnet: true
@@ -50,6 +50,9 @@ jobs:
       - run: python3 tools/import-project.py
       - name: Deterministic production touch replay and actual rendered movies
         run: xvfb-run -a python3 tools/gameplay-verify.py --presets "${{ matrix.preset }}"
+      - name: Complete rendered normal-health adventure and contextual dialogue
+        if: matrix.preset == 'precise'
+        run: xvfb-run -a python3 tools/adventure-verify.py
       - name: Real-time frame pacing and desktop capture
         if: inputs.extended && matrix.preset == 'precise'
         run: xvfb-run -a python3 tools/gameplay-verify.py --presets precise --realtime --output build/gameplay-realtime
@@ -59,11 +62,12 @@ jobs:
           echo '## Gameplay evidence' >> "$GITHUB_STEP_SUMMARY"
           echo "Source: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           echo 'Download gameplay-evidence for MP4 clips, contact sheets, trace.jsonl, scenarios.json and report.json. Movie Maker clips use a fixed clock; only the separate real-time run measures runtime pacing. Automated checks do not establish subjective feel.' >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: gameplay-evidence-${{ github.event.pull_request.head.sha || github.sha }}-${{ matrix.preset }}
           path: |
             build/gameplay/
             build/gameplay-realtime/
+            build/adventure/
           retention-days: 14

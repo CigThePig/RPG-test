@@ -1,0 +1,20 @@
+[
+  {
+    "cycle": 1,
+    "pid": "2822",
+    "screenshot": "resumed-menu.png",
+    "inputCancelCount": 2
+  },
+  {
+    "cycle": 2,
+    "pid": "2822",
+    "screenshot": "resumed-menu-2.png",
+    "inputCancelCount": 4
+  },
+  {
+    "cycle": 3,
+    "pid": "2822",
+    "screenshot": "resumed-menu-3.png",
+    "inputCancelCount": 6
+  }
+]

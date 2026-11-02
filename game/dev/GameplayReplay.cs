@@ -27,6 +27,7 @@ public sealed class GameplayReplay
     double turnPrevious;
     readonly List<object> results=new();
     Queue<V> route=new();
+    DungeonTraversalReplay? dungeonExpedition;
     public bool Finished { get; private set; }
     public string Output { get; }
     record Scenario(string Id,int Ticks,V Start,Vector2 Direction,string Region="feel-lab");
@@ -47,6 +48,7 @@ public sealed class GameplayReplay
         new("chest",100,new(374,300),Vector2.Right),
         new("settlement-route",240,new(0,0),Vector2.Right,"reach"),
         new("dungeon-route",240,new(0,0),Vector2.Right,"ruin"),
+        new("dungeon-expedition",3000,new(0,0),Vector2.Zero,"ruin"),
         new("combat-movement",180,new(0,0),Vector2.Right,"reach"),
         new("attack-readability",200,new(300,300),Vector2.Right),
         new("combat-empty",170,new(300,300),Vector2.Zero),
@@ -81,6 +83,9 @@ public sealed class GameplayReplay
     {
         app=owner;
         var args=OS.GetCmdlineUserArgs();
+        var only=args.FirstOrDefault(x=>x.StartsWith("--replay-only="))?.Split('=',2)[1];
+        scenarios=scenarios.Where(s=>only!=null ? s.Id==only : s.Id!="dungeon-expedition").ToArray();
+        if(scenarios.Length==0)throw new InvalidOperationException("Unknown replay scenario: "+only);
         Output=args.FirstOrDefault(x=>x.StartsWith("--evidence="))?.Split('=',2)[1] ?? "build/gameplay";
         Directory.CreateDirectory(Output);
         app.Trace.Start(Path.Combine(Output,"trace.jsonl"));
@@ -160,6 +165,17 @@ public sealed class GameplayReplay
             p.X=start.X;p.Y=start.Y;p.State=ActionState.Idle;p.StateRemaining=0;
             p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.Statuses.Clear();p.Cooldowns.Clear();p.PendingAbility="";
             route.Clear();
+            if(s.Id=="dungeon-expedition")
+            {
+                // Fresh fixed-seed mission; all travel/unlocks after this setup
+                // use real joystick and Interact/Dodge touches.
+                app.World.RegionsById["ruin"]=map=Regions.Dungeon(1);
+                foreach(var a in app.World.Actors.Values.Where(a=>a.Id!="player"))a.Region="feel-lab";
+                var entrance=map.Center(map.Entrance);p.X=entrance.X-48;p.Y=entrance.Y;
+                dungeonExpedition=new DungeonTraversalReplay(app.World,TapAction);
+                app.Trace.Marker("fixture/fresh-seed1-dungeon-before-first-gate");
+                app.RebuildViews();
+            }
             if(s.Id.EndsWith("-route"))
             {
                 var best=map.Features.Keys.Select(at=>map.Path(p.Position,map.Center(at),p)).Where(path=>path.Count>0).OrderByDescending(path=>path.Count).First();
@@ -324,6 +340,10 @@ public sealed class GameplayReplay
             if(route.Count==0)direction=Vector2.Zero;
             else {var d=route.Peek()-app.World.Player.Position;direction=GodotConvert.GroundToScreen(d.X,d.Y).Normalized();}
         }
+        if(test.Id=="dungeon-expedition")
+        {
+            var d=dungeonExpedition!.Tick();direction=GodotConvert.GroundToScreen(d.X,d.Y).Normalized();
+        }
         if(test.Id=="combat-movement")
         {
             direction=Vector2.Right.Rotated(local*Mathf.Pi/90);
@@ -478,6 +498,9 @@ public sealed class GameplayReplay
         Touch(false);
         var s=scenarios[index]; var p=app.World.Player;
         bool valid=app.World.RegionsById[p.Region].CanStand(p.Position,p);
+        if(s.Id=="dungeon-expedition" && (!dungeonExpedition!.Complete || dungeonExpedition.Unlocks<1 || dungeonExpedition.Rooms.Count<3 ||
+            (DungeonMechanisms.Controls(app.World.RegionsById["ruin"]).Count>0 && dungeonExpedition.Mechanisms<1)))
+            throw new InvalidOperationException("Dungeon expedition incomplete: rooms="+dungeonExpedition!.Rooms.Count+" gates="+dungeonExpedition.Unlocks+" mechanisms="+dungeonExpedition.Mechanisms);
         bool moved=distance>1;
         results.Add(new {scenario=s.Id,ticks=s.Ticks,groundDistance=distance,projectedDisplacement=GodotConvert.GroundToScreen(p.X-origin.X,p.Y-origin.Y).Length(),x=p.X,y=p.Y,clearance=valid,moved,frame=Engine.GetFramesDrawn(),speed=p.Speed});
         app.Trace.Marker("scenario-end");

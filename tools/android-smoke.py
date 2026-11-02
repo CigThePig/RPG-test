@@ -211,6 +211,53 @@ try:
     interactions=re.findall(r'MOSSLIGHT_INTERACT feedback=([^\r\n]+)',logs)
     assert len(interactions)==1 and interactions[0].startswith('Chest emptied'),f'One physical tap dispatched {len(interactions)} interactions: {interactions}'
     capture('exploration.png')
+    # Use the same sustained gesture that successfully traverses the chest route.
+    # Short swipes can begin/end between physics frames on a loaded emulator.
+    # x=290..325 is inside the stationary warden's real 65-unit talk range and
+    # outside the other resource interaction bubbles at y=588.
+    for approach in range(20):
+        logs=adb('logcat','-d')
+        positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
+        current_x=float(positions[-1][0]) if positions else 0
+        if 290<=current_x<=325: break
+        prior_releases=len(positions)
+        end_x=280 if current_x<290 else 50
+        duration='600' if current_x<290 else '300'
+        adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(end_x*w/1280)),str(int(640*h/800)),duration)
+        deadline=time.monotonic()+8
+        while time.monotonic()<deadline:
+            positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',adb('logcat','-d'))
+            if len(positions)>prior_releases: break
+            time.sleep(.2)
+        else: raise RuntimeError('Warden approach gesture was not processed by the running application')
+        ensure_foreground(timeout=10)
+    else: raise RuntimeError('OS-touch route never reached the warden dialogue stand')
+    capture('warden-approach.png')
+    tap_action('interact')
+    deadline=time.monotonic()+15
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        choices=re.findall(r'MOSSLIGHT_DIALOGUE_CHOICE text=(.*?) x=([0-9.]+) y=([0-9.]+)',logs)
+        help_choice=next((row for row in reversed(choices) if row[0].startswith('I can help')),None)
+        if help_choice: break
+        time.sleep(.25)
+    else: raise RuntimeError('OS-touch Interact did not open contextual warden dialogue')
+    capture('warden-dialogue.png')
+    tap(float(help_choice[1]),float(help_choice[2]))
+    deadline=time.monotonic()+10
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        if 'MOSSLIGHT_QUEST_ACCEPTED id=1' in logs: break
+        time.sleep(.25)
+    else: raise RuntimeError('OS-touch dialogue choice did not accept introductory quest')
+    choices=re.findall(r'MOSSLIGHT_DIALOGUE_CHOICE text=Continue x=([0-9.]+) y=([0-9.]+)',logs)
+    deadline=time.monotonic()+10
+    while not choices and time.monotonic()<deadline:
+        time.sleep(.25)
+        choices=re.findall(r'MOSSLIGHT_DIALOGUE_CHOICE text=Continue x=([0-9.]+) y=([0-9.]+)',adb('logcat','-d'))
+    assert choices,'Missing actual Continue control'
+    tap(float(choices[-1][0]),float(choices[-1][1]))
+    time.sleep(.5)
     # Approach the live enemy group and observe real damage events. This also
     # exercises repeated confirmed-hit effects on the Android renderer.
     previous_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))
@@ -297,12 +344,70 @@ try:
             f'Background cycle {cycle+1} never canceled gameplay input')
         lifecycle.append({'cycle':cycle+1,'pid':resumed_pid,'screenshot':image_name,
             'inputCancelCount':logs.count('MOSSLIGHT_INPUT_CANCELLED')})
+    # Exercise the existing developer region-entry actions on the installed
+    # exported application. F10 uses World.Enter, leaving the reversible combat
+    # fixture first; it is not a mock scene or a direct edit of region state.
+    regions=[]
+    for cycle in range(3):
+        for region in ('ruin','reach'):
+            prior=adb('logcat','-d').count('MOSSLIGHT_ENVIRONMENT_READY')
+            adb('shell','input','keyevent','140') # Android KEYCODE_F10
+            deadline=time.monotonic()+30
+            while time.monotonic()<deadline:
+                logs=adb('logcat','-d')
+                marks=re.findall(r'MOSSLIGHT_ENVIRONMENT_READY region=(\w+) walls=(\d+) decorations=(\d+) atlases=(\d+)',logs)
+                if len(marks)>prior:
+                    assert marks[-1][0]==region, 'Unexpected Android region transition'
+                    break
+                time.sleep(.25)
+            else: raise RuntimeError('Installed Android never entered '+region)
+            time.sleep(.75)
+            capture(f'{region}-entry-{cycle+1}.png',wait=20)
+            if region=='ruin':
+                landmark_marks=re.findall(r'MOSSLIGHT_LANDMARK_READY region=ruin rooms=(\d+) structures=(\d+) templates=([^\r\n]+)',logs)
+                assert landmark_marks and int(landmark_marks[-1][0])>=2 and int(landmark_marks[-1][1])>0, 'Exported dungeon lacks authored landmark structures'
+                assert 'ruined-entrance' in landmark_marks[-1][2] and 'relic-sanctuary' in landmark_marks[-1][2], 'Required mission landmarks absent'
+                deadline=time.monotonic()+10
+                while time.monotonic()<deadline:
+                    logs=adb('logcat','-d')
+                    if 'MOSSLIGHT_GAMEPLAY kind=landmark_discovered' in logs: break
+                    time.sleep(.25)
+                else: raise RuntimeError('Installed production room entry did not emit discovery')
+                movement_before=logs.count('MOSSLIGHT_LANDMARK_MOVEMENT')
+                for move_x in (230,50):
+                    adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(move_x*w/1280)),str(int(640*h/800)),'500')
+                    time.sleep(.3)
+                logs=adb('logcat','-d')
+                movement=re.findall(r'MOSSLIGHT_LANDMARK_MOVEMENT clear=(True|False) x=([0-9.]+) y=([0-9.]+)',logs)
+                assert len(movement)>=movement_before+2, 'Dungeon joystick input did not complete'
+                assert all(m[0]=='True' for m in movement), 'Installed Android player overlaps authored terrain'
+                assert len({(m[1],m[2]) for m in movement[-2:]})>1, 'Dungeon joystick produced no displacement'
+                for action,marker in (('attack','attack_completed'),('dodge','dodge_completed')):
+                    before=adb('logcat','-d').count('MOSSLIGHT_COMBAT kind='+marker)
+                    tap_action(action)
+                    deadline=time.monotonic()+15
+                    while time.monotonic()<deadline:
+                        logs=adb('logcat','-d')
+                        completed=logs.count('MOSSLIGHT_COMBAT kind='+marker)-before
+                        assert completed<=1, 'One dungeon action tap double-dispatched'
+                        if completed==1: break
+                        time.sleep(.25)
+                    else: raise RuntimeError('No '+action+' completion inside exported dungeon')
+                capture(f'ruin-combat-{cycle+1}.png',wait=20)
+            marks=re.findall(r'MOSSLIGHT_ENVIRONMENT_READY region=(\w+) walls=(\d+) decorations=(\d+) atlases=(\d+)',logs)
+            state=marks[-1]
+            assert int(state[3])==3, 'Unbounded or missing environment atlas cache'
+            assert int(state[2])<=96, 'Unbounded Android decoration count'
+            previous=[r for r in regions if r['region']==region]
+            if previous: assert previous[-1]['counts']==list(state[1:]), 'Android region views accumulate'
+            regions.append({'cycle':cycle+1,'region':region,'counts':list(state[1:])})
+    (out/'regions.json').write_text(json.dumps(regions,indent=2))
     (out/'lifecycle.json').write_text(json.dumps(lifecycle,indent=2))
     (out/'logcat.log').write_text(logs)
     assert 'MOSSLIGHT_RUNTIME' in logs,'Gameplay did not progress after touchscreen Resume'
     for error in ['FATAL EXCEPTION','Fatal signal','SCRIPT ERROR:','System.DllNotFoundException','Unhandled exception','E godot   : ERROR:','Program linking failed','unable to bind shader']:
         assert error not in logs, f'Android runtime error: {error}'
-    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. ARM64 device not tested.\n')
+    (out/'result.txt').write_text('PASS: x86_64 Android emulator install, C# scene launch, touch Resume, nonblank rendered world/menu/pack, measured player movement, Gloot chest depletion, four free Attack and three Dodge touches, at least two real player damage events, inventory screenshot, gameplay ticks, three archetypes and real spit release, three nonblank background/resume cycles during mixed combat with input cancellation and stable process identity. three generated-dungeon entry/attack/roll/return cycles with stable wall/decoration/atlas counts. Warden dialogue and introductory quest accepted with actual OS touches; production entrance discovery observed. Complete relic/return/reward OS-touch adventure is NOT covered. ARM64 physical device not tested.\n')
     print((out/'result.txt').read_text())
 finally:
     # Preserve the real surface recording on failure as well as success. ADB

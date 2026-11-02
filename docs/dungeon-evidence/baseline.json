@@ -1,0 +1,167 @@
+[
+  {
+    "seed": 1,
+    "width": 28,
+    "height": 28,
+    "tiles": 784,
+    "walkable": 241,
+    "tileArrayBytes": 3136,
+    "samples": [
+      {
+        "generationMs": 4.738,
+        "allocatedBytes": 3719320,
+        "validationMs": 0.1389,
+        "navigationMs": 0.8273,
+        "placementMs": 0.5712,
+        "solvable": true,
+        "path": 28
+      },
+      {
+        "generationMs": 5.8369,
+        "allocatedBytes": 3720168,
+        "validationMs": 2.6135,
+        "navigationMs": 0.3807,
+        "placementMs": 0.5239,
+        "solvable": true,
+        "path": 28
+      },
+      {
+        "generationMs": 4.4982,
+        "allocatedBytes": 3719296,
+        "validationMs": 0.0922,
+        "navigationMs": 0.4242,
+        "placementMs": 0.467,
+        "solvable": true,
+        "path": 28
+      },
+      {
+        "generationMs": 4.5594,
+        "allocatedBytes": 3719296,
+        "validationMs": 0.0974,
+        "navigationMs": 0.3676,
+        "placementMs": 0.4816,
+        "solvable": true,
+        "path": 28
+      },
+      {
+        "generationMs": 4.5423,
+        "allocatedBytes": 3719296,
+        "validationMs": 0.0956,
+        "navigationMs": 0.4593,
+        "placementMs": 0.4608,
+        "solvable": true,
+        "path": 28
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "width": 28,
+    "height": 21,
+    "tiles": 588,
+    "walkable": 297,
+    "tileArrayBytes": 2352,
+    "samples": [
+      {
+        "generationMs": 7.7041,
+        "allocatedBytes": 6413952,
+        "validationMs": 0.0725,
+        "navigationMs": 0.2412,
+        "placementMs": 0.5786,
+        "solvable": true,
+        "path": 21
+      },
+      {
+        "generationMs": 7.6501,
+        "allocatedBytes": 6413080,
+        "validationMs": 0.0911,
+        "navigationMs": 0.2415,
+        "placementMs": 0.5511,
+        "solvable": true,
+        "path": 21
+      },
+      {
+        "generationMs": 8.3682,
+        "allocatedBytes": 6413080,
+        "validationMs": 0.0722,
+        "navigationMs": 0.2379,
+        "placementMs": 0.5659,
+        "solvable": true,
+        "path": 21
+      },
+      {
+        "generationMs": 7.6154,
+        "allocatedBytes": 6413952,
+        "validationMs": 0.0739,
+        "navigationMs": 0.2587,
+        "placementMs": 0.5518,
+        "solvable": true,
+        "path": 21
+      },
+      {
+        "generationMs": 8.0902,
+        "allocatedBytes": 6413080,
+        "validationMs": 0.0728,
+        "navigationMs": 0.2396,
+        "placementMs": 0.6034,
+        "solvable": true,
+        "path": 21
+      }
+    ]
+  },
+  {
+    "seed": 1337,
+    "width": 42,
+    "height": 28,
+    "tiles": 1176,
+    "walkable": 241,
+    "tileArrayBytes": 4704,
+    "samples": [
+      {
+        "generationMs": 16.9358,
+        "allocatedBytes": 11944600,
+        "validationMs": 0.0891,
+        "navigationMs": 0.374,
+        "placementMs": 0.4945,
+        "solvable": true,
+        "path": 35
+      },
+      {
+        "generationMs": 12.3383,
+        "allocatedBytes": 11945440,
+        "validationMs": 0.0992,
+        "navigationMs": 0.4032,
+        "placementMs": 0.4809,
+        "solvable": true,
+        "path": 35
+      },
+      {
+        "generationMs": 17.5493,
+        "allocatedBytes": 11945440,
+        "validationMs": 0.0901,
+        "navigationMs": 0.3766,
+        "placementMs": 0.4913,
+        "solvable": true,
+        "path": 35
+      },
+      {
+        "generationMs": 38.5158,
+        "allocatedBytes": 11945464,
+        "validationMs": 0.0922,
+        "navigationMs": 0.4701,
+        "placementMs": 0.4766,
+        "solvable": true,
+        "path": 35
+      },
+      {
+        "generationMs": 15.2096,
+        "allocatedBytes": 11944568,
+        "validationMs": 0.1046,
+        "navigationMs": 2.5512,
+        "placementMs": 0.5151,
+        "solvable": true,
+        "path": 35
+      }
+    ]
+  }
+]

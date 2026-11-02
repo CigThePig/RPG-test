@@ -1,0 +1,137 @@
+[
+  {
+    "seed": 1,
+    "width": 44,
+    "height": 44,
+    "tiles": 1936,
+    "walkable": 777,
+    "tileArrayBytes": 7744,
+    "samples": [
+      {
+        "generationMs": 9.8424,
+        "allocatedBytes": 3813344,
+        "validationMs": 0.2389,
+        "navigationMs": 1.9758,
+        "placementMs": 1.5802
+      },
+      {
+        "generationMs": 4.9615,
+        "allocatedBytes": 3812472,
+        "validationMs": 0.2206,
+        "navigationMs": 1.3119,
+        "placementMs": 1.8819
+      },
+      {
+        "generationMs": 5.3926,
+        "allocatedBytes": 3812472,
+        "validationMs": 0.2575,
+        "navigationMs": 3.9132,
+        "placementMs": 2.1249
+      },
+      {
+        "generationMs": 7.1347,
+        "allocatedBytes": 3812472,
+        "validationMs": 0.3283,
+        "navigationMs": 1.5893,
+        "placementMs": 2.0645
+      },
+      {
+        "generationMs": 5.6709,
+        "allocatedBytes": 3813344,
+        "validationMs": 0.2461,
+        "navigationMs": 0.9539,
+        "placementMs": 1.5678
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "width": 44,
+    "height": 33,
+    "tiles": 1452,
+    "walkable": 957,
+    "tileArrayBytes": 5808,
+    "samples": [
+      {
+        "generationMs": 5.5679,
+        "allocatedBytes": 6464760,
+        "validationMs": 0.1301,
+        "navigationMs": 0.3489,
+        "placementMs": 1.0985
+      },
+      {
+        "generationMs": 6.3718,
+        "allocatedBytes": 6464760,
+        "validationMs": 0.1236,
+        "navigationMs": 0.3356,
+        "placementMs": 1.0473
+      },
+      {
+        "generationMs": 3.7616,
+        "allocatedBytes": 6465632,
+        "validationMs": 0.0878,
+        "navigationMs": 0.232,
+        "placementMs": 0.7334
+      },
+      {
+        "generationMs": 3.7273,
+        "allocatedBytes": 6464760,
+        "validationMs": 0.0882,
+        "navigationMs": 0.2266,
+        "placementMs": 0.7045
+      },
+      {
+        "generationMs": 3.4173,
+        "allocatedBytes": 6465632,
+        "validationMs": 0.0861,
+        "navigationMs": 0.2518,
+        "placementMs": 0.7368
+      }
+    ]
+  },
+  {
+    "seed": 1337,
+    "width": 66,
+    "height": 44,
+    "tiles": 2904,
+    "walkable": 777,
+    "tileArrayBytes": 11616,
+    "samples": [
+      {
+        "generationMs": 9.8301,
+        "allocatedBytes": 12019384,
+        "validationMs": 0.1355,
+        "navigationMs": 0.3846,
+        "placementMs": 0.8879
+      },
+      {
+        "generationMs": 16.504,
+        "allocatedBytes": 12019384,
+        "validationMs": 0.1814,
+        "navigationMs": 0.5584,
+        "placementMs": 1.2279
+      },
+      {
+        "generationMs": 34.9246,
+        "allocatedBytes": 12018560,
+        "validationMs": 0.1785,
+        "navigationMs": 0.5741,
+        "placementMs": 0.8962
+      },
+      {
+        "generationMs": 7.7083,
+        "allocatedBytes": 12019384,
+        "validationMs": 0.1749,
+        "navigationMs": 0.3385,
+        "placementMs": 0.63
+      },
+      {
+        "generationMs": 13.741,
+        "allocatedBytes": 12019384,
+        "validationMs": 0.1249,
+        "navigationMs": 0.4101,
+        "placementMs": 0.4735
+      }
+    ]
+  }
+]

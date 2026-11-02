@@ -26,7 +26,8 @@
       "Telegraph": {
         "Style": "target"
       },
-      "ActionStyle": "Bite"
+      "ActionStyle": "Bite",
+      "PlayerLearnable": false
     },
     {
       "Id": "fixture_sweep",

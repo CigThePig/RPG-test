@@ -15,7 +15,7 @@ public partial class TouchStick : Control
         float length = Math.Min(1, displacement.Length() / 72);
         return length <= deadzone ? Vector2.Zero : displacement.Normalized() * MathF.Pow((length-deadzone)/(1-deadzone),curve);
     }
-    public void Cancel() { if (finger >= 0 && OS.HasFeature("android")) GD.Print($"MOSSLIGHT_TOUCH_RELEASE x={App.World.Player.X:0.00} y={App.World.Player.Y:0.00}"); finger = -1; offset = Vector2.Zero; App.TouchMovement = Vector2.Zero; QueueRedraw(); }
+    public void Cancel() { if (finger >= 0 && OS.HasFeature("android")) GD.Print($"MOSSLIGHT_TOUCH_RELEASE x={App.World.Player.X:0.00} y={App.World.Player.Y:0.00}"); if(finger>=0 && OS.HasFeature("android") && App.World.RegionsById[App.World.Player.Region].Landmarks.Count>0) GD.Print($"MOSSLIGHT_LANDMARK_MOVEMENT clear={App.World.RegionsById[App.World.Player.Region].CanStand(App.World.Player.Position,App.World.Player)} x={App.World.Player.X:0.00} y={App.World.Player.Y:0.00}"); finger = -1; offset = Vector2.Zero; App.TouchMovement = Vector2.Zero; QueueRedraw(); }
     public override void _Input(InputEvent e)
     {
         if (App.GameplayBlocked) { Cancel(); return; }

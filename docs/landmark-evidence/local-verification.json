@@ -1,0 +1,225 @@
+{
+  "world32x24": {
+    "generationMs": 0.167,
+    "navigationMs": 0.2288,
+    "cells": 768
+  },
+  "world64x48": {
+    "generationMs": 0.5417,
+    "navigationMs": 0.9721,
+    "cells": 3072
+  },
+  "world128x96": {
+    "generationMs": 1.5438,
+    "navigationMs": 4.0567,
+    "cells": 12288
+  },
+  "regionGenerationMs": [
+    0.4657,
+    0.8589,
+    0.6049,
+    0.5122,
+    0.5682,
+    0.5587,
+    0.4862,
+    0.9287,
+    0.5614,
+    0.5102,
+    0.4636,
+    0.5552,
+    0.862,
+    0.4788,
+    0.6273,
+    0.7387,
+    0.4416,
+    0.4617,
+    0.4605,
+    0.5311,
+    0.555,
+    0.4543,
+    0.9071,
+    0.4461,
+    0.4455,
+    0.4457,
+    0.5759,
+    0.446,
+    0.4448,
+    0.4429
+  ],
+  "dungeons": [
+    {
+      "seed": 0,
+      "milliseconds": 45.9575,
+      "tiles": 2420
+    },
+    {
+      "seed": 1,
+      "milliseconds": 3.3522,
+      "tiles": 1936
+    },
+    {
+      "seed": 2,
+      "milliseconds": 14.7218,
+      "tiles": 1452
+    },
+    {
+      "seed": 3,
+      "milliseconds": 5.2132,
+      "tiles": 2420
+    },
+    {
+      "seed": 4,
+      "milliseconds": 12.0995,
+      "tiles": 2904
+    },
+    {
+      "seed": 5,
+      "milliseconds": 24.2992,
+      "tiles": 3630
+    },
+    {
+      "seed": 6,
+      "milliseconds": 176.8124,
+      "tiles": 1936
+    },
+    {
+      "seed": 7,
+      "milliseconds": 97.4782,
+      "tiles": 1936
+    },
+    {
+      "seed": 8,
+      "milliseconds": 135.4524,
+      "tiles": 1452
+    },
+    {
+      "seed": 9,
+      "milliseconds": 3.8581,
+      "tiles": 1815
+    },
+    {
+      "seed": 10,
+      "milliseconds": 20.0573,
+      "tiles": 1936
+    },
+    {
+      "seed": 11,
+      "milliseconds": 97.3503,
+      "tiles": 1815
+    },
+    {
+      "seed": 12,
+      "milliseconds": 19.8609,
+      "tiles": 1452
+    },
+    {
+      "seed": 13,
+      "milliseconds": 17.3057,
+      "tiles": 2420
+    },
+    {
+      "seed": 14,
+      "milliseconds": 22.971,
+      "tiles": 2420
+    },
+    {
+      "seed": 15,
+      "milliseconds": 26.1504,
+      "tiles": 2904
+    },
+    {
+      "seed": 16,
+      "milliseconds": 166.7964,
+      "tiles": 1815
+    },
+    {
+      "seed": 17,
+      "milliseconds": 25.0902,
+      "tiles": 1815
+    },
+    {
+      "seed": 18,
+      "milliseconds": 12.9768,
+      "tiles": 1815
+    },
+    {
+      "seed": 19,
+      "milliseconds": 211.234,
+      "tiles": 1936
+    },
+    {
+      "seed": 20,
+      "milliseconds": 9.992,
+      "tiles": 1452
+    },
+    {
+      "seed": 21,
+      "milliseconds": 16.9472,
+      "tiles": 1936
+    },
+    {
+      "seed": 22,
+      "milliseconds": 54.0733,
+      "tiles": 2904
+    },
+    {
+      "seed": 23,
+      "milliseconds": 50.6261,
+      "tiles": 1936
+    },
+    {
+      "seed": 24,
+      "milliseconds": 158.6976,
+      "tiles": 4235
+    },
+    {
+      "seed": 25,
+      "milliseconds": 28.0361,
+      "tiles": 2420
+    },
+    {
+      "seed": 26,
+      "milliseconds": 126.1677,
+      "tiles": 1089
+    },
+    {
+      "seed": 27,
+      "milliseconds": 23.9252,
+      "tiles": 2420
+    },
+    {
+      "seed": 28,
+      "milliseconds": 7.1715,
+      "tiles": 1452
+    },
+    {
+      "seed": 29,
+      "milliseconds": 10.1658,
+      "tiles": 1452
+    }
+  ],
+  "simulation16": {
+    "ticks": 600,
+    "milliseconds": 81.1727,
+    "msPerTick": 0.13528783333333336,
+    "managedBytes": 57544944,
+    "saveBytes": 97868
+  },
+  "simulation64": {
+    "ticks": 600,
+    "milliseconds": 312.9319,
+    "msPerTick": 0.5215531666666666,
+    "managedBytes": 55616512,
+    "saveBytes": 162231
+  },
+  "simulation128": {
+    "ticks": 600,
+    "milliseconds": 697.4842,
+    "msPerTick": 1.1624736666666666,
+    "managedBytes": 39943376,
+    "saveBytes": 248103
+  },
+  "assertions": 6210,
+  "elapsedSeconds": 29.4686464,
+  "environment": "Linux AMD EPYC 9V74 80-Core Processor \u00B7 Godot 4.6.1-stable (official)"
+}

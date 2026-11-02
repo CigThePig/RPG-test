@@ -159,7 +159,9 @@ public partial class RpgUi : CanvasLayer
         if (e is InputEventScreenDrag drag && touchButtons.ContainsKey(drag.Index))
         { GetViewport().SetInputAsHandled(); return; }
         if (e is not InputEventScreenTouch touch) return;
-        if (App.GameplayBlocked) { CancelActionTouches(); return; }
+        // Death blocks gameplay but leaves the hotbar visible; its Menu button must
+        // still dispatch, and every gameplay command already rejects a dead player.
+        if (App.PresentationBlocked) { CancelActionTouches(); return; }
         if (touch.Canceled)
         {
             if (touchButtons.Remove(touch.Index,out var canceled)) { canceled.Modulate=Colors.White; GetViewport().SetInputAsHandled(); }
@@ -281,11 +283,15 @@ public partial class RpgUi : CanvasLayer
 
     double interactionEmphasisUntil;
     long interactionCheckTick = -1;
+    bool defeatAnnounced;
     public void Notify(string text) => message.Text = text;
     public void Update()
     {
         hotbar.Visible = !BlocksInput && !App.Narrative.Get("speaking").AsBool();
-        if (!hotbar.Visible || App.GameplayBlocked) CancelActionTouches();
+        if (!hotbar.Visible || App.PresentationBlocked) CancelActionTouches();
+        bool defeated = !App.World.Player.Alive;
+        if (defeated && !defeatAnnounced) Notify("Defeated · open the menu to load a save or start a new game");
+        defeatAnnounced = defeated;
         Stick.Visible = MobileLayout && !App.GameplayBlocked;
         if (App.GameplayBlocked) Stick.Cancel();
         marker.Visible=App.Trace.Active && !BlocksInput;
@@ -371,14 +377,15 @@ public partial class RpgUi : CanvasLayer
                 Notify(App.ManageItem(() => App.World.Items.Craft("player", recipe)) ? "Crafted " + recipe.Output : "Missing ingredients");
                 Inventory();
             });
-        var player = App.World.Player;
-        var merchant = App.World.Actors.Values.FirstOrDefault(a => a.Profession == "merchant" && a.Alive && a.Region == player.Region && System.Numerics.Vector2.Distance(a.Position, player.Position) < 80 && !App.World.Hostile(player, a) && App.World.LineOfSight(player, a));
+        var merchant = App.NearbyMerchant();
         if (merchant != null)
         {
             using var stock = JsonDocument.Parse(App.World.Items.Service.Call("catalog", merchant.Id).AsString());
             foreach (var row in stock.RootElement.EnumerateArray())
             {
                 string id = row.GetProperty("id").GetString()!;
+                // Coins received from earlier sales are payment, not stock for sale.
+                if (id == "coin") continue;
                 string title = row.GetProperty("title").GetString()!;
                 Button(body, "Buy · " + title + " · 5 crowns", () =>
                 {
@@ -430,6 +437,7 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool() || menu.Visible) return;
         Open("REGION MAP");
+        body.AddChild(new Label { Text = "E entrance · A archive · S shrine · T storeroom · R relic · L lever · B braziers · gates: gold key, grey portcullis, cyan seal · ● you", AutowrapMode=TextServer.AutowrapMode.WordSmart, CustomMinimumSize=new Vector2(400,36) });
         var map = new RegionMap
         {
             Region = App.World.RegionsById[App.World.Player.Region],
@@ -635,10 +643,37 @@ public partial class RegionMap : Control
         for (int y = 0; y < Region.Height; y++)
             for (int x = 0; x < Region.Width; x++)
             {
+                if (Region.Id == "ruin" && !Region.ExploredTiles.Contains(y*Region.Width+x)) continue;
                 var t = Region.Tiles[y * Region.Width + x];
                 DrawRect(new Rect2(x * scale, y * scale, scale + 1, scale + 1), t is Terrain.Wall or Terrain.Rock ? new Color(.2f, .24f, .22f) : t == Terrain.Water ? new Color(.2f, .4f, .46f) : new Color(.48f, .55f, .34f));
             }
 
+        foreach (var landmark in Region.Landmarks)
+        {
+            if (!Region.DiscoveredLandmarks.Contains(Exploration.Identity(Region, landmark))) continue;
+            var at = new Vector2((landmark.OriginX+5.5f)*scale,(landmark.OriginY+5.5f)*scale);
+            DrawCircle(at, 4, landmark.Roles.Contains("objective") ? Colors.Cyan : Colors.White);
+            DrawString(ThemeDB.FallbackFont, at + new Vector2(6,-4), landmark.Template switch { "ruined-entrance"=>"E", "forgotten-archive"=>"A", "abandoned-shrine"=>"S", "collapsed-storeroom"=>"T", "relic-sanctuary"=>"R", _=>"?" }, HorizontalAlignment.Left, -1, 16, Colors.White);
+        }
+        // Explored mechanisms: gates as bars (dimmed once open), levers and brazier rings by letter.
+        foreach (var (at, kind) in Region.Features)
+        {
+            if (Region.Id == "ruin" && !Region.ExploredTiles.Contains(at)) continue;
+            var cell = new Vector2((at % Region.Width) * scale, (at / Region.Width) * scale);
+            if (RegionState.IsGate(kind))
+            {
+                var colour = kind switch { "lock" => new Color("d4b66b"), "portcullis" => new Color("a7b0b2"), _ => new Color("9fe3e6") };
+                DrawRect(new Rect2(cell, new Vector2(scale + 1, scale + 1)), Region.OpenDoors.Contains(at) ? new Color(colour, .35f) : colour);
+            }
+            else if (kind == "lever" || (kind == "brazier" && DungeonMechanisms.RingAt(Region, at).FirstOrDefault() == at))
+            {
+                var centre = kind == "lever" ? cell : new Vector2((at % Region.Width) * scale, (at / Region.Width + 3) * scale);
+                DrawCircle(centre, 3, kind == "lever" ? (Region.Depleted.Contains(at) ? new Color("a7b0b2") : new Color("d4b66b")) : (Region.Depleted.Contains(at) ? new Color("9fe3e6") : new Color("f2a443")));
+                DrawString(ThemeDB.FallbackFont, centre + new Vector2(5, -3), kind == "lever" ? "L" : "B", HorizontalAlignment.Left, -1, 14, Colors.White);
+            }
+        }
+        var entrance = new Vector2((Region.Entrance % Region.Width+.5f)*scale,(Region.Entrance/Region.Width+.5f)*scale);
+        DrawRect(new Rect2(entrance-new Vector2(4,4),new Vector2(8,8)),Colors.LightGreen);
         DrawCircle(new Vector2(Player.X / 24 * scale, Player.Y / 24 * scale), 4, Colors.Gold);
     }
 }

@@ -1,0 +1,1171 @@
+{
+  "source": "488174f7a0835584cf5059cb65e9e9b3c87be37e",
+  "dirty": true,
+  "statusEntries": [
+    "?? game/actors/ActorSeparation.cs.uid",
+    "?? game/actors/CombatBrain.cs.uid",
+    "?? game/actors/LootMarker.cs.uid",
+    "?? game/actors/RollDustOverlay.cs.uid",
+    "?? game/art/icon.svg.import",
+    "?? game/combat/CameraFeedback.cs.uid",
+    "?? game/combat/CombatEffects.cs.uid",
+    "?? game/combat/CombatGeometry.cs.uid",
+    "?? game/combat/CombatPresentation.cs.uid",
+    "?? game/combat/CombatPresentationController.cs.uid",
+    "?? game/combat/CombatTuning.cs.uid",
+    "?? game/combat/PlayerLocator.cs.uid",
+    "?? game/combat/ProjectileFlight.cs.uid",
+    "?? game/combat/TelegraphView.cs.uid",
+    "?? game/dev/DungeonTraversalReplay.cs.uid",
+    "?? game/dev/EnvironmentArtGenerator.cs.uid",
+    "?? game/dev/EnvironmentAssetCache.cs.uid",
+    "?? game/dev/EnvironmentDecoration.cs.uid",
+    "?? game/dev/EnvironmentStyle.cs.uid",
+    "?? game/dev/FeatureView.cs.uid",
+    "?? game/dev/PlaytestExport.cs.uid",
+    "?? game/dev/PlaytestInputObserver.cs.uid",
+    "?? game/dev/TerrainBatch.cs.uid",
+    "?? game/dev/TerrainWallRow.cs.uid",
+    "?? game/tests/ActorSeparationChecks.cs.uid",
+    "?? game/tests/CombatAiChecks.cs.uid",
+    "?? game/tests/CombatChecks.cs.uid",
+    "?? game/tests/CombatPresentationChecks.cs.uid",
+    "?? game/tests/CombatTelegraphChecks.cs.uid",
+    "?? game/tests/DodgeChecks.cs.uid",
+    "?? game/tests/DungeonChecks.cs.uid",
+    "?? game/tests/DungeonEncounterChecks.cs.uid",
+    "?? game/tests/DungeonVisualChecks.cs.uid",
+    "?? game/tests/EncounterChecks.cs.uid",
+    "?? game/tests/EnvironmentArtChecks.cs.uid",
+    "?? game/tests/EnvironmentVisualChecks.cs.uid",
+    "?? game/tests/LandmarkChecks.cs.uid",
+    "?? game/tests/LandmarkVisualChecks.cs.uid",
+    "?? game/tests/MobileCombatControlsChecks.cs.uid",
+    "?? game/tests/MovementChecks.cs.uid",
+    "?? game/tests/PlayabilityChecks.cs.uid",
+    "?? game/tests/ProjectileChecks.cs.uid",
+    "?? game/tests/ReviewChecks.cs.uid",
+    "?? game/tests/WallDepthChecks.cs.uid",
+    "?? game/ui/MobileCombatControls.cs.uid",
+    "?? game/ui/TouchScroll.cs.uid",
+    "?? game/world/Landmarks.cs.uid"
+  ],
+  "preset": "baseline",
+  "stateDigest": "8505cd21cbbc6375b14d0c70b162da44d7d8022072304d8ef6683cb3e8b36d45",
+  "deterministicRepeat": true,
+  "movieMode": true,
+  "captureStartUnix": 1793354219.375337,
+  "environment": {
+    "kind": "session",
+    "schema": 1,
+    "utc": "2026-10-30T09:57:05.0515298Z",
+    "engine": "4.6.1-stable (official)",
+    "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "platform": "Linux",
+    "source": "488174f7a0835584cf5059cb65e9e9b3c87be37e",
+    "units": "ground px, projected canvas px, seconds, milliseconds",
+    "timebase": "tick=simulation 60Hz; frame=Godot drawn frame; wallMs=monotonic session; movieSeconds=frame/60 only in Movie Maker",
+    "preset": "baseline",
+    "configuration": {
+      "Id": "baseline",
+      "Scale": 1,
+      "ScreenUniform": false,
+      "Response": 0,
+      "Deadzone": 0.1,
+      "Curve": 1,
+      "CameraFollow": 12,
+      "Zoom": 1.5
+    }
+  },
+  "renderWallPacing": {
+    "p50ms": 45.96229999999923,
+    "p95ms": 50.927700000000186,
+    "p99ms": 54.506100000000515
+  },
+  "distinctIndexedCreatureFrames": {
+    "sword": 12,
+    "bite": 21,
+    "tailSwipe": 21,
+    "hitReaction": 8,
+    "dodge": 12
+  },
+  "simulationSeconds": 97.81666666666666,
+  "wallSeconds": 275.6067134,
+  "metrics": {
+    "free-play": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 30,
+      "wallFrameP50ms": 46.703399999999874,
+      "wallFrameP95ms": 55.06060000000002,
+      "wallFrameP99ms": 56.79630000000009,
+      "maxCameraError": 414.52077623567
+    },
+    "horizontal": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 46.06830000000036,
+      "wallFrameP95ms": 55.940700000000106,
+      "wallFrameP99ms": 61.60939999999937,
+      "maxCameraError": 27.33334000000002
+    },
+    "vertical": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 19.999693,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 50.30400000000009,
+      "wallFrameP95ms": 57.65149999999994,
+      "wallFrameP99ms": 68.46199999999953,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "diagonal": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 25.29879076514008,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.634000000000015,
+      "wallFrameP95ms": 46.55069999999978,
+      "wallFrameP99ms": 50.34269999999924,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "tap-stop": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 0,
+      "samples": 50,
+      "wallFrameP50ms": 44.756499999999505,
+      "wallFrameP95ms": 45.794700000002194,
+      "wallFrameP99ms": 46.9406999999992,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "reversal": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.648699999997916,
+      "wallFrameP95ms": 45.50770000000193,
+      "wallFrameP99ms": 46.36019999999917,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "eight-turns": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 25.29879076514008,
+      "blockedSamples": 0,
+      "samples": 160,
+      "wallFrameP50ms": 44.65970000000016,
+      "wallFrameP95ms": 45.713299999999435,
+      "wallFrameP99ms": 45.99229999999807,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "analog-ramp": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.557700000001205,
+      "wallFrameP95ms": 45.41670000000158,
+      "wallFrameP99ms": 46.054299999999785,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "camera-follow": {
+      "settledCameraErrorMedian": 3.3316100015008447,
+      "projectedSpeed": 40.001217,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.65649999999732,
+      "wallFrameP95ms": 46.25020000000222,
+      "wallFrameP99ms": 47.01180000000022,
+      "maxCameraError": 623.5583185699522
+    },
+    "wall-slide": {
+      "settledCameraErrorMedian": 1.4902900012077775,
+      "projectedSpeed": 25.29879076514008,
+      "blockedSamples": 17,
+      "samples": 140,
+      "wallFrameP50ms": 45.441100000003644,
+      "wallFrameP95ms": 46.82179999999789,
+      "wallFrameP99ms": 47.24880000000121,
+      "maxCameraError": 314.89889897814567
+    },
+    "wall-recover": {
+      "settledCameraErrorMedian": 3.320500000542125,
+      "projectedSpeed": 40.001217,
+      "blockedSamples": 17,
+      "samples": 140,
+      "wallFrameP50ms": 45.23410000000149,
+      "wallFrameP95ms": 46.765999999995984,
+      "wallFrameP99ms": 47.302999999999884,
+      "maxCameraError": 31.74740000005667
+    },
+    "narrow-passage": {
+      "settledCameraErrorMedian": 3.3336000005400037,
+      "projectedSpeed": 40.001217,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 45.952299999997194,
+      "wallFrameP95ms": 46.94319999999425,
+      "wallFrameP99ms": 47.539099999994505,
+      "maxCameraError": 39.241445647661834
+    },
+    "menu-cancel": {
+      "settledCameraErrorMedian": 0.028165711423657723,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 0,
+      "samples": 70,
+      "wallFrameP50ms": 45.71979999999894,
+      "wallFrameP95ms": 48.60280000000057,
+      "wallFrameP99ms": 49.43330000000424,
+      "maxCameraError": 331.03820185746537
+    },
+    "multitouch": {
+      "settledCameraErrorMedian": 8.485281376931915e-05,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 0,
+      "samples": 70,
+      "wallFrameP50ms": 44.42260000000533,
+      "wallFrameP95ms": 45.450599999996484,
+      "wallFrameP99ms": 45.79630000000179,
+      "maxCameraError": 8.485281376931915e-05
+    },
+    "chest": {
+      "settledCameraErrorMedian": 8.485281376931915e-05,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.43869999999879,
+      "wallFrameP95ms": 46.20829999999842,
+      "wallFrameP99ms": 54.32180000000517,
+      "maxCameraError": 8.485281376931915e-05
+    },
+    "settlement-route": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 14,
+      "samples": 240,
+      "wallFrameP50ms": 50.02799999999115,
+      "wallFrameP95ms": 52.2103999999963,
+      "wallFrameP99ms": 57.9598999999871,
+      "maxCameraError": 21.86667
+    },
+    "dungeon-route": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 20.000608520954117,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 50.71379999999772,
+      "wallFrameP95ms": 52.36329999999725,
+      "wallFrameP99ms": 54.54360000000452,
+      "maxCameraError": 33.65526759977552
+    },
+    "combat-movement": {
+      "settledCameraErrorMedian": 0.9565999999999804,
+      "projectedSpeed": 27.362009630692295,
+      "blockedSamples": 40,
+      "samples": 180,
+      "wallFrameP50ms": 49.161000000007334,
+      "wallFrameP95ms": 52.4372999999905,
+      "wallFrameP99ms": 53.94239999999991,
+      "maxCameraError": 32.86389413593281
+    },
+    "attack-readability": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 89,
+      "samples": 200,
+      "wallFrameP50ms": 46.23210000000836,
+      "wallFrameP95ms": 48.2722999999969,
+      "wallFrameP99ms": 49.36830000000191,
+      "maxCameraError": 13.392700000000048
+    },
+    "combat-empty": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 72,
+      "samples": 170,
+      "wallFrameP50ms": 45.19810000000871,
+      "wallFrameP95ms": 46.66700000000128,
+      "wallFrameP99ms": 47.35309999999299,
+      "maxCameraError": 0.2437100000000214
+    },
+    "combat-ahead": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 45.63699999998789,
+      "wallFrameP95ms": 47.16570000001229,
+      "wallFrameP99ms": 47.422200000000885,
+      "maxCameraError": 0.0
+    },
+    "combat-behind": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 45.49199999999837,
+      "wallFrameP95ms": 46.79209999999148,
+      "wallFrameP99ms": 47.350700000009965,
+      "maxCameraError": 0.0
+    },
+    "combat-enter": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 45.375599999999395,
+      "wallFrameP95ms": 47.131300000008196,
+      "wallFrameP99ms": 48.997400000007474,
+      "maxCameraError": 0.8558924495519475
+    },
+    "combat-wall": {
+      "settledCameraErrorMedian": 0.016939999999976862,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 45.488300000011805,
+      "wallFrameP95ms": 47.42309999999998,
+      "wallFrameP99ms": 47.543699999994715,
+      "maxCameraError": 283.75124000000005
+    },
+    "dodge-idle": {
+      "settledCameraErrorMedian": 0.014000000000010004,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 47.91700000001583,
+      "wallFrameP95ms": 51.016399999993155,
+      "wallFrameP99ms": 51.517299999977695,
+      "maxCameraError": 285.74874
+    },
+    "dodge-held": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 47.3465000000142,
+      "wallFrameP95ms": 50.92389999999432,
+      "wallFrameP99ms": 51.36220000000321,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "dodge-wall": {
+      "settledCameraErrorMedian": 0.01582500000000664,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 47.149700000009034,
+      "wallFrameP95ms": 48.5338000000047,
+      "wallFrameP99ms": 48.92620000001625,
+      "maxCameraError": 283.75118000000003
+    },
+    "dodge-evasion": {
+      "settledCameraErrorMedian": 0.014000000000010004,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 48.208700000017416,
+      "wallFrameP95ms": 51.09179999999469,
+      "wallFrameP99ms": 51.66650000002119,
+      "maxCameraError": 285.74881000000005
+    },
+    "telegraph-bite": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 14,
+      "samples": 75,
+      "wallFrameP50ms": 45.836100000014994,
+      "wallFrameP95ms": 47.37979999999516,
+      "wallFrameP99ms": 48.111999999993714,
+      "maxCameraError": 0.8237600021850954
+    },
+    "telegraph-dodge": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 75,
+      "wallFrameP50ms": 47.83999999999651,
+      "wallFrameP95ms": 51.14049999997951,
+      "wallFrameP99ms": 51.94239999999991,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "telegraph-interrupt": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 75,
+      "wallFrameP50ms": 45.20829999999842,
+      "wallFrameP95ms": 47.0,
+      "wallFrameP99ms": 47.163999999989755,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "telegraph-cone": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 75,
+      "wallFrameP50ms": 45.257400000002235,
+      "wallFrameP95ms": 47.358900000021094,
+      "wallFrameP99ms": 48.111799999984214,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "presentation-fatal": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 130,
+      "wallFrameP50ms": 45.289400000008754,
+      "wallFrameP95ms": 47.235899999999674,
+      "wallFrameP99ms": 48.427900000009686,
+      "maxCameraError": 0.05078003544704562
+    },
+    "presentation-crowd": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 14,
+      "samples": 90,
+      "wallFrameP50ms": 46.304799999983516,
+      "wallFrameP95ms": 48.55120000001625,
+      "wallFrameP99ms": 49.70120000001043,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "presentation-projectile": {
+      "settledCameraErrorMedian": 6.000000001904482e-05,
+      "projectedSpeed": 0,
+      "blockedSamples": 40,
+      "samples": 140,
+      "wallFrameP50ms": 45.59259999997448,
+      "wallFrameP95ms": 47.92740000001504,
+      "wallFrameP99ms": 48.32420000000275,
+      "maxCameraError": 0.39279000458264907
+    },
+    "tactics-prowler": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 45.214099999982864,
+      "wallFrameP95ms": 46.99869999999646,
+      "wallFrameP99ms": 50.180899999977555,
+      "maxCameraError": 6.000000001904482e-05
+    },
+    "tactics-brute": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 45.05019999999786,
+      "wallFrameP95ms": 46.56479999999283,
+      "wallFrameP99ms": 47.08259999999427,
+      "maxCameraError": 0.0
+    },
+    "tactics-spitter": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 39.999386,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 46.00690000000759,
+      "wallFrameP95ms": 47.827399999980116,
+      "wallFrameP99ms": 49.44419999999809,
+      "maxCameraError": 0.0
+    },
+    "tactics-mixed": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 46.24689999999828,
+      "wallFrameP95ms": 47.73110000000452,
+      "wallFrameP99ms": 48.484499999991385,
+      "maxCameraError": 0.0
+    },
+    "tactics-spacing": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 0,
+      "samples": 240,
+      "wallFrameP50ms": 47.592800000013085,
+      "wallFrameP95ms": 49.68979999999283,
+      "wallFrameP99ms": 51.133800000010524,
+      "maxCameraError": 0.0
+    },
+    "tactics-straight": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 19.999693,
+      "blockedSamples": 0,
+      "samples": 180,
+      "wallFrameP50ms": 46.618599999987055,
+      "wallFrameP95ms": 48.80059999998775,
+      "wallFrameP99ms": 53.298299999994924,
+      "maxCameraError": 0.0
+    },
+    "tactics-homing": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 19.999693,
+      "blockedSamples": 0,
+      "samples": 180,
+      "wallFrameP50ms": 46.15179999999236,
+      "wallFrameP95ms": 48.48079999999027,
+      "wallFrameP99ms": 49.80460000000312,
+      "maxCameraError": 0.0
+    },
+    "tactics-wall": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 19.999693,
+      "blockedSamples": 0,
+      "samples": 180,
+      "wallFrameP50ms": 47.380999999993946,
+      "wallFrameP95ms": 48.99100000000908,
+      "wallFrameP99ms": 49.55219999997644,
+      "maxCameraError": 186.6667
+    },
+    "tactics-dodge": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 180,
+      "wallFrameP50ms": 46.35250000000815,
+      "wallFrameP95ms": 51.00659999996424,
+      "wallFrameP99ms": 52.04279999999562,
+      "maxCameraError": 186.66664000000003
+    },
+    "tactics-interrupt": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 0,
+      "blockedSamples": 24,
+      "samples": 120,
+      "wallFrameP50ms": 44.98090000002412,
+      "wallFrameP95ms": 46.5112000000081,
+      "wallFrameP99ms": 48.242499999993015,
+      "maxCameraError": 0.5502736370207493
+    },
+    "turn-south-north": {
+      "settledCameraErrorMedian": 0.0,
+      "projectedSpeed": 19.999693,
+      "blockedSamples": 0,
+      "samples": 100,
+      "wallFrameP50ms": 44.4943000000203,
+      "wallFrameP95ms": 45.62339999998221,
+      "wallFrameP99ms": 46.285200000042096,
+      "maxCameraError": 0.0
+    }
+  },
+  "problemPeriods": [
+    {
+      "scenario": "wall-slide",
+      "frame": 948,
+      "movieSeconds": 15.8,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 949,
+      "movieSeconds": 15.816666666666666,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 950,
+      "movieSeconds": 15.833333333333334,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 951,
+      "movieSeconds": 15.85,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 952,
+      "movieSeconds": 15.866666666666667,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 953,
+      "movieSeconds": 15.883333333333333,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 954,
+      "movieSeconds": 15.9,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 955,
+      "movieSeconds": 15.916666666666666,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 956,
+      "movieSeconds": 15.933333333333334,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 957,
+      "movieSeconds": 15.95,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 958,
+      "movieSeconds": 15.966666666666667,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 959,
+      "movieSeconds": 15.983333333333333,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 960,
+      "movieSeconds": 16.0,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 961,
+      "movieSeconds": 16.016666666666666,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 962,
+      "movieSeconds": 16.033333333333335,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 963,
+      "movieSeconds": 16.05,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-slide",
+      "frame": 964,
+      "movieSeconds": 16.066666666666666,
+      "reason": "Terrain / footprint: Rock at 30,15"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1028,
+      "movieSeconds": 17.133333333333333,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1029,
+      "movieSeconds": 17.15,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1030,
+      "movieSeconds": 17.166666666666668,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1031,
+      "movieSeconds": 17.183333333333334,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1032,
+      "movieSeconds": 17.2,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1033,
+      "movieSeconds": 17.216666666666665,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1034,
+      "movieSeconds": 17.233333333333334,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1035,
+      "movieSeconds": 17.25,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1036,
+      "movieSeconds": 17.266666666666666,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1037,
+      "movieSeconds": 17.283333333333335,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1038,
+      "movieSeconds": 17.3,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1039,
+      "movieSeconds": 17.316666666666666,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1040,
+      "movieSeconds": 17.333333333333332,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1041,
+      "movieSeconds": 17.35,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1042,
+      "movieSeconds": 17.366666666666667,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1043,
+      "movieSeconds": 17.383333333333333,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "wall-recover",
+      "frame": 1044,
+      "movieSeconds": 17.4,
+      "reason": "Terrain / footprint: Rock at 30,12"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1681,
+      "movieSeconds": 28.016666666666666,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1682,
+      "movieSeconds": 28.033333333333335,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1683,
+      "movieSeconds": 28.05,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "settlement-route",
+      "frame": 1684,
+      "movieSeconds": 28.066666666666666,
+      "reason": "Action: Staggered"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1970,
+      "movieSeconds": 32.833333333333336,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1971,
+      "movieSeconds": 32.85,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1972,
+      "movieSeconds": 32.86666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1973,
+      "movieSeconds": 32.88333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1974,
+      "movieSeconds": 32.9,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1975,
+      "movieSeconds": 32.916666666666664,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1976,
+      "movieSeconds": 32.93333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1977,
+      "movieSeconds": 32.95,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1978,
+      "movieSeconds": 32.96666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1979,
+      "movieSeconds": 32.983333333333334,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1980,
+      "movieSeconds": 33.0,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1981,
+      "movieSeconds": 33.016666666666666,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1982,
+      "movieSeconds": 33.03333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1983,
+      "movieSeconds": 33.05,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1984,
+      "movieSeconds": 33.06666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1985,
+      "movieSeconds": 33.083333333333336,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1986,
+      "movieSeconds": 33.1,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1987,
+      "movieSeconds": 33.11666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1988,
+      "movieSeconds": 33.13333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1989,
+      "movieSeconds": 33.15,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1990,
+      "movieSeconds": 33.166666666666664,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1991,
+      "movieSeconds": 33.18333333333333,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1992,
+      "movieSeconds": 33.2,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1993,
+      "movieSeconds": 33.21666666666667,
+      "reason": "Action: Windup"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1994,
+      "movieSeconds": 33.233333333333334,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1995,
+      "movieSeconds": 33.25,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1996,
+      "movieSeconds": 33.266666666666666,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1997,
+      "movieSeconds": 33.28333333333333,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1998,
+      "movieSeconds": 33.3,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 1999,
+      "movieSeconds": 33.31666666666667,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2000,
+      "movieSeconds": 33.333333333333336,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2001,
+      "movieSeconds": 33.35,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2002,
+      "movieSeconds": 33.36666666666667,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2003,
+      "movieSeconds": 33.38333333333333,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2004,
+      "movieSeconds": 33.4,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2005,
+      "movieSeconds": 33.416666666666664,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2006,
+      "movieSeconds": 33.43333333333333,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2007,
+      "movieSeconds": 33.45,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2008,
+      "movieSeconds": 33.46666666666667,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "combat-movement",
+      "frame": 2009,
+      "movieSeconds": 33.483333333333334,
+      "reason": "Action: Recovery"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2877,
+      "movieSeconds": 47.95,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2878,
+      "movieSeconds": 47.96666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2879,
+      "movieSeconds": 47.983333333333334,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2880,
+      "movieSeconds": 48.0,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2881,
+      "movieSeconds": 48.016666666666666,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2882,
+      "movieSeconds": 48.03333333333333,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2883,
+      "movieSeconds": 48.05,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2884,
+      "movieSeconds": 48.06666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2885,
+      "movieSeconds": 48.083333333333336,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2886,
+      "movieSeconds": 48.1,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2887,
+      "movieSeconds": 48.11666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2888,
+      "movieSeconds": 48.13333333333333,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2889,
+      "movieSeconds": 48.15,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2890,
+      "movieSeconds": 48.166666666666664,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2891,
+      "movieSeconds": 48.18333333333333,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2892,
+      "movieSeconds": 48.2,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2893,
+      "movieSeconds": 48.21666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2894,
+      "movieSeconds": 48.233333333333334,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2895,
+      "movieSeconds": 48.25,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2896,
+      "movieSeconds": 48.266666666666666,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2897,
+      "movieSeconds": 48.28333333333333,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2898,
+      "movieSeconds": 48.3,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2899,
+      "movieSeconds": 48.31666666666667,
+      "reason": "Action: Dodging"
+    },
+    {
+      "scenario": "dodge-held",
+      "frame": 2900,
+      "movieSeconds": 48.333333333333336,
+      "reason": "Action: Dodging"
+    }
+  ],
+  "visualReview": "Automated sanity/temporal checks only. Human or vision inspection must be reported separately."
+}
