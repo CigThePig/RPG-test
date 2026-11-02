@@ -35,6 +35,8 @@ public partial class RpgUi : CanvasLayer
     public Rect2 ScreenRect => panel.GetGlobalRect();
     public Rect2 DialogueRect { get; private set; }
     public Button ScreenBack => panel.BackButton;
+    internal PackViewState PackState { get; } = new();
+    PackLayout? packLayout;
     VBoxContainer body = null !;
     Control root = null !;
     Control hotbar = null !;
@@ -273,13 +275,24 @@ public partial class RpgUi : CanvasLayer
             var rect = UiDesign.Overlay(overlaySafe, width);
             control.CustomMinimumSize = Vector2.Zero; control.Position = rect.Position; control.Size = rect.Size;
         }
-        Arrange(panel, 740); Arrange(menu, 560); Arrange(confirmation, 560);
+        if (navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0)
+        {
+            panel.CustomMinimumSize = Vector2.Zero;
+            panel.Position = overlaySafe.Position + new Vector2(16, 16);
+            panel.Size = new Vector2(Math.Max(300, overlaySafe.Size.X - 32),
+                Math.Max(240, overlaySafe.Size.Y - 32));
+        }
+        else Arrange(panel, 740);
+        Arrange(menu, 560); Arrange(confirmation, 560);
         // Dialogue: lower part of the safe area, never wider than a comfortable line.
         float dialogueWidth = Math.Min(900, overlaySafe.Size.X - 32);
         float dialogueHeight = Math.Clamp(overlaySafe.Size.Y * .52f, Math.Min(260, overlaySafe.Size.Y - 32), 420);
         DialogueRect = new Rect2(overlaySafe.Position.X + (overlaySafe.Size.X - dialogueWidth) / 2, overlaySafe.End.Y - 16 - dialogueHeight, dialogueWidth, dialogueHeight);
         App.Narrative.Call("present", UiDesign.Theme(TextScale), DialogueRect);
         layoutTraceFrames = 3;
+        if (navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0 &&
+            packLayout != null && GodotObject.IsInstanceValid(packLayout) && packLayout.IsInsideTree())
+            packLayout.Rebuild();
     }
 
     static Button Button(Node parent, string text, Action action) => UiDesign.Action(parent, text, action);
@@ -335,7 +348,11 @@ public partial class RpgUi : CanvasLayer
     void NavigateBack()
     {
         CancelGestures();
+        if (navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0 &&
+            packLayout != null && GodotObject.IsInstanceValid(packLayout) && packLayout.IsInsideTree() &&
+            packLayout.DismissDetail()) return;
         navigation.Back(App.Narrative.Get("speaking").AsBool(), App.World.Player.Alive);
+        packLayout = null;
         SyncNavigation();
     }
     public void SetTextScale(float scale)
@@ -409,7 +426,9 @@ public partial class RpgUi : CanvasLayer
         lastSystemBackFromKey = null;
         // Rebuilding the same screen after an action keeps the reader's scroll position.
         bool refresh = navigation.Screen == heading && panel.Visible;
-        CancelGestures(); navigation.Open(heading); panel.Present(heading, refresh); SyncNavigation(); return true;
+        CancelGestures(); navigation.Open(heading);
+        panel.Present(heading == "PACK & EQUIPMENT" && PackTab == 0 ? "THE WAYFARER'S KIT" : heading, refresh);
+        SyncNavigation(); return true;
     }
 
     public override void _Process(double delta)
@@ -605,14 +624,24 @@ public partial class RpgUi : CanvasLayer
     /// <summary>Selected Pack tab (0 Items, 1 Craft, 2 Trade). Presentation state only.</summary>
     public int PackTab { get; set; }
     /// <summary>Selected bag row's Gloot selector (instance ID or prototype). Presentation state only.</summary>
-    public string? PackSelection { get; set; }
+    public string? PackSelection { get => PackState.Selector; set => PackState.SelectBag(value); }
     public bool MapZoomed { get; set; }
 
     public void Inventory()
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         if (!Open("PACK & EQUIPMENT")) return;
-        PackScreen.Populate(body, this);
+        Layout(); // Choose the real safe-area geometry after navigation changes.
+        if (PackTab == 0)
+        {
+            packLayout = new PackLayout(this);
+            panel.MountCustom(packLayout);
+        }
+        else
+        {
+            packLayout = null;
+            PackScreen.Populate(body, this);
+        }
     }
 
     /// <summary>Uses a consumable through the gameplay path, then restores the Pack and its caller.</summary>
