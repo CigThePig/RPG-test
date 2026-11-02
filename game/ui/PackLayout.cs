@@ -79,6 +79,14 @@ public partial class PackLayout : VBoxContainer
             ui.Inventory();
         });
         top.Name = "pack_nav";
+        // Unlike the legacy full-width segmented bar, these are small, fixed
+        // navigation choices. They do not steal horizontal space from the three
+        // inventory regions and keep the backpack as the dominant surface.
+        foreach (var tab in top.GetChildren().OfType<Button>())
+        {
+            tab.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
+            tab.CustomMinimumSize = new Vector2(124 * ui.TextScale, UiDesign.Target);
+        }
 
         var summary = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         AddChild(summary);
@@ -220,9 +228,11 @@ public partial class PackLayout : VBoxContainer
             if (current == null) continue;
             var stats = PackScreen.Stats(current);
             if (stats != "") UiDesign.Note(card, stats);
-            var unequip = UiDesign.Action(card, "Unequip " + current.Title, () => Unequip(slot, current));
+            var unequip = UiDesign.Action(card, "Unequip", () => Unequip(slot, current));
             unequip.Name = "unequip_" + slot;
-            unequip.Alignment = HorizontalAlignment.Left;
+            unequip.TooltipText = "Return " + current.Title + " to backpack";
+            unequip.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
+            unequip.CustomMinimumSize = new Vector2(132 * ui.TextScale, UiDesign.Target);
             if (!ui.App.World.Items.CanUnequip(ui.App.World.Player.Id, slot))
             {
                 unequip.Disabled = true;
