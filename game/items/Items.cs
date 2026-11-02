@@ -63,24 +63,67 @@ public sealed class Items(Node service, EventStream events)
     public string Describe(string owner) => service.Call("describe", owner).AsString();
     public bool Craft(string owner, RecipeDef recipe)
     {
-        // Check room for the output before consuming any ingredient.
-        if (recipe.Ingredients.Count == 0 || recipe.Ingredients.Any(x => x.Value < 1 || Count(owner, x.Key) < x.Value) || !service.Call("can_produce", recipe.Output, recipe.Count, recipe.Material, recipe.Quality).AsBool() || !service.Call("has_space", owner, recipe.Output, recipe.Count).AsBool())
+        // Ingredient removal may free the very slot the output needs. Validate the
+        // recipe and ingredient quantities first, then check capacity after removal.
+        // All Gloot mutations are synchronous, and no events escape until commit.
+        if (recipe.Ingredients.Count == 0 ||
+            recipe.Ingredients.Any(x => x.Value < 1 || Count(owner, x.Key) < x.Value) ||
+            !service.Call("can_produce", recipe.Output, recipe.Count, recipe.Material, recipe.Quality).AsBool())
             return false;
-        foreach (var x in recipe.Ingredients)
-            Take(owner, x.Key, x.Value);
-        int produced = 0;
-        if (recipe.Material != "")
+
+        // Capture the entire authoritative Gloot state, including equipment, item
+        // properties and instance IDs, rather than trying to reconstruct ingredients.
+        string before = service.Call("export_state").AsString();
+        bool produced = false;
+        Exception? failure = null;
+        try
         {
-            for (int i = 0; i < recipe.Count; i++)
-                if (service.Call("generate_item", owner, recipe.Output, recipe.Material, recipe.Quality).AsBool())
-                    produced++;
-            if (produced > 0)
-                events.Publish(new("item_acquired", owner, "", recipe.Output, produced));
+            bool consumed = true;
+            foreach (var ingredient in recipe.Ingredients)
+            {
+                if (service.Call("take", owner, ingredient.Key, ingredient.Value).AsBool())
+                    continue;
+                consumed = false;
+                break;
+            }
+
+            if (consumed && service.Call("has_space", owner, recipe.Output, recipe.Count).AsBool())
+            {
+                if (recipe.Material == "")
+                {
+                    produced = service.Call("add", owner, recipe.Output, recipe.Count).AsBool();
+                }
+                else
+                {
+                    produced = true;
+                    for (int i = 0; i < recipe.Count; i++)
+                    {
+                        if (service.Call("generate_item", owner, recipe.Output, recipe.Material, recipe.Quality).AsBool())
+                            continue;
+                        produced = false;
+                        break;
+                    }
+                }
+            }
         }
-        else if (Add(owner, recipe.Output, recipe.Count))
-            produced = recipe.Count;
-        if (produced == 0)
+        catch (Exception error)
+        {
+            failure = error;
+        }
+
+        if (!produced)
+        {
+            // Failed delivery, including a partially completed generated-item
+            // batch, restores every affected stack and the original serial.
+            // Never report a crafted item or quest progress on failure.
+            if (!service.Call("import_state", before).AsBool())
+                throw new InvalidOperationException("Crafting rollback failed; Gloot inventory state may be inconsistent.", failure);
+            if (failure != null)
+                GD.PushWarning("Crafting failed and was rolled back: " + failure);
             return false;
+        }
+
+        events.Publish(new("item_acquired", owner, "", recipe.Output, recipe.Count));
         events.Publish(new("crafted", owner, "", recipe.Id));
         return true;
     }
