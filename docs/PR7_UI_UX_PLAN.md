@@ -1,5 +1,5 @@
 # PR #7: Mobile UI and RPG experience overhaul
-Status: planning specification. The crafting regression fix is already implemented on this branch; Parts 1-4 below are **not yet implemented**. Keep the pull request in draft until all four parts and physical Galaxy S25 acceptance are completed.
+Status: Part 1 implementation is on this branch (shared theme, navigation/screen host, Character pilot and native regressions); automated build/render/APK verification and physical acceptance are tracked in the PR and `PR7_PART1_HANDOFF.md`. Parts 2-4 are **not yet implemented**. The crafting regression fix remains implemented. Keep the pull request in draft until all four parts and physical Galaxy S25 acceptance are completed.
 
 ## Goal and design priorities
 
