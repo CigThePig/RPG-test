@@ -36,6 +36,8 @@ Actual Galaxy S25 playtesting found an architectural/visual problem beyond the b
 
 ### Part 2 of 6 — Art direction, flexible screen host, and flagship Inventory
 
+**Detailed implementation blueprint:** [PR7_PART2_DESIGN.md](PR7_PART2_DESIGN.md). The document specifies the chosen responsive three-region layout, fallback compositions, actual two-slot equipment model, original ten-item icon plan, Godot architecture, touch/state behavior, test fixtures, visual review checkpoint and explicit non-goals. **This is design approval material, not a claim that Part 2 has been implemented.**
+
 **Outcome:** first polished RPG-quality vertical slice and definitive visual grammar for all subsequent screens.
 
 **Design checkpoint before full implementation:** provide annotated inventories at a standard S25 landscape viewport and at compact 900x560, with item/equipment/icon/selection/details states. Compare at least two compositions by density, thumb ergonomics and how many items fit; select one direction before scaling to other screens. Do not confuse an old mockup or an automated image with an accepted finished design.
