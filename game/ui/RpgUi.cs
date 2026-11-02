@@ -14,6 +14,9 @@ public partial class RpgUi : CanvasLayer
     ulong lastSystemBackAt;
     public Button ActionControl(string id) => actions[id];
     internal Rect2 StatusRect => health.GetGlobalRect();
+    internal Rect2 NoticeRect => message.GetGlobalRect();
+    internal bool NoticeVisible => message.Visible;
+    internal IEnumerable<Control> HotbarControls => hotbar.GetChildren().OfType<Control>().Where(c => c.IsVisibleInTree()).Append(Stick);
     internal Rect2? VerificationSafeArea { get; set; }
     public MobileCombatControls? CombatControls => hotbar as MobileCombatControls;
     Label health = null !, message = null !, title = null !;
@@ -195,8 +198,9 @@ public partial class RpgUi : CanvasLayer
         hotbar.Position = MobileLayout ? Vector2.Zero : new Vector2(size.X - 760, size.Y - 160);
         hotbar.Size = MobileLayout ? size : new Vector2(740, 140);
         Stick.Position = new Vector2(40, size.Y - 260);
+        // Desktop notices sit left of the hotbar instead of underneath its second row.
         message.Position = new Vector2(24, size.Y - 80);
-        message.Size = new Vector2(size.X - 48, 64);
+        message.Size = new Vector2(Math.Max(240, hotbar.Position.X - 48), 64);
         metrics.Position = new Vector2(size.X - 480, 100);
         if (hotbar is MobileCombatControls mobile)
         {
@@ -211,8 +215,12 @@ public partial class RpgUi : CanvasLayer
             health.Position=safe.Position+new Vector2(24,48);
             health.AutowrapMode=TextServer.AutowrapMode.WordSmart;
             health.Size=new Vector2(Math.Max(200,safe.Size.X-280),100);
-            message.Position=new Vector2(safe.Position.X+24,safe.End.Y-80);
-            message.Size=new Vector2(safe.Size.X-48,64);
+            // Keep notices in the bottom gap between the stick and Attack so the
+            // panel never covers a control or its touch feedback.
+            var attack = MobileCombatControls.Geometry(safe)["attack"];
+            float noticeLeft = pad.End.X + UiDesign.Gap, noticeRight = attack.Position.X - UiDesign.Gap;
+            message.Position=new Vector2(noticeLeft,safe.End.Y-80);
+            message.Size=new Vector2(Math.Max(160,noticeRight-noticeLeft),64);
             if(OS.HasFeature("android"))
                 foreach(var (id, button) in actions)
                 {
@@ -331,7 +339,16 @@ public partial class RpgUi : CanvasLayer
     double interactionEmphasisUntil;
     long interactionCheckTick = -1;
     bool defeatAnnounced, dialogueActive;
-    public void Notify(string text) { message.Text = text; message.Visible = !string.IsNullOrWhiteSpace(text); }
+    // Notices are transient so the world stays visible; the defeat notice persists
+    // while the player remains defeated because it names the only recovery path.
+    const ulong NoticeMilliseconds = 4500;
+    const string DefeatNotice = "Defeated · open the menu to load a save or start a new game";
+    ulong noticeUntil;
+    public void Notify(string text)
+    {
+        message.Text = text; message.Visible = !string.IsNullOrWhiteSpace(text);
+        noticeUntil = Time.GetTicksMsec() + NoticeMilliseconds;
+    }
     public void Update()
     {
         hotbar.Visible = !BlocksInput && !App.Narrative.Get("speaking").AsBool();
@@ -340,8 +357,11 @@ public partial class RpgUi : CanvasLayer
         bool defeated = !App.World.Player.Alive;
         if ((speaking && !dialogueActive) || (defeated && !defeatAnnounced)) CancelGestures();
         if (dialogueActive != speaking) { dialogueActive = speaking; SyncNavigation(); }
-        if (defeated && !defeatAnnounced) Notify("Defeated · open the menu to load a save or start a new game");
+        if (defeated && !defeatAnnounced) Notify(DefeatNotice);
+        // A restored or reset player must not keep the stale recovery instruction.
+        if (!defeated && defeatAnnounced && message.Text == DefeatNotice) message.Visible = false;
         defeatAnnounced = defeated;
+        if (message.Visible && !defeated && Time.GetTicksMsec() > noticeUntil) message.Visible = false;
         Stick.Visible = MobileLayout && !App.GameplayBlocked;
         if (App.GameplayBlocked) Stick.Cancel();
         marker.Visible=App.Trace.Active && !BlocksInput;
@@ -502,7 +522,7 @@ public partial class RpgUi : CanvasLayer
     {
         Clear(menu);
         var box = new VBoxContainer();
-        var scroll = new TouchScroll { SizeFlagsVertical = Control.SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, ScrollDeadzone = 12 };
+        var scroll = new TouchScroll { SizeFlagsVertical = Control.SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, VerticalScrollMode = ScrollContainer.ScrollMode.Reserve, ScrollDeadzone = 12 };
         scroll.GetVScrollBar().CustomMinimumSize = new Vector2(28,0);
         menu.AddChild(scroll);
         box.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;

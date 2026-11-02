@@ -16,7 +16,7 @@ public partial class UiScreenHost : PanelContainer
         BackButton = UiDesign.Action(header, "Back", back);
         BackButton.CustomMinimumSize = new Vector2(112, UiDesign.Target);
         Scroll = new TouchScroll { SizeFlagsVertical = SizeFlags.ExpandFill,
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, ScrollDeadzone = 12 };
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, VerticalScrollMode = ScrollContainer.ScrollMode.Reserve, ScrollDeadzone = 12 };
         Scroll.GetVScrollBar().CustomMinimumSize = new Vector2(28,0);
         column.AddChild(Scroll);
         Body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; Scroll.AddChild(Body);

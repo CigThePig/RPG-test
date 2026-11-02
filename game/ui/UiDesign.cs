@@ -25,6 +25,16 @@ public static class UiDesign
         theme.SetStylebox("focus", "Button", Box(new Color(0,0,0,0), new Color("ffdf8c"), 3));
         theme.SetColor("font_disabled_color", "Button", new Color("b6b8b0"));
         theme.SetConstant("separation", "VBoxContainer", Gap);
+        // ScrollContainer reserves the scrollbar's theme minimum width, not its
+        // CustomMinimumSize. Give the track a real 28px minimum so content is laid
+        // out beside the touch-draggable scrollbar instead of underneath it.
+        var track = new StyleBoxFlat { BgColor = new Color(0, 0, 0, .25f), ContentMarginLeft = 14, ContentMarginRight = 14,
+            CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8, CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8 };
+        theme.SetStylebox("scroll", "VScrollBar", track);
+        theme.SetStylebox("scroll_focus", "VScrollBar", track);
+        foreach (var (state, color) in new[] { ("grabber", new Color("71816c")), ("grabber_highlight", Bronze), ("grabber_pressed", Bronze) })
+            theme.SetStylebox(state, "VScrollBar", new StyleBoxFlat { BgColor = color,
+                CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8, CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8 });
         return theme;
     }
     public static Label Text(string text) => new()

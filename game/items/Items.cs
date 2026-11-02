@@ -111,7 +111,9 @@ public sealed class Items(Node service, EventStream events)
             failure = error;
         }
 
-        if (!produced)
+        // An exception after some generated items were added is never a success,
+        // even if the loop had not yet cleared its produced flag.
+        if (!produced || failure != null)
         {
             // Failed delivery, including a partially completed generated-item
             // batch, restores every affected stack and the original serial.

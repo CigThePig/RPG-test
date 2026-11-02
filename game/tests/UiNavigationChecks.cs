@@ -76,6 +76,9 @@ public static class UiNavigationChecks
                 Require(app.Ui.ScreenBack.Size.Y >= UiDesign.Target, "Back target minimum");
                 var scroll = app.Ui.FindChildren("*","ScrollContainer",true,false).OfType<TouchScroll>().First(s=>s.IsVisibleInTree());
                 Require(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page,"large text pilot scrolls");
+                var bar = scroll.GetVScrollBar().GetGlobalRect();
+                Require(scroll.GetChild<Control>(0).GetGlobalRect().End.X <= bar.Position.X + 1,
+                    $"{size} scroll content is laid out beside, not under, the touch scrollbar");
                 string prefix = app.Ui.MobileLayout ? "mobile-" : "";
                 Directory.CreateDirectory("docs/native-screenshots");
                 await app.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
@@ -83,6 +86,19 @@ public static class UiNavigationChecks
                 scroll.ScrollVertical = (int)scroll.GetVScrollBar().MaxValue; await Frames();
                 Require(app.Ui.ScreenRect.Encloses(app.Ui.ScreenBack.GetGlobalRect()), "Back stays reachable after scrolling");
                 app.Ui.Back();
+            }
+            // Notices must not cover gameplay controls at any supported viewport.
+            foreach(var size in new[]{new Vector2I(1280,800),new Vector2I(900,560)})
+            {
+                window.Size = size; await Frames();
+                var viewport = app.GetViewport().GetVisibleRect();
+                app.Ui.VerificationSafeArea = new Rect2(viewport.Position+new Vector2(60,28),viewport.Size-new Vector2(120,56));
+                app.ResumeGame(); app.Ui.Layout(); app.Ui.Notify("Layout notice"); await Frames();
+                Require(app.Ui.NoticeVisible, "notice is shown");
+                var notice = app.Ui.NoticeRect;
+                foreach (var control in app.Ui.HotbarControls.Where(c => c.IsVisibleInTree()))
+                    Require(!notice.Intersects(control.GetGlobalRect()), $"{size} notice clears control {control.Name}");
+                app.Ui.Notify("");
             }
         }
         finally
