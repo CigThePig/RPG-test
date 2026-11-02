@@ -10,6 +10,8 @@ public partial class RpgUi : CanvasLayer
     readonly Dictionary<string, Button> actions = new();
     readonly Dictionary<string, Button> navigationTargets = new();
     int layoutTraceFrames;
+    bool? lastSystemBackFromKey;
+    ulong lastSystemBackAt;
     public Button ActionControl(string id) => actions[id];
     internal Rect2 StatusRect => health.GetGlobalRect();
     internal Rect2? VerificationSafeArea { get; set; }
@@ -140,7 +142,7 @@ public partial class RpgUi : CanvasLayer
     public override void _Input(InputEvent e)
     {
         if (e is InputEventKey key && key.Pressed && !key.Echo && (key.Keycode == Key.Escape || key.PhysicalKeycode == Key.Escape || key.Keycode == Key.Back))
-        { Back(); GetViewport().SetInputAsHandled(); return; }
+        { SystemBack(fromKey: true); GetViewport().SetInputAsHandled(); return; }
         // Hotbar touches are dispatched below for independent multitouch ownership.
         // Godot also synthesizes a mouse click for the same finger; consuming that
         // event prevents a second native Button.Pressed without disabling mouse
@@ -265,7 +267,21 @@ public partial class RpgUi : CanvasLayer
             GD.Print($"MOSSLIGHT_UI_TARGET version=1 id={id} x={center.X:0} y={center.Y:0}");
         }
     }
+    // Android delivers key/window Back through different queues; the paired
+    // event may arrive in the next frame. Coalesce only opposite delivery types.
+    public void SystemBack(bool fromKey = false)
+    {
+        ulong now = Time.GetTicksMsec();
+        if (lastSystemBackFromKey.HasValue && lastSystemBackFromKey.Value != fromKey && now - lastSystemBackAt < 250) return;
+        lastSystemBackFromKey = fromKey; lastSystemBackAt = now;
+        NavigateBack();
+    }
     public void Back()
+    {
+        lastSystemBackFromKey = null;
+        NavigateBack();
+    }
+    void NavigateBack()
     {
         CancelGestures();
         navigation.Back(App.Narrative.Get("speaking").AsBool(), App.World.Player.Alive);
@@ -278,6 +294,7 @@ public partial class RpgUi : CanvasLayer
     }
     void ConfirmNewGame()
     {
+        lastSystemBackFromKey = null;
         CancelGestures(); navigation.Confirm(); Clear(confirmation);
         var box = new VBoxContainer(); confirmation.AddChild(box);
         box.AddChild(UiDesign.Text("Start a new game? Unsaved progress will be lost. Saved slots are retained."));
@@ -299,6 +316,7 @@ public partial class RpgUi : CanvasLayer
     bool Open(string heading)
     {
         if (navigation.Confirmation || App.Narrative.Get("speaking").AsBool()) return false;
+        lastSystemBackFromKey = null;
         CancelGestures(); navigation.Open(heading); panel.Present(heading); SyncNavigation(); return true;
     }
 
@@ -365,10 +383,11 @@ public partial class RpgUi : CanvasLayer
 
     public void PauseForVerification()
     {
+        lastSystemBackFromKey = null;
         CancelGestures(); navigation.Pause(); SyncNavigation();
     }
-    public void HideMenu() { CancelGestures(); navigation.Resume(); SyncNavigation(); }
-    public void ClosePanels() { CancelGestures(); navigation.Resume(); SyncNavigation(); }
+    public void HideMenu() { lastSystemBackFromKey = null; CancelGestures(); navigation.Resume(); SyncNavigation(); }
+    public void ClosePanels() { lastSystemBackFromKey = null; CancelGestures(); navigation.Resume(); SyncNavigation(); }
     public void Inventory()
     {
         if (App.Narrative.Get("speaking").AsBool()) return;

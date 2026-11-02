@@ -56,7 +56,9 @@ public static class UiNavigationChecks
             app.Ui.PauseForVerification(); await Frames();
             var newGame = app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="New game");
             Tap(newGame); await Frames(); Require(app.Ui.Navigation.Confirmation && !app.Ui.MenuOpen,"confirmation hides lower menu");
-            app.Ui.Back(); await Frames(); Require(app.Ui.MenuOpen && !app.Ui.Navigation.Confirmation,"Back cancels confirmation");
+            Input.ParseInputEvent(new InputEventKey { Keycode=Key.Back, Pressed=true });
+            app._Notification((int)Node.NotificationWMGoBackRequest);
+            await Frames(); Require(app.Ui.MenuOpen && !app.Ui.Navigation.Confirmation,"Android key plus window notification cancels confirmation exactly once");
             app.Ui.Character();
             app._Notification((int)Node.NotificationApplicationFocusOut);
             app._Notification((int)Node.NotificationApplicationFocusIn); await Frames();

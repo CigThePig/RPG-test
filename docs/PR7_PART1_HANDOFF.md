@@ -27,7 +27,7 @@ Implementation-source workflow entry points (final run URLs/status are recorded 
 
 ## Android smoke adaptation
 
-The first APK built successfully, but the old Android smoke test tapped a fixed Resume coordinate that now belongs to Pack. It also assumed New Game had no confirmation. The follow-up reports actual physical navigation-button centers after Container layout, consumes these in OS-touch smoke, verifies Android Back cancels the destructive modal, and explicitly confirms reset. Production gameplay and button geometry are unchanged by this test adaptation. Use the final PR head's APK and workflow links, not an earlier build.
+The first APK built successfully, but the old Android smoke test tapped a fixed Resume coordinate that now belongs to Pack. It also assumed New Game had no confirmation. The follow-up reports actual physical navigation-button centers after Container layout, consumes these in OS-touch smoke, verifies Android Back cancels the destructive modal, and explicitly confirms reset. The real Android test then exposed duplicate key/window Back delivery. SystemBack coalesces opposite key/window deliveries within 250 ms, including cross-frame queued input; the native rendered regression injects both deliveries and requires exactly one modal dismissal. Production gameplay and button geometry are unchanged. Use the final PR head's APK and workflow links, not an earlier build.
 
 ## Boundaries and phone acceptance
 

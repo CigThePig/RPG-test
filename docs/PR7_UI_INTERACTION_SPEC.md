@@ -35,7 +35,7 @@ Priority: dialogue > confirmation > pause menu > information screen > gameplay. 
 - Opening/replacing/closing screens, confirmations, menu, dialogue, defeat, lifecycle pause and layout changes cancel pending action touches, joystick, scrolling gestures, TouchMovement and dodge. Orphan action releases never dispatch.
 - TouchScroll owns swipes that begin over rows, suppresses emulated clicks, and activates only an uncanceled release inside the original row. Its existing scrollbar, slider and option-selector exceptions remain native.
 - Pilot Back stays outside the scroll surface. It receives initial keyboard focus. Native Godot tab/directional traversal follows visual insertion order; a bronze focus outline is visible. Confirmation Cancel receives initial focus. No required pilot information needs hover.
-- Back is handled in the UI input stage before gameplay shortcuts; WMGoBackRequest uses the same coordinator. `config/quit_on_go_back=false` prevents Android from exiting instead.
+- Back is handled in the UI input stage before gameplay shortcuts; WMGoBackRequest uses the same coordinator. `config/quit_on_go_back=false` prevents Android from exiting instead. Android may deliver both a key event and WMGoBackRequest for one press; SystemBack coalesces opposite key/window delivery types within 250 ms (they can cross frame queues), so one physical press cannot pop the confirmation and then resume the menu beneath it. Explicit navigation resets the pair guard, same-source repeated Back remains available, and visible button/programmatic Back remains independent.
 
 ## Layout and accessibility tokens
 
