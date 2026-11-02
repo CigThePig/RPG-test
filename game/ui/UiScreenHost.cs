@@ -8,6 +8,7 @@ public partial class UiScreenHost : PanelContainer
     public Button BackButton { get; private set; } = null!;
     Label heading = null!;
     public TouchScroll Scroll { get; private set; } = null!;
+    MarginContainer customHost = null!;
     public void Build(Action back)
     {
         var column = new VBoxContainer(); AddChild(column);
@@ -19,6 +20,9 @@ public partial class UiScreenHost : PanelContainer
             HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, VerticalScrollMode = ScrollContainer.ScrollMode.Reserve, ScrollDeadzone = 12 };
         Scroll.GetVScrollBar().CustomMinimumSize = new Vector2(28,0);
         column.AddChild(Scroll);
+        customHost = new MarginContainer { Name = "custom_content", Visible = false,
+            SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        column.AddChild(customHost);
         Body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; Scroll.AddChild(Body);
     }
     int restoreScroll = -1, restoreFrames;
@@ -27,8 +31,24 @@ public partial class UiScreenHost : PanelContainer
         // Rebuilt content is laid out next frame; restore the position once it exists.
         restoreScroll = keepScroll ? Scroll.ScrollVertical : -1; restoreFrames = 2;
         Scroll.CancelGesture(); Scroll.ScrollVertical = 0;
+        ClearCustom(); customHost.Hide(); Scroll.Show();
         foreach (var child in Body.GetChildren()) { Body.RemoveChild(child); child.QueueFree(); }
         heading.Text = title; Show(); BackButton.GrabFocus();
+    }
+    public void MountCustom(Control screen)
+    {
+        ClearCustom();
+        Scroll.CancelGesture();
+        Scroll.Hide();
+        customHost.Show();
+        screen.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+        screen.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        customHost.AddChild(screen);
+        restoreScroll = -1;
+    }
+    void ClearCustom()
+    {
+        foreach (var child in customHost.GetChildren()) { customHost.RemoveChild(child); child.QueueFree(); }
     }
     public override void _Process(double delta)
     {
