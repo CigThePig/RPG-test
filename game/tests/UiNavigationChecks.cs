@@ -35,9 +35,16 @@ public static class UiNavigationChecks
         try
         {
             app.Ui.PauseForVerification(); await Frames();
-            var character = app.Ui.FindChildren("*", "Button", true, false).OfType<Button>().First(b=>b.Text=="Character");
-            var menuScroll = app.Ui.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>().First(s=>s.IsVisibleInTree());
-            var pack = app.Ui.FindChildren("*", "Button", true, false).OfType<Button>().First(b=>b.Text=="Pack");
+            // Resolve the real menu controls by their stable IDs. Mobile HUD
+            // utilities also contain Character/Pack-labelled buttons, but they
+            // are not descendants of the pause-menu scroll surface.
+            var character = app.Ui.FindChild("menu_character", true, false) as Button
+                ?? throw new InvalidOperationException("Missing menu_character");
+            var pack = app.Ui.FindChild("menu_pack", true, false) as Button
+                ?? throw new InvalidOperationException("Missing menu_pack");
+            var menuScroll = app.Ui.FindChildren("*", "ScrollContainer", true, false)
+                .OfType<TouchScroll>().First(s => s.IsVisibleInTree() &&
+                    s.IsAncestorOf(character) && s.IsAncestorOf(pack));
             // Real Android swipe regression: a drag beginning over a row must not
             // leave that row dark/focused or activate it. Repeat on a second row
             // because the device failure moved the stuck state between buttons.
