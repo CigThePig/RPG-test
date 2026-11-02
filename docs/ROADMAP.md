@@ -45,3 +45,12 @@ Part 3 is implemented and verified on runtime `488174f7a0835584cf5059cb65e9e9b3c
 Dungeon mechanisms (follow-up): the grammar's Lever and Puzzle nodes are now physical lever-raised portcullis shortcuts and brazier-ring light seals, saved, rendered, mapped and exercised by real-input and normal-health adventure runs. See [DUNGEON_MECHANISMS.md](DUNGEON_MECHANISMS.md).
 
 Part 4 implementation connects The Buried Light to ordered stages, contextual return/hand-in dialogue, confirmed/pending Gloot rewards, saved room discovery/map knowledge, optional lore/supply cache and once-only room-aware eight-enemy pacing. See [PR5_PART4_HANDOFF.md](PR5_PART4_HANDOFF.md) for actual verification status. PR #5 remains draft for final checks and physical S25 acceptance. Future content should extend these contracts, not introduce parallel mission, inventory or quest stores.
+
+## PR #7 — Mobile UI and RPG experience overhaul
+
+The design package for all four UX milestones (design system, mockups and an implementation guide per part) is in [docs/ui/README.md](ui/README.md). Implementers should follow the guides and record actual results in `docs/PR7_PARTn_HANDOFF.md`.
+
+- [ ] Part 1: UI design system and navigation — [guide](ui/PART1_FOUNDATION.md)
+- [ ] Part 2: Gameplay HUD and mobile controls — [guide](ui/PART2_HUD.md)
+- [ ] Part 3: RPG screens (Adventurer's Book) — [guide](ui/PART3_SCREENS.md)
+- [ ] Part 4: Dialogue, pause/settings, accessibility and verification — [guide](ui/PART4_DIALOGUE_SETTINGS_VERIFICATION.md)
