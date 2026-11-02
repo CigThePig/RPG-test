@@ -1,3 +1,123 @@
+# PR #7: Complete RPG Interface Redesign
+**Revised canonical plan (v2) | 2 November 2026 | Target: `feat/mobile-ui-ux-overhaul` -> `main`**
+
+> **Scope reset, not a code reset.** The original four implementation parts are retained unchanged in history as **new Part 1: Functional UI foundation**. All shipped code, safeguards, source references, tests and previous handoffs remain valid as historical records. New Parts 2–6 are planned and **are not implemented**. PR #7 stays **draft and unmerged** until visual and physical-device acceptance. Part 1 has outstanding Galaxy S25 issues, including swipe/highlight behavior under verification, and is not considered phone-accepted.
+
+## Why the plan changed
+
+Actual Galaxy S25 playtesting found an architectural/visual problem beyond the button-focus defect. The pack screen is a generic scrolling stack of identical buttons, labels and cards. Equipment lacks a paper-doll or recognizable gear slots; three backpack stacks already require scrolling because oversized action buttons occupy the viewport. The same structural problem affects Character, Journal, Map and menus. The initial Part 1–4 work created sound functional contracts, **not the final player-facing RPG experience**.
+
+`UiScreenHost` currently exposes one vertically scrolling `VBoxContainer` to every information screen; `UiDesign.Action/Card/Tabs` amplify that uniformity. **Keep the input/navigation/data contracts but permit every screen to own its layout.** Rebuild presentation, not gameplay state.
+
+**New success criterion:** Mosslight looks and behaves like a coherent mobile-first fantasy action RPG with visually distinct inventory, character, journal, map and merchant experiences. A screenshot should communicate what the player owns, can do and is exploring before they read a paragraph.
+
+## Design principles and non-negotiable contracts
+
+1. **Screen purpose determines layout.** Reuse design tokens, navigation, controls and components, not a one-column layout. Preserve a common header/Back and confirmation model, but give Inventory, Character, Journal and Map their own spatial composition.
+2. **Visual objects, not document forms.** Equipment should occupy recognizable slots, backpack items should have consistent icons or silhouettes, actions appear beside the currently selected object. Keep item names, quantities and stat changes legible alongside iconography.
+3. **Mobile landscape first.** Design for the actual Galaxy S25 plus 1280x720, 1280x800, 1920x864, 1024x768 and 900x560 logical viewports, nonzero safe-area insets and text scales 1.0–1.4. Choose adaptive arrangements rather than simply shrinking controls or forcing horizontal scroll.
+4. **Fantasy identity, restrained execution.** Mosslight’s overgrown-ruins/forest palette, stone/bronze framing, subtle parchment-like panels and readable pixel-world-friendly item imagery. Avoid copying another game's art, oversaturated rarity glows, excessive decorations, generic admin-dashboard cards, or bespoke effects that conflict with the world.
+5. **Shared art pipeline.** First check existing item data, procedural/world art and available licensed assets. Introduce a small deterministic, cached item icon/portrait/slot visual pipeline where needed. Draw a clear icon even when an item has no bespoke asset. Avoid per-frame asset regeneration and large texture allocations.
+6. **Touchable and understandable.** One tap selects an item, explicit buttons invoke destructive/equipment actions, swipe scrolls without selection, Back behaves consistently, no hidden essential long-press/double-tap actions. Selected vs focused vs pressed must be visually distinct; disabled controls must explain why.
+7. **No gameplay fork.** `World`, `Foundation`, Gloot/`Items`, `Narrative.gd`, `RegionState`, persistence and skill rules remain authoritative. No parallel inventory, stat cache, quest progress, merchant stock or unapproved world-save migrations.
+8. **Preserve integration contracts.** Stable action IDs and `RpgUi` compatibility methods, multitouch ownership, touch cancellation, Android Back deduplication, combat hit/miss semantics, save-slot protections, craft/trade atomicity, accessibility preferences and visual/headless CI checks all remain in force.
+9. **Measure usability visually and physically.** Passing tests is necessary, not sufficient. Each Part 2–5 feature receives representative landscape screenshots at two scales and an Android APK playtest checklist. No acceptance purely from simulated screenshots.
+10. **Incrementally replace, never strand the player.** Each new screen must be usable from the existing menu and maintain all current gameplay actions during migration. Preserve old functionality until the new view covers it; avoid reworking gameplay mechanics under cover of UI design.
+
+## Roadmap and acceptance
+
+### Part 1 of 6 — Functional foundations (original Parts 1–4; implementation already exists)
+
+**Completed engineering scope:** responsive safe-area hosting, navigation and modal/back ownership; gesture cancellation; HUD and contextual interaction; Gloot-backed pack/equip/crafting/trade; character progression, structured quests and explored map; player/developer menu separation; dialogue, save/load validation, settings and accessibility; transaction/save safety and verification.
+
+**Historical crosswalk:** old Part 1 = new Part 1A (navigation/design tokens); old Part 2 = new Part 1B (HUD/controls); old Part 3 = new Part 1C (functional RPG screens); old Part 4 = new Part 1D (dialogue/menu/settings/a11y). Keep `PR7_PART1_HANDOFF.md` through `PR7_PART4_HANDOFF.md` unchanged as records of the original milestones.
+
+**Remaining acceptance:** resolve device-reported touchscreen defects (notably menu-row dark/stuck state), run final-source source/build/visual checks, and establish an accepted foundation baseline on the physical S25. Completion of the original coding does not imply completion of device acceptance.
+
+### Part 2 of 6 — Art direction, flexible screen host, and flagship Inventory
+
+**Outcome:** first polished RPG-quality vertical slice and definitive visual grammar for all subsequent screens.
+
+**Design checkpoint before full implementation:** provide annotated inventories at a standard S25 landscape viewport and at compact 900x560, with item/equipment/icon/selection/details states. Compare at least two compositions by density, thumb ergonomics and how many items fit; select one direction before scaling to other screens. Do not confuse an old mockup or an automated image with an accepted finished design.
+
+**Implementation:**
+- Separate a shared safe-area/header/back/modal shell from per-screen layout: `UiScreenHost` must no longer force every screen into one scrollable `VBoxContainer`. Support independently scrollable list/grid regions and fixed inspection/actions regions.
+- Create reusable visual primitives: framed slots, generated item icon presentation with fallback, selected/hover/focus/pressed states, text hierarchy, stat deltas, compact action group, item quantity overlays and small contextual hints. Prefer reusable Godot `Control` nodes and cached textures.
+- Landscape inventory composition: identifiable **equipment/character** region, **backpack grid/list** region and **persistent selected-item inspection/action** region. A reasonable starting allocation is roughly 28% / 40% / 32%; adjust to actual layout/safe areas, not arbitrary pixel constants.
+- A selected item shows name, condition/quality/material when available, description/stats, equipped-vs-candidate comparisons, and context-specific Use/Equip/Unequip, with clear disabled reasons. Do not allocate giant Unequip buttons under every equipped slot.
+- Keep currency and capacity/stack summary compact and discoverable. Represent the existing actual item instances, quantity and gear slots; do not invent inventory size or item art as gameplay facts.
+- Existing Craft/Trade remain functional during this vertical slice and will receive their final treatment in Part 5. Make their navigation unambiguous without dedicating most of the inventory viewport to permanent large tabs.
+- On compact views: adapt pane placement, use an inspector sheet/page if necessary, and preserve inventory context when returning. No horizontal overflow; no forced tiny touch targets.
+- Preserve automatic updates after item transactions/load and keep the existing `Items` transaction path. Ensure scrolling does not click rows or leave visual selection stuck.
+
+**Acceptance:** screenshot review of populated and empty inventory, selected gear/consumable/currency, comparison, full pack, long names, larger text and two aspect ratios; functional touch tests for open, select, scroll, equip/unequip/use, cancel, swap and scroll restore; Android frame/memory sanity; no save or transaction regressions.
+
+### Part 3 of 6 — Character identity, readable attributes and progression
+
+**Outcome:** Character should feel like inspecting and improving a hero, not reading a debug dump.
+
+- Dedicated layout with a prominent live or cached **Procedural Pixel Creatures** character preview, identity/class/level summary and equipment context. Reuse existing creature rendering pipeline when feasible, with a robust/static fallback if expensive or unavailable; never change actor data simply to render a preview.
+- Clear grouped attributes and effective/base/equipment/training values using existing `CharacterOverview.Breakdown` and world authority.
+- Skills/abilities presented as purposeful entries with learned/locked/available states, costs, and reasons; explicit confirmation for irreversible training.
+- Gear/stat comparison makes changes obvious with numbers and signs, not just colour. Current abilities and future unlocks must not be confused.
+- Responsive tab/pane compositions, legible text scaling, controlled focus and no huge list of every stat followed by giant buttons.
+
+**Acceptance:** first-level and progressed character, available/blocked skills, equipped and unequipped appearances, portrait performance, confirmations, phone accessibility, no double spend, save/load consistency.
+
+### Part 4 of 6 — Quest Journal and Exploration Map
+
+**Outcome:** two distinct, information-rich RPG experiences rather than generic scroll cards.
+
+**Journal:** quest index grouped by status and a persistent selected-quest reading area with current objective, stage history, reward and relevant lore/discoveries. Clearly distinguish active vs available/complete, hide unknown future stage spoilers, and preserve quest selection while switching and returning.
+
+**Map:** map canvas dominates the screen. Overlay compact title, player location, exploration controls/zoom and a collapsible legend/discoveries drawer rather than a lengthy text list ahead of or below the map. Use only `RegionState` explored tiles, landmarks, mechanisms and known entrance/objective facts; never reveal hidden rooms.
+
+**Acceptance:** active/completed/locked journal states; map in Reach and partially discovered ruins; map markers and fog integrity; readable controls at small sizes; touch scrolling/zoom, Back, pause/resume and no unexplored information leakage.
+
+### Part 5 of 6 — Crafting, Merchants and full-shell coherence
+
+**Outcome:** all remaining player-facing screens share the new art direction without having the same layout.
+
+- **Crafting:** recipe collection, materials owned/required and item-result preview; actions and blockers visible at a glance. Keep exact transactional rollback and full-pack behavior.
+- **Trading:** merchant identity and inventory, prices, owned crowns and selected purchase preview; trade should be context-aware instead of a visually dominant always-on Pack tab. Preserve any existing reachable merchant workflows until their replacements work.
+- **Pause menu:** prioritize Resume, Pack, Character, Journal and Map; secondary Save/load, Settings, New game and Quit should read as secondary; Developer tools must stay available but deliberately separated.
+- **Save/load and Settings:** readable compact summaries and grouped options; irreversible actions keep explicit confirmation and backup protections. Accessibility preferences apply to new controls, not just original buttons.
+- **Dialogue:** fit the same art direction and respect Dialogue Manager's actual narrative state, safe areas, response focus, input capture and interruptions. The interface should not block the visible speaker/required choice or show gameplay actions.
+- Replace unnecessary full-height forms and oversized buttons across these surfaces while keeping every existing command accessible.
+
+**Acceptance:** complete recipe and purchase transaction scenarios, no action-leaking during dialogue or modal transitions, corrupted/incompatible saves protected, settings persistent, all labels readable and screens visually coherent.
+
+### Part 6 of 6 — System polish, regression and final S25 acceptance
+
+**Outcome:** a coherent finished UI, not merely six separately attractive screen builds.
+
+- Audit every gameplay and overlay transition, including menu-to-screen-to-Back, direct HUD opens, modal cancellation, Android Back key/window pairing, activity pause/resume, defeat/recovery, fast repeated taps, two-finger gestures and menu drag across buttons.
+- Integrate pressed/selected/focus feedback and subtle optional transitions; honor reduced motion and high contrast. Ensure fixed controls and notification/HUD do not hide required telegraphs.
+- Run `dotnet build`, import, headless integration, desktop visual, `--mobile-ui` visual and relevant gameplay/adventure smoke checks; verify Android APK generated at the **exact final commit**. Do not erase preexisting assertions to make the redesign pass.
+- Automated screenshots at 1280x720, 1280x800, 1920x864, 1024x768 and 900x560, with nonzero insets, standard/large text, selected/unselected and empty/full states. Review screenshots for hierarchy, clipping, visible item count and contrasts, not merely bounds checks.
+- **Physical Galaxy S25 release gate:** personally inspect inventory/item selection and swipe, equipment/stats, character progression, journal navigation, map panning/zoom, crafting/trading, dialogue, save/load, Android Back, interruption, one complete The Buried Light progression, frame rate and touch comfort. Record observations and fix high-severity regressions before merge.
+
+## Engineering implementation boundaries
+
+- Keep the old functional screens alive behind a migration boundary until a replacement passes its acceptance gate; choose stable names/IDs or update callsites/tests as part of the same focused step.
+- Treat `UiDesign` as design tokens/components, not a reason to render every datum as a button. Keep `TouchScroll` isolated to genuinely scrollable subregions.
+- Stable `RpgUi.Inventory/Character/Journal/Map/SaveLoad/Settings/Back` and other external interfaces stay available. Preserve `UiNavigation` authority and `MobileCombatControls` geometry unless a separately reviewed ergonomic adjustment is warranted.
+- Item icon generation, creature portrait rendering and map drawing must be cache-aware, deterministic when using data-driven procedural art and resilient to missing/unknown items.
+- Avoid introducing costly dependencies or external assets without explicit licensing, attribution and Android packaging review. The game should remain runnable offline.
+- Preserve all gameplay and progression authority, save formats, action semantics and existing quest access, especially *The Buried Light*. Do not let visual refactoring become a gameplay overhaul.
+
+## Evidence and work discipline
+
+For each new part: maintain a design note/wireframe or screenshot references; scope code changed and preserve authority; add/adjust purposeful tests; run available GitHub workflows; record commit SHAs and Android artifact status; document physical-device findings separately from emulated success. Keep PR #7 in **draft** throughout. New part numbers refer to this revised plan; historical handoffs retain their original numbering and must not be rewritten as if those milestones had been redesigned already.
+
+---
+
+## Appendix: preserved original four-part plan (historical baseline)
+
+The text below is intentionally retained verbatim for traceability. Its Parts 1–4 correspond to **new Part 1A–1D**, not the newly planned Parts 2–6. It documents the previously implemented functional milestones and historical acceptance evidence, not the current final release criteria.
+
+---
+
 # PR #7: Mobile UI and RPG experience overhaul
 Status: All four parts are implemented on this branch (Part 1: theme, navigation/screen host, Character pilot; Part 2: gameplay HUD, structured objective, contextual Interact; Part 3: Pack/crafting/trading, progression, Journal, Map; Part 4: themed dialogue, Save & load with slot states and confirmations, persistent UI settings, developer/player menu split, accessibility verification). Automated verification is recorded in `PR7_PART1_HANDOFF.md` … `PR7_PART4_HANDOFF.md` and the PR. **Physical Galaxy S25 acceptance remains pending and is the release gate.** The crafting regression fix remains implemented. Keep the pull request in draft until that acceptance is recorded.
 
