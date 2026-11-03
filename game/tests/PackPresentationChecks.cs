@@ -171,6 +171,8 @@ public static class PackPresentationChecks
                 (ui.PackSelection ?? "(null)") + " tint=" + tile.Modulate +
                 " focused=" + tile.HasFocus() + " hit=" + scroll.GetGlobalRect().HasPoint(at) +
                 " at=" + at + " scroll=" + scroll.GetGlobalRect() +
+                " visible=" + scroll.IsVisibleInTree() + " events=" + scroll.DiagnosticEvents +
+                " nativeTargets=" + scroll.DiagnosticNativeTargets +
                 " touches=" + scroll.DiagnosticTouches + " swipes=" + scroll.DiagnosticSwipes +
                 " focusReleased=" + scroll.DiagnosticFocusReleases +
                 " scrollY=" + scroll.ScrollVertical);

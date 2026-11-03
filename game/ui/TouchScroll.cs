@@ -13,6 +13,8 @@ public partial class TouchScroll : ScrollContainer
     // Sweep that late focus during the following frames of a touch swipe.
     int clearSwipeFocusFrames;
     // Verification counters to distinguish missing touch ownership from late focus.
+    internal int DiagnosticEvents { get; private set; }
+    internal int DiagnosticNativeTargets { get; private set; }
     internal int DiagnosticTouches { get; private set; }
     internal int DiagnosticSwipes { get; private set; }
     internal int DiagnosticFocusReleases { get; private set; }
@@ -35,6 +37,7 @@ public partial class TouchScroll : ScrollContainer
     }
     public override void _Input(InputEvent e)
     {
+        if(e is InputEventScreenTouch) DiagnosticEvents++;
         if(!IsVisibleInTree()){CancelGesture();suppressMouse=false;mouseReleaseGraceFrames=0;return;}
         // Native scrollbar/slider/popup gestures keep their mouse input even when
         // their drag moves across ordinary rows.
@@ -85,6 +88,7 @@ public partial class TouchScroll : ScrollContainer
                 // must receive native GUI events rather than being treated as menu buttons.
                 if(NativeTouchTarget(touch.Position))
                 {
+                    DiagnosticNativeTargets++;
                     nativeFinger=touch.Index;nativeMouseGraceFrames=0;
                     suppressMouse=false;return;
                 }
