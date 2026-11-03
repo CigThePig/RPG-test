@@ -157,14 +157,20 @@ public static class PackPresentationChecks
                 "bag tiles have exactly one scrolling owner");
             scroll!.EnsureControlVisible(tile!);await Frames();
             Vector2 at=tile!.GetGlobalRect().GetCenter(), end=at-new Vector2(0,78);
+            // ParseInputEvent enters the native window/input pipeline, not the
+            // CanvasLayer's logical coordinate space. Under canvas_items stretch
+            // a 900x560 Window does NOT use the same coordinates as GlobalRect.
+            // Android target tracing uses this identical logical-to-screen map.
+            var toScreen = app.GetViewport().GetScreenTransform();
+            Vector2 touchAt = toScreen * at, touchEnd = toScreen * end;
             Input.ParseInputEvent(new InputEventMouseButton {
-                Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=at });
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=47,Pressed=true,Position=at});
+                Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=touchAt });
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=47,Pressed=true,Position=touchAt});
             Input.ParseInputEvent(new InputEventMouseButton {
-                Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=at});
+                Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=touchAt});
             tile.GrabFocus();
-            Input.ParseInputEvent(new InputEventScreenDrag {Index=47,Position=end,Relative=end-at});
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=47,Pressed=false,Position=end});
+            Input.ParseInputEvent(new InputEventScreenDrag {Index=47,Position=touchEnd,Relative=touchEnd-touchAt});
+            Input.ParseInputEvent(new InputEventScreenTouch {Index=47,Pressed=false,Position=touchEnd});
             await Frames();
             Require(ui.PackSelection==null && tile.Modulate==Colors.White && !tile.HasFocus(),
                 "dragging a tile never selects, activates or leaves it dark/focused; selector=" +
