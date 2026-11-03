@@ -9,6 +9,9 @@ public partial class TouchScroll : ScrollContainer
     int initialScroll;
     bool dragging, suppressMouse;
     int mouseReleaseGraceFrames, nativeMouseGraceFrames;
+    // Godot may assign native Button focus after this scroll's _Input handler.
+    // Sweep that late focus during the following frames of a touch swipe.
+    int clearSwipeFocusFrames;
     Button? pressed;
     bool NativeTouchTarget(Vector2 position) =>
         GetVScrollBar().GetGlobalRect().HasPoint(position) ||
@@ -18,6 +21,7 @@ public partial class TouchScroll : ScrollContainer
     public void CancelGesture()
     {
         Cancel();
+        clearSwipeFocusFrames = 0;
         nativeFinger=-1;nativeMouseGraceFrames=0;
     }
     void Cancel()
@@ -101,19 +105,34 @@ public partial class TouchScroll : ScrollContainer
                 // A swipe is not a button selection. Clear any focus assigned by
                 // the touchscreen's native/emulated GUI path, but preserve focus on
                 // controls outside this scroll area (e.g. the fixed Back button).
-                var focus=GetViewport().GuiGetFocusOwner();
-                if(focus!=null && IsAncestorOf(focus))focus.ReleaseFocus();
+                ClearSwipeFocus();
+                // Keep guarding for late assignment by the native GUI queue,
+                // including release-order races with emulated mouse events.
+                clearSwipeFocusFrames = 4;
             }
             if(dragging)
             {
                 if(GodotObject.IsInstanceValid(pressed))pressed!.Modulate=Colors.White;
+                ClearSwipeFocus();
                 ScrollVertical=(int)Math.Clamp(initialScroll+start.Y-drag.Position.Y,0,Math.Max(0,GetVScrollBar().MaxValue-GetVScrollBar().Page));
             }
             GetViewport().SetInputAsHandled();
         }
     }
+    void ClearSwipeFocus()
+    {
+        // Never release the fixed Back button or focus elsewhere in the UI.
+        var focus = GetViewport().GuiGetFocusOwner();
+        if (focus != null && IsAncestorOf(focus)) focus.ReleaseFocus();
+        if (GodotObject.IsInstanceValid(pressed) && pressed!.HasFocus()) pressed.ReleaseFocus();
+    }
     public override void _Process(double delta)
     {
+        if (clearSwipeFocusFrames > 0)
+        {
+            ClearSwipeFocus();
+            --clearSwipeFocusFrames;
+        }
         // Covers the release-order race without swallowing a future, unrelated
         // emulated click. Genuine desktop mouse input is never suppressed.
         if(finger<0 && mouseReleaseGraceFrames>0 && --mouseReleaseGraceFrames==0)
