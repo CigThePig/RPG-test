@@ -170,7 +170,10 @@ public static class PackPresentationChecks
                 "dragging a tile never selects, activates or leaves it dark/focused; selector=" +
                 (ui.PackSelection ?? "(null)") + " tint=" + tile.Modulate +
                 " focused=" + tile.HasFocus() + " hit=" + scroll.GetGlobalRect().HasPoint(at) +
-                " at=" + at + " scroll=" + scroll.GetGlobalRect());
+                " at=" + at + " scroll=" + scroll.GetGlobalRect() +
+                " touches=" + scroll.DiagnosticTouches + " swipes=" + scroll.DiagnosticSwipes +
+                " focusReleased=" + scroll.DiagnosticFocusReleases +
+                " scrollY=" + scroll.ScrollVertical);
         }
         finally
         {
