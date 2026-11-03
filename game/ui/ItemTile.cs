@@ -13,7 +13,7 @@ public partial class ItemTile : Button
     {
         Item = item;
         Name = "item_" + item.Selector.ToLowerInvariant().Replace(':', '_');
-        CustomMinimumSize = new Vector2(78 * scale, 104 * scale);
+        CustomMinimumSize = new Vector2(78 * scale, 90 * scale);
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         MouseFilter = MouseFilterEnum.Pass;
         FocusMode = FocusModeEnum.All;
@@ -42,13 +42,34 @@ public partial class ItemTile : Button
         content.AddChild(title);
         if (item.Count > 1)
         {
+            // Quantity is a corner badge, not a third line that steals the
+            // item name's height at 140% text scale on a compact phone.
+            var badge = new PanelContainer { Name = "quantity_badge",
+                MouseFilter = MouseFilterEnum.Ignore };
+            badge.AddThemeStyleboxOverride("panel", new StyleBoxFlat {
+                BgColor = UiDesign.HighContrast ? new Color("0b1312") : new Color("20332e"),
+                BorderColor = UiDesign.Border,
+                BorderWidthLeft = 1, BorderWidthTop = 1, BorderWidthRight = 1, BorderWidthBottom = 1,
+                CornerRadiusTopLeft = 5, CornerRadiusTopRight = 5,
+                CornerRadiusBottomLeft = 5, CornerRadiusBottomRight = 5,
+                ContentMarginLeft = 3, ContentMarginRight = 3,
+                ContentMarginTop = 0, ContentMarginBottom = 0
+            });
+            AddChild(badge);
+            badge.SetAnchorsAndOffsetsPreset(LayoutPreset.TopRight);
+            badge.OffsetLeft = -43 * scale;
+            badge.OffsetRight = -3 * scale;
+            badge.OffsetTop = 3 * scale;
+            badge.OffsetBottom = 25 * scale;
             var amount = new Label {
-                Text = "×" + item.Count, HorizontalAlignment = HorizontalAlignment.Right,
+                Text = "×" + item.Count,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
                 MouseFilter = MouseFilterEnum.Ignore
             };
-            amount.AddThemeFontSizeOverride("font_size", (int)(15 * scale));
+            amount.AddThemeFontSizeOverride("font_size", (int)(13 * scale));
             amount.AddThemeColorOverride("font_color", UiDesign.Ink);
-            content.AddChild(amount);
+            badge.AddChild(amount);
         }
     }
 

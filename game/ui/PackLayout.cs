@@ -102,22 +102,24 @@ public partial class PackLayout : VBoxContainer
                 SizeFlagsHorizontal = SizeFlags.ShrinkEnd };
             switcher.AddThemeConstantOverride("separation", 6);
             summary.AddChild(switcher);
-            var backpack = UiDesign.Action(switcher, state.GearOpen ? "Backpack" : "[Backpack]", () =>
+            var backpack = UiDesign.Action(switcher, state.GearOpen ? "Bag" : "[Bag]", () =>
             {
                 state.GearOpen = false; state.DetailOpen = false; UpdateVisibility();
-                switcher.GetChild<Button>(0).Text = "[Backpack]";
-                switcher.GetChild<Button>(1).Text = "Equipment";
+                switcher.GetChild<Button>(0).Text = "[Bag]";
+                switcher.GetChild<Button>(1).Text = "Gear";
             });
             backpack.Name = "view_backpack"; backpack.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
-            backpack.CustomMinimumSize = new Vector2(118 * ui.TextScale, UiDesign.Target);
-            var equipment = UiDesign.Action(switcher, state.GearOpen ? "[Equipment]" : "Equipment", () =>
+            backpack.CustomMinimumSize = new Vector2(86 * ui.TextScale, UiDesign.Target);
+            backpack.TooltipText = "View backpack items";
+            var equipment = UiDesign.Action(switcher, state.GearOpen ? "[Gear]" : "Gear", () =>
             {
                 state.GearOpen = true; state.DetailOpen = false; UpdateVisibility();
-                switcher.GetChild<Button>(0).Text = "Backpack";
-                switcher.GetChild<Button>(1).Text = "[Equipment]";
+                switcher.GetChild<Button>(0).Text = "Bag";
+                switcher.GetChild<Button>(1).Text = "[Gear]";
             });
             equipment.Name = "view_equipment"; equipment.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
-            equipment.CustomMinimumSize = new Vector2(130 * ui.TextScale, UiDesign.Target);
+            equipment.CustomMinimumSize = new Vector2(88 * ui.TextScale, UiDesign.Target);
+            equipment.TooltipText = "View weapon and body equipment";
         }
         var regions = new HBoxContainer { Name = "pack_regions",
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
