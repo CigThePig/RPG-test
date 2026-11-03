@@ -177,6 +177,9 @@ public static class PackPresentationChecks
             Require(recognizedSwipes==1 && ui.PackSelection==null &&
                 tile.Modulate==Colors.White && !tile.HasFocus(),
                 "one real backpack swipe cancels activation, focus and touch tint");
+            ui.Back(); await Frames(4);
+            Require(Find<PackLayout>("wayfarers_kit")==null,
+                "closing Pack frees custom scroll input owners after the GUI frame");
         }
         finally
         {

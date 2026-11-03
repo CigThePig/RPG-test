@@ -307,6 +307,18 @@ public partial class RpgUi : CanvasLayer
     }
     void SyncNavigation()
     {
+        // A closed Pack must not leave invisible ScrollContainers processing
+        // queued Android touches. QueueFree is safe even from a Button callback;
+        // the next inventory open mounts a fresh presentation from Gloot.
+        if (packLayout != null && (navigation.Screen != "PACK & EQUIPMENT" || PackTab != 0))
+        {
+            if (GodotObject.IsInstanceValid(packLayout) && !packLayout.IsQueuedForDeletion())
+            {
+                packLayout.Hide();
+                packLayout.QueueFree();
+            }
+            packLayout = null;
+        }
         bool dialogue = App.Narrative.Get("speaking").AsBool();
         panel.Visible = navigation.Screen != null && !navigation.Confirmation && !dialogue;
         menu.Visible = navigation.Menu && !navigation.Confirmation && !dialogue;

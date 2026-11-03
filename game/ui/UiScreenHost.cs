@@ -48,7 +48,16 @@ public partial class UiScreenHost : PanelContainer
     }
     void ClearCustom()
     {
-        foreach (var child in customHost.GetChildren()) { customHost.RemoveChild(child); child.QueueFree(); }
+        foreach (var child in customHost.GetChildren())
+        {
+            // Removing an input-processing Control immediately during a Button
+            // callback can leave a native GUI event holding an out-of-tree Node.
+            // Hide first, cancel owned gestures and let Godot free at frame end.
+            if (child is Control control) control.Hide();
+            foreach (var scroll in child.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>())
+                scroll.CancelGesture();
+            if (!child.IsQueuedForDeletion()) child.QueueFree();
+        }
     }
     public override void _Process(double delta)
     {
