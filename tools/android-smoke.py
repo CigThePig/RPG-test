@@ -212,9 +212,16 @@ try:
     assert len(re.findall(r'MOSSLIGHT_SESSION_STARTED tick=0',adb('logcat','-d')))==before_reset, 'New game reset before confirmation'
     # Android system Back cancels only the destructive modal and returns to menu.
     adb('shell','input','keyevent','4')
-    time.sleep(.5)
-    states=re.findall(r'MOSSLIGHT_UI_STATE menu=(True|False) screen=(True|False) confirmation=(True|False)',adb('logcat','-d'))
-    assert states and states[-1]==('True','False','False'), 'System Back did not cancel confirmation to menu'
+    # Hosted emulators can deliver Back and publish the post-layout state more
+    # than 500 ms later. Observe the result of this one keypress; never repeat it
+    # (a second Back would close the menu and hide a real navigation defect).
+    deadline=time.monotonic()+15
+    while time.monotonic()<deadline:
+        states=re.findall(r'MOSSLIGHT_UI_STATE menu=(True|False) screen=(True|False) confirmation=(True|False)',adb('logcat','-d'))
+        if states and states[-1]==('True','False','False'): break
+        if not adb('shell','pidof',package): raise RuntimeError('Application exited while canceling confirmation')
+        time.sleep(.25)
+    else: raise AssertionError('System Back did not cancel confirmation to menu; last states: '+repr(states[-3:]))
     capture('new-game-canceled.png',wait=10)
     tap_ui('new_game')
     time.sleep(.5)
