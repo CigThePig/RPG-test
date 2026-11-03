@@ -366,7 +366,6 @@ public partial class RpgUi : CanvasLayer
             packLayout != null && GodotObject.IsInstanceValid(packLayout) && packLayout.IsInsideTree() &&
             packLayout.DismissDetail()) return;
         navigation.Back(App.Narrative.Get("speaking").AsBool(), App.World.Player.Alive);
-        packLayout = null;
         SyncNavigation();
     }
     public void SetTextScale(float scale)
@@ -441,6 +440,8 @@ public partial class RpgUi : CanvasLayer
         // Rebuilding the same screen after an action keeps the reader's scroll position.
         bool refresh = navigation.Screen == heading && panel.Visible;
         CancelGestures(); navigation.Open(heading);
+        // Present retires the previous custom tree; Layout must never rebuild it.
+        packLayout = null;
         panel.Present(heading == "PACK & EQUIPMENT" && PackTab == 0 ? "THE WAYFARER'S KIT" : heading, refresh);
         SyncNavigation(); return true;
     }

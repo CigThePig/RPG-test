@@ -53,6 +53,9 @@ public partial class UiScreenHost : PanelContainer
             // Removing an input-processing Control immediately during a Button
             // callback can leave a native GUI event holding an out-of-tree Node.
             // Hide first, cancel owned gestures and let Godot free at frame end.
+            // Release the stable screen name immediately. Godot otherwise renames
+            // the replacement while this retired node awaits frame-end deletion.
+            child.Name = "retired_" + child.GetInstanceId();
             if (child is Control control) control.Hide();
             foreach (var scroll in child.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>())
                 scroll.CancelGesture();

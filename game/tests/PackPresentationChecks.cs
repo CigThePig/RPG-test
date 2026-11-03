@@ -116,6 +116,14 @@ public static class PackPresentationChecks
                 await Shot("pack-equipped-weapon");
             }
 
+            // Refresh twice without yielding: retired controls still exist until
+            // frame end and must not steal the replacement's stable node name.
+            ui.Inventory();ui.Inventory();await Frames();
+            Require(Find<PackLayout>("wayfarers_kit")?.IsVisibleInTree()==true,
+                "same-frame Pack refresh retains the live layout identity");
+            Require(ui.FindChildren("*", "VBoxContainer", true, false).OfType<PackLayout>().Count()==1,
+                "same-frame refresh frees all retired Pack layouts");
+
             ui.PackState.DetailOpen=false;
             await Resize(1024,768);
             Require(Find<PackLayout>("wayfarers_kit")?.Mode == PackLayout.LayoutKind.Compact,
