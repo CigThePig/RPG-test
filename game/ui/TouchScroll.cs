@@ -12,12 +12,8 @@ public partial class TouchScroll : ScrollContainer
     // Godot may assign native Button focus after this scroll's _Input handler.
     // Sweep that late focus during the following frames of a touch swipe.
     int clearSwipeFocusFrames;
-    // Verification counters to distinguish missing touch ownership from late focus.
-    internal int DiagnosticEvents { get; private set; }
-    internal int DiagnosticNativeTargets { get; private set; }
-    internal int DiagnosticTouches { get; private set; }
-    internal int DiagnosticSwipes { get; private set; }
-    internal int DiagnosticFocusReleases { get; private set; }
+    /// <summary>Triggered once when a finger swipe owns scrolling, never for a tap.</summary>
+    public event Action? SwipeRecognized;
     Button? pressed;
     bool NativeTouchTarget(Vector2 position) =>
         GetVScrollBar().GetGlobalRect().HasPoint(position) ||
@@ -37,7 +33,6 @@ public partial class TouchScroll : ScrollContainer
     }
     public override void _Input(InputEvent e)
     {
-        if(e is InputEventScreenTouch) DiagnosticEvents++;
         if(!IsVisibleInTree()){CancelGesture();suppressMouse=false;mouseReleaseGraceFrames=0;return;}
         // Native scrollbar/slider/popup gestures keep their mouse input even when
         // their drag moves across ordinary rows.
@@ -88,12 +83,10 @@ public partial class TouchScroll : ScrollContainer
                 // must receive native GUI events rather than being treated as menu buttons.
                 if(NativeTouchTarget(touch.Position))
                 {
-                    DiagnosticNativeTargets++;
                     nativeFinger=touch.Index;nativeMouseGraceFrames=0;
                     suppressMouse=false;return;
                 }
                 finger=touch.Index;start=touch.Position;initialScroll=ScrollVertical;dragging=false;suppressMouse=true;mouseReleaseGraceFrames=0;
-                DiagnosticTouches++;
                 pressed=FindChildren("*","Button",true,false).OfType<Button>().LastOrDefault(b=>b.IsVisibleInTree() && !b.Disabled && b.GetGlobalRect().HasPoint(touch.Position));
                 if(pressed!=null)pressed.Modulate=new Color(.75f,.85f,.85f);
                 GetViewport().SetInputAsHandled();
@@ -111,7 +104,7 @@ public partial class TouchScroll : ScrollContainer
             if(!dragging && Math.Abs(drag.Position.Y-start.Y)>ScrollDeadzone)
             {
                 dragging=true;
-                DiagnosticSwipes++;
+                SwipeRecognized?.Invoke();
                 // A swipe is not a button selection. Clear any focus assigned by
                 // the touchscreen's native/emulated GUI path, but preserve focus on
                 // controls outside this scroll area (e.g. the fixed Back button).
@@ -133,11 +126,12 @@ public partial class TouchScroll : ScrollContainer
     {
         // Never release the fixed Back button or focus elsewhere in the UI.
         var focus = GetViewport().GuiGetFocusOwner();
-        if (focus != null && IsAncestorOf(focus)) { focus.ReleaseFocus(); DiagnosticFocusReleases++; }
+        if (focus != null && IsAncestorOf(focus)) focus.ReleaseFocus();
         if (GodotObject.IsInstanceValid(pressed) && pressed!.HasFocus()) pressed.ReleaseFocus();
     }
     public override void _Process(double delta)
     {
+        if (!IsInsideTree()) return;
         if (clearSwipeFocusFrames > 0)
         {
             ClearSwipeFocus();

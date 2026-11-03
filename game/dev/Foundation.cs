@@ -780,6 +780,13 @@ public partial class Foundation : Node2D
         try
         {
             await VisualChecks.Run(this);
+            // In the mobile input suite Godot can still have native/emulated
+            // touch events buffered when this async test finishes. Drain them
+            // while the owning Controls remain in the tree, rather than exiting
+            // with queued GUI events referring to detached nodes.
+            Input.FlushBufferedEvents();
+            for (int i=0;i<5;i++)
+                await ToSignal(GetTree(),SceneTree.SignalName.ProcessFrame);
             GetTree().Quit(0);
         }
         catch (Exception e)

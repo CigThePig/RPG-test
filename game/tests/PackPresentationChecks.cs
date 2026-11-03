@@ -156,6 +156,8 @@ public static class PackPresentationChecks
             Require(tile!=null && scroll!=null && scroll.IsAncestorOf(tile),
                 "bag tiles have exactly one scrolling owner");
             scroll!.EnsureControlVisible(tile!);await Frames();
+            int recognizedSwipes=0;
+            scroll.SwipeRecognized += () => recognizedSwipes++;
             Vector2 at=tile!.GetGlobalRect().GetCenter(), end=at-new Vector2(0,78);
             // ParseInputEvent enters the native window/input pipeline, not the
             // CanvasLayer's logical coordinate space. Under canvas_items stretch
@@ -172,16 +174,9 @@ public static class PackPresentationChecks
             Input.ParseInputEvent(new InputEventScreenDrag {Index=47,Position=touchEnd,Relative=touchEnd-touchAt});
             Input.ParseInputEvent(new InputEventScreenTouch {Index=47,Pressed=false,Position=touchEnd});
             await Frames();
-            Require(ui.PackSelection==null && tile.Modulate==Colors.White && !tile.HasFocus(),
-                "dragging a tile never selects, activates or leaves it dark/focused; selector=" +
-                (ui.PackSelection ?? "(null)") + " tint=" + tile.Modulate +
-                " focused=" + tile.HasFocus() + " hit=" + scroll.GetGlobalRect().HasPoint(at) +
-                " at=" + at + " scroll=" + scroll.GetGlobalRect() +
-                " visible=" + scroll.IsVisibleInTree() + " events=" + scroll.DiagnosticEvents +
-                " nativeTargets=" + scroll.DiagnosticNativeTargets +
-                " touches=" + scroll.DiagnosticTouches + " swipes=" + scroll.DiagnosticSwipes +
-                " focusReleased=" + scroll.DiagnosticFocusReleases +
-                " scrollY=" + scroll.ScrollVertical);
+            Require(recognizedSwipes==1 && ui.PackSelection==null &&
+                tile.Modulate==Colors.White && !tile.HasFocus(),
+                "one real backpack swipe cancels activation, focus and touch tint");
         }
         finally
         {
