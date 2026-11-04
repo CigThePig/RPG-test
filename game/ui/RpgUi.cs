@@ -13,6 +13,7 @@ public partial class RpgUi : CanvasLayer
     bool? lastSystemBackFromKey;
     ulong lastSystemBackAt;
     public Button ActionControl(string id) => actions[id];
+    internal Button NavigationControl(string id) => navigationTargets[id];
     internal Rect2 StatusRect => hud.GetGlobalRect();
     public GameplayHud Hud => hud;
     public InteractionPreview InteractionLabel { get; private set; } = InteractionPreview.None;

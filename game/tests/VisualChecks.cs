@@ -515,7 +515,7 @@ public static class VisualChecks
             if((scrollable>=1 && scroller.ScrollVertical<Math.Min(60,scrollable)-1) || !app.Ui.MenuOpen)throw new InvalidOperationException($"Menu swipe over button rows did not scroll safely ({scroller.ScrollVertical}/{scrollable})");
             scroller.ScrollVertical=0;
             await Frames(app,3);
-            var enter=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Enter / Resume");
+            var enter=app.Ui.NavigationControl("resume");
             var enterPoint=enter.GetGlobalRect().GetCenter();
             Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=true,Position=enterPoint});
             Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=false,Canceled=true,Position=enterPoint});
