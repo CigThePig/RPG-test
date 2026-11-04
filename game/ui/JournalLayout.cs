@@ -92,6 +92,10 @@ public partial class JournalLayout : VBoxContainer
                     tab.Text = selected ? "[" + text + "]" : text;
                     var face = UiDesign.InventoryTile(selected); tab.AddThemeStyleboxOverride("normal", face); tab.AddThemeStyleboxOverride("hover", face);
                 }
+        // A second finger may switch pages while a scroll still owns a touch.
+        // Cancel the hidden pane's gesture before it can activate a hidden row.
+        if (compact && ui.JournalReading && indexPane.Visible && indexPane is TouchScroll indexScroll) indexScroll.CancelGesture();
+        if (compact && !ui.JournalReading && detailPane.Visible && detailPane is TouchScroll readingScroll) readingScroll.CancelGesture();
         indexPane.Visible = !compact || !ui.JournalReading; detailPane.Visible = !compact || ui.JournalReading;
     }
     public bool DismissReading()

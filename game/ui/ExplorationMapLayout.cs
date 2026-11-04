@@ -51,6 +51,6 @@ public partial class ExplorationMapLayout : VBoxContainer
     public bool DismissGuide()
     {
         if (!ui.MapGuide) return false;
-        ui.MapGuide = false; ui.Map(); return true;
+        ui.MapGuide = false; Rebuild(); return true;
     }
 }

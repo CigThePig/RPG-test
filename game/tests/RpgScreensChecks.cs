@@ -359,6 +359,9 @@ public static class RpgScreensChecks
             finally { n.Set("speaking", false); }
             ui.Back(); await Frames();
             Require(!ui.MapGuide && ui.Navigation.Screen == "REGION MAP", "Back closes map guide before leaving map");
+            await Press("map_guide");
+            ui.SystemBack(fromKey: false); ui.SystemBack(fromKey: true); await Frames();
+            Require(!ui.MapGuide && ui.Navigation.Screen == "REGION MAP", "paired Android Back closes only the guide");
             await Shot("map-ruin");
 
             // Large text at a compact phone viewport: no control is clipped horizontally.
