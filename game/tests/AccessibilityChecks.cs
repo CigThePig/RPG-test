@@ -156,7 +156,7 @@ public static class AccessibilityChecks
 
             // Menu: player entries only, ≥56 targets, complete keyboard focus order.
             ui.PauseForVerification(); await Frames();
-            var menuButtons = ui.FindChildren("*", "Button", true, false).OfType<Button>().Where(b => b.IsVisibleInTree() && ui.MenuOpen && b.GetParent()?.GetParent() is TouchScroll).ToList();
+            var menuButtons = ui.FindChildren("*", "Button", true, false).OfType<Button>().Where(b => b.IsVisibleInTree() && ui.MenuOpen && ui.FindChild("pause_content", true, false)!.IsAncestorOf(b)).ToList();
             Require(menuButtons.Count >= 10, "menu lists its entries");
             string[] developerOnly = { "Creature workshop", "Performance overlay", "Game-feel lab", "Developer diagnostics", "Collision" };
             Require(!menuButtons.Any(b => developerOnly.Any(d => b.Text.StartsWith(d))), "developer tools are not mixed into the player menu");
@@ -164,7 +164,10 @@ public static class AccessibilityChecks
             var visited = new HashSet<Control>(); Control? at = menuButtons[0];
             for (int i = 0; i < 40 && at != null && visited.Add(at); i++) at = at.FindNextValidFocus();
             Require(menuButtons.All(visited.Contains), "Tab focus order reaches every menu entry");
-            await Shot("menu-part4");
+            await Shot("menu-part5");
+            await Press("menu_quit");
+            Require(ui.Navigation.Confirmation && ui.ConfirmationText.Contains("Unsaved progress"), "Quit requires confirmation");
+            await Cancel(); Require(ui.MenuOpen, "cancel Quit returns to pause");
 
             // Developer tools remain reachable behind one entry; Back returns to the menu.
             await Press("menu_developer");
@@ -180,8 +183,12 @@ public static class AccessibilityChecks
             Require(ui.Preferences.TextSize == 1 && Math.Abs(ui.TextScale - 1.3f) < .01f && UiPreferences.Load(out _).TextSize == 1, "text size changes and persists");
             await Press("set_contrast");
             Require(UiDesign.HighContrast && UiPreferences.Load(out _).HighContrast, "high contrast applies and persists");
+            await Shot("settings-display-part5");
+            await Press("settings_comfort");
             await Press("set_motion");
             Require(app.CombatCamera.Strength == 0 && UiPreferences.Load(out _).ReducedMotion, "reduced motion removes camera nudges");
+            await Shot("settings-comfort-part5");
+            await Press("settings_audio");
             await Press("set_sound");
             Require(AudioServer.IsBusMute(0) && UiPreferences.Load(out _).Muted, "sound preference mutes and persists");
             Require(Persistence.Capture(w, n) == world, "changing settings leaves world state untouched");
@@ -213,7 +220,9 @@ public static class AccessibilityChecks
             File.WriteAllText(Persistence.SlotPath(2), old.ToJsonString());
             File.WriteAllText(Persistence.SlotPath(3), "{\"Generator\":\"" + Regions.Version + "\",\"Schema\":\"broken\"}");
             ui.PauseForVerification(); ui.SaveLoad(); await Frames();
+            await Press("choose_slot_2");
             Require(Find("load_2").Disabled && Find("save_2").Disabled, "older-version slot can be neither loaded nor overwritten");
+            await Press("choose_slot_3");
             Require(Find("load_3").Disabled && Find("save_3").Text.StartsWith("Replace damaged"), "damaged slot cannot load and offers an explicit replacement");
             await Shot("save-load");
             await Press("save_3");
@@ -254,7 +263,8 @@ public static class AccessibilityChecks
                 ui.SystemBack(); Input.ParseInputEvent(new InputEventKey { Keycode = Key.Escape, Pressed = true }); await Frames();
                 app._Notification((int)Node.NotificationApplicationFocusOut); app._Notification((int)Node.NotificationApplicationFocusIn); await Frames();
                 Require(n.Get("speaking").AsBool() && !ui.MenuOpen && panel.Visible, $"{size} dialogue survives Back and focus loss");
-                // A tap where Attack lives does nothing while dialogue owns input.
+                // A tap where Attack normally lives cannot cause combat. The wider
+                // dialogue may put a legitimate reply there, so refresh reply references afterwards.
                 int attacks = 0; void Count(string kind, System.Numerics.Vector2 d, string c) { if (kind == "attack_started") attacks++; }
                 w.CombatDiagnostic += Count;
                 var attackAt = MobileCombatControls.Geometry(safe)["attack"].GetCenter();
@@ -262,13 +272,20 @@ public static class AccessibilityChecks
                 Input.ParseInputEvent(new InputEventScreenTouch { Index = 17, Pressed = false, Position = attackAt });
                 await Frames(); w.CombatDiagnostic -= Count;
                 Require(attacks == 0, $"{size} gameplay actions blocked during dialogue");
-                var goodbye = choices.Last();
-                if (ui.MobileLayout)
+                for (int i = 0; i < 20 && n.Get("advancing").AsBool(); i++) await Frames();
+                if (n.Get("speaking").AsBool())
                 {
-                    ((ScrollContainer)n.Get("choice_scroll").AsGodotObject()).EnsureControlVisible(goodbye); await Frames(3);
-                    Tap(goodbye);
+                    var goodbye = ((VBoxContainer)n.Get("choices").AsGodotObject()).GetChildren().OfType<Button>().LastOrDefault(b => b.Visible && !b.Disabled);
+                    if (goodbye != null)
+                    {
+                        if (ui.MobileLayout)
+                        {
+                            ((ScrollContainer)n.Get("choice_scroll").AsGodotObject()).EnsureControlVisible(goodbye); await Frames(3);
+                            Tap(goodbye);
+                        }
+                        else goodbye.EmitSignal(Button.SignalName.Pressed);
+                    }
                 }
-                else goodbye.EmitSignal(Button.SignalName.Pressed);
                 for (int i = 0; i < 20 && n.Get("speaking").AsBool(); i++)
                 {
                     await Frames(2);
@@ -278,6 +295,13 @@ public static class AccessibilityChecks
                 Require(!n.Get("speaking").AsBool(), $"{size} dialogue closes through its own responses");
                 ui.PauseForVerification(); app.ResumeGame(); await Frames();
             }
+            window.Size = new Vector2I(900, 560); await Frames();
+            var compactViewport = app.GetViewport().GetVisibleRect();
+            ui.VerificationSafeArea = new Rect2(compactViewport.Position + new Vector2(60, 28), compactViewport.Size - new Vector2(120, 56));
+            ui.ApplyPreferences(new UiPreferences { TextSize = 2, HighContrast = true }, persist: false);
+            ui.PauseForVerification(); await Shot("pause-part5-900x560-largest");
+            ui.SettingsPage = 0; ui.Settings(); await Shot("settings-part5-900x560-largest");
+            ui.SaveSelection = 3; ui.SaveLoad(); await Shot("saves-part5-900x560-largest");
         }
         finally
         {

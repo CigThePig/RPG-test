@@ -67,11 +67,17 @@ public static class UiNavigationChecks
                 Require(!row.HasFocus() && row.Modulate == Colors.White, "swiping clears row focus and touch tint");
                 Require(app.Ui.MenuOpen && app.Ui.Navigation.Screen == null, "swipe never activates a menu row");
             }
+            // Force overflow for the gesture fixture: the redesigned compact menu
+            // naturally fits at standard sizes, but must still cancel row swipes.
+            var menuContent = menuScroll.GetChild<Control>(0);
+            var originalMinimum = menuContent.CustomMinimumSize;
+            menuContent.CustomMinimumSize = new Vector2(0, menuScroll.Size.Y + 400); await Frames();
             int beforeSwipe = menuScroll.ScrollVertical;
             await SwipeRow(character, -75);
             Require(menuScroll.ScrollVertical > beforeSwipe, "finger drag over Character actually scrolls");
             await SwipeRow(pack, 75);
             Require(!character.HasFocus() && !pack.HasFocus(), "successive swipes cannot leave either row selected");
+            menuContent.CustomMinimumSize = originalMinimum;
             menuScroll.ScrollVertical=0; await Frames(3);
             Tap(character); await Frames();
             Require(!app.Ui.MenuOpen && app.Ui.Navigation.Screen != null && app.GameplayBlocked, "menu to Character atomic input block");

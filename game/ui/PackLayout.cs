@@ -79,6 +79,7 @@ public partial class PackLayout : VBoxContainer
             ui.Inventory();
         });
         top.Name = "pack_nav";
+        top.GetChild<Control>(2).Visible = ui.App.NearbyMerchant() != null;
         // Unlike the legacy full-width segmented bar, these are small, fixed
         // navigation choices. They do not steal horizontal space from the three
         // inventory regions and keep the backpack as the dominant surface.

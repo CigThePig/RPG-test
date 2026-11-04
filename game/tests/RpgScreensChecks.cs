@@ -31,11 +31,16 @@ public static class RpgScreensChecks
             // Inventory read model mirrors Gloot exactly.
             items.Add("player", "ore", 3); items.Add("player", "wood", 1);
             var priorInstances = items.View("player").Select(v => v.Instance).ToHashSet();
+            string productSnapshot = items.Service.Call("export_state").AsString();
+            var outputPreview = items.ProductPreview(forge);
+            check(outputPreview != null && outputPreview.Instance == "" && items.Service.Call("export_state").AsString() == productSnapshot,
+                "product preview changes no bags, slots or serials");
             check(items.Craft("player", forge) && items.LastCraftFailure == CraftFailure.None, "generated sword crafted");
             var view = items.View("player");
             using (var catalog = System.Text.Json.JsonDocument.Parse(items.Service.Call("catalog", "player").AsString()))
                 check(view.Where(v => !v.Equipped).Sum(v => v.Count) == catalog.RootElement.EnumerateArray().Sum(r => r.GetProperty("count").GetInt32()), "inventory view matches Gloot catalog counts");
             var sword = view.Single(v => v.Id == "iron_sword" && !priorInstances.Contains(v.Instance));
+            check(outputPreview!.Stat("damage") == sword.Stat("damage"), "preview and crafted output share material rules");
             check(sword.Properties["material"] == "iron" && sword.Properties["quality"] == "2" && sword.Stat("damage") > 8, "generated instance exposes material, quality and scaled damage");
             check(view.Where(v => v.Instance != "").Select(v => v.Instance).Distinct().Count() == view.Count(v => v.Instance != ""), "instance identities are unique in the view");
             check(PackScreen.Comparison(sword, null).Contains("Slot is empty"), "comparison against an empty slot");
@@ -220,12 +225,14 @@ public static class RpgScreensChecks
             w.Items.Add("player", "ore", 3); w.Items.Add("player", "wood", 1);
             ui.PackTab = 1; ui.PackSelection = null; ui.Inventory(); await Frames();
             Require(Find("tab_craft").Text == "[Craft]", "selected tab is marked in words");
+            await Press("recipe_forge_sword");
             await Shot("pack-craft");
             int swords = w.Items.Count("player", "iron_sword");
             await Press("craft_forge_sword");
             Require(w.Items.Count("player", "iron_sword") == swords + 1 && ui.NoticeText.Contains("Crafted"), $"craft button made exactly one sword: {swords}->{w.Items.Count("player", "iron_sword")} notice '{ui.NoticeText}' failure {w.Items.LastCraftFailure}");
             Require(ui.Navigation.Screen == "PACK & EQUIPMENT", "pack stays open after crafting");
             w.Items.Take("player", "herb", w.Items.Count("player", "herb")); ui.Inventory(); await Frames();
+            await Press("recipe_draught");
             Require(Find("craft_draught").Disabled, "missing ingredients disable the recipe with a reason");
 
             // Inspect and equip the generated instance.
@@ -258,6 +265,7 @@ public static class RpgScreensChecks
             w.Items.Take("player", "coin", w.Items.Count("player", "coin"));
             ui.PackTab = 2; ui.Inventory(); await Frames();
             var buyable = w.Items.View(merchant.Id).First(v => v.Id != "coin");
+            await Press("stock_" + buyable.Id);
             Require(Find("buy_" + buyable.Id).Disabled, "no crowns disables Buy");
             w.Items.Add("player", "coin", Items.Price(buyable.Id)); ui.Inventory(); await Frames();
             int had = w.Items.Count("player", buyable.Id);
@@ -368,7 +376,7 @@ public static class RpgScreensChecks
             window.Size = new Vector2I(900, 560); await Frames();
             var viewport = app.GetViewport().GetVisibleRect();
             ui.VerificationSafeArea = new Rect2(viewport.Position + new Vector2(60, 28), viewport.Size - new Vector2(120, 56));
-            ui.SetTextScale(1.3f);
+            ui.SetTextScale(1.4f);
             foreach (var open in new Action[] { () => { ui.PackTab = 0; ui.Inventory(); }, () => { ui.PackTab = 1; ui.Inventory(); }, ui.Journal, ui.Character, ui.Map })
             {
                 open(); await Frames(6);
@@ -380,6 +388,7 @@ public static class RpgScreensChecks
                     Require(screen.Encloses(canvas.GetGlobalRect()) && canvas.Size.Y > 80, "compact map owns a visible canvas inside safe area");
                     continue;
                 }
+                await Shot("part5-" + ui.Navigation.Screen!.ToLowerInvariant().Replace(" ", "-").Replace("&", "and").Replace("·", "-") + "-900x560-largest");
                 float right = scroll.GetVScrollBar().GetGlobalRect().Position.X + 1;
                 foreach (var control in scroll.FindChildren("*", "Control", true, false).OfType<Control>().Where(c => c.IsVisibleInTree() && c is Button or PanelContainer))
                     Require(control.GetGlobalRect().End.X <= right && control.GetGlobalRect().Position.X >= screen.Position.X, $"{ui.Navigation.Screen}: {control.Name} fits beside the scrollbar with large text");

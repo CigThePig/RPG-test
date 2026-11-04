@@ -1,7 +1,7 @@
 # PR #7: Complete RPG Interface Redesign
 **Revised canonical plan (v2) | 2 November 2026 | Target: `feat/mobile-ui-ux-overhaul` -> `main`**
 
-> **Scope reset, not a code reset.** The original four implementation parts are retained unchanged in history as **new Part 1: Functional UI foundation**. All shipped code, safeguards, source references, tests and previous handoffs remain valid as historical records. Revised Parts 2–3 have implementation on this branch; physical Galaxy S25 acceptance remains pending. Part 4 has implementation on this branch; Parts 5–6 remain planned. PR #7 stays **draft and unmerged** until visual and physical-device acceptance. Part 1 has outstanding Galaxy S25 issues, including swipe/highlight behavior under verification, and is not considered phone-accepted.
+> **Scope reset, not a code reset.** The original four implementation parts are retained unchanged in history as **new Part 1: Functional UI foundation**. All shipped code, safeguards, source references, tests and previous handoffs remain valid as historical records. Revised Parts 2–3 have implementation on this branch; physical Galaxy S25 acceptance remains pending. Parts 4–5 have implementation on this branch; Part 6 remains planned. PR #7 stays **draft and unmerged** until visual and physical-device acceptance. Part 1 has outstanding Galaxy S25 issues, including swipe/highlight behavior under verification, and is not considered phone-accepted.
 
 ## Why the plan changed
 
@@ -81,6 +81,8 @@ Implementation: [Exploration presentation handoff](PR7_EXPLORATION_PRESENTATION_
 **Acceptance:** active/completed/locked journal states; map in Reach and partially discovered ruins; map markers and fog integrity; readable controls at small sizes; touch scrolling/zoom, Back, pause/resume and no unexplored information leakage.
 
 ### Part 5 of 6 — Crafting, Merchants and full-shell coherence
+
+Implementation: [Commerce and supporting-shell handoff](PR7_COMMERCE_SHELL_HANDOFF.md). Dedicated workbench/merchant previews, persistent transaction actions, contextual Trade navigation, tile-based pause/save library, grouped settings and adaptive story/reply dialogue. Existing authorities and protective confirmations remain in force. Part 4 received positive S25 feedback; Part 5 still needs device acceptance.
 
 **Outcome:** all remaining player-facing screens share the new art direction without having the same layout.
 

@@ -55,8 +55,13 @@ public sealed class Items(Node service, EventStream events)
 
     /// <summary>Read-only structured rows for bag stacks and equipped items, straight from Gloot.</summary>
     public IReadOnlyList<ItemView> View(string owner)
+        => ReadView(service.Call("inventory_view", owner).AsString());
+
+    public ItemView? ProductPreview(RecipeDef recipe) => ReadView(service.Call("product_preview", recipe.Output, recipe.Material, recipe.Quality).AsString()).FirstOrDefault();
+
+    static IReadOnlyList<ItemView> ReadView(string json)
     {
-        using var doc = JsonDocument.Parse(service.Call("inventory_view", owner).AsString());
+        using var doc = JsonDocument.Parse(json);
         var rows = new List<ItemView>();
         foreach (var row in doc.RootElement.EnumerateArray())
         {

@@ -15,6 +15,8 @@ var text_label: Label
 var advancing := false
 var dialogue_epoch := 0
 var choices: VBoxContainer
+var dialogue_body: BoxContainer
+var story_scroll: ScrollContainer
 
 func _ready() -> void:
 	add_child(manager)
@@ -315,6 +317,9 @@ func apply_presentation() -> void:
 		ui.position = ui_rect.position
 		ui.size = ui_rect.size
 		ui.custom_minimum_size = Vector2.ZERO
+	if dialogue_body != null and ui_theme != null:
+		var scale := maxf(1.0, ui_theme.default_font_size / 20.0)
+		dialogue_body.vertical = ui_rect.size.x / scale < 960.0
 
 func build_ui() -> void:
 	var layer := CanvasLayer.new()
@@ -341,14 +346,29 @@ func build_ui() -> void:
 	text_label.name = "Line"
 	text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text_label.custom_minimum_size = Vector2(0, 56)
-	box.add_child(text_label)
+	dialogue_body = BoxContainer.new()
+	dialogue_body.name = "DialogueBody"
+	dialogue_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	dialogue_body.add_theme_constant_override("separation", 16)
+	box.add_child(dialogue_body)
+	story_scroll = load("res://game/ui/TouchScroll.cs").new()
+	story_scroll.name = "Story"
+	story_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	story_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	story_scroll.size_flags_stretch_ratio = 0.48
+	story_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	dialogue_body.add_child(story_scroll)
+	text_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	story_scroll.add_child(text_label)
 	# Touch-owned scrolling: a swipe over responses never selects one.
 	choice_scroll = load("res://game/ui/TouchScroll.cs").new()
 	choice_scroll.name = "Responses"
 	choice_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	choice_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	choice_scroll.scroll_deadzone = 12
-	box.add_child(choice_scroll)
+	choice_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	choice_scroll.size_flags_stretch_ratio = 0.52
+	dialogue_body.add_child(choice_scroll)
 	choices = VBoxContainer.new()
 	choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	choices.add_theme_constant_override("separation", 10)
@@ -377,6 +397,7 @@ func advance(cue: String) -> void:
 	speaker_label.text = current_line.character.to_upper()
 	text_label.text = current_line.text
 	choice_scroll.scroll_vertical = 0
+	story_scroll.scroll_vertical = 0
 	if current_line.responses.is_empty():
 		var button := Button.new()
 		button.custom_minimum_size.y = 64

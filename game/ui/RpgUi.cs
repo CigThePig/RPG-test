@@ -38,6 +38,11 @@ public partial class RpgUi : CanvasLayer
     public Button ScreenBack => panel.BackButton;
     internal PackViewState PackState { get; } = new();
     PackLayout? packLayout;
+    CommerceLayout? commerceLayout;
+    SupportingLayout? supportingLayout;
+    internal string? CraftSelection, TradeSelection;
+    internal bool CommerceDetail;
+    internal int SaveSelection = 1, SettingsPage;
     internal int CharacterTab;
     CharacterSheet? characterSheet;
     JournalLayout? journalLayout;
@@ -50,6 +55,7 @@ public partial class RpgUi : CanvasLayer
     Control root = null !;
     Control hotbar = null !;
     public TouchStick Stick { get; private set; } = null!;
+    Label? pauseSummary;
     Label metrics = null!;
     bool showMetrics;
     bool labVisible;
@@ -285,7 +291,7 @@ public partial class RpgUi : CanvasLayer
             var rect = UiDesign.Overlay(overlaySafe, width);
             control.CustomMinimumSize = Vector2.Zero; control.Position = rect.Position; control.Size = rect.Size;
         }
-        if ((navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0) || navigation.Screen is "CHARACTER · WAYFARER" or "QUEST JOURNAL" or "REGION MAP")
+        if (navigation.Screen is "PACK & EQUIPMENT" or "CHARACTER · WAYFARER" or "QUEST JOURNAL" or "REGION MAP" or "SAVE & LOAD" or "SETTINGS")
         {
             panel.CustomMinimumSize = Vector2.Zero;
             panel.Position = overlaySafe.Position + new Vector2(16, 16);
@@ -293,13 +299,15 @@ public partial class RpgUi : CanvasLayer
                 Math.Max(240, overlaySafe.Size.Y - 32));
         }
         else Arrange(panel, 740);
-        Arrange(menu, 560); Arrange(confirmation, 560);
+        Arrange(menu, 760); Arrange(confirmation, 560);
         // Dialogue: lower part of the safe area, never wider than a comfortable line.
-        float dialogueWidth = Math.Min(900, overlaySafe.Size.X - 32);
-        float dialogueHeight = Math.Clamp(overlaySafe.Size.Y * .52f, Math.Min(260, overlaySafe.Size.Y - 32), 420);
+        float dialogueWidth = Math.Min(1100, overlaySafe.Size.X - 32);
+        float dialogueHeight = Math.Clamp(overlaySafe.Size.Y * .44f, Math.Min(240, overlaySafe.Size.Y - 32), 420);
         DialogueRect = new Rect2(overlaySafe.Position.X + (overlaySafe.Size.X - dialogueWidth) / 2, overlaySafe.End.Y - 16 - dialogueHeight, dialogueWidth, dialogueHeight);
         App.Narrative.Call("present", UiDesign.Theme(TextScale), DialogueRect);
         layoutTraceFrames = 3;
+        if (navigation.Screen == "PACK & EQUIPMENT" && PackTab != 0 && commerceLayout != null && GodotObject.IsInstanceValid(commerceLayout) && commerceLayout.IsInsideTree()) commerceLayout.Rebuild();
+        if (navigation.Screen is "SAVE & LOAD" or "SETTINGS" && supportingLayout != null && GodotObject.IsInstanceValid(supportingLayout) && supportingLayout.IsInsideTree()) supportingLayout.Rebuild();
         if (navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0 &&
             packLayout != null && GodotObject.IsInstanceValid(packLayout) && packLayout.IsInsideTree())
             packLayout.Rebuild();
@@ -341,9 +349,19 @@ public partial class RpgUi : CanvasLayer
         { if (GodotObject.IsInstanceValid(journalLayout)) { journalLayout.Hide(); journalLayout.QueueFree(); } journalLayout = null; }
         if (mapLayout != null && navigation.Screen != "REGION MAP")
         { if (GodotObject.IsInstanceValid(mapLayout)) { mapLayout.Hide(); mapLayout.QueueFree(); } mapLayout = null; }
+        if (commerceLayout != null && (navigation.Screen != "PACK & EQUIPMENT" || PackTab == 0))
+        { if (GodotObject.IsInstanceValid(commerceLayout)) { commerceLayout.Hide(); commerceLayout.QueueFree(); } commerceLayout = null; }
+        if (supportingLayout != null && navigation.Screen is not ("SAVE & LOAD" or "SETTINGS"))
+        { if (GodotObject.IsInstanceValid(supportingLayout)) { supportingLayout.Hide(); supportingLayout.QueueFree(); } supportingLayout = null; }
         bool dialogue = App.Narrative.Get("speaking").AsBool();
         panel.Visible = navigation.Screen != null && !navigation.Confirmation && !dialogue;
         menu.Visible = navigation.Menu && !navigation.Confirmation && !dialogue;
+        if (menu.Visible && pauseSummary != null)
+        {
+            var player = App.World.Player;
+            pauseSummary.Text = player.Alive ? $"{player.Name} · Level {player.Level} · {(player.Region == "ruin" ? "The Ruin" : "The Reach")}" : "Defeated · load a saved adventure or start a new game";
+            if (navigationTargets.TryGetValue("resume", out var resume)) resume.Disabled = !player.Alive;
+        }
         confirmation.Visible = navigation.Confirmation && !dialogue;
         hotbar.Visible = !navigation.Blocked && !App.Narrative.Get("speaking").AsBool();
         if (menu.Visible) menu.FindChildren("*", "Button", true, false).OfType<Button>().FirstOrDefault()?.GrabFocus();
@@ -388,6 +406,7 @@ public partial class RpgUi : CanvasLayer
         if (!navigation.Confirmation && navigation.Screen == "QUEST JOURNAL" && journalLayout?.DismissReading() == true) return;
         if (!navigation.Confirmation && navigation.Screen == "REGION MAP" && mapLayout?.DismissGuide() == true) return;
 
+        if (!navigation.Confirmation && navigation.Screen == "PACK & EQUIPMENT" && PackTab != 0 && commerceLayout?.DismissDetails() == true) return;
         if (navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0 &&
             packLayout != null && GodotObject.IsInstanceValid(packLayout) && packLayout.IsInsideTree() &&
             packLayout.DismissDetail()) return;
@@ -469,7 +488,7 @@ public partial class RpgUi : CanvasLayer
         // Present retires the previous custom tree; Layout must never rebuild it.
         packLayout = null;
         characterSheet = null;
-        journalLayout = null; mapLayout = null;
+        journalLayout = null; mapLayout = null; commerceLayout = null; supportingLayout = null;
         panel.Present(heading == "PACK & EQUIPMENT" && PackTab == 0 ? "THE WAYFARER'S KIT" : heading, refresh);
         SyncNavigation(); return true;
     }
@@ -683,7 +702,7 @@ public partial class RpgUi : CanvasLayer
         else
         {
             packLayout = null;
-            PackScreen.Populate(body, this);
+            commerceLayout = new CommerceLayout(this); panel.MountCustom(commerceLayout);
         }
     }
 
@@ -726,21 +745,25 @@ public partial class RpgUi : CanvasLayer
     void BuildMenu()
     {
         Clear(menu);
-        var box = new VBoxContainer();
-        var scroll = new TouchScroll { SizeFlagsVertical = Control.SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, VerticalScrollMode = ScrollContainer.ScrollMode.Reserve, ScrollDeadzone = 12 };
-        scroll.GetVScrollBar().CustomMinimumSize = new Vector2(28,0);
+        var scroll = new TouchScroll { SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, VerticalScrollMode = ScrollContainer.ScrollMode.Reserve, ScrollDeadzone = 12 };
         menu.AddChild(scroll);
-        box.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        scroll.AddChild(box);
-        box.AddThemeConstantOverride("separation", 8);
-        box.AddChild(new Label { Text = "MOSSLIGHT", HorizontalAlignment = HorizontalAlignment.Center });
-        navigationTargets["resume"] = Button(box, "Enter / Resume", () => { if (App.World.Player.Alive) App.ResumeGame(); else Notify("Defeated · Load a save or start a New game to continue"); });
-        foreach (var entry in new (string, Action)[] { ("Pack", Inventory), ("Journal", Journal), ("Character", Character), ("Map", Map), ("Save & load", SaveLoad), ("Settings", Settings) })
-            Button(box, entry.Item1, entry.Item2).Name = "menu_" + entry.Item1.ToLowerInvariant().Replace(" & ", "_");
-        navigationTargets["new_game"] = Button(box, "New game", ConfirmNewGame);
-        // Test, tuning and diagnostic tools stay reachable, but behind one explicit entry.
+        var box = new VBoxContainer { Name = "pause_content", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; scroll.AddChild(box);
+        UiDesign.Heading(box, "MOSSLIGHT");
+        pauseSummary = UiDesign.Note(box, "Adventure paused");
+        navigationTargets["resume"] = Button(box, "Resume adventure", () => { if (App.World.Player.Alive) App.ResumeGame(); else Notify("Defeated · Load a save or start a New game to continue"); });
+        var adventures = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; adventures.AddThemeConstantOverride("h_separation", 8); adventures.AddThemeConstantOverride("v_separation", 8); box.AddChild(adventures);
+        foreach (var entry in new (string, Action)[] { ("Pack", Inventory), ("Character", Character), ("Journal", Journal), ("Map", Map) })
+        { var entryButton = Button(adventures, entry.Item1, entry.Item2); entryButton.Name = "menu_" + entry.Item1.ToLowerInvariant(); entryButton.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; }
+        UiDesign.Heading(box, "YOUR ADVENTURE");
+        var utilities = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; utilities.AddThemeConstantOverride("h_separation", 8); utilities.AddThemeConstantOverride("v_separation", 8); box.AddChild(utilities);
+        Button(utilities, "Save & load", SaveLoad).Name = "menu_save_load";
+        Button(utilities, "Settings", Settings).Name = "menu_settings";
+        navigationTargets["new_game"] = Button(utilities, "New game", ConfirmNewGame);
+        Button(utilities, "Quit", () => Confirm("Quit Mosslight? Unsaved progress will be lost.", "Quit", () => GetTree().Quit(), "quit", refreshScreen: false)).Name = "menu_quit";
+        foreach (var button in utilities.GetChildren().OfType<Button>()) button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        UiDesign.Heading(box, "WORKSHOP & TESTING");
         Button(box, "Developer tools", Developer).Name = "menu_developer";
-        Button(box, "Quit", () => GetTree().Quit());
         if (menu.IsVisibleInTree()) box.GetChildren().OfType<Button>().FirstOrDefault()?.GrabFocus();
         layoutTraceFrames = 3;
     }
@@ -752,9 +775,14 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         if (!Open("SAVE & LOAD")) return;
-        UiDesign.Note(body, "Three slots plus a background autosave. Saves from older Mosslight builds are kept but cannot be loaded here. Settings are stored separately and never change when you load.");
-        for (int slot = 1; slot <= 3; slot++)
+        Layout(); supportingLayout = new SupportingLayout(this, true); panel.MountCustom(supportingLayout);
+    }
+
+    internal void PopulateSaveDetails(VBoxContainer body)
+    {
+        if (SaveSelection is >= 1 and <= 3)
         {
+            int slot = SaveSelection;
             int index = slot;
             string path = Persistence.SlotPath(slot);
             var info = Persistence.Inspect(path, App.World.Content);
@@ -790,6 +818,7 @@ public partial class RpgUi : CanvasLayer
             load.Name = "load_" + slot;
             if (loadBlocker != null) { load.Disabled = true; UiDesign.Note(card, loadBlocker); }
         }
+        if (SaveSelection != 4) return;
         var auto = Persistence.Inspect(Persistence.AutosavePath, App.World.Content);
         var autoCard = UiDesign.Card(body, "slot_autosave");
         UiDesign.Heading(autoCard, "BACKGROUND AUTOSAVE");
@@ -853,10 +882,17 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         if (!Open("SETTINGS")) return;
+        Layout(); supportingLayout = new SupportingLayout(this, false); panel.MountCustom(supportingLayout);
+    }
+
+    internal void PopulateSettings(VBoxContainer body)
+    {
         UiDesign.Note(body, "Saved on this device, separately from game saves. Loading a game never changes them.");
         if (PreferencesProblem != null) UiDesign.Note(body, PreferencesProblem);
         void Option(string name, string title, string state, string explanation, Action<UiPreferences> change)
         {
+            int page = name == "motion" ? 1 : name == "sound" ? 2 : 0;
+            if (SettingsPage != page) return;
             var card = UiDesign.Card(body, "setting_" + name);
             UiDesign.Heading(card, title.ToUpperInvariant());
             UiDesign.Note(card, explanation);
@@ -867,10 +903,13 @@ public partial class RpgUi : CanvasLayer
         Option("sound", "Sound", Preferences.Muted ? "Off" : "On", "Combat and interface sounds.", p => p.Muted = !p.Muted);
         Option("motion", "Reduced motion", Preferences.ReducedMotion ? "On" : "Off", "Removes the camera nudge on impacts. Combat timing, sounds and hit cues are unchanged.", p => p.ReducedMotion = !p.ReducedMotion);
         Option("contrast", "High contrast", Preferences.HighContrast ? "On" : "Off", "Opaque panels, ivory borders and brighter secondary text.", p => p.HighContrast = !p.HighContrast);
+        if (SettingsPage == 0)
+        {
         var zoom = UiDesign.Card(body, "setting_zoom");
         UiDesign.Heading(zoom, "CAMERA ZOOM");
         UiDesign.Note(zoom, "Pixel scale of the world view for this session.");
         Button(zoom, "Change camera zoom", () => App.CycleZoom()).Name = "set_zoom";
+        }
         var reset = Button(body, "Restore default settings", () => Confirm("Restore default settings? Text size, sound, motion and contrast return to their defaults.", "Restore defaults", () => ApplyPreferences(new UiPreferences(), persist: true), "reset_settings"));
         reset.Name = "set_reset";
     }

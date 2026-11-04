@@ -183,13 +183,25 @@ func generate_item(owner: String, prototype: String, material: String, quality: 
 	var item := bag(owner).create_item(prototype)
 	serial += 1
 	item.set_property("instance_id", "item:%d" % serial)
+	_apply_material(item, materials[material], material, quality)
+	return bag(owner).add_item(item)
+
+## Shared deterministic material rules. Preview uses an unattached disposable item, no bag or serial changes.
+func _apply_material(item: InventoryItem, properties: Dictionary, material: String, quality: int) -> void:
 	item.set_property("material", material)
 	item.set_property("quality", quality)
 	item.set_property("condition", 100)
-	item.set_property("mass", materials[material].mass)
+	item.set_property("mass", properties.mass)
 	for stat in ["damage", "defence", "power"]:
-		if item.has_property(stat): item.set_property(stat, float(item.get_property(stat)) * float(materials[material].get(stat, 1.0)) * (0.85 + quality * 0.15))
-	return bag(owner).add_item(item)
+		if item.has_property(stat): item.set_property(stat, float(item.get_property(stat)) * float(properties.get(stat, 1.0)) * (0.85 + quality * 0.15))
+
+func product_preview(prototype: String, material: String, quality: int) -> String:
+	if not can_produce(prototype, 1, material, quality): return "[]"
+	var item := InventoryItem.new(protos, prototype)
+	if material != "":
+		var materials: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://game/data/materials.json"))
+		_apply_material(item, materials[material], material, quality)
+	return JSON.stringify([item_row(item, false, "")])
 
 func equipment_appearance(owner: String) -> String:
 	var result := {"weapon": "none", "outfit": "none"}

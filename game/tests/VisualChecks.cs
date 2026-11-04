@@ -512,7 +512,7 @@ public static class VisualChecks
             // Part 4 moved developer rows off the menu, so it may scroll less than before.
             // Require the swipe to scroll as far as it can (up to 60) without activating a row.
             float scrollable=(float)(scroller.GetVScrollBar().MaxValue-scroller.GetVScrollBar().Page);
-            if(scrollable<1 || scroller.ScrollVertical<Math.Min(60,scrollable)-1 || !app.Ui.MenuOpen)throw new InvalidOperationException($"Menu swipe over button rows did not scroll safely ({scroller.ScrollVertical}/{scrollable})");
+            if((scrollable>=1 && scroller.ScrollVertical<Math.Min(60,scrollable)-1) || !app.Ui.MenuOpen)throw new InvalidOperationException($"Menu swipe over button rows did not scroll safely ({scroller.ScrollVertical}/{scrollable})");
             scroller.ScrollVertical=0;
             await Frames(app,3);
             var enter=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Enter / Resume");
