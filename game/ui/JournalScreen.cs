@@ -38,7 +38,7 @@ public sealed record JournalExtras(IReadOnlyList<string> Discoveries, IReadOnlyL
 /// <summary>Journal screen (PR #7 Part 3). Presents QuestSystem/Narrative state; never changes it.</summary>
 public static class JournalScreen
 {
-    static readonly (string Status, string Heading)[] Sections =
+    public static readonly (string Status, string Heading)[] Sections =
     {
         ("active", "ACTIVE"), ("available", "AVAILABLE FROM THE WARDEN"), ("completed", "COMPLETED"), ("locked", "NOT YET AVAILABLE"), ("failed", "FAILED")
     };
@@ -72,7 +72,7 @@ public static class JournalScreen
         }
     }
 
-    static void Card(VBoxContainer body, Foundation app, JournalQuest q)
+    public static void Card(VBoxContainer body, Foundation app, JournalQuest q)
     {
         var card = UiDesign.Card(body, "quest_" + q.Id);
         string state = q.Status switch
@@ -101,8 +101,7 @@ public static class JournalScreen
                         if (stage.Done) { card.AddChild(UiDesign.Text("Done: " + stage.Text)); shown++; }
                         else if (stage.Current) { card.AddChild(UiDesign.Text("Now: " + stage.Text)); shown++; }
                     }
-                    int later = q.Stages.Count - shown;
-                    if (q.Status == "active" && later > 0) UiDesign.Note(card, $"{later} more step{(later == 1 ? "" : "s")} after this");
+
                 }
                 else card.AddChild(UiDesign.Text($"{q.Objective} ({q.Progress}/{q.Required})"));
                 break;

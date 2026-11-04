@@ -38,6 +38,14 @@ public static class MapScreen
         };
         body.AddChild(map);
 
+        Guide(body, ui);
+    }
+
+    public static void Guide(VBoxContainer body, RpgUi ui)
+    {
+        var region = ui.App.World.RegionsById[ui.App.World.Player.Region];
+        bool ruin = region.Id == "ruin";
+        var discovered = region.Landmarks.Where(l => region.DiscoveredLandmarks.Contains(Exploration.Identity(region, l))).ToList();
         var legend = UiDesign.Card(body, "map_legend");
         UiDesign.Heading(legend, "LEGEND");
         void Key(Color colour, string marker, string text)
@@ -75,15 +83,18 @@ public partial class RegionMap : Control
     public ActorState Player { get; set; } = null!;
     /// <summary>Show a window around the player instead of the whole region.</summary>
     public bool Zoomed { get; set; }
+    public Vector2I? Centre { get; set; }
     const int WindowWidth = 28, WindowHeight = 18;
     public Rect2 TileWindow { get; private set; }
+
+    public override void _Notification(int what) { if (what == NotificationResized) QueueRedraw(); }
 
     public override void _Draw()
     {
         DrawRect(new Rect2(Vector2.Zero, Size), new Color(.05f, .08f, .08f));
         int px = (int)(Player.X / RegionState.Tile), py = (int)(Player.Y / RegionState.Tile);
         int w = Zoomed ? Math.Min(WindowWidth, Region.Width) : Region.Width, h = Zoomed ? Math.Min(WindowHeight, Region.Height) : Region.Height;
-        int x0 = Zoomed ? Math.Clamp(px - w / 2, 0, Region.Width - w) : 0, y0 = Zoomed ? Math.Clamp(py - h / 2, 0, Region.Height - h) : 0;
+        int x0 = Zoomed ? Math.Clamp((Centre?.X ?? px) - w / 2, 0, Region.Width - w) : 0, y0 = Zoomed ? Math.Clamp((Centre?.Y ?? py) - h / 2, 0, Region.Height - h) : 0;
         TileWindow = new Rect2(x0, y0, w, h);
         float scale = Math.Min(Size.X / w, Size.Y / h);
         var origin = new Vector2((Size.X - w * scale) / 2, (Size.Y - h * scale) / 2);
@@ -106,8 +117,8 @@ public partial class RegionMap : Control
         foreach (var landmark in Region.Landmarks)
         {
             if (!Region.DiscoveredLandmarks.Contains(Exploration.Identity(Region, landmark))) continue;
-            if (!Inside(landmark.OriginX + 5.5f, landmark.OriginY + 5.5f)) continue;
-            var at = At(landmark.OriginX + 5.5f, landmark.OriginY + 5.5f);
+            if (!Inside(landmark.OriginX + landmark.FocalX + .5f, landmark.OriginY + landmark.FocalY + .5f)) continue;
+            var at = At(landmark.OriginX + landmark.FocalX + .5f, landmark.OriginY + landmark.FocalY + .5f);
             DrawCircle(at, 5, landmark.Roles.Contains("objective") ? MapScreen.ObjectiveColour : MapScreen.LandmarkColour);
             Letter(at + new Vector2(7, -4), MapScreen.Landmarks.FirstOrDefault(l => l.Template == landmark.Template).Letter ?? "?");
         }
@@ -132,10 +143,12 @@ public partial class RegionMap : Control
             }
         }
         int ex = Region.Entrance % Region.Width, ey = Region.Entrance / Region.Width;
-        if (Inside(ex, ey)) DrawRect(new Rect2(At(ex + .5f, ey + .5f) - new Vector2(5, 5), new Vector2(10, 10)), MapScreen.EntranceColour);
+        if (Inside(ex, ey) && (Region.Id != "ruin" || Region.ExploredTiles.Contains(Region.Entrance))) DrawRect(new Rect2(At(ex + .5f, ey + .5f) - new Vector2(5, 5), new Vector2(10, 10)), MapScreen.EntranceColour);
         var you = At(Player.X / RegionState.Tile, Player.Y / RegionState.Tile);
-        DrawCircle(you, 7, Colors.Black);
-        DrawCircle(you, 5, MapScreen.PlayerColour);
-        Letter(you + new Vector2(9, -6), "You");
+        if (Inside(Player.X / RegionState.Tile, Player.Y / RegionState.Tile))
+        {
+            DrawCircle(you, 7, Colors.Black); DrawCircle(you, 5, MapScreen.PlayerColour);
+            Letter(you + new Vector2(9, -6), "You");
+        }
     }
 }

@@ -299,22 +299,59 @@ public static class RpgScreensChecks
             Require(ui.FindChild("hero_portrait", true, false) is TextureRect portrait && portrait.Texture != null,
                 "hero preview reuses existing PPC art");
             await Shot("character-hero");
+            var live = app.Views[p.Id].Creature;
+            double facing = live.Motor!.Yaw;
+            var front = HeroPortrait.Get(live.Model);
+            live.Motor.Teleport(PixelCreatures.Core.Vec3.Zero, facing + Math.PI);
+            double turned = live.Motor.Yaw;
+            Require(ReferenceEquals(front, HeroPortrait.Get(live.Model)) && live.Motor.Yaw == turned,
+                "portrait is facing-independent, cached and never rotates gameplay motor");
+            live.Motor.Teleport(new PixelCreatures.Core.Vec3(p.X, 0, p.Y), facing);
+
 
             // Journal and map present production quest and exploration state.
             n.Call("accept_quest", 1); n.Call("receive", "defeated", "player", "", "beast", 1);
             ui.Journal(); await Frames();
             Require(ui.FindChild("quest_1", true, false) != null && ui.FindChild("quest_2", true, false) != null, "journal lists quests as cards");
+            await Press("quest_2");
+            Require(ui.JournalSelection == 2 && ui.FindChild("selected_quest", true, false) != null, "quest index selects a reading page");
+            string narrativeBefore = n.Call("export_state").AsString();
+            ui.Character(); ui.Journal(); await Frames();
+            Require(ui.JournalSelection == 2 && n.Call("export_state").AsString() == narrativeBefore, "journal selection survives switching without changing quests");
+            var locked = JournalQuest.Read(n).First(q => q.Id == 2);
+            var text = string.Join("\n", ui.FindChildren("*", "Label", true, false).OfType<Label>().Where(l => l.IsVisibleInTree()).Select(l => l.Text));
+            Require(locked.Stages.Where(s => !s.Done && !s.Current).All(s => !text.Contains(s.Text)), "reading pane hides unknown future stages");
             await Shot("journal");
+            n.Call("receive", "defeated", "player", "", "beast", 1);
+            n.Call("accept_quest", 2); w.Enter(p, "ruin");
+            ui.JournalSelection = 2; ui.Journal(); await Frames();
+            var activeQuest = JournalQuest.Read(n).First(q => q.Id == 2);
+            var shown = string.Join("\n", ui.FindChildren("*", "Label", true, false).OfType<Label>().Where(l => l.IsVisibleInTree()).Select(l => l.Text));
+            Require(activeQuest.Status == "active" && activeQuest.Stages.Where(s => !s.Done && !s.Current).All(s => !shown.Contains(s.Text)), "active journal reveals current and past stages only");
+            await Shot("journal-active");
+            w.Enter(p, "reach");
             ui.MapZoomed = false; ui.Map(); await Frames();
             var map = (RegionMap)ui.FindChild("region_map", true, false)!;
             Require(map.TileWindow.Size.X == w.RegionsById[p.Region].Width, "whole-map view");
             await Press("map_around you");
             map = (RegionMap)ui.FindChild("region_map", true, false)!;
             Require(ui.MapZoomed && map.TileWindow.Size.X < w.RegionsById[p.Region].Width, "zoom shows a window around the player");
+            var exploredBefore = w.RegionsById[p.Region].ExploredTiles.Count;
+            var startWindow = map.TileWindow;
+            await Press("map_pan_east");
+            Require(map.Centre != null && map.TileWindow.End.X <= map.Region.Width && map.TileWindow.Position.X >= 0, "bounded map pan");
+            await Press("map_recenter");
+            Require(map.Centre == null && map.TileWindow == startWindow && map.Region.ExploredTiles.Count == exploredBefore, "recenter preserves fog authority");
             await Shot("map");
-            w.RegionsById["ruin"] = Regions.Dungeon(1); w.Enter(p, "ruin"); ui.MapZoomed = false; ui.Map(); await Frames();
+            w.RegionsById["ruin"] = Regions.Dungeon(1); w.Enter(p, "ruin");
             var ruin = w.RegionsById["ruin"];
+            var entrance = ruin.Center(ruin.Entrance); p.X = entrance.X; p.Y = entrance.Y; Exploration.Discover(w);
+            ui.MapZoomed = true; ui.Map(); await Frames();
+            await Press("map_guide");
             Require(ruin.ExploredTiles.Count < ruin.Tiles.Length && ui.FindChild("map_landmarks", true, false) != null, "ruin map renders only explored state with a discovered-room list");
+            await Shot("map-ruin-guide");
+            ui.Back(); await Frames();
+            Require(!ui.MapGuide && ui.Navigation.Screen == "REGION MAP", "Back closes map guide before leaving map");
             await Shot("map-ruin");
 
             // Large text at a compact phone viewport: no control is clipped horizontally.
@@ -326,7 +363,13 @@ public static class RpgScreensChecks
             {
                 open(); await Frames(6);
                 var screen = ui.ScreenRect;
-                var scroll = ui.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>().First(s => s.IsVisibleInTree());
+                var scroll = ui.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>().FirstOrDefault(s => s.IsVisibleInTree());
+                if (scroll == null)
+                {
+                    var canvas = (RegionMap)ui.FindChild("region_map", true, false)!;
+                    Require(screen.Encloses(canvas.GetGlobalRect()) && canvas.Size.Y > 80, "compact map owns a visible canvas inside safe area");
+                    continue;
+                }
                 float right = scroll.GetVScrollBar().GetGlobalRect().Position.X + 1;
                 foreach (var control in scroll.FindChildren("*", "Control", true, false).OfType<Control>().Where(c => c.IsVisibleInTree() && c is Button or PanelContainer))
                     Require(control.GetGlobalRect().End.X <= right && control.GetGlobalRect().Position.X >= screen.Position.X, $"{ui.Navigation.Screen}: {control.Name} fits beside the scrollbar with large text");
@@ -336,6 +379,7 @@ public static class RpgScreensChecks
         finally
         {
             window.Size = originalSize; ui.VerificationSafeArea = null; ui.SetTextScale(1);
+            ui.JournalSelection = null; ui.JournalReading = ui.MapGuide = false; ui.MapCentre = null;
             ui.CharacterTab = 0; ui.PackTab = 0; ui.PackSelection = null; ui.MapZoomed = false;
             Persistence.Restore(w, n, original); app.RebuildViews(); ui.Layout(); ui.Notify(""); ui.PauseForVerification(); await Frames(2);
         }

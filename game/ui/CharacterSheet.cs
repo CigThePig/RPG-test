@@ -1,7 +1,7 @@
 using Godot;
 namespace Mosslight;
 
-/// <summary>Read-only hero presentation. Shares the world's PPC texture; never creates a second actor or renderer.</summary>
+/// <summary>Read-only hero presentation. Uses an independent cached PPC portrait; never changes the gameplay actor.</summary>
 public partial class CharacterSheet : VBoxContainer
 {
     readonly RpgUi ui;
@@ -57,22 +57,12 @@ public partial class CharacterSheet : VBoxContainer
     {
         var app = ui.App; var actor = app.World.Player;
         UiDesign.Heading(column, "THE WAYFARER");
-        // CreatureActor already caches its last render. Sharing its texture is bounded,
-        // follows actual equipped appearance, and respects reduced motion while paused.
-        var texture = app.Views.GetValueOrDefault(actor.Id)?.Creature?.Texture;
-        if (texture != null)
-        {
-            // PPC canvases include transparent space for the full animation range.
-            // Inspect alpha once on opening/rebuild, then share only the occupied
-            // region through an atlas view. No extra creature or texture upload.
-            using var image = texture.GetImage();
-            var occupied = image.GetUsedRect();
-            Texture2D portrait = occupied.HasArea() ? new AtlasTexture { Atlas = texture, Region = occupied, FilterClip = true } : texture;
+        var portrait = HeroPortrait.Get(app.Views.GetValueOrDefault(actor.Id)?.Creature?.Model);
+        if (portrait != null)
             column.AddChild(new TextureRect { Name = "hero_portrait", Texture = portrait,
                 CustomMinimumSize = new Vector2(0, 190 * ui.TextScale),
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                 TextureFilter = CanvasItem.TextureFilterEnum.Nearest, MouseFilter = MouseFilterEnum.Ignore });
-        }
         else UiDesign.Note(column, actor.Appearance.Family + " · Portrait unavailable");
         UiDesign.Note(column, $"{actor.Appearance.Family} · {actor.Region}\nHealth {actor.Health:0} / {actor.MaxHealth} · Mana {actor.Mana:0} / {actor.MaxMana}");
         var xp = new ProgressBar { Name = "character_experience", MinValue = 0, MaxValue = actor.Level * 100,

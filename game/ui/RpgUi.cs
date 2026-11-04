@@ -40,6 +40,12 @@ public partial class RpgUi : CanvasLayer
     PackLayout? packLayout;
     internal int CharacterTab;
     CharacterSheet? characterSheet;
+    JournalLayout? journalLayout;
+    ExplorationMapLayout? mapLayout;
+    internal int? JournalSelection;
+    internal bool JournalReading, MapGuide;
+    internal string? MapRegion;
+    internal Vector2I? MapCentre;
     VBoxContainer body = null !;
     Control root = null !;
     Control hotbar = null !;
@@ -279,7 +285,7 @@ public partial class RpgUi : CanvasLayer
             var rect = UiDesign.Overlay(overlaySafe, width);
             control.CustomMinimumSize = Vector2.Zero; control.Position = rect.Position; control.Size = rect.Size;
         }
-        if ((navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0) || navigation.Screen == "CHARACTER · WAYFARER")
+        if ((navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0) || navigation.Screen is "CHARACTER · WAYFARER" or "QUEST JOURNAL" or "REGION MAP")
         {
             panel.CustomMinimumSize = Vector2.Zero;
             panel.Position = overlaySafe.Position + new Vector2(16, 16);
@@ -299,6 +305,8 @@ public partial class RpgUi : CanvasLayer
             packLayout.Rebuild();
         if (navigation.Screen == "CHARACTER · WAYFARER" && characterSheet != null &&
             GodotObject.IsInstanceValid(characterSheet) && characterSheet.IsInsideTree()) characterSheet.Rebuild();
+        if (navigation.Screen == "QUEST JOURNAL" && journalLayout != null && GodotObject.IsInstanceValid(journalLayout) && journalLayout.IsInsideTree()) journalLayout.Rebuild();
+        if (navigation.Screen == "REGION MAP" && mapLayout != null && GodotObject.IsInstanceValid(mapLayout) && mapLayout.IsInsideTree()) mapLayout.Rebuild();
     }
 
     static Button Button(Node parent, string text, Action action) => UiDesign.Action(parent, text, action);
@@ -329,6 +337,10 @@ public partial class RpgUi : CanvasLayer
             { characterSheet.Hide(); characterSheet.QueueFree(); }
             characterSheet = null;
         }
+        if (journalLayout != null && navigation.Screen != "QUEST JOURNAL")
+        { if (GodotObject.IsInstanceValid(journalLayout)) { journalLayout.Hide(); journalLayout.QueueFree(); } journalLayout = null; }
+        if (mapLayout != null && navigation.Screen != "REGION MAP")
+        { if (GodotObject.IsInstanceValid(mapLayout)) { mapLayout.Hide(); mapLayout.QueueFree(); } mapLayout = null; }
         bool dialogue = App.Narrative.Get("speaking").AsBool();
         panel.Visible = navigation.Screen != null && !navigation.Confirmation && !dialogue;
         menu.Visible = navigation.Menu && !navigation.Confirmation && !dialogue;
@@ -372,6 +384,9 @@ public partial class RpgUi : CanvasLayer
     void NavigateBack()
     {
         CancelGestures();
+        if (!navigation.Confirmation && navigation.Screen == "QUEST JOURNAL" && journalLayout?.DismissReading() == true) return;
+        if (!navigation.Confirmation && navigation.Screen == "REGION MAP" && mapLayout?.DismissGuide() == true) return;
+
         if (navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0 &&
             packLayout != null && GodotObject.IsInstanceValid(packLayout) && packLayout.IsInsideTree() &&
             packLayout.DismissDetail()) return;
@@ -453,6 +468,7 @@ public partial class RpgUi : CanvasLayer
         // Present retires the previous custom tree; Layout must never rebuild it.
         packLayout = null;
         characterSheet = null;
+        journalLayout = null; mapLayout = null;
         panel.Present(heading == "PACK & EQUIPMENT" && PackTab == 0 ? "THE WAYFARER'S KIT" : heading, refresh);
         SyncNavigation(); return true;
     }
@@ -685,7 +701,7 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         if (!Open("QUEST JOURNAL")) return;
-        JournalScreen.Populate(body, App);
+        Layout(); journalLayout = new JournalLayout(this); panel.MountCustom(journalLayout);
     }
 
     public void Character()
@@ -701,7 +717,7 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         if (!Open("REGION MAP")) return;
-        MapScreen.Populate(body, this);
+        Layout(); mapLayout = new ExplorationMapLayout(this); panel.MountCustom(mapLayout);
     }
 
     public void Menu() => Back();

@@ -1,7 +1,7 @@
 # PR #7: Complete RPG Interface Redesign
 **Revised canonical plan (v2) | 2 November 2026 | Target: `feat/mobile-ui-ux-overhaul` -> `main`**
 
-> **Scope reset, not a code reset.** The original four implementation parts are retained unchanged in history as **new Part 1: Functional UI foundation**. All shipped code, safeguards, source references, tests and previous handoffs remain valid as historical records. Revised Parts 2–3 have implementation on this branch; physical Galaxy S25 acceptance remains pending. Parts 4–6 remain planned. PR #7 stays **draft and unmerged** until visual and physical-device acceptance. Part 1 has outstanding Galaxy S25 issues, including swipe/highlight behavior under verification, and is not considered phone-accepted.
+> **Scope reset, not a code reset.** The original four implementation parts are retained unchanged in history as **new Part 1: Functional UI foundation**. All shipped code, safeguards, source references, tests and previous handoffs remain valid as historical records. Revised Parts 2–3 have implementation on this branch; physical Galaxy S25 acceptance remains pending. Part 4 has implementation on this branch; Parts 5–6 remain planned. PR #7 stays **draft and unmerged** until visual and physical-device acceptance. Part 1 has outstanding Galaxy S25 issues, including swipe/highlight behavior under verification, and is not considered phone-accepted.
 
 ## Why the plan changed
 
@@ -69,6 +69,8 @@ Implementation: [Character presentation handoff](PR7_CHARACTER_PRESENTATION_HAND
 **Acceptance:** first-level and progressed character, available/blocked skills, equipped and unequipped appearances, portrait performance, confirmations, phone accessibility, no double spend, save/load consistency.
 
 ### Part 4 of 6 — Quest Journal and Exploration Map
+
+Implementation: [Exploration presentation handoff](PR7_EXPLORATION_PRESENTATION_HANDOFF.md). Dedicated quest index/reading panes, compact reading pages, map-dominant canvas, optional guide and bounded around-you pan controls. The user's S25 portrait-facing feedback is corrected with a separate cached front-facing PPC render. Automated and physical acceptance remain separate.
 
 **Outcome:** two distinct, information-rich RPG experiences rather than generic scroll cards.
 

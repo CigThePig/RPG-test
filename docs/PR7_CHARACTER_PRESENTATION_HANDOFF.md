@@ -1,6 +1,10 @@
 # PR #7 — Revised Part 3: Character and progression
 
-## Implementation
+## S25 feedback and portrait correction
+
+The user tested Part 3 on the Galaxy S25 and reported that it looks good overall. The shared live texture followed gameplay facing, which made a back-facing portrait look wrong. The Part 4 follow-up replaces it with an independent, cached PPC render in a neutral south-facing pose. It uses the actual equipped model, never touches the gameplay motor, and rerenders only when the model changes. This correction still needs the user's S25 retest.
+
+## Original implementation
 
 Character now mounts its own full safe-area composition through `UiScreenHost.MountCustom`. Wide views keep a hero/gear pane alongside independently scrolling Stats, Train and Abilities pages. Compact views add a full-width Hero page. The breakpoint uses available safe width divided by text scale; required controls retain the shared 56-unit minimum target and persistent Back button. The selected page survives confirmation refresh and resizing.
 
