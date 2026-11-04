@@ -38,6 +38,8 @@ public partial class RpgUi : CanvasLayer
     public Button ScreenBack => panel.BackButton;
     internal PackViewState PackState { get; } = new();
     PackLayout? packLayout;
+    internal int CharacterTab;
+    CharacterSheet? characterSheet;
     VBoxContainer body = null !;
     Control root = null !;
     Control hotbar = null !;
@@ -277,7 +279,7 @@ public partial class RpgUi : CanvasLayer
             var rect = UiDesign.Overlay(overlaySafe, width);
             control.CustomMinimumSize = Vector2.Zero; control.Position = rect.Position; control.Size = rect.Size;
         }
-        if (navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0)
+        if ((navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0) || navigation.Screen == "CHARACTER · WAYFARER")
         {
             panel.CustomMinimumSize = Vector2.Zero;
             panel.Position = overlaySafe.Position + new Vector2(16, 16);
@@ -295,6 +297,8 @@ public partial class RpgUi : CanvasLayer
         if (navigation.Screen == "PACK & EQUIPMENT" && PackTab == 0 &&
             packLayout != null && GodotObject.IsInstanceValid(packLayout) && packLayout.IsInsideTree())
             packLayout.Rebuild();
+        if (navigation.Screen == "CHARACTER · WAYFARER" && characterSheet != null &&
+            GodotObject.IsInstanceValid(characterSheet) && characterSheet.IsInsideTree()) characterSheet.Rebuild();
     }
 
     static Button Button(Node parent, string text, Action action) => UiDesign.Action(parent, text, action);
@@ -318,6 +322,12 @@ public partial class RpgUi : CanvasLayer
                 packLayout.QueueFree();
             }
             packLayout = null;
+        }
+        if (characterSheet != null && navigation.Screen != "CHARACTER · WAYFARER")
+        {
+            if (GodotObject.IsInstanceValid(characterSheet) && !characterSheet.IsQueuedForDeletion())
+            { characterSheet.Hide(); characterSheet.QueueFree(); }
+            characterSheet = null;
         }
         bool dialogue = App.Narrative.Get("speaking").AsBool();
         panel.Visible = navigation.Screen != null && !navigation.Confirmation && !dialogue;
@@ -442,6 +452,7 @@ public partial class RpgUi : CanvasLayer
         CancelGestures(); navigation.Open(heading);
         // Present retires the previous custom tree; Layout must never rebuild it.
         packLayout = null;
+        characterSheet = null;
         panel.Present(heading == "PACK & EQUIPMENT" && PackTab == 0 ? "THE WAYFARER'S KIT" : heading, refresh);
         SyncNavigation(); return true;
     }
@@ -681,7 +692,9 @@ public partial class RpgUi : CanvasLayer
     {
         if (App.Narrative.Get("speaking").AsBool()) return;
         if (!Open("CHARACTER · WAYFARER")) return;
-        CharacterOverview.Populate(body, App, this);
+        Layout();
+        characterSheet = new CharacterSheet(this);
+        panel.MountCustom(characterSheet);
     }
 
     public void Map()

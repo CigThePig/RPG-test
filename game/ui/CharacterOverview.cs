@@ -59,16 +59,16 @@ public static class CharacterOverview
         return null;
     }
 
-    static void Progression(VBoxContainer body, Foundation app, RpgUi ui)
+    public static void Progression(VBoxContainer body, Foundation app, RpgUi ui, bool abilities = true, bool skills = true)
     {
         var actor = app.World.Player;
         UiDesign.Heading(body, $"PROGRESSION · {actor.SkillPoints} unspent skill point{(actor.SkillPoints == 1 ? "" : "s")}");
         UiDesign.Note(body, "Spending skill points is permanent. Each choice asks for confirmation. Level up by defeating foes.");
-        foreach (var ability in app.World.Content.Abilities.Where(a => a.PlayerLearnable || actor.Abilities.Contains(a.Id)))
+        if (abilities) foreach (var ability in app.World.Content.Abilities.Where(a => a.PlayerLearnable || actor.Abilities.Contains(a.Id)))
         {
             var card = UiDesign.Card(body, "ability_" + ability.Id);
             bool learned = actor.Abilities.Contains(ability.Id);
-            UiDesign.Heading(card, $"{ability.Name.ToUpperInvariant()}  ·  {(learned ? "Learned" : "Not learned")}");
+            UiDesign.Heading(card, $"{ability.Name.ToUpperInvariant()}  ·  {(learned ? "Learned" : LearnBlocker(actor, ability) == null ? "Available" : "Locked")}");
             card.AddChild(UiDesign.Text($"Mana {ability.Cost:0} · range {ability.Range:0} · recovers in {ability.Cooldown:0.#}s" + (learned ? "" : $"\nRequires level {ability.UnlockLevel} · costs {ability.UnlockCost} skill point{(ability.UnlockCost == 1 ? "" : "s")}")));
             if (learned) continue;
             var blocker = LearnBlocker(actor, ability);
@@ -82,18 +82,18 @@ public static class CharacterOverview
             learn.Name = "learn_" + ability.Id;
             if (blocker != null) { learn.Disabled = true; UiDesign.Note(card, blocker); }
         }
-        foreach (var skill in app.World.Content.Skills)
+        if (skills) foreach (var skill in app.World.Content.Skills)
         {
             var card = UiDesign.Card(body, "skill_" + skill.Id);
             int rank = actor.SkillRanks.GetValueOrDefault(skill.Id);
             string name = char.ToUpperInvariant(skill.Id[0]) + skill.Id[1..];
-            UiDesign.Heading(card, $"{name.ToUpperInvariant()}  ·  rank {rank} of {skill.MaxRank}");
-            card.AddChild(UiDesign.Text($"Each rank adds {skill.PerRank:0.##} {skill.Stat} · now {rank * skill.PerRank:+0.##;-0.##;0} {skill.Stat}"));
+            UiDesign.Heading(card, $"{name.ToUpperInvariant()} · { (rank >= skill.MaxRank ? "Mastered" : TrainBlocker(actor, skill) == null ? "Available" : "Blocked")} · rank {rank} of {skill.MaxRank}");
+            card.AddChild(UiDesign.Text($"Each rank adds {skill.PerRank:+0.##;-0.##;0} {skill.Stat} · costs 1 skill point\n" + Breakdown(app.World, actor, skill.Stat) + $"\nAfter training: {app.World.Stat(actor, skill.Stat) + (rank < skill.MaxRank ? skill.PerRank : 0):0.##} {skill.Stat}"));
             var blocker = TrainBlocker(actor, skill);
             var train = UiDesign.Action(card, $"Train {name} to rank {Math.Min(rank + 1, skill.MaxRank)}", () => ui.Confirm(
                 $"Train {name} to rank {rank + 1}? This spends 1 skill point and cannot be undone.", "Train " + name, () =>
                 {
-                    bool ok = app.ManageItem(() => Mosslight.Progression.Train(app.World, actor, skill.Id));
+                    bool ok = app.ManageItem(() => actor == app.World.Player && actor.SkillRanks.GetValueOrDefault(skill.Id) == rank && Mosslight.Progression.Train(app.World, actor, skill.Id));
                     ui.Notify(ok ? $"{name} trained to rank {actor.SkillRanks.GetValueOrDefault(skill.Id)}" : TrainBlocker(actor, skill) ?? "Cannot train right now");
                 }));
             train.Name = "train_" + skill.Id;

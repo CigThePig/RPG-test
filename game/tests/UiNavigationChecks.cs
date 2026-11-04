@@ -107,11 +107,11 @@ public static class UiNavigationChecks
                 var viewport = app.GetViewport().GetVisibleRect();
                 var safe = new Rect2(viewport.Position+new Vector2(60,28),viewport.Size-new Vector2(120,56));
                 app.Ui.VerificationSafeArea = safe;
-                app.Ui.SetTextScale(1.3f); app.Ui.Character(); await Frames(8);
+                app.Ui.SetTextScale(1.3f); app.Ui.CharacterTab = 2; app.Ui.Character(); await Frames(8);
                 Require(safe.Encloses(app.Ui.ScreenRect), $"{size} screen safe bounds");
                 Require(app.Ui.ScreenRect.Encloses(app.Ui.ScreenBack.GetGlobalRect()), $"{size} persistent Back inside panel");
                 Require(app.Ui.ScreenBack.Size.Y >= UiDesign.Target, "Back target minimum");
-                var scroll = app.Ui.FindChildren("*","ScrollContainer",true,false).OfType<TouchScroll>().First(s=>s.IsVisibleInTree());
+                var scroll = app.Ui.FindChildren("*","ScrollContainer",true,false).OfType<TouchScroll>().First(s=>s.IsVisibleInTree() && s.Name == "character_detail_scroll");
                 Require(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page,"large text pilot scrolls");
                 var bar = scroll.GetVScrollBar().GetGlobalRect();
                 Require(scroll.GetChild<Control>(0).GetGlobalRect().End.X <= bar.Position.X + 1,

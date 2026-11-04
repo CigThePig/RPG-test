@@ -268,19 +268,37 @@ public static class RpgScreensChecks
             Require(ui.FindChild("buy_" + buyable.Id, true, false) == null, "trade offers vanish away from the merchant");
 
             // Character progression requires confirmation; Cancel changes nothing.
-            p.SkillPoints = 1; var skill = w.Content.Skills.First();
+            p.SkillPoints = 2; var skill = w.Content.Skills.First();
             int rank = p.SkillRanks.GetValueOrDefault(skill.Id);
+            ui.CharacterTab = 2;
             ui.Character(); await Frames();
+            Require(ui.FindChild("character_sheet", true, false) != null, "Character owns a dedicated composition");
+            Require(ui.FindChild("skill_" + skill.Id, true, false) != null, "training page shows authoritative skill ranks");
             await Press("train_" + skill.Id);
             Require(ui.Navigation.Confirmation && ui.ConfirmationText.Contains("cannot be undone"), "training asks for confirmation");
             await Shot("character-confirm");
             ui.ConfirmationButton("confirm_cancel")!.EmitSignal(Button.SignalName.Pressed); await Frames();
-            Require(p.SkillPoints == 1 && p.SkillRanks.GetValueOrDefault(skill.Id) == rank && ui.Navigation.Screen == "CHARACTER · WAYFARER", "Cancel returns to Character unchanged");
+            Require(p.SkillPoints == 2 && p.SkillRanks.GetValueOrDefault(skill.Id) == rank && ui.Navigation.Screen == "CHARACTER · WAYFARER", "Cancel returns to Character unchanged");
             await Press("train_" + skill.Id);
-            ui.ConfirmationButton("confirm_accept")!.EmitSignal(Button.SignalName.Pressed); await Frames();
-            Require(p.SkillPoints == 0 && p.SkillRanks.GetValueOrDefault(skill.Id) == rank + 1 && ui.Navigation.Screen == "CHARACTER · WAYFARER", "Confirm trains once and returns to Character");
+            var acceptTraining = ui.ConfirmationButton("confirm_accept")!;
+            acceptTraining.EmitSignal(Button.SignalName.Pressed);
+            acceptTraining.EmitSignal(Button.SignalName.Pressed); await Frames();
+            Require(p.SkillPoints == 1 && p.SkillRanks.GetValueOrDefault(skill.Id) == rank + 1 && ui.Navigation.Screen == "CHARACTER · WAYFARER", "Confirm trains once and returns to Character");
+            p.SkillPoints = 0; ui.Character(); await Frames();
             Require(Find("train_" + skill.Id).Disabled, "no points left disables training with a reason");
             await Shot("character-progression");
+            // Learned and future abilities occupy their own page, separate from attributes.
+            await Press("character_tab_abilities");
+            Require(ui.FindChild("ability_" + p.Abilities.First(), true, false) != null, "learned abilities remain discoverable");
+            await Shot("character-abilities");
+            await Press("character_tab_stats");
+            Require(ui.FindChild("attribute_strength", true, false) != null && ui.FindChild("train_" + skill.Id, true, false) == null,
+                "attributes and progression have distinct purposeful pages");
+            await Shot("character-attributes");
+            ui.CharacterTab = 0; ui.Character(); await Frames();
+            Require(ui.FindChild("hero_portrait", true, false) is TextureRect portrait && portrait.Texture != null,
+                "hero preview reuses existing PPC art");
+            await Shot("character-hero");
 
             // Journal and map present production quest and exploration state.
             n.Call("accept_quest", 1); n.Call("receive", "defeated", "player", "", "beast", 1);
@@ -318,7 +336,7 @@ public static class RpgScreensChecks
         finally
         {
             window.Size = originalSize; ui.VerificationSafeArea = null; ui.SetTextScale(1);
-            ui.PackTab = 0; ui.PackSelection = null; ui.MapZoomed = false;
+            ui.CharacterTab = 0; ui.PackTab = 0; ui.PackSelection = null; ui.MapZoomed = false;
             Persistence.Restore(w, n, original); app.RebuildViews(); ui.Layout(); ui.Notify(""); ui.PauseForVerification(); await Frames(2);
         }
     }

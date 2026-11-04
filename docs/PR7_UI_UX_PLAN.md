@@ -1,7 +1,7 @@
 # PR #7: Complete RPG Interface Redesign
 **Revised canonical plan (v2) | 2 November 2026 | Target: `feat/mobile-ui-ux-overhaul` -> `main`**
 
-> **Scope reset, not a code reset.** The original four implementation parts are retained unchanged in history as **new Part 1: Functional UI foundation**. All shipped code, safeguards, source references, tests and previous handoffs remain valid as historical records. New Parts 2–6 are planned and **are not implemented**. PR #7 stays **draft and unmerged** until visual and physical-device acceptance. Part 1 has outstanding Galaxy S25 issues, including swipe/highlight behavior under verification, and is not considered phone-accepted.
+> **Scope reset, not a code reset.** The original four implementation parts are retained unchanged in history as **new Part 1: Functional UI foundation**. All shipped code, safeguards, source references, tests and previous handoffs remain valid as historical records. Revised Parts 2–3 have implementation on this branch; physical Galaxy S25 acceptance remains pending. Parts 4–6 remain planned. PR #7 stays **draft and unmerged** until visual and physical-device acceptance. Part 1 has outstanding Galaxy S25 issues, including swipe/highlight behavior under verification, and is not considered phone-accepted.
 
 ## Why the plan changed
 
@@ -55,6 +55,8 @@ Actual Galaxy S25 playtesting found an architectural/visual problem beyond the b
 **Acceptance:** screenshot review of populated and empty inventory, selected gear/consumable/currency, comparison, full pack, long names, larger text and two aspect ratios; functional touch tests for open, select, scroll, equip/unequip/use, cancel, swap and scroll restore; Android frame/memory sanity; no save or transaction regressions.
 
 ### Part 3 of 6 — Character identity, readable attributes and progression
+
+Implementation: [Character presentation handoff](PR7_CHARACTER_PRESENTATION_HANDOFF.md). Dedicated responsive hero/gear and Stats/Train/Abilities pages, cached PPC art, authoritative breakdowns and confirmed spending. Automated and physical acceptance are tracked separately.
 
 **Outcome:** Character should feel like inspecting and improving a hero, not reading a debug dump.
 
