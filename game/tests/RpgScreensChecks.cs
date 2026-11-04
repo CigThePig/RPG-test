@@ -350,6 +350,13 @@ public static class RpgScreensChecks
             await Press("map_guide");
             Require(ruin.ExploredTiles.Count < ruin.Tiles.Length && ui.FindChild("map_landmarks", true, false) != null, "ruin map renders only explored state with a discovered-room list");
             await Shot("map-ruin-guide");
+            n.Set("speaking", true);
+            try
+            {
+                ui.SystemBack();
+                Require(ui.MapGuide && ui.Navigation.Screen == "REGION MAP", "dialogue owns Back over custom map guide");
+            }
+            finally { n.Set("speaking", false); }
             ui.Back(); await Frames();
             Require(!ui.MapGuide && ui.Navigation.Screen == "REGION MAP", "Back closes map guide before leaving map");
             await Shot("map-ruin");

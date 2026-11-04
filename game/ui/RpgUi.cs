@@ -384,6 +384,7 @@ public partial class RpgUi : CanvasLayer
     void NavigateBack()
     {
         CancelGestures();
+        if (App.Narrative.Get("speaking").AsBool()) return; // Dialogue owns Back, including custom pages underneath.
         if (!navigation.Confirmation && navigation.Screen == "QUEST JOURNAL" && journalLayout?.DismissReading() == true) return;
         if (!navigation.Confirmation && navigation.Screen == "REGION MAP" && mapLayout?.DismissGuide() == true) return;
 
