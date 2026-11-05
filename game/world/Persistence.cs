@@ -231,12 +231,39 @@ public static class Persistence
         try
         {
             var data = Parse(text, content);
+            ValidateSubsystems(data);
             var player = data.Actors["player"];
             return new(SlotState.Ready, "Ready", player.Level, player.Region, data.Time, data.Tick, saved);
         }
         catch (Exception e) when (e is InvalidDataException or JsonException or KeyNotFoundException or ArgumentException or NotSupportedException or NullReferenceException or InvalidOperationException or OverflowException)
         {
             return new(SlotState.Damaged, "Damaged save file · " + e.Message, 0, "", 0, 0, saved);
+        }
+    }
+
+    // Run the same importers as Restore against disposable nodes. The narrative
+    // manager normally becomes a child in _Ready; attach it here without entering
+    // the scene tree or touching the live game and its UI.
+    static void ValidateSubsystems(SaveData data)
+    {
+        var items = GD.Load<GDScript>("res://game/items/ItemService.gd").New().AsGodotObject() as Node
+            ?? throw new InvalidOperationException("Cannot create item validator");
+        Node? narrative = null;
+        try
+        {
+            narrative = GD.Load<GDScript>("res://game/narrative/Narrative.gd").New().AsGodotObject() as Node
+                ?? throw new InvalidOperationException("Cannot create narrative validator");
+            var manager = narrative.Get("manager").AsGodotObject() as Node
+                ?? throw new InvalidOperationException("Cannot create narrative manager");
+            narrative.AddChild(manager);
+            if (!items.Call("import_state", data.Items ?? "").AsBool() ||
+                !narrative.Call("import_state", data.Narrative ?? "").AsBool())
+                throw new InvalidDataException("Subsystem snapshot rejected");
+        }
+        finally
+        {
+            narrative?.Free();
+            items.Free();
         }
     }
 

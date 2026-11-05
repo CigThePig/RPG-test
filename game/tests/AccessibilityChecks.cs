@@ -95,10 +95,30 @@ public static class AccessibilityChecks
                 check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Damaged,
                     "null " + property + " is damaged instead of throwing");
             }
+            string liveBeforeInspection = Persistence.Capture(app.World, app.Narrative);
+            int retainedNumber = 0;
+            foreach (string property in new[] { "Items", "Narrative" })
+            {
+                foreach (string? badSnapshot in new string?[] { null, "", "{}", "not json" })
+                {
+                    var damagedSave = System.Text.Json.Nodes.JsonNode.Parse(validSave)!;
+                    if (badSnapshot == null) damagedSave.AsObject().Remove(property);
+                    else damagedSave[property] = badSnapshot;
+                    string damagedText = damagedSave.ToJsonString();
+                    File.WriteAllText(Persistence.SlotPath(3), damagedText);
+                    check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Damaged
+                        && File.ReadAllText(Persistence.SlotPath(3)) == damagedText
+                        && Persistence.Capture(app.World, app.Narrative) == liveBeforeInspection,
+                        property + " invalid snapshot is damaged without changing file or live state");
+                    Persistence.ReplaceDamaged(app.World, app.Narrative, 3);
+                    check(File.ReadAllText(Persistence.SlotPath(3) + ".damaged-" + (++retainedNumber) + ".json") == damagedText,
+                        property + " damaged snapshot retained on replacement");
+                }
+            }
             File.WriteAllText(Persistence.SlotPath(3), "{truncated");
             check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Damaged && File.ReadAllText(Persistence.SlotPath(3)) == "{truncated", "corrupt file is damaged and untouched by inspection");
             Persistence.ReplaceDamaged(app.World, app.Narrative, 3);
-            check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Ready && File.ReadAllText(Persistence.SlotPath(3) + ".damaged-1.json") == "{truncated", "replacing a damaged slot keeps a copy of it");
+            check(Persistence.Inspect(Persistence.SlotPath(3), content).State == SlotState.Ready && File.ReadAllText(Persistence.SlotPath(3) + ".damaged-9.json") == "{truncated", "replacing a damaged slot keeps a copy of it");
             refused = false; try { Persistence.ReplaceDamaged(app.World, app.Narrative, 1); } catch (InvalidOperationException) { refused = true; }
             check(refused, "only damaged slots can be replaced without confirmation of overwrite");
             string malformedRecovery = "{\"Generator\":\"" + Regions.Version + "\",\"Schema\":\"broken\"}";
