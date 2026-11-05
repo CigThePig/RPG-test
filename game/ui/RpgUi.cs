@@ -1083,7 +1083,7 @@ public partial class RpgUi : CanvasLayer
         Option("text", "book", "Text size", Preferences.TextSizeName, "Menus, screens, dialogue and notices. The HUD keeps a fixed size so it never covers controls.",
             p => p.TextSize = (p.TextSize + 1) % UiPreferences.TextScales.Length);
         Option("sound", "spark", "Sound", Preferences.Muted ? "Off" : "On", "Combat and interface sounds.", p => p.Muted = !p.Muted, !Preferences.Muted);
-        Option("motion", "feather", "Reduced motion", Preferences.ReducedMotion ? "On" : "Off", "Removes the camera nudge on impacts. Combat timing, sounds and hit cues are unchanged.", p => p.ReducedMotion = !p.ReducedMotion, Preferences.ReducedMotion);
+        Option("motion", "feather", "Reduced motion", Preferences.ReducedMotion ? "On" : "Off", "Stops water movement and removes the camera nudge on impacts. Combat timing, sounds and hit cues are unchanged.", p => p.ReducedMotion = !p.ReducedMotion, Preferences.ReducedMotion);
         Option("contrast", "eye", "High contrast", Preferences.HighContrast ? "On" : "Off", "Opaque panels, ivory borders and brighter secondary text.", p => p.HighContrast = !p.HighContrast, Preferences.HighContrast);
         if (SettingsPage == 0)
         {

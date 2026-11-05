@@ -44,6 +44,8 @@ jobs:
         run: xvfb-run -a python3 tools/verify.py --visual --mobile
       - name: Native widescreen surface, physical controls and responsive overlays
         run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --widescreen-only
+      - name: Living Reach production water references and resource rebuild checks
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --overworld-only
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -51,6 +53,8 @@ jobs:
           path: |
             docs/native-screenshots/
             docs/landmark-screenshots/
+            docs/overworld-screenshots/
+            build/overworld/
             docs/audio-samples/
             docs/verification.json
             docs/render-verification*.json

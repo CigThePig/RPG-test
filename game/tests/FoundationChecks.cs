@@ -41,6 +41,7 @@ public static class FoundationChecks
             AdventureChecks.Run(app,Check);
             LandmarkChecks.Run(app,Check);
             EnvironmentArtChecks.Run(app,Check);
+            OverworldWaterChecks.Run(app,Check);
             DungeonChecks.Run(app, Check);
             DungeonEncounterChecks.Run(app, Check);
             MechanismChecks.Run(app, Check);

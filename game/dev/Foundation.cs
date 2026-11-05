@@ -694,6 +694,8 @@ public partial class Foundation : Node2D
             Art = art
         };
         ground.AddChild(tilemap);
+        if(r.Rooms.Count==0 && OverworldWaterRenderer.UseLivingReach)
+            ground.AddChild(new OverworldWaterRenderer {Region=r,ReducedMotion=()=>Ui.Preferences.ReducedMotion});
         foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
         wallRows.Clear();
         wallRows.AddRange(TerrainWallRow.Create(r));
@@ -892,6 +894,7 @@ public partial class TerrainView : Node2D
 
         )
         {
+            if (terrain==Terrain.Water && Region.Rooms.Count==0 && OverworldWaterRenderer.UseLivingReach) continue;
             if (!Art.TryGetValue(key, out var texture))
                 continue;
             for (int y = 0; y < Region.Height; y++)
@@ -916,7 +919,7 @@ public partial class TerrainView : Node2D
                 var p=GodotConvert.GroundToScreen(x*24,y*24);
                 // Raised dungeon walls live in TerrainWallRow beside the actors.
                 // Natural rocks retain their established overworld rendering here.
-                if(tile==Terrain.Water)
+                if(tile==Terrain.Water && !(Region.Rooms.Count==0 && OverworldWaterRenderer.UseLivingReach))
                 {
                     if(y>0 && Region.Tiles[at-Region.Width]!=Terrain.Water) batch.Line(p,p+new Vector2(24,0),new Color("b2bea0"),2);
                     if(y<Region.Height-1 && Region.Tiles[at+Region.Width]!=Terrain.Water) batch.Line(p+new Vector2(0,12),p+new Vector2(24,12),new Color("b2bea0"),2);
