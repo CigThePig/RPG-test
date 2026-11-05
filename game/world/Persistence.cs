@@ -246,6 +246,9 @@ public static class Persistence
     // the scene tree or touching the live game and its UI.
     static void ValidateSubsystems(SaveData data)
     {
+        // Reject malformed JSON before Godot importers, whose parser logs errors.
+        using var itemJson = JsonDocument.Parse(data.Items ?? "");
+        using var narrativeJson = JsonDocument.Parse(data.Narrative ?? "");
         var items = GD.Load<GDScript>("res://game/items/ItemService.gd").New().AsGodotObject() as Node
             ?? throw new InvalidOperationException("Cannot create item validator");
         Node? narrative = null;
