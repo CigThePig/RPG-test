@@ -19,6 +19,7 @@ public partial class OverworldWaterRenderer : Node2D
     bool reduced;
     public override void _Ready()
     {
+        AddToGroup("overworld-water");
         TextureFilter=TextureFilterEnum.Nearest;
         var timer=System.Diagnostics.Stopwatch.StartNew();
         if(OS.GetCmdlineUserArgs().Contains("--water-static-fallback"))
@@ -76,12 +77,14 @@ public partial class OverworldWaterRenderer : Node2D
             if(OverworldWaterArt.Distance(Region,x,y,x*24+px,y*24+py*2)<7)continue;
             glints.Rect(new Rect2(x*24+px,y*12+py,3+h%3,1),new Color(.42f,.59f,.55f,.2f));
         }
-        glintShader ??= new Shader {Code="shader_type canvas_item; render_mode unshaded; uniform float motion = 0.0; varying vec2 place; void vertex(){place=VERTEX;} void fragment(){float wave=0.55+0.45*sin(TIME*0.7+place.x*0.018+place.y*0.009);COLOR.a*=mix(0.55,wave,motion);}"};
+        glintShader ??= new Shader {Code="shader_type canvas_item; render_mode unshaded; uniform float motion = 0.0; uniform float preview_time = -1.0; varying vec2 place; void vertex(){place=VERTEX;} void fragment(){float t=preview_time<0.0?TIME:preview_time;float wave=0.55+0.45*sin(t*0.7+place.x*0.018+place.y*0.009);COLOR.a*=mix(0.55,wave,motion);}"};
         glintMaterial=new ShaderMaterial {Shader=glintShader};reduced=ReducedMotion();glintMaterial.SetShaderParameter("motion",reduced?0f:1f);
         AddChild(new WaterGlints {Batch=details});
         AddChild(new WaterGlints {Batch=glints,Material=glintMaterial});
         LastVertexBytes=surface.VertexBytes+details.VertexBytes+glints.VertexBytes;LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;BuildCount++;
     }
+    // Deterministic shader-only clock for frozen visual fixtures; negative restores engine time.
+    public void SetAnimationPreviewTime(float time)=>glintMaterial?.SetShaderParameter("preview_time",time);
     public override void _Process(double delta)
     {
         bool value=ReducedMotion();if(value==reduced)return;

@@ -51,8 +51,11 @@ public static class OverworldVisualChecks
                 async System.Threading.Tasks.Task<int> Changes(bool reducedMotion)
                 {
                     var setting=prefs.Copy();setting.ReducedMotion=reducedMotion;app.Ui.ApplyPreferences(setting,false);await Frames(app);
-                    await app.ToSignal(RenderingServer.Singleton,RenderingServer.SignalName.FramePostDraw);
-                    using var first=app.GetViewport().GetTexture().GetImage();await Frames(app,90);
+                    foreach(var water in app.GetTree().GetNodesInGroup("overworld-water").OfType<OverworldWaterRenderer>())water.SetAnimationPreviewTime(0);
+                    await Frames(app,2);await app.ToSignal(RenderingServer.Singleton,RenderingServer.SignalName.FramePostDraw);
+                    using var first=app.GetViewport().GetTexture().GetImage();
+                    foreach(var water in app.GetTree().GetNodesInGroup("overworld-water").OfType<OverworldWaterRenderer>())water.SetAnimationPreviewTime(4);
+                    await Frames(app,2);
                     await app.ToSignal(RenderingServer.Singleton,RenderingServer.SignalName.FramePostDraw);
                     using var second=app.GetViewport().GetTexture().GetImage();int changed=0;
                     for(int y=170;y<390;y++)for(int x=800;x<1250;x++)if(first.GetPixel(x,y)!=second.GetPixel(x,y))changed++;
@@ -62,6 +65,7 @@ public static class OverworldVisualChecks
                 if(animated==0 || still!=0)throw new InvalidOperationException($"Water animation/static pixels: {animated}/{still}");
                 File.WriteAllText("build/overworld/motion.json",JsonSerializer.Serialize(new {animatedPixels=animated,reducedMotionPixels=still},Content.Json));
                 app.Ui.ApplyPreferences(prefs,false);
+                foreach(var water in app.GetTree().GetNodesInGroup("overworld-water").OfType<OverworldWaterRenderer>())water.SetAnimationPreviewTime(-1);
             }
             p.X=31*24;p.Y=27*24;app.RebuildViews();await Capture(app,version+"-shoreline");
             p.X=32.5f*24;p.Y=34.5f*24;app.RebuildViews();
