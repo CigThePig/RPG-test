@@ -28,8 +28,8 @@ public static class UiNavigationChecks
         void Tap(Button button)
         {
             var at = button.GetGlobalRect().GetCenter();
-            Input.ParseInputEvent(new InputEventScreenTouch { Index=14, Pressed=true, Position=at });
-            Input.ParseInputEvent(new InputEventScreenTouch { Index=14, Pressed=false, Position=at });
+            app.GetViewport().InjectLocal(new InputEventScreenTouch { Index=14, Pressed=true, Position=at });
+            app.GetViewport().InjectLocal(new InputEventScreenTouch { Index=14, Pressed=false, Position=at });
         }
         var window = app.GetWindow(); var original = window.Size;
         try
@@ -54,15 +54,15 @@ public static class UiNavigationChecks
                 var at = row.GetGlobalRect().GetCenter();
                 // Emulated mouse-down can arrive before touch-down; mouse-up may
                 // then precede the end of the swipe. Neither may select the row.
-                Input.ParseInputEvent(new InputEventMouseButton { Device=(int)InputEvent.DeviceIdEmulation,
+                app.GetViewport().InjectLocal(new InputEventMouseButton { Device=(int)InputEvent.DeviceIdEmulation,
                     ButtonIndex=MouseButton.Left, Pressed=true, Position=at });
-                Input.ParseInputEvent(new InputEventScreenTouch { Index=21, Pressed=true, Position=at });
-                Input.ParseInputEvent(new InputEventMouseButton { Device=(int)InputEvent.DeviceIdEmulation,
+                app.GetViewport().InjectLocal(new InputEventScreenTouch { Index=21, Pressed=true, Position=at });
+                app.GetViewport().InjectLocal(new InputEventMouseButton { Device=(int)InputEvent.DeviceIdEmulation,
                     ButtonIndex=MouseButton.Left, Pressed=false, Position=at });
                 row.GrabFocus(); // native touch may focus a pressed row
                 var moved = at + new Vector2(0,dy);
-                Input.ParseInputEvent(new InputEventScreenDrag { Index=21, Position=moved, Relative=new Vector2(0,dy) });
-                Input.ParseInputEvent(new InputEventScreenTouch { Index=21, Pressed=false, Position=moved });
+                app.GetViewport().InjectLocal(new InputEventScreenDrag { Index=21, Position=moved, Relative=new Vector2(0,dy) });
+                app.GetViewport().InjectLocal(new InputEventScreenTouch { Index=21, Pressed=false, Position=moved });
                 await Frames(3);
                 Require(!row.HasFocus() && row.Modulate == Colors.White, "swiping clears row focus and touch tint");
                 Require(app.Ui.MenuOpen && app.Ui.Navigation.Screen == null, "swipe never activates a menu row");
@@ -92,14 +92,14 @@ public static class UiNavigationChecks
             app.World.Items.Add("player", "potion");
             app.Ui.Back(); await Frames(); Require(!app.Ui.BlocksInput,"menu Back resumes");
             app.Ui.Character(); await Frames();
-            Input.ParseInputEvent(new InputEventKey { Keycode=Key.Escape, Pressed=true }); await Frames();
+            app.GetViewport().InjectLocal(new InputEventKey { Keycode=Key.Escape, Pressed=true }); await Frames();
             Require(!app.Ui.BlocksInput,"Escape closes directly opened screen");
             app.Ui.Character(); app._Notification((int)Node.NotificationWMGoBackRequest); await Frames();
             Require(!app.Ui.BlocksInput,"Android Back follows same direct screen path");
             app.Ui.PauseForVerification(); await Frames();
             var newGame = app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="New game");
             Tap(newGame); await Frames(); Require(app.Ui.Navigation.Confirmation && !app.Ui.MenuOpen,"confirmation hides lower menu");
-            Input.ParseInputEvent(new InputEventKey { Keycode=Key.Back, Pressed=true });
+            app.GetViewport().InjectLocal(new InputEventKey { Keycode=Key.Back, Pressed=true });
             app._Notification((int)Node.NotificationWMGoBackRequest);
             await Frames(); Require(app.Ui.MenuOpen && !app.Ui.Navigation.Confirmation,"Android key plus window notification cancels confirmation exactly once");
             app.Ui.Character();
@@ -118,6 +118,14 @@ public static class UiNavigationChecks
                 Require(app.Ui.ScreenRect.Encloses(app.Ui.ScreenBack.GetGlobalRect()), $"{size} persistent Back inside panel");
                 Require(app.Ui.ScreenBack.Size.Y >= UiDesign.Target, "Back target minimum");
                 var scroll = app.Ui.FindChildren("*","ScrollContainer",true,false).OfType<TouchScroll>().First(s=>s.IsVisibleInTree() && s.Name == "character_detail_scroll");
+                // Expand can reveal more vertical space on 4:3 screens. If the natural
+                // list fits, deliberately overflow it to retain the scrollbar/Back test.
+                if(scroll.GetVScrollBar().MaxValue<=scroll.GetVScrollBar().Page)
+                {
+                    var content=scroll.GetChild<Control>(0);
+                    content.CustomMinimumSize=new Vector2(content.CustomMinimumSize.X,scroll.Size.Y+400);
+                    await Frames();
+                }
                 Require(scroll.GetVScrollBar().MaxValue > scroll.GetVScrollBar().Page,"large text pilot scrolls");
                 var bar = scroll.GetVScrollBar().GetGlobalRect();
                 Require(scroll.GetChild<Control>(0).GetGlobalRect().End.X <= bar.Position.X + 1,

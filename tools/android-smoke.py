@@ -5,7 +5,9 @@ import xml.etree.ElementTree as ET
 from android_window import anr_messages, has_game_focus
 from PIL import Image
 from io import BytesIO
-out=Path('build/android-runtime');out.mkdir(parents=True,exist_ok=True)
+display=next((arg.split('=',1)[1] for arg in sys.argv if arg.startswith('--display=')), '1280x800')
+assert re.fullmatch(r'[0-9]+x[0-9]+',display), 'Invalid emulator display'
+out=Path('build/android-runtime')/display;out.mkdir(parents=True,exist_ok=True)
 package='com.cigthepig.mosslight.dev'
 recorder=None
 recording_start=None
@@ -26,7 +28,7 @@ def adb(*args):
             time.sleep(.5)
 log=(out/'emulator.log').open('w')
 emulator=subprocess.Popen([os.environ['ANDROID_HOME']+'/emulator/emulator','-avd','mosslight',
-    '-no-window','-no-audio','-no-boot-anim','-no-snapshot','-gpu','swangle','-skin','1280x800'],stdout=log,stderr=log)
+    '-no-window','-no-audio','-no-boot-anim','-no-snapshot','-gpu','swangle','-skin',display],stdout=log,stderr=log)
 try:
     deadline=time.monotonic()+240
     while time.monotonic()<deadline:
@@ -53,9 +55,22 @@ try:
     else: raise RuntimeError('C# scene or imported dialogue readiness marker never arrived')
     source=run('git','rev-parse','HEAD',text=True).strip()
     assert 'source='+source in logs, 'Exported build is missing its exact source revision'
-    # Landscape UI coordinate scaled from the logical 1280x800 base.
+    # Android display size and app surface must agree; a wide skin alone is not proof.
     bounds=adb('shell','wm','size').split()[-1].split('x');w,h=sorted(map(int,bounds),reverse=True)
-    def tap(x,y): adb('shell','input','tap',str(int(x*w/1280)),str(int(y*h/800)))
+    def display_geometry():
+        rows=re.findall(r'MOSSLIGHT_DISPLAY (\{[^\r\n]+\})',adb('logcat','-d'))
+        assert rows, 'Missing actual application viewport diagnostic'
+        return json.loads(rows[-1])
+    def tap(x,y):
+        # Dialogue reports logical canvas points, not native display pixels.
+        d=display_geometry()
+        adb('shell','input','tap',str(round(x*d['scale']+d['originX'])),str(round(y*d['scaleY']+d['originY'])))
+    def joystick(end_x,duration):
+        rows=re.findall(r'MOSSLIGHT_CONTROL version=3 id=stick x=([0-9]+) y=([0-9]+)',adb('logcat','-d'))
+        assert rows, 'Missing real joystick centre'
+        x,y=map(int,rows[-1]); width=display_geometry()['stickWidth']
+        displacement=(end_x-140)/200*width
+        adb('shell','input','swipe',str(x),str(y),str(round(x+displacement)),str(y),str(duration))
     def ensure_foreground(timeout=30):
         deadline=time.monotonic()+timeout
         while time.monotonic()<deadline:
@@ -86,8 +101,7 @@ try:
         raise RuntimeError('Mosslight never acquired foreground input focus')
     # Fresh Android emulators display a system immersive-mode confirmation over
     # Godot on first launch. Dismiss it before taking evidence or tapping our menu.
-    tap(880,190) # System 'Got it', outside the game UI.
-    time.sleep(2)
+    ensure_foreground() # Resolve native system confirmation by its actual bounds.
     # Readiness is CPU-side; shader failure can leave a fully running game blank.
     adb_path = os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb')
     def screenrecord_pids():
@@ -127,6 +141,15 @@ try:
             time.sleep(.25)
         raise RuntimeError('Missing production navigation target: '+action)
     ensure_foreground()
+    geometry=display_geometry()
+    (out/'display-geometry.json').write_text(json.dumps({'android_wm':adb('shell','wm','size'),'application':geometry},indent=2))
+    drawable=list(map(float,re.findall(r'[0-9.]+',geometry['drawable'])))
+    logical=list(map(float,re.findall(r'[0-9.]+',geometry['logical'])))
+    assert len(drawable)==2 and len(logical)==2
+    assert abs(drawable[0]/drawable[1]-w/h)<.02, 'App surface does not fill Android display'
+    assert abs(logical[0]/logical[1]-w/h)<.02, 'App still renders a narrower aspect'
+    assert abs(logical[0]*geometry['scale']-drawable[0])<3, 'Horizontal bars remain'
+    assert abs(logical[1]*geometry['scale']-drawable[1])<3, 'Vertical bars remain'
     capture('start-menu.png',wait=45)
     tap_ui('resume')
     deadline=time.monotonic()+20
@@ -141,7 +164,7 @@ try:
     # Set a westward facing and leave the nearby enemy group alone while
     # checking repeated controls. The earlier chest-first ordering let active
     # enemies kill the player mid-test; it did not expose an input failure.
-    adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(30*w/1280)),str(int(640*h/800)),'600')
+    joystick(30,'600')
     time.sleep(.4)
     def action_target(action):
         rows=re.findall(fr'MOSSLIGHT_CONTROL version=3 id={action} x=([0-9]+) y=([0-9]+)',adb('logcat','-d'))
@@ -235,7 +258,7 @@ try:
     # Exercise actual touch ownership, then open the starting Gloot chest.
     # Read release positions from production diagnostics instead of assuming emulator FPS.
     for attempt in range(16):
-        adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(280*w/1280)),str(int(640*h/800)),'600')
+        joystick(280,'600')
         time.sleep(.4)
         ensure_foreground(timeout=10)
         logs=adb('logcat','-d')
@@ -263,7 +286,7 @@ try:
         prior_releases=len(positions)
         end_x=280 if current_x<290 else 50
         duration='600' if current_x<290 else '300'
-        adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(end_x*w/1280)),str(int(640*h/800)),duration)
+        joystick(end_x,duration)
         deadline=time.monotonic()+8
         while time.monotonic()<deadline:
             positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',adb('logcat','-d'))
@@ -309,7 +332,7 @@ try:
         if len(observed_hits)>=2: break
         if not adb('shell','pidof',package): raise RuntimeError('Android process exited during real combat damage')
         if approaches<2:
-            adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(280*w/1280)),str(int(640*h/800)),'600')
+            joystick(280,'600')
             approaches+=1
         else: time.sleep(.5)
     else: raise RuntimeError('Android combat did not produce two real player damage events')
@@ -415,7 +438,7 @@ try:
                 else: raise RuntimeError('Installed production room entry did not emit discovery')
                 movement_before=logs.count('MOSSLIGHT_LANDMARK_MOVEMENT')
                 for move_x in (230,50):
-                    adb('shell','input','swipe',str(int(140*w/1280)),str(int(640*h/800)),str(int(move_x*w/1280)),str(int(640*h/800)),'500')
+                    joystick(move_x,'500')
                     time.sleep(.3)
                 logs=adb('logcat','-d')
                 movement=re.findall(r'MOSSLIGHT_LANDMARK_MOVEMENT clear=(True|False) x=([0-9.]+) y=([0-9.]+)',logs)

@@ -100,6 +100,7 @@ public partial class Foundation : Node2D
         Persistence.Restore(World,Narrative,courseSnapshot);courseSnapshot=null;lastRuntimeLog=World.Tick;
         TouchMovement=ControllerVelocity=Vector2.Zero;Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/return");
     }
+    internal bool FreezeSimulationForVerification;
     bool suspended;
     bool sessionEntered;
     // A real simulation tick also establishes a session, regardless of which UI
@@ -135,6 +136,7 @@ public partial class Foundation : Node2D
     public CombatPresentationController? CombatPresentation => presentation;
     public Node Audio => audio;
     CombatPresentationController? presentation;
+    Vector2 cameraViewport, cameraBounds, cameraZoom;
     double accumulator;
     long lastRuntimeLog;
     Node audio = null !;
@@ -229,6 +231,8 @@ public partial class Foundation : Node2D
             ZIndex = -10
         };
         AddChild(ground);
+        var bedrock=new CanvasLayer { Layer=-100 };
+        AddChild(bedrock); bedrock.AddChild(new RegionBedrock());
         camera = new Camera2D
         {
             Zoom = new Vector2(1.5f, 1.5f),
@@ -418,7 +422,7 @@ public partial class Foundation : Node2D
         if (ui == null)
             return;
         try { replay?.BeforeStep(); } catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); return; }
-        if (!GameplayBlocked && !adventureVisual)
+        if (!GameplayBlocked && !adventureVisual && !(VerificationMode && FreezeSimulationForVerification))
         {
             DroppedSeconds += Math.Max(0,delta-.1);
             accumulator += Math.Min(delta, .1);
@@ -459,8 +463,16 @@ public partial class Foundation : Node2D
         var bounds = GodotConvert.GroundToScreen(region.Width * 24, region.Height * 24);
         var half = GetViewportRect().Size / camera.Zoom / 2;
         var focus = GodotConvert.GroundToScreen(player.X, player.Y);
-        camera.Position = new Vector2(bounds.X <= half.X*2 ? bounds.X/2 : Mathf.Clamp(focus.X,half.X,bounds.X-half.X), bounds.Y <= half.Y*2 ? bounds.Y/2 : Mathf.Clamp(focus.Y,half.Y,bounds.Y-half.Y));
-        camera.Offset = CombatCamera.Confine(camera.Position, bounds, half);
+        camera.Position = DisplayLayout.CameraCenter(focus,bounds,half);
+        // Resizing/zooming can put the old smoothed centre outside the new bounds.
+        // Reset only when geometry changes, never on impacts or ordinary following.
+        if(cameraViewport!=GetViewportRect().Size || cameraBounds!=bounds || cameraZoom!=camera.Zoom)
+        {
+            cameraViewport=GetViewportRect().Size; cameraBounds=bounds; cameraZoom=camera.Zoom;
+            camera.ResetSmoothing();
+        }
+        // Constrain feedback against the rendered smoothed centre, not its destination.
+        camera.Offset = CombatCamera.Confine(camera.GetScreenCenterPosition()-camera.Offset, bounds, half);
         var target = World.InteractionTargets(player).FirstOrDefault();
         foreach (var feature in features)
         {
@@ -825,6 +837,7 @@ public partial class Foundation : Node2D
 public partial class TerrainView : Node2D
 {
     public static double LastBuildMilliseconds { get; private set; }
+    public static long BuildCount { get; private set; }
     public static long LastVertexBytes { get; private set; }
     public override void _ExitTree() { foreach(var batch in batches)batch.Dispose(); }
     readonly List<TerrainBatch> batches=new();
@@ -833,6 +846,7 @@ public partial class TerrainView : Node2D
 
     public override void _Draw()
     {
+        BuildCount++;
         var buildTimer = System.Diagnostics.Stopwatch.StartNew();
         foreach(var oldBatch in batches)oldBatch.Dispose();
         batches.Clear();

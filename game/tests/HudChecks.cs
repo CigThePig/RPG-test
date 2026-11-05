@@ -150,8 +150,8 @@ public static class HudChecks
         void Tap(string id)
         {
             var at = ui.ActionControl(id).GetGlobalRect().GetCenter();
-            Input.ParseInputEvent(new InputEventScreenTouch { Index = 12, Pressed = true, Position = at });
-            Input.ParseInputEvent(new InputEventScreenTouch { Index = 12, Pressed = false, Position = at });
+            app.GetViewport().InjectLocal(new InputEventScreenTouch { Index = 12, Pressed = true, Position = at });
+            app.GetViewport().InjectLocal(new InputEventScreenTouch { Index = 12, Pressed = false, Position = at });
         }
         try
         {

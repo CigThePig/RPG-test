@@ -29,6 +29,7 @@ public partial class MobileCombatControls : Control
     }
     public static Dictionary<string, Rect2> Geometry(Rect2 safe)
     {
+        safe = DisplayLayout.Gameplay(safe);
         // Compact fallback scales the complete arrangement, including touch gaps.
         float s = Math.Min(1, Math.Min(safe.Size.X / 900, safe.Size.Y / 560));
         var result = new Dictionary<string, Rect2>();
@@ -54,6 +55,7 @@ public partial class MobileCombatControls : Control
     }
     public void Arrange(Rect2 safe)
     {
+        safe = DisplayLayout.Gameplay(safe);
         SafeRegion = safe;
         foreach (var (id, rect) in Geometry(safe))
             if (Actions.TryGetValue(id, out var button))

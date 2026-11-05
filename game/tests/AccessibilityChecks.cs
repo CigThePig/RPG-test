@@ -130,8 +130,8 @@ public static class AccessibilityChecks
         void Tap(Button button)
         {
             var at = button.GetGlobalRect().GetCenter();
-            Input.ParseInputEvent(new InputEventScreenTouch { Index = 16, Pressed = true, Position = at });
-            Input.ParseInputEvent(new InputEventScreenTouch { Index = 16, Pressed = false, Position = at });
+            app.GetViewport().InjectLocal(new InputEventScreenTouch { Index = 16, Pressed = true, Position = at });
+            app.GetViewport().InjectLocal(new InputEventScreenTouch { Index = 16, Pressed = false, Position = at });
         }
         async System.Threading.Tasks.Task Press(string name)
         {
@@ -261,7 +261,7 @@ public static class AccessibilityChecks
                 Require(app.GetViewport().GuiGetFocusOwner() == choices[0], $"{size} first response has keyboard focus");
                 await Shot($"dialogue-{size.X}x{size.Y}-largest");
                 // Back and Escape never dismiss dialogue; app interruption keeps it.
-                ui.SystemBack(); Input.ParseInputEvent(new InputEventKey { Keycode = Key.Escape, Pressed = true }); await Frames();
+                ui.SystemBack(); app.GetViewport().InjectLocal(new InputEventKey { Keycode = Key.Escape, Pressed = true }); await Frames();
                 app._Notification((int)Node.NotificationApplicationFocusOut); app._Notification((int)Node.NotificationApplicationFocusIn); await Frames();
                 Require(n.Get("speaking").AsBool() && !ui.MenuOpen && panel.Visible, $"{size} dialogue survives Back and focus loss");
                 // A tap where Attack normally lives cannot cause combat. The wider
@@ -269,8 +269,8 @@ public static class AccessibilityChecks
                 int attacks = 0; void Count(string kind, System.Numerics.Vector2 d, string c) { if (kind == "attack_started") attacks++; }
                 w.CombatDiagnostic += Count;
                 var attackAt = MobileCombatControls.Geometry(safe)["attack"].GetCenter();
-                Input.ParseInputEvent(new InputEventScreenTouch { Index = 17, Pressed = true, Position = attackAt });
-                Input.ParseInputEvent(new InputEventScreenTouch { Index = 17, Pressed = false, Position = attackAt });
+                app.GetViewport().InjectLocal(new InputEventScreenTouch { Index = 17, Pressed = true, Position = attackAt });
+                app.GetViewport().InjectLocal(new InputEventScreenTouch { Index = 17, Pressed = false, Position = attackAt });
                 await Frames(); w.CombatDiagnostic -= Count;
                 Require(attacks == 0, $"{size} gameplay actions blocked during dialogue");
                 for (int i = 0; i < 20 && n.Get("advancing").AsBool(); i++) await Frames();

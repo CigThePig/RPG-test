@@ -127,6 +127,10 @@ jobs:
             docs/native-screenshots/
 
   android-runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        display: [1280x800, 1560x720]
     needs: apk
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -161,10 +165,10 @@ jobs:
       - name: Verify Android native window classification
         run: python3 tools/test_android_window.py
       - name: Install, launch and exercise exported C# application
-        run: python3 tools/android-smoke.py build/emulator/Mosslight-emulator.apk
+        run: python3 tools/android-smoke.py build/emulator/Mosslight-emulator.apk --display=${{ matrix.display }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: android-runtime-evidence
+          name: android-runtime-evidence-${{ matrix.display }}
           path: build/android-runtime/
           retention-days: 30

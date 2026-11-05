@@ -10,6 +10,10 @@ public partial class RpgUi : CanvasLayer
     readonly Dictionary<string, Button> actions = new();
     readonly Dictionary<string, Button> navigationTargets = new();
     int layoutTraceFrames;
+    double safeAreaPoll;
+    Rect2I lastPhysicalSafe;
+    public Rect2 GameplayRegion { get; private set; }
+    public int LayoutPasses { get; private set; }
     bool? lastSystemBackFromKey;
     ulong lastSystemBackAt;
     public Button ActionControl(string id) => actions[id];
@@ -253,6 +257,7 @@ public partial class RpgUi : CanvasLayer
     }
     public void Layout()
     {
+        LayoutPasses++;
         var size = GetViewport().GetVisibleRect().Size;
         CancelGestures();
         hotbar.Position = MobileLayout ? Vector2.Zero : new Vector2(size.X - 760, size.Y - 160);
@@ -269,7 +274,8 @@ public partial class RpgUi : CanvasLayer
             var safe = new Rect2(Vector2.Zero, size);
             if (OS.HasFeature("android"))
                 safe = MobileCombatControls.ToLogicalSafeArea(safe, DisplayServer.GetDisplaySafeArea(), GetViewport().GetScreenTransform());
-            safe=VerificationSafeArea ?? safe;
+            safe=DisplayLayout.Gameplay(VerificationSafeArea ?? safe);
+            GameplayRegion=safe;
             mobile.Arrange(safe);
             var pad = MobileCombatControls.Geometry(safe)["stick"];
             Stick.Position=pad.Position; Stick.Size=pad.Size;
@@ -284,15 +290,28 @@ public partial class RpgUi : CanvasLayer
             message.Size=new Vector2(Math.Max(160,noticeRight-noticeLeft),72);
             gameplayNotice = new Rect2(message.Position, message.Size);
             if(OS.HasFeature("android"))
+            {
+                var transform=GetViewport().GetScreenTransform();
+                var stickRect=Stick.GetGlobalRect();
+                var stickCenter=transform*stickRect.GetCenter();
+                GD.Print($"MOSSLIGHT_CONTROL version={MobileCombatControls.LayoutVersion} id=stick x={stickCenter.X:0} y={stickCenter.Y:0}");
+                var physicalRects=actions.ToDictionary(p=>p.Key,p=>p.Value.GetGlobalRect());
+                physicalRects["stick"]=stickRect;physicalRects["hud"]=hud.GetGlobalRect();
+                var diagnosticRects=physicalRects.ToDictionary(p=>p.Key,p=> {
+                    var a=transform*p.Value.Position;var b=transform*p.Value.End;
+                    return new {x=a.X,y=a.Y,width=b.X-a.X,height=b.Y-a.Y};
+                });
+                GD.Print("MOSSLIGHT_DISPLAY "+System.Text.Json.JsonSerializer.Serialize(new { physical=DisplayServer.ScreenGetSize().ToString(), drawable=GetWindow().Size.ToString(), logical=size.ToString(), safe=MobileCombatControls.ToLogicalSafeArea(new Rect2(Vector2.Zero,size),DisplayServer.GetDisplaySafeArea(),transform).ToString(), gameplay=safe.ToString(), controlRects=diagnosticRects, scale=transform.X.Length(), scaleY=transform.Y.Length(), originX=transform.Origin.X, originY=transform.Origin.Y, stickWidth=stickRect.Size.X*transform.X.Length(), zoom=App.Camera.Zoom.ToString(), worldSpan=(size/App.Camera.Zoom).ToString() }));
                 foreach(var (id, button) in actions)
                 {
                     var center=GetViewport().GetScreenTransform()*button.GetGlobalRect().GetCenter();
                     GD.Print($"MOSSLIGHT_CONTROL version={MobileCombatControls.LayoutVersion} id={id} x={center.X:0} y={center.Y:0}");
                 }
+            }
         }
         var overlaySafe = new Rect2(Vector2.Zero, size);
         if (OS.HasFeature("android")) overlaySafe = MobileCombatControls.ToLogicalSafeArea(overlaySafe, DisplayServer.GetDisplaySafeArea(), GetViewport().GetScreenTransform());
-        overlaySafe = VerificationSafeArea ?? overlaySafe;
+        overlaySafe = DisplayLayout.Overlay(VerificationSafeArea ?? overlaySafe);
         PackAvailableSize = new Vector2(Math.Max(0, overlaySafe.Size.X - 32), Math.Max(0, overlaySafe.Size.Y - 32));
         OverlaySafe = overlaySafe;
         scrim.Position = Vector2.Zero; scrim.Size = size; scrim.QueueRedraw();
@@ -576,6 +595,14 @@ public partial class RpgUi : CanvasLayer
 
     public override void _Process(double delta)
     {
+        // Android can change cutout/system-bar geometry without a viewport resize.
+        // Poll cheaply; only a real change cancels gestures and rebuilds the layout.
+        if (OS.HasFeature("android") && (safeAreaPoll -= delta) <= 0)
+        {
+            safeAreaPoll=.5;
+            var physicalSafe=DisplayServer.GetDisplaySafeArea();
+            if(physicalSafe!=lastPhysicalSafe) { lastPhysicalSafe=physicalSafe; Layout(); }
+        }
         // Wait for deferred Container sorting before reporting real physical target centers.
         if (layoutTraceFrames > 0 && --layoutTraceFrames == 0) TraceNavigationTargets();
         frames.Enqueue(delta * 1000);

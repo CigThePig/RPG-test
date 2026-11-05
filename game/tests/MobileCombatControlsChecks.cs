@@ -5,6 +5,7 @@ public static class MobileCombatControlsChecks
 {
     public static void Run(Action<bool,string> check)
     {
+        WidescreenChecks.Geometry(check);
         foreach(var size in new[]{new Vector2(1280,800),new Vector2(1280,720),new Vector2(1920,864),new Vector2(1024,768),new Vector2(900,560)})
         foreach(var insets in new[]{Vector2.Zero,new Vector2(60,28)})
         {
@@ -55,12 +56,15 @@ public static class MobileCombatControlsChecks
     public static async System.Threading.Tasks.Task InputPipeline(Foundation app)
     {
         if(!app.Ui.MobileLayout)return;
+        // These fixture points are logical. Native Android dispatch is tested by ADB;
+        // convert them once to native window coordinates, retaining mouse emulation.
+        void Dispatch(InputEvent e) => app.GetViewport().InjectLocal(e);
         int attacks=0,dodges=0;
         void Diagnostic(string kind,System.Numerics.Vector2 direction,string context)
         {if(kind=="attack_started")attacks++;if(kind=="dodge_started")dodges++;}
         async System.Threading.Tasks.Task Frame(int n=2)
         {for(int i=0;i<n;i++)await app.ToSignal(app.GetTree(),SceneTree.SignalName.ProcessFrame);}
-        void Touch(int finger,bool pressed,Vector2 at,bool canceled=false) => Input.ParseInputEvent(new InputEventScreenTouch{Index=finger,Pressed=pressed,Position=at,Canceled=canceled});
+        void Touch(int finger,bool pressed,Vector2 at,bool canceled=false) => Dispatch(new InputEventScreenTouch{Index=finger,Pressed=pressed,Position=at,Canceled=canceled});
         void Tap(string id)
         {var at=app.Ui.ActionControl(id).GetGlobalRect().GetCenter();Touch(8,true,at);Touch(8,false,at);}
         void Require(bool value,string name){if(!value)throw new InvalidOperationException("Mobile pipeline: "+name);}
@@ -77,16 +81,16 @@ public static class MobileCombatControlsChecks
             Touch(8,true,outside);Touch(8,false,attack);await Frame();
             Require(attacks==0,"outside press / inside release");
             Touch(8,true,attack);
-            Input.ParseInputEvent(new InputEventScreenDrag{Index=8,Position=dodge});
+            Dispatch(new InputEventScreenDrag{Index=8,Position=dodge});
             Touch(8,false,dodge);await Frame();
             Require(attacks==0 && dodges==0,"drag across actions");
             Touch(8,true,attack);Touch(8,false,attack,true);await Frame();
             Require(attacks==0,"cancellation");
             var stick=app.Ui.Stick.GetGlobalRect().GetCenter();
             Touch(7,true,stick);
-            Input.ParseInputEvent(new InputEventScreenDrag{Index=7,Position=stick+Vector2.Right*72});
+            Dispatch(new InputEventScreenDrag{Index=7,Position=stick+Vector2.Right*72});
             Tap("attack");await Frame();
-            Require(attacks==1 && app.Ui.Stick.Finger==7,"movement and free attack");
+            Require(attacks==1 && app.Ui.Stick.Finger==7,$"movement and free attack (attacks={attacks}, finger={app.Ui.Stick.Finger}, attack={attack}, stick={stick}, viewport={app.GetViewport().GetVisibleRect()}, transform={app.GetViewport().GetScreenTransform()})");
             Tap("attack");await Frame();Require(attacks==1,"cooldown rejection");
             app.World.Cancel(p);p.Cooldowns.Clear();await Frame();
             // Two independent action fingers must never transfer ownership to the pad.
@@ -112,9 +116,9 @@ public static class MobileCombatControlsChecks
             p.Health=20;int potions=app.World.Items.Count("player","potion");
             var potion=app.Ui.ActionControl("potion").GetGlobalRect().GetCenter();
             Touch(8,true,potion);
-            Input.ParseInputEvent(new InputEventMouseButton{Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=potion,GlobalPosition=potion});
+            Dispatch(new InputEventMouseButton{Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=potion,GlobalPosition=potion});
             Touch(8,false,potion);
-            Input.ParseInputEvent(new InputEventMouseButton{Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=potion,GlobalPosition=potion});
+            Dispatch(new InputEventMouseButton{Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=potion,GlobalPosition=potion});
             await Frame();Require(app.World.Items.Count("player","potion")==potions-1,"one physical item tap plus emulated mouse");
             Touch(8,true,attack);Tap("menu");await Frame();
             Require(app.Ui.MenuOpen && app.TouchMovement==Vector2.Zero && app.Ui.Stick.Finger<0,"menu cancels movement and pending action");
