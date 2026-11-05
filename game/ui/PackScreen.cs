@@ -26,6 +26,32 @@ public static class PackScreen
     }
 
     static string Name(string id) => id.ToLowerInvariant().Replace(':', '_');
+
+    /// <summary>Plain-language item category shown as a chip.</summary>
+    public static string Kind(ItemView item) => item.Slot switch
+    {
+        "weapon" => "Weapon", "body" => "Body armour",
+        _ => item.Usable ? "Consumable" : item.Id == "coin" ? "Currency" : item.Id is "relic" or "dungeon_key" ? "Quest item" : "Material"
+    };
+    public static Tone KindTone(ItemView item) => item.Slot != "" ? Tone.Gold : item.Usable ? Tone.Ember : item.Id is "relic" or "dungeon_key" ? Tone.Arcane : item.Id == "coin" ? Tone.Gold : Tone.Moss;
+    public static string StatGlyph(string stat) => stat switch
+    {
+        "damage" => "sword", "defence" => "shield", "power" => "bolt", "healing" => "leaf", "condition" => "star", "strength" => "sword", _ => "diamond"
+    };
+    /// <summary>Displayed stat rows in a fixed order: (stat, label, value).</summary>
+    public static IEnumerable<(string Stat, string Label, string Value)> StatRows(ItemView item)
+    {
+        foreach (var stat in StatOrder.Where(item.Properties.ContainsKey)) yield return (stat, Cap(stat), item.Properties[stat]);
+        if (item.Properties.TryGetValue("condition", out var c)) yield return ("condition", "Condition", c + "%");
+    }
+    /// <summary>Signed change against the equipped item in the same slot, or null when nothing changes.</summary>
+    public static (string Text, bool Better)? Delta(ItemView candidate, ItemView? current, string stat)
+    {
+        if (current == null || stat is "healing" or "condition") return null;
+        float delta = candidate.Stat(stat) - current.Stat(stat);
+        if (Math.Abs(delta) < .005f) return ("±0", true);
+        return ((delta > 0 ? "▲ +" : "▼ −") + Math.Abs(delta).ToString("0.##", CultureInfo.InvariantCulture), delta > 0);
+    }
     static string Cap(string text) => text == "" ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
     /// <summary>Short identity: material and quality for generated or material items.</summary>

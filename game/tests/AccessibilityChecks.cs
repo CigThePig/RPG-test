@@ -19,17 +19,18 @@ public static class AccessibilityChecks
     public static void Run(Foundation app, Action<bool, string> check)
     {
         // Contrast of shared tokens (WCAG 4.5:1 for normal text).
-        var heading = UiDesign.Bronze.Lightened(.25f);
-        foreach (var (fg, bg, name) in new[]
+        // Every text pairing the theme declares, in both normal and high-contrast palettes.
+        bool contrastMode = UiDesign.HighContrast;
+        try
         {
-            (UiDesign.Ink, UiDesign.Surface, "ivory on surface"), (UiDesign.Ink, new Color("263c36"), "ivory on button"),
-            (UiDesign.Ink, new Color("1d2f2b"), "ivory on card"), (new Color("c9c6b6"), new Color("1d2f2b"), "secondary on card"),
-            (heading, new Color("1d2f2b"), "heading on card"), (new Color("b6b8b0"), new Color("1c2a27"), "disabled on disabled button"),
-            (UiDesign.Ink, new Color("8e2f2a"), "HP bar text"), (UiDesign.Ink, new Color("2d5591"), "MP bar text"), (UiDesign.Ink, new Color("7d6322"), "XP bar text"),
-            (UiDesign.Ink, new Color("795433"), "Attack face"), (UiDesign.Ink, new Color("355b56"), "Dodge face"), (UiDesign.Ink, new Color("263f43"), "action face"),
-            (new Color("d6c99e"), UiDesign.Surface, "dialogue speaker")
-        })
-            check(Contrast(fg, bg) >= 4.5, $"contrast {name} {Contrast(fg, bg):0.0}:1 ≥ 4.5:1");
+            foreach (bool high in new[] { false, true })
+            {
+                UiDesign.HighContrast = high;
+                foreach (var (fg, bg, name) in UiDesign.ContrastPairs())
+                    check(Contrast(fg, bg) >= 4.5, $"contrast {(high ? "high-contrast " : "")}{name} {Contrast(fg, bg):0.0}:1 ≥ 4.5:1");
+            }
+        }
+        finally { UiDesign.HighContrast = contrastMode; }
 
         // Preferences: round trip, damaged file, isolation from world saves.
         string previousPath = UiPreferences.FilePath;

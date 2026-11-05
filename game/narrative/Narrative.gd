@@ -321,6 +321,15 @@ func apply_presentation() -> void:
 		var scale := maxf(1.0, ui_theme.default_font_size / 20.0)
 		dialogue_body.vertical = ui_rect.size.x / scale < 960.0
 
+var portrait_frame: PanelContainer
+var portrait_rect: TextureRect
+
+## Optional speaker portrait supplied by RpgUi; presentation only.
+func set_portrait(texture: Texture2D) -> void:
+	if ui == null: build_ui()
+	portrait_rect.texture = texture
+	portrait_frame.visible = texture != null
+
 func build_ui() -> void:
 	var layer := CanvasLayer.new()
 	# Above the gameplay UI layer: dialogue owns presentation while it is active.
@@ -338,26 +347,60 @@ func build_ui() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	ui.add_child(box)
-	speaker_label = Label.new()
-	speaker_label.name = "Speaker"
-	speaker_label.add_theme_color_override("font_color", Color("d6c99e"))
-	box.add_child(speaker_label)
-	text_label = Label.new()
-	text_label.name = "Line"
-	text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	text_label.custom_minimum_size = Vector2(0, 56)
 	dialogue_body = BoxContainer.new()
 	dialogue_body.name = "DialogueBody"
 	dialogue_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	dialogue_body.add_theme_constant_override("separation", 16)
+	dialogue_body.add_theme_constant_override("separation", 18)
 	box.add_child(dialogue_body)
+	# Story column: speaker portrait medallion, engraved name plate and the line.
+	var story_column := HBoxContainer.new()
+	story_column.name = "StoryColumn"
+	story_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	story_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	story_column.size_flags_stretch_ratio = 0.48
+	story_column.add_theme_constant_override("separation", 14)
+	dialogue_body.add_child(story_column)
+	portrait_frame = PanelContainer.new()
+	portrait_frame.name = "Portrait"
+	portrait_frame.theme_type_variation = "IconWell"
+	portrait_frame.custom_minimum_size = Vector2(84, 84)
+	portrait_frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait_frame.visible = false
+	story_column.add_child(portrait_frame)
+	portrait_rect = TextureRect.new()
+	portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	portrait_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait_frame.add_child(portrait_rect)
+	var story_stack := VBoxContainer.new()
+	story_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	story_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	story_stack.add_theme_constant_override("separation", 10)
+	story_column.add_child(story_stack)
+	var plate_row := HBoxContainer.new()
+	story_stack.add_child(plate_row)
+	var plate := PanelContainer.new()
+	plate.name = "SpeakerPlate"
+	plate.theme_type_variation = "Speaker"
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate_row.add_child(plate)
+	speaker_label = Label.new()
+	speaker_label.name = "Speaker"
+	speaker_label.theme_type_variation = "DialogueSpeaker"
+	plate.add_child(speaker_label)
+	text_label = Label.new()
+	text_label.name = "Line"
+	text_label.theme_type_variation = "DialogueLine"
+	text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text_label.custom_minimum_size = Vector2(0, 56)
 	story_scroll = load("res://game/ui/TouchScroll.cs").new()
 	story_scroll.name = "Story"
 	story_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	story_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	story_scroll.size_flags_stretch_ratio = 0.48
 	story_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	dialogue_body.add_child(story_scroll)
+	story_stack.add_child(story_scroll)
 	text_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	story_scroll.add_child(text_label)
 	# Touch-owned scrolling: a swipe over responses never selects one.
@@ -394,7 +437,7 @@ func advance(cue: String) -> void:
 		speaking = false
 		ui.hide()
 		return
-	speaker_label.text = current_line.character.to_upper()
+	speaker_label.text = current_line.character
 	text_label.text = current_line.text
 	choice_scroll.scroll_vertical = 0
 	story_scroll.scroll_vertical = 0
@@ -403,6 +446,7 @@ func advance(cue: String) -> void:
 		button.custom_minimum_size.y = 64
 		button.name = "Continue"
 		button.text = "Continue"
+		button.theme_type_variation = "PrimaryButton"
 		button.pressed.connect(func(): advance(current_line.next_id))
 		choices.add_child(button)
 	else:
@@ -411,6 +455,8 @@ func advance(cue: String) -> void:
 			var button := Button.new()
 			button.custom_minimum_size.y = 64
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.theme_type_variation = "DialogueChoice"
+			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			button.text = response.text
 			button.disabled = not response.is_allowed
 			button.pressed.connect(func(): advance(response.next_id))

@@ -224,7 +224,7 @@ public static class RpgScreensChecks
             // Craft: production recipe through the Craft tab.
             w.Items.Add("player", "ore", 3); w.Items.Add("player", "wood", 1);
             ui.PackTab = 1; ui.PackSelection = null; ui.Inventory(); await Frames();
-            Require(Find("tab_craft").Text == "[Craft]", "selected tab is marked in words");
+            Require(UiDesign.IsSelected(Find("tab_craft")) && Find("tab_craft").ThemeTypeVariation == "TabSelected" && !UiDesign.IsSelected(Find("tab_items")), "selected tab is marked by its raised, underlined segment and selection flag");
             await Press("recipe_forge_sword");
             await Shot("pack-craft");
             int swords = w.Items.Count("player", "iron_sword");

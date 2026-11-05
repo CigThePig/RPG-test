@@ -42,8 +42,30 @@ public partial class TouchStick : Control
     }
     public override void _Draw()
     {
-        float scale = Math.Min(Size.X,Size.Y)/200;
-        DrawCircle(Size / 2, 94*scale, new Color(.08f,.14f,.14f,.65f));
-        DrawCircle((finger < 0 ? Size / 2 : anchor) + offset, 30*scale, new Color(.65f,.73f,.5f,.8f));
+        float scale = Math.Min(Size.X, Size.Y) / 200;
+        var centre = Size / 2;
+        bool active = finger >= 0;
+        // Recessed base: soft shadow, glass disc, engraved rings and compass ticks.
+        DrawCircle(centre, 94 * scale, new Color(.03f, .06f, .055f, active ? .62f : .46f));
+        DrawArc(centre, 93 * scale, 0, MathF.Tau, 64, new Color(UiDesign.Gold, active ? .55f : .3f), 2 * scale, true);
+        DrawArc(centre, 72 * scale, 0, MathF.Tau, 64, new Color(1, 1, 1, .07f), 1.5f * scale, true);
+        for (int i = 0; i < 4; i++)
+        {
+            float a = i * MathF.PI / 2 - MathF.PI / 2;
+            var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
+            var tip = centre + dir * 86 * scale; var side = new Vector2(-dir.Y, dir.X) * 6 * scale;
+            DrawColoredPolygon(new[] { tip, tip - dir * 9 * scale + side, tip - dir * 9 * scale - side }, new Color(UiDesign.GoldBright, active ? .5f : .28f));
+        }
+        var knob = (finger < 0 ? centre : anchor) + offset;
+        if (active && offset.Length() > 4)
+        {
+            // Direction glow along the rim shows where the stick is pushed.
+            float a = offset.Angle();
+            DrawArc(centre, 93 * scale, a - .45f, a + .45f, 16, new Color(UiDesign.GoldBright, .85f), 4 * scale, true);
+        }
+        DrawCircle(knob + new Vector2(0, 4 * scale), 32 * scale, new Color(0, 0, 0, .35f));
+        DrawCircle(knob, 30 * scale, new Color("2a3b34"));
+        DrawCircle(knob, 25 * scale, new Color("3d5348"), true, -1, true);
+        DrawArc(knob, 31 * scale, 0, MathF.Tau, 48, new Color(UiDesign.Gold, active ? .95f : .7f), 2 * scale, true);
     }
 }

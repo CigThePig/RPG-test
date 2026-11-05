@@ -72,9 +72,17 @@ public static class JournalScreen
         }
     }
 
+    /// <summary>Index medallion for a quest: shape and words carry the state, tone reinforces it.</summary>
+    public static (string Glyph, Tone Tone) Marker(JournalQuest q) => q.PendingReward ? ("star", Tone.Gold) : q.Status switch
+    {
+        "active" => ("diamond", Tone.Gold), "available" => ("spark", Tone.Arcane), "completed" => ("check", Tone.Moss),
+        "locked" => ("lock", Tone.Neutral), "failed" => ("cross", Tone.Ember), _ => ("dot", Tone.Neutral)
+    };
+
     public static void Card(VBoxContainer body, Foundation app, JournalQuest q)
     {
-        var card = UiDesign.Card(body, "quest_" + q.Id);
+        var card = UiDesign.Card(body, "quest_" + q.Id, "Well");
+        card.AddThemeConstantOverride("separation", 10);
         string state = q.Status switch
         {
             "active" => q.Staged ? $"Active · step {Math.Min(q.Progress + 1, q.Required)} of {q.Required}" : $"Active · {q.Progress}/{q.Required}",
@@ -84,30 +92,51 @@ public static class JournalScreen
             "failed" => "Failed",
             _ => q.Status
         };
-        UiDesign.Heading(card, $"{q.Title.ToUpperInvariant()}  ·  {state}");
-        if (q.Description != "") UiDesign.Note(card, q.Description);
+        var (glyph, tone) = Marker(q);
+        var head = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; head.AddThemeConstantOverride("separation", 12);
+        card.AddChild(head);
+        head.AddChild(new Glyph(glyph, UiDesign.ToneColor(tone), 26));
+        var title = UiDesign.Title(head, q.Title);
+        title.AddThemeFontSizeOverride("font_size", (int)(title.GetThemeFontSize("font_size") * .9f));
+        UiDesign.Chip(head, state, tone);
+        if (q.Description != "") UiDesign.Note(UiDesign.Card(card, null, "Quote"), q.Description);
+        void Step(string mark, Color colour, string text, bool current)
+        {
+            var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; row.AddThemeConstantOverride("separation", 12);
+            card.AddChild(row);
+            row.AddChild(new Glyph(mark, colour, 18) { SizeFlagsVertical = Control.SizeFlags.ShrinkBegin });
+            var label = UiDesign.Text(text); label.ThemeTypeVariation = current ? "RowTitle" : "RowSubtitle"; row.AddChild(label);
+        }
         switch (q.Status)
         {
-            case "available": card.AddChild(UiDesign.Text("Speak to the warden in Reach to accept this quest.")); break;
+            case "available": Step("spark", UiDesign.Arcane, "Speak to the warden in Reach to accept this quest.", true); break;
             case "locked":
-                card.AddChild(UiDesign.Text(q.PrerequisiteMet ? "Already accepted earlier." : $"Requires: complete {q.PrerequisiteTitle} first.")); break;
+                Step("lock", UiDesign.Faint, q.PrerequisiteMet ? "Already accepted earlier." : $"Requires: complete {q.PrerequisiteTitle} first.", true); break;
             default:
                 if (q.Staged)
                 {
-                    int shown = 0;
+                    UiDesign.Caption(card, "The path so far");
                     foreach (var stage in q.Stages)
                     {
                         // Completed and current stages only; later stages are not spoiled.
-                        if (stage.Done) { card.AddChild(UiDesign.Text("Done: " + stage.Text)); shown++; }
-                        else if (stage.Current) { card.AddChild(UiDesign.Text("Now: " + stage.Text)); shown++; }
+                        if (stage.Done) Step("check", UiDesign.Moss, "Done: " + stage.Text, false);
+                        else if (stage.Current) Step("diamond", UiDesign.Gold, "Now: " + stage.Text, true);
                     }
-
                 }
-                else card.AddChild(UiDesign.Text($"{q.Objective} ({q.Progress}/{q.Required})"));
+                else
+                {
+                    Step(q.Status == "completed" ? "check" : "diamond", q.Status == "completed" ? UiDesign.Moss : UiDesign.Gold, $"{q.Objective} ({q.Progress}/{q.Required})", q.Status != "completed");
+                    card.AddChild(new Meter { Name = "quest_progress", Caption = "Progress", Value = $"{q.Progress} / {q.Required}", Fill = UiDesign.Experience,
+                        Ratio = q.Required == 0 ? 1 : (float)q.Progress / q.Required, CustomMinimumSize = new Vector2(0, 22) });
+                }
                 break;
         }
         string reward = $"{app.World.Items.Title(q.RewardItem)} ×{q.RewardCount}";
-        UiDesign.Note(card, q.PendingReward ? $"Reward waiting: {reward} · make pack space, then speak to the warden"
+        var prize = new HBoxContainer { Name = "quest_reward_row", MouseFilter = Control.MouseFilterEnum.Ignore }; prize.AddThemeConstantOverride("separation", 10);
+        card.AddChild(prize);
+        UiDesign.IconWell(prize, ItemIconAtlas.Get(q.RewardItem), 40, !q.Rewarded);
+        var line = UiDesign.Note(prize, q.PendingReward ? $"Reward waiting: {reward} · make pack space, then speak to the warden"
             : q.Rewarded ? $"Reward received: {reward}" : $"Reward: {reward}");
+        line.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
     }
 }

@@ -16,6 +16,7 @@ public partial class CharacterSheet : VBoxContainer
             VerticalScrollMode = ScrollContainer.ScrollMode.Reserve, ScrollDeadzone = 12 };
         parent.AddChild(scroll);
         var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        column.AddThemeConstantOverride("separation", 10);
         scroll.AddChild(column);
         return column;
     }
@@ -24,21 +25,27 @@ public partial class CharacterSheet : VBoxContainer
         if (!IsInsideTree()) return;
         foreach (var scroll in FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>()) scroll.CancelGesture();
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
+        AddThemeConstantOverride("separation", 10);
         Compact = ui.PackAvailableSize.X / ui.TextScale < 1000;
         var actor = ui.App.World.Player;
-        var summary = UiDesign.Text($"{actor.Name} · Level {actor.Level} · {actor.SkillPoints} skill points");
-        summary.Name = "hero_identity"; AddChild(summary);
         var regions = new HBoxContainer { Name = "character_regions", SizeFlagsVertical = SizeFlags.ExpandFill };
         regions.AddThemeConstantOverride("separation", 12); AddChild(regions);
         if (!Compact)
         {
-            var hero = Scroll(regions, "hero_scroll");
-            hero.GetParent<Control>().SizeFlagsStretchRatio = .36f;
-            Hero(hero);
+            var pane = UiDesign.InventoryPanel(regions, "hero_pane", "THE WAYFARER", "person");
+            pane.GetParent<Control>().SizeFlagsStretchRatio = .36f;
+            Hero(Scroll(pane, "hero_scroll"));
         }
         var pages = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill,
             SizeFlagsStretchRatio = .64f };
+        pages.AddThemeConstantOverride("separation", 10);
         regions.AddChild(pages);
+        var identity = new HBoxContainer { Name = "hero_identity", MouseFilter = MouseFilterEnum.Ignore };
+        identity.AddThemeConstantOverride("separation", 8);
+        pages.AddChild(identity);
+        UiDesign.Chip(identity, "Level " + actor.Level, Tone.Gold, "star");
+        UiDesign.Chip(identity, actor.SkillPoints + (actor.SkillPoints == 1 ? " skill point" : " skill points"), actor.SkillPoints > 0 ? Tone.Moss : Tone.Neutral, actor.SkillPoints > 0 ? "plus" : null);
+        UiDesign.Chip(identity, actor.Abilities.Count + (actor.Abilities.Count == 1 ? " ability" : " abilities"), Tone.Arcane);
         // Compact gets a dedicated Hero page; other views retain a full-width reading area.
         string[] labels = Compact ? new[] { "Hero", "Stats", "Train", "Abilities" } : new[] { "Stats", "Train", "Abilities" };
         int selected = Compact ? ui.CharacterTab : Math.Max(0, ui.CharacterTab - 1);
@@ -56,32 +63,52 @@ public partial class CharacterSheet : VBoxContainer
     void Hero(VBoxContainer column)
     {
         var app = ui.App; var actor = app.World.Player;
-        UiDesign.Heading(column, "THE WAYFARER");
+        float scale = Math.Min(ui.TextScale, 1.2f);
+        var pedestal = new PanelContainer { ThemeTypeVariation = "Well", Name = "hero_pedestal", MouseFilter = MouseFilterEnum.Ignore };
+        column.AddChild(pedestal);
+        var stage = new Control { CustomMinimumSize = new Vector2(0, 168 * scale), MouseFilter = MouseFilterEnum.Ignore };
+        pedestal.AddChild(stage);
+        var glow = new Halo(); stage.AddChild(glow); glow.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var portrait = HeroPortrait.Get(app.Views.GetValueOrDefault(actor.Id)?.Creature?.Model);
         if (portrait != null)
-            column.AddChild(new TextureRect { Name = "hero_portrait", Texture = portrait,
-                CustomMinimumSize = new Vector2(0, 190 * ui.TextScale),
+        {
+            var picture = new TextureRect { Name = "hero_portrait", Texture = portrait,
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-                TextureFilter = CanvasItem.TextureFilterEnum.Nearest, MouseFilter = MouseFilterEnum.Ignore });
-        else UiDesign.Note(column, actor.Appearance.Family + " · Portrait unavailable");
-        UiDesign.Note(column, $"{actor.Appearance.Family} · {actor.Region}\nHealth {actor.Health:0} / {actor.MaxHealth} · Mana {actor.Mana:0} / {actor.MaxMana}");
-        var xp = new ProgressBar { Name = "character_experience", MinValue = 0, MaxValue = actor.Level * 100,
-            Value = actor.Experience, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 16), MouseFilter = MouseFilterEnum.Ignore };
-        column.AddChild(xp);
-        UiDesign.Note(column, $"Experience {actor.Experience} / {actor.Level * 100}");
+                TextureFilter = CanvasItem.TextureFilterEnum.Nearest, MouseFilter = MouseFilterEnum.Ignore };
+            stage.AddChild(picture); picture.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+            picture.OffsetTop = picture.OffsetBottom = 0; picture.OffsetTop = 8; picture.OffsetBottom = -8;
+        }
+        else UiDesign.Note(pedestal, actor.Appearance.Family + " · Portrait unavailable");
+        var name = UiDesign.Title(column, actor.Name);
+        name.HorizontalAlignment = HorizontalAlignment.Center;
+        var origin = UiDesign.Caption(column, $"{actor.Appearance.Family} · {(actor.Region == "ruin" ? "The Ruin" : actor.Region == "reach" ? "The Reach" : actor.Region)}");
+        origin.HorizontalAlignment = HorizontalAlignment.Center;
+        Meter(column, "character_health", "HP", actor.Health, actor.MaxHealth, UiDesign.Health);
+        Meter(column, "character_mana", "MP", actor.Mana, actor.MaxMana, UiDesign.Mana);
+        Meter(column, "character_experience", "XP", actor.Experience, actor.Level * 100, UiDesign.Experience);
         UiDesign.Heading(column, "EQUIPPED GEAR");
         var gear = app.World.Items.View(actor.Id).Where(v => v.Equipped).ToList();
         foreach (var slot in new[] { "weapon", "body" })
         {
             var item = gear.FirstOrDefault(v => v.EquippedSlot == slot);
-            var row = new HBoxContainer(); column.AddChild(row);
-            if (item != null) row.AddChild(new TextureRect { Texture = ItemIconAtlas.Get(item.Id),
-                CustomMinimumSize = new Vector2(40, 40), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
-                MouseFilter = MouseFilterEnum.Ignore });
-            UiDesign.Note(row, slot.ToUpperInvariant() + " · " + (item?.Title ?? "Empty"));
+            var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore }; row.AddThemeConstantOverride("separation", 10);
+            column.AddChild(row);
+            var well = UiDesign.IconWell(row, item == null ? null : ItemIconAtlas.Get(item.Id), 48 * scale, item != null);
+            if (item == null) well.GetChild(0).AddChild(new Glyph(slot == "weapon" ? "sword" : "shield", new Color(UiDesign.Faint, .45f), 24) { Position = new Vector2(12, 12) * scale });
+            var text = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
+            text.AddThemeConstantOverride("separation", 0);
+            row.AddChild(text);
+            UiDesign.Caption(text, slot == "weapon" ? "Weapon" : "Body");
+            var title = UiDesign.Text(item?.Title ?? "Empty"); title.ThemeTypeVariation = item == null ? "RowSubtitle" : "RowTitle"; text.AddChild(title);
         }
         var equipment = UiDesign.Action(column, "Manage equipment", ui.Inventory); equipment.Name = "character_equipment";
+    }
+
+    void Meter(VBoxContainer column, string name, string caption, float value, float maximum, Color fill)
+    {
+        var meter = new Meter { Name = name, Caption = caption, Value = $"{Math.Ceiling(value):0} / {maximum:0}", Fill = fill,
+            Ratio = value / Math.Max(1, maximum), CustomMinimumSize = new Vector2(0, 24 * Math.Min(ui.TextScale, 1.2f)) };
+        column.AddChild(meter);
     }
 
     void Attributes(VBoxContainer column)
@@ -89,13 +116,35 @@ public partial class CharacterSheet : VBoxContainer
         var app = ui.App; var actor = app.World.Player;
         UiDesign.Heading(column, "COMBAT ATTRIBUTES");
         UiDesign.Note(column, "Effective totals include gear, training and active effects.");
-        foreach (var stat in new[] { "strength", "defence", "power" })
+        foreach (var (stat, glyph, tone) in new[] { ("strength", "sword", Tone.Ember), ("defence", "shield", Tone.Moss), ("power", "bolt", Tone.Arcane) })
         {
-            var line = UiDesign.Card(column, "attribute_" + stat);
-            UiDesign.Note(line, CharacterOverview.Breakdown(app.World, actor, stat));
+            var card = new PanelContainer { Name = "attribute_" + stat, ThemeTypeVariation = "Card", MouseFilter = MouseFilterEnum.Pass };
+            column.AddChild(card);
+            var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore }; row.AddThemeConstantOverride("separation", 14);
+            card.AddChild(row);
+            var badge = new PanelContainer { ThemeTypeVariation = "IconWell", CustomMinimumSize = new Vector2(48, 48), SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
+            row.AddChild(badge);
+            badge.AddChild(new Glyph(glyph, UiDesign.ToneColor(tone), 26) { SizeFlagsHorizontal = SizeFlags.ShrinkCenter });
+            var text = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
+            text.AddThemeConstantOverride("separation", 1);
+            row.AddChild(text);
+            var label = UiDesign.Text(char.ToUpperInvariant(stat[0]) + stat[1..]); label.ThemeTypeVariation = "RowTitle"; text.AddChild(label);
+            // Full breakdown sentence kept as the accessible description.
+            var breakdown = CharacterOverview.Breakdown(app.World, actor, stat);
+            var parts = UiDesign.Text(breakdown.Contains('(') ? breakdown[(breakdown.IndexOf('(') + 1)..].TrimEnd(')') : breakdown);
+            parts.ThemeTypeVariation = "RowSubtitle"; text.AddChild(parts);
+            card.TooltipText = breakdown;
+            UiDesign.Value(row, app.World.Stat(actor, stat).ToString("0.##"), "BigValue").SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
         }
-        UiDesign.Note(column, $"Weapon damage bonus {app.World.Items.Bonus(actor, "damage"):+0.##;-0.##;0}");
+        var bonus = UiDesign.Well(column, "weapon_bonus");
+        UiDesign.Stat(bonus, "sword", "Weapon damage bonus", app.World.Items.Bonus(actor, "damage").ToString("+0.##;-0.##;0"));
         UiDesign.Heading(column, "EXPLORATION & STANDING");
-        UiDesign.Note(column, $"Flight: {(actor.Flies ? "Yes" : "No")} · Swimming: {(actor.Swims ? "Yes" : "No")}\nGrasping: {(actor.Grasps ? "Yes" : "No")}\nWarden reputation {actor.Reputation.GetValueOrDefault("wardens")}");
+        var traits = new HFlowContainer { MouseFilter = MouseFilterEnum.Ignore };
+        traits.AddThemeConstantOverride("h_separation", 8); traits.AddThemeConstantOverride("v_separation", 8);
+        column.AddChild(traits);
+        foreach (var (label, has, glyph) in new[] { ("Flight", actor.Flies, "feather"), ("Swimming", actor.Swims, "wave"), ("Grasping", actor.Grasps, "hand") })
+            UiDesign.Chip(traits, label + (has ? " · yes" : " · no"), has ? Tone.Moss : Tone.Neutral, has ? "check" : "cross");
+        var standing = UiDesign.Well(column, "standing");
+        UiDesign.Stat(standing, "shield", "Warden reputation", actor.Reputation.GetValueOrDefault("wardens").ToString(), tone: Tone.Moss);
     }
 }

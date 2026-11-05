@@ -25,7 +25,8 @@ public partial class RpgUi : CanvasLayer
     public MobileCombatControls? CombatControls => hotbar as MobileCombatControls;
     Label message = null !;
     GameplayHud hud = null!;
-    readonly Dictionary<string, ColorRect> cooldownShades = new();
+    readonly Dictionary<string, ActionFace> faces = new();
+    Scrim scrim = null!;
     readonly Dictionary<string, int> actionKeys = new();
     readonly Dictionary<Button, string> unavailableReasons = new();
     UiScreenHost panel = null!;
@@ -106,8 +107,9 @@ public partial class RpgUi : CanvasLayer
         message.MaxLinesVisible = 2;
         message.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         message.AddThemeFontSizeOverride("font_size", 17);
+        message.AddThemeFontOverride("font", UiDesign.BodyMedium);
         message.AddThemeStyleboxOverride("normal", UiDesign.Notification());
-        root.AddChild(message);
+        message.VerticalAlignment = VerticalAlignment.Center;
         hotbar = MobileLayout ? new MobileCombatControls() : new GridContainer { Columns = 5 };
         hotbar.Position = new Vector2(500, 640);
 
@@ -135,7 +137,6 @@ public partial class RpgUi : CanvasLayer
             if (!MobileLayout)
             {
                 // Fixed face: contextual labels and cooldowns never resize the grid cells.
-                // Two label lines fit without growth (72 = 2 × 16px lines + face margins).
                 button.CustomMinimumSize = new Vector2(140, 72);
                 button.AutowrapMode = TextServer.AutowrapMode.Off; button.ClipText = true;
                 button.AddThemeFontSizeOverride("font_size", 16);
@@ -143,14 +144,14 @@ public partial class RpgUi : CanvasLayer
             actions[actionId] = button;
             button.Name = "action_" + actionId;
             if (hotbar is MobileCombatControls mobile) mobile.Register(actionId, button);
+            else ActionFace.Attach(button, actionId, ActionFace.Style.Tile);
+            // The painted face carries cooldown and labels, so it never changes the touch rectangle.
+            var face = ActionFace.Of(button)!;
+            faces[actionId == "attack" ? "slash" : actionId] = face;
+            face.Caption = MobileLayout ? text.Split(" · ").Last() : text.Split(" · ").Last();
+            face.Key = MobileLayout ? "" : text.Split(" · ")[0];
             if (actionId == "dodge") abilityButtons["dodge"] = button;
             var id = actionId switch { "attack" => "slash", "ember" => "ember", "mend" => "mend", _ => "" };
-            if (actionId is "attack" or "dodge" or "ember" or "mend")
-            {
-                // Cooldown shade is a child, so it never changes the button's touch rectangle.
-                var shade = new ColorRect { Color = new Color(0, 0, 0, .45f), MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
-                button.AddChild(shade); cooldownShades[actionId == "attack" ? "slash" : actionId] = shade;
-            }
             if (id != "")
             {
                 abilityButtons[id] = button;
@@ -159,6 +160,8 @@ public partial class RpgUi : CanvasLayer
             }
         }
 
+        scrim = new Scrim { Name = "scrim", Visible = false };
+        root.AddChild(scrim);
         panel = new UiScreenHost { Visible = false };
         root.AddChild(panel);
         panel.Build(Back);
@@ -177,6 +180,8 @@ public partial class RpgUi : CanvasLayer
         BuildMenu();
         confirmation = new PanelContainer { Visible = false };
         root.AddChild(confirmation);
+        // Notices float above open screens so feedback (crafted, equipped, saved) stays visible.
+        root.AddChild(message);
         Stick = new TouchStick { App = App, Size = new Vector2(200, 200) };
         root.AddChild(Stick);
         metrics = new Label { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
@@ -256,6 +261,7 @@ public partial class RpgUi : CanvasLayer
         // Desktop notices sit left of the hotbar instead of underneath its second row.
         message.Position = new Vector2(24, size.Y - 84);
         message.Size = new Vector2(Math.Max(240, hotbar.Position.X - 48), 72);
+        gameplayNotice = new Rect2(message.Position, message.Size);
         hud.Arrange(new Vector2(24, 18), GameplayHud.MaxWidth);
         metrics.Position = new Vector2(size.X - 480, 100);
         if (hotbar is MobileCombatControls mobile)
@@ -276,6 +282,7 @@ public partial class RpgUi : CanvasLayer
             float noticeLeft = pad.End.X + UiDesign.Gap, noticeRight = attack.Position.X - UiDesign.Gap;
             message.Position=new Vector2(noticeLeft,safe.End.Y-84);
             message.Size=new Vector2(Math.Max(160,noticeRight-noticeLeft),72);
+            gameplayNotice = new Rect2(message.Position, message.Size);
             if(OS.HasFeature("android"))
                 foreach(var (id, button) in actions)
                 {
@@ -287,6 +294,8 @@ public partial class RpgUi : CanvasLayer
         if (OS.HasFeature("android")) overlaySafe = MobileCombatControls.ToLogicalSafeArea(overlaySafe, DisplayServer.GetDisplaySafeArea(), GetViewport().GetScreenTransform());
         overlaySafe = VerificationSafeArea ?? overlaySafe;
         PackAvailableSize = new Vector2(Math.Max(0, overlaySafe.Size.X - 32), Math.Max(0, overlaySafe.Size.Y - 32));
+        OverlaySafe = overlaySafe;
+        scrim.Position = Vector2.Zero; scrim.Size = size; scrim.QueueRedraw();
         void Arrange(Control control, float width)
         {
             var rect = UiDesign.Overlay(overlaySafe, width);
@@ -299,8 +308,11 @@ public partial class RpgUi : CanvasLayer
             panel.Size = new Vector2(Math.Max(300, overlaySafe.Size.X - 32),
                 Math.Max(240, overlaySafe.Size.Y - 32));
         }
-        else Arrange(panel, 740);
-        Arrange(menu, 760); Arrange(confirmation, 560);
+        else Arrange(panel, 760);
+        // The cut-out sits inside the panel's rounded corners, which stay dimmed.
+        scrim.Hole = scrim.Hole == null ? null : panel.GetGlobalRect().Grow(-20);
+        FitModals();
+        PlaceNotice();
         // Dialogue: lower part of the safe area, never wider than a comfortable line.
         float dialogueWidth = Math.Min(1100, overlaySafe.Size.X - 32);
         float dialogueHeight = Math.Clamp(overlaySafe.Size.Y * .44f, Math.Min(240, overlaySafe.Size.Y - 32), 420);
@@ -319,6 +331,45 @@ public partial class RpgUi : CanvasLayer
     }
 
     static Button Button(Node parent, string text, Action action) => UiDesign.Action(parent, text, action);
+
+    internal Rect2 OverlaySafe { get; private set; }
+    /// <summary>Pause menu and confirmation size to their content and sit centred in the safe area.</summary>
+    public void FitModals()
+    {
+        var safe = OverlaySafe;
+        if (!safe.HasArea()) return;
+        void Fit(PanelContainer modal, float width, Control? content)
+        {
+            width = Math.Min(width, safe.Size.X - 32);
+            var style = modal.GetThemeStylebox("panel");
+            float margins = style.GetMargin(Side.Top) + style.GetMargin(Side.Bottom);
+            float wanted = content == null ? safe.Size.Y - 32 : content.GetCombinedMinimumSize().Y + margins + 4;
+            float height = Math.Clamp(wanted, Math.Min(200, safe.Size.Y - 32), safe.Size.Y - 32);
+            modal.CustomMinimumSize = Vector2.Zero;
+            modal.Size = new Vector2(width, height);
+            modal.Position = safe.Position + new Vector2((safe.Size.X - width) / 2, (safe.Size.Y - height) / 2);
+        }
+        Fit(menu, 720 * Math.Min(TextScale, 1.2f), menu.FindChild("pause_content", true, false) as Control);
+        Fit(confirmation, 580, confirmation.GetChildCount() > 0 ? confirmation.GetChild<Control>(0) : null);
+    }
+
+    /// <summary>During play, notices sit in the free band between the stick and Attack; over open
+    /// screens and menus they float at the top centre so action feedback remains visible.</summary>
+    void PlaceNotice()
+    {
+        if (navigation.Blocked || App.Narrative.Get("speaking").AsBool())
+        {
+            var safe = OverlaySafe;
+            float width = Math.Clamp(safe.Size.X - 440, 300, 640);
+            message.Position = new Vector2(safe.Position.X + (safe.Size.X - width) / 2, safe.Position.Y + 6);
+            message.Size = new Vector2(width, 64);
+        }
+        else
+        {
+            message.Position = gameplayNotice.Position; message.Size = gameplayNotice.Size;
+        }
+    }
+    Rect2 gameplayNotice;
 
     void CancelGestures()
     {
@@ -364,6 +415,10 @@ public partial class RpgUi : CanvasLayer
             if (navigationTargets.TryGetValue("resume", out var resume)) resume.Disabled = !player.Alive;
         }
         confirmation.Visible = navigation.Confirmation && !dialogue;
+        scrim.Visible = !dialogue && (panel.Visible || menu.Visible || confirmation.Visible);
+        scrim.Hole = panel.Visible && !menu.Visible && !confirmation.Visible && panel.Size.X > OverlaySafe.Size.X * .8f ? panel.GetGlobalRect().Grow(-20) : null;
+        PlaceNotice();
+        if (menu.Visible || confirmation.Visible) { FitModals(); CallDeferred(nameof(FitModals)); }
         hotbar.Visible = !navigation.Blocked && !App.Narrative.Get("speaking").AsBool();
         if (menu.Visible) menu.FindChildren("*", "Button", true, false).OfType<Button>().FirstOrDefault()?.GrabFocus();
         // Dialogue owns focus (its first response); only release focus for plain gameplay.
@@ -417,10 +472,23 @@ public partial class RpgUi : CanvasLayer
     public void SetTextScale(float scale)
     {
         TextScale = Math.Clamp(scale, 1, 1.4f);
+        root.Theme = UiDesign.Theme(1);
         panel.Theme = menu.Theme = confirmation.Theme = UiDesign.Theme(TextScale); Layout();
+        foreach (var face in faces.Values) face.QueueRedraw();
+        hud.QueueRedraw(); Stick.QueueRedraw();
         // Notices follow text size, capped so two lines still fit the notification region.
         message.AddThemeFontSizeOverride("font_size", (int)Math.Min(20, 17 * TextScale));
     }
+    /// <summary>Gives the dialogue panel the nearest warden's front-facing portrait (presentation only).</summary>
+    void PresentSpeaker()
+    {
+        var player = App.World.Player;
+        var speaker = App.World.Actors.Values.Where(a => a.Alive && a.Profession == "merchant" && a.Region == player.Region)
+            .OrderBy(a => System.Numerics.Vector2.Distance(a.Position, player.Position)).FirstOrDefault();
+        var model = speaker == null ? null : App.Views.GetValueOrDefault(speaker.Id)?.Creature?.Model;
+        App.Narrative.Call("set_portrait", HeroPortrait.Get(model)!);
+    }
+
     void ConfirmNewGame()
     {
         Confirm("Start a new game? Unsaved progress will be lost. Saved slots are retained.", "Start new game",
@@ -437,12 +505,20 @@ public partial class RpgUi : CanvasLayer
         if (App.Narrative.Get("speaking").AsBool()) return;
         lastSystemBackFromKey = null;
         CancelGestures(); navigation.Confirm(); Clear(confirmation);
-        var box = new VBoxContainer(); confirmation.AddChild(box);
-        box.AddChild(UiDesign.Text(question));
-        var cancel = Button(box, "Cancel / Back", Back);
-        cancel.Name = "confirm_cancel";
+        var box = new VBoxContainer { Name = "confirm_box" }; confirmation.AddChild(box);
+        box.AddThemeConstantOverride("separation", 16);
+        var head = new HBoxContainer(); head.AddThemeConstantOverride("separation", 14); box.AddChild(head);
+        bool destructive = target is "new_game" or "quit" or "reset_settings" || target.StartsWith("save_");
+        head.AddChild(new Glyph(destructive ? "warning" : "diamond-outline", destructive ? UiDesign.Ember : UiDesign.Gold, 30) { SizeFlagsVertical = Control.SizeFlags.ShrinkBegin });
+        var prompt = UiDesign.Text(question); prompt.Name = "confirm_question"; prompt.ThemeTypeVariation = "RowTitle";
+        head.AddChild(prompt);
+        UiDesign.Divider(box, ornament: false);
+        var choices = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; box.AddChild(choices);
+        choices.AddThemeConstantOverride("separation", 12);
+        var cancel = Button(choices, "Cancel", Back);
+        cancel.Name = "confirm_cancel"; cancel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         navigationTargets["cancel_" + target] = cancel;
-        var accept = Button(box, confirmLabel, () =>
+        var accept = Button(choices, confirmLabel, () =>
         {
             string? screen = navigation.Screen;
             navigation.CancelConfirmation();
@@ -450,11 +526,14 @@ public partial class RpgUi : CanvasLayer
             SyncNavigation();
             if (refreshScreen && screen != null && navigation.Screen == screen) RefreshScreen(screen);
         });
-        accept.Name = "confirm_accept";
+        accept.Name = "confirm_accept"; accept.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        if (destructive) UiDesign.Danger(accept); else UiDesign.Primary(accept);
         navigationTargets["confirm_" + target] = accept;
+        // A wrapping question only knows its height once it has a width: refit as it settles.
+        box.MinimumSizeChanged += FitModals;
         SyncNavigation(); cancel.GrabFocus();
     }
-    public string ConfirmationText => confirmation.GetChildCount() > 0 && confirmation.GetChild(0).GetChildCount() > 0 ? ((Label)confirmation.GetChild(0).GetChild(0)).Text : "";
+    public string ConfirmationText => (confirmation.FindChild("confirm_question", true, false) as Label)?.Text ?? "";
     public Button? ConfirmationButton(string name) => navigation.Confirmation ? confirmation.FindChild(name, true, false) as Button : null;
 
     void RefreshScreen(string screen)
@@ -490,7 +569,8 @@ public partial class RpgUi : CanvasLayer
         packLayout = null;
         characterSheet = null;
         journalLayout = null; mapLayout = null; commerceLayout = null; supportingLayout = null;
-        panel.Present(heading == "PACK & EQUIPMENT" && PackTab == 0 ? "THE WAYFARER'S KIT" : heading, refresh);
+        panel.Present(heading == "PACK & EQUIPMENT" ? "THE WAYFARER'S KIT" : heading, refresh,
+            heading == "PACK & EQUIPMENT" ? PackTab switch { 1 => "The workbench", 2 => "Merchant wares", _ => "Equipment and belongings" } : null);
         SyncNavigation(); return true;
     }
 
@@ -540,6 +620,7 @@ public partial class RpgUi : CanvasLayer
         bool speaking = App.Narrative.Get("speaking").AsBool();
         bool defeated = !App.World.Player.Alive;
         if ((speaking && !dialogueActive) || (defeated && !defeatAnnounced)) CancelGestures();
+        if (speaking && !dialogueActive) PresentSpeaker();
         if (dialogueActive != speaking) { dialogueActive = speaking; SyncNavigation(); }
         if (defeated && !defeatAnnounced) Notify(DefeatNotice);
         // A restored or reset player must not keep the stale recovery instruction.
@@ -587,11 +668,14 @@ public partial class RpgUi : CanvasLayer
         var button = actions["interact"];
         // Never disabled: pressing an unavailable Interact still explains why through the
         // authoritative interaction feedback. The dimmed face and label say so in advance.
-        button.SelfModulate = preview.Available ? new Color(1.25f, 1.25f, 1.05f) : new Color(.7f, .74f, .74f);
         if (preview == InteractionLabel && actionKeys.ContainsKey("interact")) return;
         InteractionLabel = preview; actionKeys["interact"] = 1;
         button.Text = ButtonLabel("E", preview.Label, "");
         button.TooltipText = preview.Reason;
+        // Available interactions glow; unavailable ones read as quiet with their reason.
+        faces["interact"].Show(preview.Label == "" ? "Interact" : preview.Label, highlight: preview.Available,
+            status: "");
+        faces["interact"].Modulate = preview.Available ? Colors.White : new Color(.72f, .76f, .74f);
     }
 
     void RefreshPotion(ActorState a)
@@ -603,6 +687,7 @@ public partial class RpgUi : CanvasLayer
         actionKeys["potion"] = key;
         button.Disabled = count <= 0 || !a.Alive;
         button.Text = ButtonLabel("4", "Draught", count > 0 ? "×" + count : "none");
+        faces["potion"].Show("Draught", count > 0 ? (MobileLayout ? count.ToString() : "×" + count) : (MobileLayout ? "0" : "none left"), count > 0 ? Tone.Gold : Tone.Ember);
         SetUnavailable(button, count <= 0 ? "No draughts left · craft one from silverleaf in the Pack" : !a.Alive ? "Defeated" : null);
     }
 
@@ -630,11 +715,9 @@ public partial class RpgUi : CanvasLayer
             float cooldown = a.Cooldowns.GetValueOrDefault(id);
             var def = id == "dodge" ? null : Ability(id);
             float total = def == null ? CombatTuning.DodgeCooldown : def.Cooldown;
-            if (cooldownShades.TryGetValue(id, out var shade))
-            {
-                shade.Visible = cooldown > 0;
-                if (shade.Visible) { float ratio = Math.Clamp(cooldown / Math.Max(total, cooldown), 0, 1); shade.Position = Vector2.Zero; shade.Size = new Vector2(button.Size.X, button.Size.Y * ratio); }
-            }
+            var face = faces[id];
+            float ratio = cooldown > 0 ? Math.Clamp(cooldown / Math.Max(total, cooldown), 0, 1) : 0;
+            if (Math.Abs(face.Cooldown - ratio) > .004f) { face.Cooldown = ratio; face.QueueRedraw(); }
             bool lowMana = def != null && a.Mana < def.Cost;
             // Target availability is advisory: the button stays enabled and Cast reports the reason.
             bool noTarget = def != null && !def.Self && id != "slash" && (slow ? !HasTarget(a, def) : actionKeys.GetValueOrDefault(id + ":target") == 1);
@@ -655,6 +738,12 @@ public partial class RpgUi : CanvasLayer
                 _ => def != null && id != "slash" && MobileLayout ? $"{def.Cost:0} mana" : ""
             };
             button.Text = ButtonLabel(binding, name, detail);
+            string faceName = id == "dodge" ? "Dodge" : id == "slash" ? (MobileLayout ? "Attack" : def!.Name) : def!.Name.Split(' ')[0];
+            face.Show(faceName,
+                badge: def != null && id != "slash" ? (MobileLayout ? $"{def.Cost:0}" : $"{def.Cost:0} mana") : "",
+                tone: Tone.Arcane,
+                status: state switch { 2 => "Low mana", 3 => "No target", 4 => "Defeated", _ => "" },
+                cooldown: ratio, cooldownText: state == 1 ? $"{cooldown:0.0}" : "");
             SetUnavailable(button, state switch
             {
                 1 => $"{name} recovering · {cooldown:0.0}s",
@@ -747,26 +836,55 @@ public partial class RpgUi : CanvasLayer
     {
         Clear(menu);
         var scroll = new TouchScroll { SizeFlagsVertical = Control.SizeFlags.ExpandFill,
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, VerticalScrollMode = ScrollContainer.ScrollMode.Reserve, ScrollDeadzone = 12 };
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, VerticalScrollMode = ScrollContainer.ScrollMode.Auto, ScrollDeadzone = 12 };
+        scroll.GetVScrollBar().CustomMinimumSize = new Vector2(28, 0);
         menu.AddChild(scroll);
-        var box = new VBoxContainer { Name = "pause_content", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; scroll.AddChild(box);
-        UiDesign.Heading(box, "MOSSLIGHT");
+        var box = new VBoxContainer { Name = "pause_content", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        box.AddThemeConstantOverride("separation", 12);
+        scroll.AddChild(box);
+        var title = UiDesign.Title(box, "Mosslight");
+        title.HorizontalAlignment = HorizontalAlignment.Center;
+        title.AddThemeFontSizeOverride("font_size", (int)(40 * TextScale));
         pauseSummary = UiDesign.Note(box, "Adventure paused");
-        navigationTargets["resume"] = Button(box, "Resume adventure", () => { if (App.World.Player.Alive) App.ResumeGame(); else Notify("Defeated · Load a save or start a New game to continue"); });
-        var adventures = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; adventures.AddThemeConstantOverride("h_separation", 8); adventures.AddThemeConstantOverride("v_separation", 8); box.AddChild(adventures);
-        foreach (var entry in new (string, Action)[] { ("Pack", Inventory), ("Character", Character), ("Journal", Journal), ("Map", Map) })
-        { var entryButton = Button(adventures, entry.Item1, entry.Item2); entryButton.Name = "menu_" + entry.Item1.ToLowerInvariant(); entryButton.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; }
-        UiDesign.Heading(box, "YOUR ADVENTURE");
-        var utilities = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; utilities.AddThemeConstantOverride("h_separation", 8); utilities.AddThemeConstantOverride("v_separation", 8); box.AddChild(utilities);
+        pauseSummary.HorizontalAlignment = HorizontalAlignment.Center;
+        UiDesign.Divider(box);
+        var resume = UiDesign.Primary(Button(box, "Resume adventure", () => { if (App.World.Player.Alive) App.ResumeGame(); else Notify("Defeated · Load a save or start a New game to continue"); }));
+        resume.CustomMinimumSize = new Vector2(0, 64);
+        navigationTargets["resume"] = resume;
+        // Four adventure destinations as illustrated tiles; two columns when narrow.
+        bool wide = OverlaySafe.Size.X / TextScale >= 700 || !OverlaySafe.HasArea();
+        var adventures = new GridContainer { Columns = wide ? 4 : 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        box.AddChild(adventures);
+        foreach (var (label, glyph, action) in new (string, string, Action)[] { ("Pack", "bag", Inventory), ("Character", "person", Character), ("Journal", "book", Journal), ("Map", "map", Map) })
+        {
+            var tile = new RichButton(label, 8, 10) { Name = "menu_" + label.ToLowerInvariant(), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MinHeight = 96 * Math.Min(TextScale, 1.2f) };
+            tile.ThemeTypeVariation = "RowButton";
+            tile.TooltipText = "Open " + label;
+            tile.Pressed += action;
+            var column = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
+            column.AddThemeConstantOverride("separation", 6);
+            tile.Content.AddChild(column);
+            var icon = new Glyph(glyph, UiDesign.Gold, 34 * Math.Min(TextScale, 1.2f)) { SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter };
+            column.AddChild(icon);
+            var name = UiDesign.Text(label); name.ThemeTypeVariation = "RowTitle"; name.HorizontalAlignment = HorizontalAlignment.Center;
+            name.AutowrapMode = TextServer.AutowrapMode.Off;
+            column.AddChild(name);
+            adventures.AddChild(tile);
+        }
+        UiDesign.Divider(box, ornament: false);
+        var utilities = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; box.AddChild(utilities);
         Button(utilities, "Save & load", SaveLoad).Name = "menu_save_load";
         Button(utilities, "Settings", Settings).Name = "menu_settings";
         navigationTargets["new_game"] = Button(utilities, "New game", ConfirmNewGame);
-        Button(utilities, "Quit", () => Confirm("Quit Mosslight? Unsaved progress will be lost.", "Quit", () => GetTree().Quit(), "quit", refreshScreen: false)).Name = "menu_quit";
+        UiDesign.Danger(Button(utilities, "Quit", () => Confirm("Quit Mosslight? Unsaved progress will be lost.", "Quit", () => GetTree().Quit(), "quit", refreshScreen: false))).Name = "menu_quit";
         foreach (var button in utilities.GetChildren().OfType<Button>()) button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        UiDesign.Heading(box, "WORKSHOP & TESTING");
-        Button(box, "Developer tools", Developer).Name = "menu_developer";
+        var developer = UiDesign.Quiet(Button(box, "Developer tools", Developer));
+        developer.Name = "menu_developer";
+        developer.TooltipText = "Workshop, tuning and diagnostics · not part of normal play";
         if (menu.IsVisibleInTree()) box.GetChildren().OfType<Button>().FirstOrDefault()?.GrabFocus();
         layoutTraceFrames = 3;
+        box.MinimumSizeChanged += FitModals;
+        if (menu.IsInsideTree()) CallDeferred(nameof(FitModals));
     }
 
     // ---- Save & load (PR #7 Part 4) ----
@@ -781,17 +899,31 @@ public partial class RpgUi : CanvasLayer
 
     internal void PopulateSaveDetails(VBoxContainer body)
     {
+        void Header(VBoxContainer card, string title, string state, Tone tone)
+        {
+            var head = new HBoxContainer(); head.AddThemeConstantOverride("separation", 10); card.AddChild(head);
+            var name = UiDesign.Title(head, title); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            UiDesign.Chip(head, state, tone);
+        }
+        void Blocked(VBoxContainer card, string reason)
+        {
+            var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 8); card.AddChild(line);
+            line.AddChild(new Glyph("lock", UiDesign.Faint, 16));
+            UiDesign.Note(line, reason);
+        }
         if (SaveSelection is >= 1 and <= 3)
         {
             int slot = SaveSelection;
             int index = slot;
             string path = Persistence.SlotPath(slot);
             var info = Persistence.Inspect(path, App.World.Content);
-            var card = UiDesign.Card(body, "slot_" + slot);
-            UiDesign.Heading(card, $"SLOT {slot}  ·  {info.State switch { SlotState.Ready => "Saved game", SlotState.Empty => "Empty", SlotState.Incompatible => "Older version", _ => "Damaged" }}");
-            card.AddChild(UiDesign.Text(info.Describe()));
+            var card = UiDesign.Card(body, "slot_" + slot, "Well");
+            card.AddThemeConstantOverride("separation", 12);
+            Header(card, "Slot " + slot, info.State switch { SlotState.Ready => "Saved game", SlotState.Empty => "Empty", SlotState.Incompatible => "Older version", _ => "Damaged" },
+                info.State switch { SlotState.Ready => Tone.Moss, SlotState.Empty => Tone.Neutral, SlotState.Incompatible => Tone.Arcane, _ => Tone.Ember });
+            UiDesign.Note(UiDesign.Card(card, null, "Quote"), info.Describe());
             string? saveBlocker = FeelCourseBlocker("saving") ?? (!App.World.Player.Alive ? "Cannot save while defeated" : info.State == SlotState.Incompatible ? "Kept safe · choose another slot to save" : null);
-            var save = Button(card, info.State == SlotState.Damaged ? "Replace damaged file (a copy is kept)" : info.State == SlotState.Ready ? $"Overwrite slot {slot}" : $"Save to slot {slot}", () =>
+            var save = UiDesign.Primary(Button(card, info.State == SlotState.Damaged ? "Replace damaged file (a copy is kept)" : info.State == SlotState.Ready ? $"Overwrite slot {slot}" : $"Save to slot {slot}", () =>
             {
                 void Write()
                 {
@@ -808,30 +940,31 @@ public partial class RpgUi : CanvasLayer
                         ? $"Replace the damaged file in slot {index}? The damaged file is copied aside, not deleted."
                         : $"Overwrite slot {index}? The saved game there ({info.Describe()}) will be replaced.",
                     info.State == SlotState.Damaged ? "Replace" : "Overwrite", Write, "save_" + index);
-            });
+            }));
             save.Name = "save_" + slot;
-            if (saveBlocker != null) { save.Disabled = true; UiDesign.Note(card, saveBlocker); }
+            if (saveBlocker != null) { save.Disabled = true; Blocked(card, saveBlocker); }
             string? loadBlocker = FeelCourseBlocker("loading") ?? info.State switch
             {
                 SlotState.Empty => "Nothing saved here yet", SlotState.Incompatible => "Needs an older Mosslight build", SlotState.Damaged => "This file cannot be loaded", _ => null
             };
             var load = Button(card, $"Load slot {slot}", () => Confirm($"Load slot {index}? Progress since your last save will be lost.", "Load", () => LoadSlot(index), "load_" + index));
             load.Name = "load_" + slot;
-            if (loadBlocker != null) { load.Disabled = true; UiDesign.Note(card, loadBlocker); }
+            if (loadBlocker != null) { load.Disabled = true; Blocked(card, loadBlocker); }
         }
         if (SaveSelection != 4) return;
         var auto = Persistence.Inspect(Persistence.AutosavePath, App.World.Content);
-        var autoCard = UiDesign.Card(body, "slot_autosave");
-        UiDesign.Heading(autoCard, "BACKGROUND AUTOSAVE");
-        autoCard.AddChild(UiDesign.Text(auto.State == SlotState.Empty ? "None yet · written when the app goes to the background" : auto.Describe()));
-        var recover = Button(autoCard, "Recover background autosave", () => Confirm("Recover the background autosave? Progress since then will be lost.", "Recover", () =>
+        var autoCard = UiDesign.Card(body, "slot_autosave", "Well");
+        autoCard.AddThemeConstantOverride("separation", 12);
+        Header(autoCard, "Recovery", auto.State == SlotState.Ready ? "Available" : auto.State == SlotState.Empty ? "None yet" : "Unavailable", auto.State == SlotState.Ready ? Tone.Moss : Tone.Neutral);
+        UiDesign.Note(UiDesign.Card(autoCard, null, "Quote"), auto.State == SlotState.Empty ? "None yet · written when the app goes to the background" : auto.Describe());
+        var recover = UiDesign.Primary(Button(autoCard, "Recover background autosave", () => Confirm("Recover the background autosave? Progress since then will be lost.", "Recover", () =>
         {
             try { if (App.InFeelCourse) throw new InvalidOperationException("Return from the controlled course before loading"); Persistence.LoadAutosave(App.World, App.Narrative); App.RebuildViews(); App.ResumeGame(); Notify("Recovered autosave"); }
             catch (Exception e) { Notify(e.Message); }
-        }, "load_autosave"));
+        }, "load_autosave")));
         recover.Name = "load_autosave";
         string? autoBlocker = FeelCourseBlocker("loading") ?? (auto.State == SlotState.Ready ? null : auto.State == SlotState.Empty ? "No autosave yet" : auto.Message);
-        if (autoBlocker != null) { recover.Disabled = true; UiDesign.Note(autoCard, autoBlocker); }
+        if (autoBlocker != null) { recover.Disabled = true; Blocked(autoCard, autoBlocker); }
     }
 
     void LoadSlot(int slot)
@@ -890,28 +1023,48 @@ public partial class RpgUi : CanvasLayer
     {
         UiDesign.Note(body, "Saved on this device, separately from game saves. Loading a game never changes them.");
         if (PreferencesProblem != null) UiDesign.Note(body, PreferencesProblem);
-        void Option(string name, string title, string state, string explanation, Action<UiPreferences> change)
+        void Row(string name, string glyph, string title, string explanation, Control value)
+        {
+            var card = UiDesign.Card(body, "setting_" + name);
+            var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); card.AddChild(row);
+            var badge = new PanelContainer { ThemeTypeVariation = "IconWell", CustomMinimumSize = new Vector2(44, 44), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter, MouseFilter = Control.MouseFilterEnum.Ignore };
+            row.AddChild(badge);
+            badge.AddChild(new Glyph(glyph, UiDesign.Gold, 22) { SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter });
+            var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
+            text.AddThemeConstantOverride("separation", 2); row.AddChild(text);
+            var heading = UiDesign.Text(title); heading.ThemeTypeVariation = "RowTitle"; text.AddChild(heading);
+            var detail = UiDesign.Text(explanation); detail.ThemeTypeVariation = "RowSubtitle"; text.AddChild(detail);
+            row.AddChild(value);
+        }
+        void Option(string name, string glyph, string title, string state, string explanation, Action<UiPreferences> change, bool? on = null)
         {
             int page = name == "motion" ? 1 : name == "sound" ? 2 : 0;
             if (SettingsPage != page) return;
-            var card = UiDesign.Card(body, "setting_" + name);
-            UiDesign.Heading(card, title.ToUpperInvariant());
-            UiDesign.Note(card, explanation);
-            Button(card, $"{title}: {state} · tap to change", () => ChangePreference(change)).Name = "set_" + name;
+            var control = new RichButton($"{title}: {state} · tap to change", 12, 6) { Name = "set_" + name, CustomMinimumSize = new Vector2(150 * Math.Min(TextScale, 1.2f), UiDesign.Target),
+                SizeFlagsVertical = Control.SizeFlags.ShrinkCenter, TooltipText = $"{title}: {state} · tap to change" };
+            control.Content.Alignment = BoxContainer.AlignmentMode.End;
+            var label = new Label { Text = state, ThemeTypeVariation = on == true ? "PositiveLabel" : "ValueLabel", MouseFilter = Control.MouseFilterEnum.Ignore, VerticalAlignment = VerticalAlignment.Center };
+            control.Content.AddChild(label);
+            if (on is bool value) control.Content.AddChild(new Switch { On = value });
+            else control.Content.AddChild(new Glyph("next", UiDesign.Gold, 16));
+            control.Pressed += () => ChangePreference(change);
+            Row(name, glyph, title, explanation, control);
         }
-        Option("text", "Text size", Preferences.TextSizeName, "Menus, screens, dialogue and notices. The HUD keeps a fixed size so it never covers controls.",
+        Option("text", "book", "Text size", Preferences.TextSizeName, "Menus, screens, dialogue and notices. The HUD keeps a fixed size so it never covers controls.",
             p => p.TextSize = (p.TextSize + 1) % UiPreferences.TextScales.Length);
-        Option("sound", "Sound", Preferences.Muted ? "Off" : "On", "Combat and interface sounds.", p => p.Muted = !p.Muted);
-        Option("motion", "Reduced motion", Preferences.ReducedMotion ? "On" : "Off", "Removes the camera nudge on impacts. Combat timing, sounds and hit cues are unchanged.", p => p.ReducedMotion = !p.ReducedMotion);
-        Option("contrast", "High contrast", Preferences.HighContrast ? "On" : "Off", "Opaque panels, ivory borders and brighter secondary text.", p => p.HighContrast = !p.HighContrast);
+        Option("sound", "spark", "Sound", Preferences.Muted ? "Off" : "On", "Combat and interface sounds.", p => p.Muted = !p.Muted, !Preferences.Muted);
+        Option("motion", "feather", "Reduced motion", Preferences.ReducedMotion ? "On" : "Off", "Removes the camera nudge on impacts. Combat timing, sounds and hit cues are unchanged.", p => p.ReducedMotion = !p.ReducedMotion, Preferences.ReducedMotion);
+        Option("contrast", "eye", "High contrast", Preferences.HighContrast ? "On" : "Off", "Opaque panels, ivory borders and brighter secondary text.", p => p.HighContrast = !p.HighContrast, Preferences.HighContrast);
         if (SettingsPage == 0)
         {
-        var zoom = UiDesign.Card(body, "setting_zoom");
-        UiDesign.Heading(zoom, "CAMERA ZOOM");
-        UiDesign.Note(zoom, "Pixel scale of the world view for this session.");
-        Button(zoom, "Change camera zoom", () => App.CycleZoom()).Name = "set_zoom";
+            var zoom = new RichButton("Change camera zoom", 12, 6) { Name = "set_zoom", CustomMinimumSize = new Vector2(150 * Math.Min(TextScale, 1.2f), UiDesign.Target), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
+            zoom.Content.Alignment = BoxContainer.AlignmentMode.End;
+            zoom.Content.AddChild(new Label { Text = "Cycle", ThemeTypeVariation = "ValueLabel", MouseFilter = Control.MouseFilterEnum.Ignore, VerticalAlignment = VerticalAlignment.Center });
+            zoom.Content.AddChild(new Glyph("target", UiDesign.Gold, 18));
+            zoom.Pressed += () => App.CycleZoom();
+            Row("zoom", "map", "Camera zoom", "Pixel scale of the world view for this session.", zoom);
         }
-        var reset = Button(body, "Restore default settings", () => Confirm("Restore default settings? Text size, sound, motion and contrast return to their defaults.", "Restore defaults", () => ApplyPreferences(new UiPreferences(), persist: true), "reset_settings"));
+        var reset = UiDesign.Danger(Button(body, "Restore default settings", () => Confirm("Restore default settings? Text size, sound, motion and contrast return to their defaults.", "Restore defaults", () => ApplyPreferences(new UiPreferences(), persist: true), "reset_settings")));
         reset.Name = "set_reset";
     }
 

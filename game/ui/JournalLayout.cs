@@ -25,46 +25,62 @@ public partial class JournalLayout : VBoxContainer
         if (!IsInsideTree()) return;
         foreach (var scroll in FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>()) scroll.CancelGesture();
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
+        AddThemeConstantOverride("separation", 10);
         entries.Clear(); quests = JournalQuest.Read(ui.App.Narrative);
         compact = ui.PackAvailableSize.X / ui.TextScale < 1000;
         if (!quests.Any(q => q.Id == ui.JournalSelection))
             ui.JournalSelection = quests.FirstOrDefault(q => q.Status == "active")?.Id ?? quests.FirstOrDefault()?.Id;
-        UiDesign.Note(this, "YOUR JOURNEY · " + quests.Count(q => q.Status == "active") + " active · " + quests.Count(q => q.Status == "completed") + " completed");
+        var summary = new HBoxContainer { Name = "journey_summary", MouseFilter = MouseFilterEnum.Ignore };
+        summary.AddThemeConstantOverride("separation", 8);
+        AddChild(summary);
+        UiDesign.Caption(summary, "Your journey");
+        UiDesign.Chip(summary, quests.Count(q => q.Status == "active") + " active", Tone.Gold, "diamond");
+        UiDesign.Chip(summary, quests.Count(q => q.Status == "completed") + " completed", Tone.Moss, "check");
+        int offered = quests.Count(q => q.Status == "available");
+        if (offered > 0) UiDesign.Chip(summary, offered + " available", Tone.Arcane, "spark");
         if (compact)
             UiDesign.Tabs(this, new[] { "Quests", "Reading" }, ui.JournalReading ? 1 : 0,
                 i => { ui.JournalReading = i == 1; UpdateVisibility(); }, "journal_");
-        var regions = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill }; regions.AddThemeConstantOverride("separation", 16); AddChild(regions);
-        var index = Scroll(regions, "quest_index_scroll"); indexPane = index.GetParent<Control>(); indexPane.SizeFlagsStretchRatio = .34f;
-        reading = Scroll(regions, "quest_reading_scroll"); detailPane = reading.GetParent<Control>(); detailPane.SizeFlagsStretchRatio = .66f;
+        var regions = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill }; regions.AddThemeConstantOverride("separation", 12); AddChild(regions);
+        var indexColumn = UiDesign.InventoryPanel(regions, "quest_index", "QUESTS", "book");
+        indexPane = indexColumn.GetParent<Control>(); indexPane.SizeFlagsStretchRatio = .36f;
+        var index = Scroll(indexColumn, "quest_index_scroll");
+        var readingColumn = new PanelContainer { Name = "quest_page", ThemeTypeVariation = "Pane", SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsStretchRatio = .64f };
+        regions.AddChild(readingColumn);
+        detailPane = readingColumn;
+        reading = Scroll(readingColumn, "quest_reading_scroll");
+        reading.AddThemeConstantOverride("separation", 12);
         foreach (var (status, heading) in JournalScreen.Sections)
         {
             var group = quests.Where(q => q.Status == status).ToList(); if (group.Count == 0) continue;
-            UiDesign.Heading(index, heading);
+            UiDesign.Caption(index, heading);
             foreach (var q in group)
             {
-                var button = UiDesign.Action(index, q.Title + "\n" + Status(q), () =>
+                var button = new RichButton(q.Title, 10, 8) { Name = "quest_" + q.Id, SizeFlagsHorizontal = SizeFlags.ExpandFill, MinHeight = 64 * Math.Min(ui.TextScale, 1.2f) };
+                button.Pressed += () =>
                 {
                     ui.JournalSelection = q.Id; ui.JournalReading = true; ReadSelected(); UpdateVisibility();
                     reading.GetParent<TouchScroll>().ScrollVertical = 0;
-                });
-                button.Name = "quest_" + q.Id; entries[q.Id] = button;
+                };
+                var (glyph, tone) = JournalScreen.Marker(q);
+                var medal = new PanelContainer { ThemeTypeVariation = "IconWell", CustomMinimumSize = new Vector2(40, 40), SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
+                button.Content.AddChild(medal);
+                medal.AddChild(new Glyph(glyph, UiDesign.ToneColor(tone), 20) { SizeFlagsHorizontal = SizeFlags.ShrinkCenter });
+                button.Stack(q.Title, Status(q));
+                index.AddChild(button);
+                entries[q.Id] = button;
             }
         }
         if (quests.Count == 0) UiDesign.Note(index, "No quests yet. Speak to the warden in Reach.");
         ReadSelected(); UpdateVisibility();
     }
     public static string Status(JournalQuest q) => q.PendingReward ? "Complete · reward waiting" : q.Status switch
-    { "active" => "Active", "available" => "Available from the warden", "locked" => "Not yet available", "completed" => "Complete", "failed" => "Failed", _ => q.Status };
+    { "active" => q.Staged ? $"Active · step {Math.Min(q.Progress + 1, q.Required)} of {q.Required}" : $"Active · {q.Progress} of {q.Required}", "available" => "Available from the warden", "locked" => "Not yet available", "completed" => "Complete", "failed" => "Failed", _ => q.Status };
     void ReadSelected()
     {
         if (reading == null) return;
         foreach (var child in reading.GetChildren()) { reading.RemoveChild(child); child.QueueFree(); }
-        foreach (var (id, button) in entries)
-        {
-            var face = UiDesign.InventoryTile(id == ui.JournalSelection);
-            button.AddThemeStyleboxOverride("normal", face); button.AddThemeStyleboxOverride("hover", face);
-            button.Text = (id == ui.JournalSelection ? "[Selected] " : "") + quests.First(q => q.Id == id).Title + "\n" + Status(quests.First(q => q.Id == id));
-        }
+        foreach (var (id, button) in entries) UiDesign.SetSelected(button, id == ui.JournalSelection);
         var q = quests.FirstOrDefault(q => q.Id == ui.JournalSelection);
         if (q == null) UiDesign.Note(reading, "Select a quest to read your journal.");
         else
@@ -75,12 +91,22 @@ public partial class JournalLayout : VBoxContainer
             detail.GetChild(0).Name = "quest_detail_" + q.Id;
         }
         var extras = JournalExtras.Read(ui.App.Narrative);
-        if (extras.Discoveries.Count > 0)
-        { UiDesign.Heading(reading, "DISCOVERED PLACES"); UiDesign.Note(reading, string.Join(" · ", extras.Discoveries)); }
-        if (extras.Shortcuts + extras.Seals > 0)
-            UiDesign.Note(reading, $"Shortcuts raised: {extras.Shortcuts} · Light seals broken: {extras.Seals}");
+        if (extras.Discoveries.Count > 0 || extras.Shortcuts + extras.Seals > 0)
+        {
+            UiDesign.Divider(reading);
+            UiDesign.Heading(reading, "DISCOVERED PLACES");
+            var places = new HFlowContainer { Name = "discovered_places", MouseFilter = MouseFilterEnum.Ignore };
+            places.AddThemeConstantOverride("h_separation", 6); places.AddThemeConstantOverride("v_separation", 6);
+            reading.AddChild(places);
+            foreach (var place in extras.Discoveries) UiDesign.Chip(places, place, Tone.Neutral, "pin");
+            if (extras.Shortcuts + extras.Seals > 0)
+                UiDesign.Note(reading, $"Shortcuts raised: {extras.Shortcuts} · Light seals broken: {extras.Seals}");
+        }
         if (extras.Lore.Count > 0)
-        { UiDesign.Heading(reading, "GATHERED LORE"); foreach (var entry in extras.Lore) UiDesign.Note(reading, entry); }
+        {
+            UiDesign.Heading(reading, "GATHERED LORE");
+            foreach (var entry in extras.Lore) UiDesign.Note(UiDesign.Card(reading, null, "Quote"), entry);
+        }
     }
     void UpdateVisibility()
     {
@@ -88,10 +114,7 @@ public partial class JournalLayout : VBoxContainer
         if (compact)
             foreach (var (name, text, selected) in new[] { ("journal_quests", "Quests", !ui.JournalReading), ("journal_reading", "Reading", ui.JournalReading) })
                 if (FindChild(name, true, false) is Button tab)
-                {
-                    tab.Text = selected ? "[" + text + "]" : text;
-                    var face = UiDesign.InventoryTile(selected); tab.AddThemeStyleboxOverride("normal", face); tab.AddThemeStyleboxOverride("hover", face);
-                }
+                    UiDesign.SetSelected(tab, selected, "TabButton", "TabSelected");
         // A second finger may switch pages while a scroll still owns a touch.
         // Cancel the hidden pane's gesture before it can activate a hidden row.
         if (compact && ui.JournalReading && indexPane.Visible && indexPane is TouchScroll indexScroll) indexScroll.CancelGesture();

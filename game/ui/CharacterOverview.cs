@@ -59,26 +59,61 @@ public static class CharacterOverview
         return null;
     }
 
+    static string AbilityGlyph(string id) => id switch { "slash" => "sword", "ember" => "flame", "mend" => "leaf", "dodge" => "dodge", _ => "spark" };
+    static string SkillGlyph(string stat) => stat switch { "strength" => "sword", "defence" => "shield", "power" => "bolt", _ => "star" };
+
+    /// <summary>Card header: icon medallion, title, state chip.</summary>
+    static VBoxContainer CardHeader(VBoxContainer card, string glyph, Tone tone, string title, string state, Tone stateTone, string? stateGlyph)
+    {
+        var head = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; head.AddThemeConstantOverride("separation", 12);
+        card.AddChild(head);
+        var badge = new PanelContainer { ThemeTypeVariation = "IconWell", CustomMinimumSize = new Vector2(46, 46), SizeFlagsVertical = Control.SizeFlags.ShrinkBegin, MouseFilter = Control.MouseFilterEnum.Ignore };
+        head.AddChild(badge);
+        badge.AddChild(new Glyph(glyph, UiDesign.ToneColor(tone), 24) { SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter });
+        var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Ignore };
+        text.AddThemeConstantOverride("separation", 4);
+        head.AddChild(text);
+        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; row.AddThemeConstantOverride("separation", 8);
+        text.AddChild(row);
+        var name = UiDesign.Heading(row, title.ToUpperInvariant());
+        name.AddThemeFontSizeOverride("font_size", (int)(name.GetThemeFontSize("font_size") * 1.15f));
+        name.AddThemeColorOverride("font_color", UiDesign.GoldBright);
+        UiDesign.Chip(row, state, stateTone, stateGlyph);
+        return text;
+    }
+
     public static void Progression(VBoxContainer body, Foundation app, RpgUi ui, bool abilities = true, bool skills = true)
     {
         var actor = app.World.Player;
-        UiDesign.Heading(body, $"PROGRESSION · {actor.SkillPoints} unspent skill point{(actor.SkillPoints == 1 ? "" : "s")}");
-        UiDesign.Note(body, "Spending skill points is permanent. Each choice asks for confirmation. Level up by defeating foes.");
+        var banner = UiDesign.Card(body, "progression_banner", "Quote");
+        var line = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; line.AddThemeConstantOverride("separation", 10);
+        banner.AddChild(line);
+        line.AddChild(new Glyph("star", actor.SkillPoints > 0 ? UiDesign.Gold : UiDesign.Faint, 22));
+        UiDesign.Heading(line, $"PROGRESSION · {actor.SkillPoints} unspent skill point{(actor.SkillPoints == 1 ? "" : "s")}");
+        UiDesign.Note(banner, "Spending skill points is permanent. Each choice asks for confirmation. Level up by defeating foes.");
         if (abilities) foreach (var ability in app.World.Content.Abilities.Where(a => a.PlayerLearnable || actor.Abilities.Contains(a.Id)))
         {
             var card = UiDesign.Card(body, "ability_" + ability.Id);
             bool learned = actor.Abilities.Contains(ability.Id);
-            UiDesign.Heading(card, $"{ability.Name.ToUpperInvariant()}  ·  {(learned ? "Learned" : LearnBlocker(actor, ability) == null ? "Available" : "Locked")}");
-            card.AddChild(UiDesign.Text($"Mana {ability.Cost:0} · range {ability.Range:0} · recovers in {ability.Cooldown:0.#}s" + (learned ? "" : $"\nRequires level {ability.UnlockLevel} · costs {ability.UnlockCost} skill point{(ability.UnlockCost == 1 ? "" : "s")}")));
-            if (learned) continue;
             var blocker = LearnBlocker(actor, ability);
-            var learn = UiDesign.Action(card, "Learn " + ability.Name, () => ui.Confirm(
+            string state = learned ? "Learned" : blocker == null ? "Available" : "Locked";
+            var text = CardHeader(card, AbilityGlyph(ability.Id), learned ? Tone.Gold : Tone.Arcane, ability.Name, state,
+                learned ? Tone.Moss : blocker == null ? Tone.Gold : Tone.Neutral, learned ? "check" : blocker == null ? null : "lock");
+            var facts = new HFlowContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+            facts.AddThemeConstantOverride("h_separation", 6); facts.AddThemeConstantOverride("v_separation", 4);
+            text.AddChild(facts);
+            UiDesign.Chip(facts, $"Mana {ability.Cost:0}", Tone.Arcane);
+            UiDesign.Chip(facts, $"Range {ability.Range:0}", Tone.Neutral);
+            UiDesign.Chip(facts, $"Recovers {ability.Cooldown:0.#}s", Tone.Neutral);
+            if (!learned) UiDesign.Note(text, $"Requires level {ability.UnlockLevel} · costs {ability.UnlockCost} skill point{(ability.UnlockCost == 1 ? "" : "s")}");
+            if (learned) continue;
+            var learn = UiDesign.Primary(UiDesign.Action(card, "Learn " + ability.Name, () => ui.Confirm(
                 $"Learn {ability.Name}? This spends {ability.UnlockCost} skill point{(ability.UnlockCost == 1 ? "" : "s")} and cannot be undone.",
                 "Learn " + ability.Name, () =>
                 {
                     bool ok = app.ManageItem(() => Mosslight.Progression.Unlock(app.World, actor, ability.Id));
                     ui.Notify(ok ? "Learned " + ability.Name : LearnBlocker(actor, ability) ?? "Cannot learn " + ability.Name + " right now");
-                }));
+                })));
             learn.Name = "learn_" + ability.Id;
             if (blocker != null) { learn.Disabled = true; UiDesign.Note(card, blocker); }
         }
@@ -87,15 +122,33 @@ public static class CharacterOverview
             var card = UiDesign.Card(body, "skill_" + skill.Id);
             int rank = actor.SkillRanks.GetValueOrDefault(skill.Id);
             string name = char.ToUpperInvariant(skill.Id[0]) + skill.Id[1..];
-            UiDesign.Heading(card, $"{name.ToUpperInvariant()} · { (rank >= skill.MaxRank ? "Mastered" : TrainBlocker(actor, skill) == null ? "Available" : "Blocked")} · rank {rank} of {skill.MaxRank}");
-            card.AddChild(UiDesign.Text($"Each rank adds {skill.PerRank:+0.##;-0.##;0} {skill.Stat} · costs 1 skill point\n" + Breakdown(app.World, actor, skill.Stat) + $"\nAfter training: {app.World.Stat(actor, skill.Stat) + (rank < skill.MaxRank ? skill.PerRank : 0):0.##} {skill.Stat}"));
             var blocker = TrainBlocker(actor, skill);
-            var train = UiDesign.Action(card, $"Train {name} to rank {Math.Min(rank + 1, skill.MaxRank)}", () => ui.Confirm(
+            string state = rank >= skill.MaxRank ? "Mastered" : blocker == null ? "Available" : "Blocked";
+            var text = CardHeader(card, SkillGlyph(skill.Stat), Tone.Gold, name, state,
+                rank >= skill.MaxRank ? Tone.Moss : blocker == null ? Tone.Gold : Tone.Neutral, rank >= skill.MaxRank ? "check" : null);
+            var pips = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Name = "rank_pips" }; pips.AddThemeConstantOverride("separation", 4);
+            text.AddChild(pips);
+            for (int i = 0; i < skill.MaxRank; i++) pips.AddChild(new Glyph(i < rank ? "diamond" : "diamond-outline", i < rank ? UiDesign.Gold : UiDesign.Faint, 14));
+            UiDesign.Caption(pips, $"  Rank {rank} of {skill.MaxRank}");
+            UiDesign.Note(text, $"Each rank adds {skill.PerRank:+0.##;-0.##;0} {skill.Stat} · costs 1 skill point");
+            float now = app.World.Stat(actor, skill.Stat), next = now + (rank < skill.MaxRank ? skill.PerRank : 0);
+            var projection = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; projection.AddThemeConstantOverride("separation", 10);
+            text.AddChild(projection);
+            projection.AddChild(new Glyph(SkillGlyph(skill.Stat), UiDesign.Faint, 16));
+            var label = UiDesign.Value(projection, char.ToUpperInvariant(skill.Stat[0]) + skill.Stat[1..], "NoteLabel");
+            UiDesign.Value(projection, now.ToString("0.##")).SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin;
+            if (rank < skill.MaxRank)
+            {
+                projection.AddChild(new Glyph("next", UiDesign.Gold, 14));
+                UiDesign.Value(projection, next.ToString("0.##"), "PositiveLabel").SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin;
+            }
+            card.TooltipText = Breakdown(app.World, actor, skill.Stat) + $" · After training: {next:0.##} {skill.Stat}";
+            var train = UiDesign.Primary(UiDesign.Action(card, $"Train {name} to rank {Math.Min(rank + 1, skill.MaxRank)}", () => ui.Confirm(
                 $"Train {name} to rank {rank + 1}? This spends 1 skill point and cannot be undone.", "Train " + name, () =>
                 {
                     bool ok = app.ManageItem(() => actor == app.World.Player && actor.SkillRanks.GetValueOrDefault(skill.Id) == rank && Mosslight.Progression.Train(app.World, actor, skill.Id));
                     ui.Notify(ok ? $"{name} trained to rank {actor.SkillRanks.GetValueOrDefault(skill.Id)}" : TrainBlocker(actor, skill) ?? "Cannot train right now");
-                }));
+                })));
             train.Name = "train_" + skill.Id;
             if (blocker != null) { train.Disabled = true; UiDesign.Note(card, blocker); }
         }

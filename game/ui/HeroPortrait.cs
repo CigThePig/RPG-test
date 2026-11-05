@@ -8,12 +8,19 @@ namespace Mosslight;
 /// <summary>One cached neutral, south-facing PPC portrait, independent of the gameplay motor and texture.</summary>
 public static class HeroPortrait
 {
-    static CreatureModel? cachedModel;
-    static Texture2D? cached;
+    // Small reference-keyed cache: the hero and a dialogue speaker never evict each other.
+    static readonly Dictionary<CreatureModel, Texture2D?> cache = new(ReferenceEqualityComparer.Instance);
     public static Texture2D? Get(CreatureModel? model)
     {
         if (model == null) return null;
-        if (ReferenceEquals(model, cachedModel)) return cached;
+        if (cache.TryGetValue(model, out var known)) return known;
+        if (cache.Count >= 8) cache.Clear();
+        var texture = Render(model);
+        cache[model] = texture;
+        return texture;
+    }
+    static Texture2D? Render(CreatureModel model)
+    {
         var motor = new CreatureMotor(model, CreatureRuntime.Registry, new MotorOptions { Facing = FacingMode.Free, ExportMode = true });
         double yaw = PixelCamera.DirectionYaw(6); // South: towards the camera.
         motor.Teleport(Vec3.Zero, yaw);
@@ -35,7 +42,6 @@ public static class HeroPortrait
         var bounds = image.GetUsedRect();
         if (!bounds.HasArea()) return null;
         using var crop = image.GetRegion(bounds);
-        cachedModel = model; cached = ImageTexture.CreateFromImage(crop);
-        return cached;
+        return ImageTexture.CreateFromImage(crop);
     }
 }

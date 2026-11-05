@@ -72,7 +72,10 @@ public partial class PackLayout : VBoxContainer
         // measured rectangle when the viewport contracts in this same frame.
         Mode = ChooseMode(ui.PackAvailableSize - new Vector2(32, 72), ui.TextScale);
 
-        var top = UiDesign.Tabs(this, PackScreen.Tabs, 0, tab =>
+        var header = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        header.AddThemeConstantOverride("separation", 12);
+        AddChild(header);
+        var top = UiDesign.Tabs(header, PackScreen.Tabs, 0, tab =>
         {
             ui.PackTab = tab;
             state.DetailOpen = false;
@@ -80,63 +83,55 @@ public partial class PackLayout : VBoxContainer
         });
         top.Name = "pack_nav";
         top.GetChild<Control>(2).Visible = ui.App.NearbyMerchant() != null;
-        // Unlike the legacy full-width segmented bar, these are small, fixed
-        // navigation choices. They do not steal horizontal space from the three
+        // Small fixed navigation choices: they never steal width from the three
         // inventory regions and keep the backpack as the dominant surface.
+        var track = top.GetParent<Control>(); track.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
         foreach (var tab in top.GetChildren().OfType<Button>())
         {
             tab.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
-            tab.CustomMinimumSize = new Vector2(124 * ui.TextScale, UiDesign.Target);
+            tab.CustomMinimumSize = new Vector2(112 * ui.TextScale, UiDesign.Target - 8);
         }
-
-        var summary = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        AddChild(summary);
+        header.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
         int coins = bag.Where(v => v.Id == "coin").Sum(v => v.Count);
-        UiDesign.Note(summary, "CROWNS  " + coins + "    ·    " + bag.Count +
-            (bag.Count == 1 ? " stack" : " stacks"));
+        var purse = UiDesign.Chip(header, coins + " crowns", Tone.Gold, "coin");
+        purse.Name = "purse"; purse.TooltipText = "Crowns · " + bag.Count + (bag.Count == 1 ? " stack" : " stacks") + " in your backpack";
         if (Mode == LayoutKind.Single)
         {
             // Preserve a full tile row on small phones: keep the two local view
-            // switches beside the currency summary instead of spending a second
-            // full-height row underneath it.
+            // switches beside the tabs instead of spending a second full-height row.
             var switcher = new HBoxContainer { Name = "single_region_switcher",
                 SizeFlagsHorizontal = SizeFlags.ShrinkEnd };
             switcher.AddThemeConstantOverride("separation", 6);
-            summary.AddChild(switcher);
-            var backpack = UiDesign.Action(switcher, state.GearOpen ? "Bag" : "[Bag]", () =>
-            {
-                state.GearOpen = false; state.DetailOpen = false; UpdateVisibility();
-                switcher.GetChild<Button>(0).Text = "[Bag]";
-                switcher.GetChild<Button>(1).Text = "Gear";
-            });
+            header.AddChild(switcher);
+            void Mark() { UiDesign.SetSelected(switcher.GetChild<Button>(0), !state.GearOpen, "TabButton", "TabSelected"); UiDesign.SetSelected(switcher.GetChild<Button>(1), state.GearOpen, "TabButton", "TabSelected"); }
+            var backpack = UiDesign.Action(switcher, "Bag", () => { state.GearOpen = false; state.DetailOpen = false; UpdateVisibility(); Mark(); });
             backpack.Name = "view_backpack"; backpack.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
-            backpack.CustomMinimumSize = new Vector2(86 * ui.TextScale, UiDesign.Target);
+            backpack.CustomMinimumSize = new Vector2(80 * ui.TextScale, UiDesign.Target);
             backpack.TooltipText = "View backpack items";
-            var equipment = UiDesign.Action(switcher, state.GearOpen ? "[Gear]" : "Gear", () =>
-            {
-                state.GearOpen = true; state.DetailOpen = false; UpdateVisibility();
-                switcher.GetChild<Button>(0).Text = "Bag";
-                switcher.GetChild<Button>(1).Text = "[Gear]";
-            });
+            var equipment = UiDesign.Action(switcher, "Gear", () => { state.GearOpen = true; state.DetailOpen = false; UpdateVisibility(); Mark(); });
             equipment.Name = "view_equipment"; equipment.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
-            equipment.CustomMinimumSize = new Vector2(88 * ui.TextScale, UiDesign.Target);
+            equipment.CustomMinimumSize = new Vector2(80 * ui.TextScale, UiDesign.Target);
             equipment.TooltipText = "View weapon and body equipment";
+            Mark();
         }
         var regions = new HBoxContainer { Name = "pack_regions",
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill };
-        regions.AddThemeConstantOverride("separation", 8);
+        regions.AddThemeConstantOverride("separation", 10);
         AddChild(regions);
-        var gearContent = UiDesign.InventoryPanel(regions, "equipment_panel", "EQUIPPED");
+        var gearContent = UiDesign.InventoryPanel(regions, "equipment_panel", "EQUIPPED", "shield");
         gearPanel = (Control)gearContent.GetParent();
-        var bagContent = UiDesign.InventoryPanel(regions, "backpack_panel", "BACKPACK");
+        var bagContent = UiDesign.InventoryPanel(regions, "backpack_panel", "BACKPACK", "bag");
         bagPanel = (Control)bagContent.GetParent();
-        var detailContent = UiDesign.InventoryPanel(regions, "inspector_panel", "INSPECT");
+        var bagHeader = bagContent.GetChild<HBoxContainer>(0);
+        bagHeader.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
+        UiDesign.Caption(bagHeader, bag.Count + (bag.Count == 1 ? " stack" : " stacks"));
+        var detailContent = UiDesign.InventoryPanel(regions, "inspector_panel", "INSPECT", "eye");
         detailPanel = (Control)detailContent.GetParent();
         if (Mode == LayoutKind.Wide)
         {
-            gearPanel.SizeFlagsStretchRatio = .26f;
-            bagPanel.SizeFlagsStretchRatio = .41f;
+            gearPanel.SizeFlagsStretchRatio = .27f;
+            bagPanel.SizeFlagsStretchRatio = .40f;
             detailPanel.SizeFlagsStretchRatio = .33f;
         }
         else if (Mode == LayoutKind.Compact)
@@ -160,13 +155,13 @@ public partial class PackLayout : VBoxContainer
         // On a short single-pane view, its contents can scroll so neither action
         // is pushed outside the playable safe area at 140% text size.
         VBoxContainer content = column;
-        if (Mode == LayoutKind.Single)
+        if (Mode == LayoutKind.Single || ui.TextScale > 1.2f || ui.PackAvailableSize.Y < 640)
         {
             var scroll = new TouchScroll { Name = "equipment_scroll",
                 SizeFlagsVertical = SizeFlags.ExpandFill,
                 SizeFlagsHorizontal = SizeFlags.ExpandFill,
                 HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
-                VerticalScrollMode = ScrollContainer.ScrollMode.Reserve,
+                VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
                 ScrollDeadzone = 12 };
             column.AddChild(scroll);
             content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
@@ -174,16 +169,40 @@ public partial class PackLayout : VBoxContainer
             scroll.AddChild(content);
         }
 
-        var intro = UiDesign.Card(content, "wayfarer_portrait_mount");
-        UiDesign.Heading(intro, "WAYFARER");
-        UiDesign.Note(intro, "Your travelling equipment");
+        var actor = ui.App.World.Player;
+        var intro = UiDesign.Well(content, "wayfarer_portrait_mount");
+        var hero = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+        hero.AddThemeConstantOverride("separation", 10);
+        intro.AddChild(hero);
+        var portrait = HeroPortrait.Get(ui.App.Views.GetValueOrDefault(actor.Id)?.Creature?.Model);
+        var frame = new Control { CustomMinimumSize = new Vector2(64, 64) * Math.Min(ui.TextScale, 1.2f), MouseFilter = MouseFilterEnum.Ignore };
+        hero.AddChild(frame);
+        var glow = new Halo(); frame.AddChild(glow); glow.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        if (portrait != null)
+        {
+            var picture = new TextureRect { Texture = portrait, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, TextureFilter = CanvasItem.TextureFilterEnum.Nearest, MouseFilter = MouseFilterEnum.Ignore };
+            frame.AddChild(picture); picture.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        }
+        else frame.AddChild(new Glyph("person", UiDesign.Gold, 40));
+        var who = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
+        who.AddThemeConstantOverride("separation", 0);
+        hero.AddChild(who);
+        UiDesign.Heading(who, actor.Name.ToUpperInvariant());
+        UiDesign.Note(who, "Level " + actor.Level + " · your travelling gear");
         foreach (var slot in new[] { "weapon", "body" })
         {
             var current = equipped.GetValueOrDefault(slot);
             var card = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
             card.AddThemeConstantOverride("separation", 4);
             content.AddChild(card);
-            var button = UiDesign.Action(card, "", () =>
+            var button = new RichButton(current?.Title ?? (slot == "weapon" ? "Weapon slot" : "Body slot"), 10, 8)
+            {
+                Name = "inspect_" + slot, SizeFlagsHorizontal = SizeFlags.ExpandFill, MinHeight = 76 * ui.TextScale,
+                TooltipText = current == null ? slot + " is empty" : current.Title + " (equipped)"
+            };
+            button.ThemeTypeVariation = "RowButton";
+            button.Pressed += () =>
             {
                 if (current == null)
                 {
@@ -193,55 +212,29 @@ public partial class PackLayout : VBoxContainer
                 state.SelectEquipped(slot, current.Selector);
                 state.DetailOpen = true;
                 UpdateSelection(); UpdateInspector(); UpdateVisibility();
-            });
-            button.Name = "inspect_" + slot;
-            button.CustomMinimumSize = new Vector2(0, 80 * ui.TextScale);
-            button.TooltipText = current == null ? slot + " is empty" : current.Title + " (equipped)";
+            };
+            card.AddChild(button);
             gearButtons[slot] = button;
-            var padding = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-            padding.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-            padding.AddThemeConstantOverride("margin_left", 8);
-            padding.AddThemeConstantOverride("margin_right", 8);
-            padding.AddThemeConstantOverride("margin_top", 4);
-            padding.AddThemeConstantOverride("margin_bottom", 4);
-            button.AddChild(padding);
-            var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-            row.AddThemeConstantOverride("separation", 8);
-            padding.AddChild(row);
-            if (current != null)
-            {
-                row.AddChild(new TextureRect { Texture = ItemIconAtlas.Get(current.Id),
-                    TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
-                    CustomMinimumSize = new Vector2(48 * ui.TextScale, 48 * ui.TextScale),
-                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-                    MouseFilter = Control.MouseFilterEnum.Ignore });
-            }
-            else
-            {
-                var empty = UiDesign.Text("◇");
-                empty.CustomMinimumSize = new Vector2(48 * ui.TextScale, 48 * ui.TextScale);
-                empty.HorizontalAlignment = HorizontalAlignment.Center;
-                empty.VerticalAlignment = VerticalAlignment.Center;
-                row.AddChild(empty);
-            }
-            var identity = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill,
-                MouseFilter = Control.MouseFilterEnum.Ignore };
-            identity.AddThemeConstantOverride("separation", 3);
-            row.AddChild(identity);
-            var caption = UiDesign.Heading(identity, slot == "weapon" ? "WEAPON" : "BODY");
-            caption.AddThemeFontSizeOverride("font_size", (int)(14 * ui.TextScale));
+            var well = UiDesign.IconWell(button.Content, current == null ? null : ItemIconAtlas.Get(current.Id), 56 * Math.Min(ui.TextScale, 1.25f), current != null);
+            if (current == null) well.GetChild(0).AddChild(new Glyph(slot == "weapon" ? "sword" : "shield", new Color(UiDesign.Faint, .45f), 28) { Position = new Vector2(14, 14) * Math.Min(ui.TextScale, 1.25f) });
+            var identity = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore };
+            identity.AddThemeConstantOverride("separation", 1);
+            button.Content.AddChild(identity);
+            UiDesign.Caption(identity, slot == "weapon" ? "Weapon" : "Body");
             var itemName = UiDesign.Text(current?.Title ?? "Empty slot");
-            itemName.AddThemeFontSizeOverride("font_size", (int)(17 * ui.TextScale));
+            itemName.ThemeTypeVariation = current == null ? "RowSubtitle" : "RowTitle";
             identity.AddChild(itemName);
             if (current == null) continue;
             var stats = PackScreen.Stats(current);
-            if (stats != "") UiDesign.Note(card, stats);
-            var unequip = UiDesign.Action(card, "Unequip", () => Unequip(slot, current));
+            if (stats != "") { var line = UiDesign.Text(stats); line.ThemeTypeVariation = "RowSubtitle"; identity.AddChild(line); }
+            var actions = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            card.AddChild(actions);
+            actions.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
+            var unequip = UiDesign.Quiet(UiDesign.Action(actions, "Unequip", () => Unequip(slot, current)));
             unequip.Name = "unequip_" + slot;
             unequip.TooltipText = "Return " + current.Title + " to backpack";
             unequip.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
-            unequip.CustomMinimumSize = new Vector2(132 * ui.TextScale, UiDesign.Target);
+            unequip.CustomMinimumSize = new Vector2(124 * ui.TextScale, UiDesign.Target);
             if (!ui.App.World.Items.CanUnequip(ui.App.World.Player.Id, slot))
             {
                 unequip.Disabled = true;
@@ -254,7 +247,10 @@ public partial class PackLayout : VBoxContainer
     {
         if (bag.Count == 0)
         {
-            UiDesign.Note(column, "Your backpack is empty. Search chests, collect plants and explore the ruins.");
+            var empty = UiDesign.Well(column);
+            empty.AddChild(new Glyph("bag", new Color(UiDesign.Gold, .6f), 40) { SizeFlagsHorizontal = SizeFlags.ShrinkCenter });
+            var note = UiDesign.Note(empty, "Your backpack is empty. Search chests, collect plants and explore the ruins.");
+            note.HorizontalAlignment = HorizontalAlignment.Center;
             return;
         }
         bagScroll = new TouchScroll { Name = "backpack_scroll", SizeFlagsVertical = SizeFlags.ExpandFill,
@@ -265,12 +261,12 @@ public partial class PackLayout : VBoxContainer
 
         float scale = ui.TextScale;
         float usableWidth = Math.Max(220, ui.PackAvailableSize.X - 32);
-        float share = Mode switch { LayoutKind.Wide => .41f, LayoutKind.Compact => .64f, _ => 1f };
-        int columns = Math.Clamp((int)((usableWidth * share - 24 + 7) / (78 * scale + 7)), 2, 6);
+        float share = Mode switch { LayoutKind.Wide => .40f, LayoutKind.Compact => .64f, _ => 1f };
+        int columns = Math.Clamp((int)((usableWidth * share - 24 - 28 + 8) / (ItemTile.Width * scale + 8)), 2, 6);
         var grid = new GridContainer { Name = "item_grid", Columns = columns,
             SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        grid.AddThemeConstantOverride("h_separation", 7);
-        grid.AddThemeConstantOverride("v_separation", 7);
+        grid.AddThemeConstantOverride("h_separation", 8);
+        grid.AddThemeConstantOverride("v_separation", 8);
         bagScroll.AddChild(grid);
         foreach (var item in bag)
         {
@@ -283,6 +279,9 @@ public partial class PackLayout : VBoxContainer
             grid.AddChild(tile);
             tiles[item.Selector] = tile;
         }
+        // Complete the last row and show a little spare capacity so the bag reads as a bag.
+        int cells = Math.Max(columns * 3, (bag.Count + columns - 1) / columns * columns);
+        for (int i = bag.Count; i < cells; i++) grid.AddChild(new EmptySlot(scale) { Name = "empty_slot_" + i });
         bagScroll.GetVScrollBar().ValueChanged += value => state.BagScroll = (int)value;
     }
 
@@ -290,8 +289,9 @@ public partial class PackLayout : VBoxContainer
     {
         if (Mode != LayoutKind.Wide)
         {
-            var toBag = UiDesign.Action(column, "Back to items", () => DismissDetail());
+            var toBag = UiDesign.Quiet(UiDesign.Action(column, "‹  Back to items", () => DismissDetail()));
             toBag.Name = "back_to_items";
+            toBag.Alignment = HorizontalAlignment.Left;
         }
         var scroll = new TouchScroll { Name = "inspector_scroll",
             SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsHorizontal = SizeFlags.ExpandFill,
@@ -303,7 +303,7 @@ public partial class PackLayout : VBoxContainer
         scroll.AddChild(inspectorDetails);
         inspectorActions = new VBoxContainer { Name = "inspector_actions",
             SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        inspectorActions.AddThemeConstantOverride("separation", 5);
+        inspectorActions.AddThemeConstantOverride("separation", 6);
         column.AddChild(inspectorActions);
         UpdateInspector();
     }
@@ -320,36 +320,53 @@ public partial class PackLayout : VBoxContainer
         var selected = state.Reconcile(snapshot);
         if (selected == null)
         {
-            UiDesign.Note(inspectorDetails, "Select a backpack item or a piece of equipment to inspect it.");
+            var hint = new VBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
+            inspectorDetails.AddChild(hint);
+            hint.AddChild(new Control { CustomMinimumSize = new Vector2(0, 40), MouseFilter = MouseFilterEnum.Ignore });
+            hint.AddChild(new Glyph("eye", new Color(UiDesign.Gold, .55f), 44) { SizeFlagsHorizontal = SizeFlags.ShrinkCenter });
+            var note = UiDesign.Note(hint, "Select a backpack item or a piece of equipment to inspect it.");
+            note.HorizontalAlignment = HorizontalAlignment.Center;
             return;
         }
 
+        float scale = Math.Min(ui.TextScale, 1.25f);
         var banner = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        banner.AddThemeConstantOverride("separation", 12);
         inspectorDetails.AddChild(banner);
-        banner.AddChild(new TextureRect { Texture = ItemIconAtlas.Get(selected.Id),
-            CustomMinimumSize = new Vector2(56 * ui.TextScale, 56 * ui.TextScale),
-            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            MouseFilter = Control.MouseFilterEnum.Ignore });
-        var caption = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        UiDesign.IconWell(banner, ItemIconAtlas.Get(selected.Id), 84 * scale);
+        var caption = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter };
+        caption.AddThemeConstantOverride("separation", 4);
         banner.AddChild(caption);
-        UiDesign.Heading(caption, selected.Title.ToUpperInvariant());
-        UiDesign.Note(caption, state.EquippedSlot != null ? "EQUIPPED · " + state.EquippedSlot :
-            selected.Slot != "" ? "Gear · " + selected.Slot : selected.Usable ? "Consumable" :
-            selected.Id == "coin" ? "Currency" : "Inventory item");
+        var title = UiDesign.Heading(caption, selected.Title.ToUpperInvariant());
+        title.AddThemeFontSizeOverride("font_size", (int)(19 * ui.TextScale));
+        title.AddThemeColorOverride("font_color", UiDesign.GoldBright);
+        var chips = new HFlowContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        chips.AddThemeConstantOverride("h_separation", 6); chips.AddThemeConstantOverride("v_separation", 4);
+        caption.AddChild(chips);
+        UiDesign.Chip(chips, state.EquippedSlot != null ? "Equipped · " + state.EquippedSlot : PackScreen.Kind(selected), state.EquippedSlot != null ? Tone.Moss : PackScreen.KindTone(selected),
+            state.EquippedSlot != null ? "check" : null);
+        if (PackScreen.Describe(selected) is var described && described != "") UiDesign.Chip(chips, described, Tone.Neutral);
 
-        var details = new List<string>();
+        UiDesign.Divider(inspectorDetails, ornament: false);
+        var facts = new VBoxContainer();
+        facts.AddThemeConstantOverride("separation", 6);
+        inspectorDetails.AddChild(facts);
         if (selected.Count > 1 || selected.MaxStack > 1)
-            details.Add("Quantity  " + selected.Count + " · maximum per stack " + selected.MaxStack);
-        if (selected.Instance != "") details.Add("Instance " + selected.Instance.Replace("item:", "#"));
-        if (PackScreen.Describe(selected) != "") details.Add(PackScreen.Describe(selected));
-        if (selected.Properties.TryGetValue("mass", out var mass)) details.Add("Mass " + mass);
-        foreach (var fact in details) UiDesign.Note(inspectorDetails, fact);
-        if (PackScreen.Stats(selected) is var stats && stats != "")
+            UiDesign.Stat(facts, "bag", "Quantity", selected.Count + " of " + selected.MaxStack + " per stack", tone: Tone.Neutral);
+        if (selected.Instance != "") UiDesign.Stat(facts, "diamond-outline", "Instance", selected.Instance.Replace("item:", "#"), tone: Tone.Neutral);
+        if (selected.Properties.TryGetValue("mass", out var mass)) UiDesign.Stat(facts, "dot", "Mass", mass, tone: Tone.Neutral);
+
+        var current = selected.Slot != "" && state.EquippedSlot == null ? equipped.GetValueOrDefault(selected.Slot) : null;
+        var rows = PackScreen.StatRows(selected).ToList();
+        if (rows.Count > 0)
         {
-            UiDesign.Heading(inspectorDetails, "ATTRIBUTES");
-            UiDesign.Note(inspectorDetails, stats);
+            UiDesign.Heading(inspectorDetails, current != null ? "ATTRIBUTES · VS " + current.Title.ToUpperInvariant() : "ATTRIBUTES");
+            var sheet = UiDesign.Well(inspectorDetails, "item_attributes");
+            foreach (var (stat, label, value) in rows)
+            {
+                var delta = PackScreen.Delta(selected, current, stat);
+                UiDesign.Stat(sheet, PackScreen.StatGlyph(stat), label, value, delta?.Text, delta?.Better ?? true);
+            }
         }
 
         if (state.EquippedSlot != null)
@@ -366,19 +383,17 @@ public partial class PackLayout : VBoxContainer
         }
         else if (selected.Slot != "")
         {
-            UiDesign.Heading(inspectorDetails, "EQUIPMENT COMPARISON");
-            UiDesign.Note(inspectorDetails, PackScreen.Comparison(selected,
-                equipped.GetValueOrDefault(selected.Slot)));
+            if (current == null) UiDesign.Note(inspectorDetails, PackScreen.Comparison(selected, null));
             string? reason = PackScreen.EquipBlocker(ui.App, selected);
-            var equip = UiDesign.Action(inspectorActions, "Equip " + selected.Title, () => Equip(selected));
+            var equip = UiDesign.Primary(UiDesign.Action(inspectorActions, "Equip " + selected.Title, () => Equip(selected)));
             equip.Name = "equip";
             if (reason != null) { equip.Disabled = true; UiDesign.Note(inspectorDetails, reason); }
         }
         if (state.EquippedSlot == null && selected.Usable)
         {
-            var use = UiDesign.Action(inspectorActions,
+            var use = UiDesign.Primary(UiDesign.Action(inspectorActions,
                 "Use · restores " + selected.Stat("healing").ToString("0") + " health",
-                () => ui.UseFromPack(selected.Selector));
+                () => ui.UseFromPack(selected.Selector)));
             use.Name = "use";
             if (ui.App.World.Player.Health >= ui.App.World.Player.MaxHealth)
                 UiDesign.Note(inspectorDetails, "Health is already full; using this now restores nothing.");
@@ -389,7 +404,8 @@ public partial class PackLayout : VBoxContainer
                 ? "Crafting material · usable in the Craft section" :
                 selected.Id == "coin" ? "Currency · used when buying from merchants" :
                 "Keep this item; it may be useful during your adventures.";
-            UiDesign.Note(inspectorDetails, reason);
+            var usage = UiDesign.Card(inspectorDetails, null, "Quote");
+            UiDesign.Note(usage, reason);
         }
     }
 
@@ -414,12 +430,7 @@ public partial class PackLayout : VBoxContainer
         foreach (var (selector, tile) in tiles)
             tile.SetSelected(state.EquippedSlot == null && state.Selector == selector);
         foreach (var (slot, button) in gearButtons)
-        {
-            bool selected = state.EquippedSlot == slot;
-            var face = UiDesign.InventoryTile(selected);
-            button.AddThemeStyleboxOverride("normal", face);
-            button.AddThemeStyleboxOverride("hover", face);
-        }
+            UiDesign.SetSelected(button, state.EquippedSlot == slot);
     }
 
     void UpdateVisibility()
