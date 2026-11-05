@@ -422,7 +422,7 @@ public partial class Foundation : Node2D
         if (ui == null)
             return;
         try { replay?.BeforeStep(); } catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); return; }
-        if (!GameplayBlocked && !adventureVisual && !(VerificationMode && FreezeSimulationForVerification))
+        if (!GameplayBlocked && !adventureVisual && !(FreezeSimulationForVerification && VerificationMode))
         {
             DroppedSeconds += Math.Max(0,delta-.1);
             accumulator += Math.Min(delta, .1);

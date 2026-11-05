@@ -297,11 +297,14 @@ public partial class RpgUi : CanvasLayer
                 GD.Print($"MOSSLIGHT_CONTROL version={MobileCombatControls.LayoutVersion} id=stick x={stickCenter.X:0} y={stickCenter.Y:0}");
                 var physicalRects=actions.ToDictionary(p=>p.Key,p=>p.Value.GetGlobalRect());
                 physicalRects["stick"]=stickRect;physicalRects["hud"]=hud.GetGlobalRect();
-                var diagnosticRects=physicalRects.ToDictionary(p=>p.Key,p=> {
-                    var a=transform*p.Value.Position;var b=transform*p.Value.End;
-                    return new {x=a.X,y=a.Y,width=b.X-a.X,height=b.Y-a.Y};
-                });
-                GD.Print("MOSSLIGHT_DISPLAY "+System.Text.Json.JsonSerializer.Serialize(new { physical=DisplayServer.ScreenGetSize().ToString(), drawable=GetWindow().Size.ToString(), logical=size.ToString(), safe=MobileCombatControls.ToLogicalSafeArea(new Rect2(Vector2.Zero,size),DisplayServer.GetDisplaySafeArea(),transform).ToString(), gameplay=safe.ToString(), controlRects=diagnosticRects, scale=transform.X.Length(), scaleY=transform.Y.Length(), originX=transform.Origin.X, originY=transform.Origin.Y, stickWidth=stickRect.Size.X*transform.X.Length(), zoom=App.Camera.Zoom.ToString(), worldSpan=(size/App.Camera.Zoom).ToString() }));
+                GD.Print("MOSSLIGHT_DISPLAY "+System.Text.Json.JsonSerializer.Serialize(new { physical=DisplayServer.ScreenGetSize().ToString(), drawable=GetWindow().Size.ToString(), logical=size.ToString(), safe=MobileCombatControls.ToLogicalSafeArea(new Rect2(Vector2.Zero,size),DisplayServer.GetDisplaySafeArea(),transform).ToString(), gameplay=safe.ToString(), scale=transform.X.Length(), scaleY=transform.Y.Length(), originX=transform.Origin.X, originY=transform.Origin.Y, stickWidth=stickRect.Size.X*transform.X.Length(), zoom=App.Camera.Zoom.ToString(), worldSpan=(size/App.Camera.Zoom).ToString() }));
+                // Android's Godot logger truncates long lines around 1024 bytes.
+                // Keep geometry and each physical control rectangle in separate records.
+                foreach(var (id,rect) in physicalRects)
+                {
+                    var a=transform*rect.Position;var b=transform*rect.End;
+                    GD.Print("MOSSLIGHT_CONTROL_RECT "+System.Text.Json.JsonSerializer.Serialize(new {id,x=a.X,y=a.Y,width=b.X-a.X,height=b.Y-a.Y}));
+                }
                 foreach(var (id, button) in actions)
                 {
                     var center=GetViewport().GetScreenTransform()*button.GetGlobalRect().GetCenter();

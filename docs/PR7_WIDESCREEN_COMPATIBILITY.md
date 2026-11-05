@@ -123,3 +123,11 @@ The expanded surface renders 35.4% more game pixels and a modest number of addit
 - `.github/workflows/android.yml`: baseline plus S25-aspect runtime matrix.
 - `.github/workflows/ci.yml`: native widescreen verification and artifact collection.
 - This document, five native screenshots and `docs/widescreen-measurements.json`: reviewable evidence.
+
+## Android runtime follow-up
+
+The first wide emulator attempt hit the existing 20-second cold-install limit before launch. A same-source retry installed and launched successfully, then exposed Android's observed truncation of Godot log messages at roughly 1024 bytes: fractional wide control coordinates made the combined JSON exceed that limit. The drawable and logical size values already showed the expected 1560×720 and 1733×800, but a truncated record cannot be accepted as verification.
+
+Display metadata and each physical control rectangle now use separate short records. `tools/android_layout.py` validates complete display metadata and all ten physical target rectangles; `tools/test_android_layout.py` covers fractional records below the limit, rejection of a truncated newest record, latest target ownership and missing-target rejection. All existing display/aspect/touch assertions remain. Only package installation gets a 60-second cold-start allowance; other ADB operations retain their 20-second bounds and installation is never blindly repeated. The verification-only freeze condition also short-circuits on its false flag before querying command-line arguments during normal gameplay.
+
+Follow-up files: `game/ui/RpgUi.cs`, `game/dev/Foundation.cs`, `tools/android-smoke.py`, `tools/android_layout.py`, `tools/test_android_layout.py`, `.github/workflows/android.yml`, and this record. See the PR for final exact-source workflow results.

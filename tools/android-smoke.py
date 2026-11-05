@@ -3,6 +3,7 @@ from pathlib import Path
 import os, subprocess, sys, time, re, json
 import xml.etree.ElementTree as ET
 from android_window import anr_messages, has_game_focus
+from android_layout import latest_display, control_rectangles
 from PIL import Image
 from io import BytesIO
 display=next((arg.split('=',1)[1] for arg in sys.argv if arg.startswith('--display=')), '1280x800')
@@ -20,7 +21,8 @@ def adb(*args):
     # the game keeps running. Retry this read only; never repeat touch/install mutations.
     attempts=3 if args==('logcat','-d') else 1
     for attempt in range(attempts):
-        try: return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True).strip()
+        try: return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True,
+                        timeout=60 if args and args[0]=='install' else 20).strip()
         except subprocess.CalledProcessError as error:
             if attempts==1: raise
             (out/f'adb-logcat-read-{time.monotonic_ns()}.log').write_text(str(error)+"\n"+str(error.output))
@@ -58,9 +60,7 @@ try:
     # Android display size and app surface must agree; a wide skin alone is not proof.
     bounds=adb('shell','wm','size').split()[-1].split('x');w,h=sorted(map(int,bounds),reverse=True)
     def display_geometry():
-        rows=re.findall(r'MOSSLIGHT_DISPLAY (\{[^\r\n]+\})',adb('logcat','-d'))
-        assert rows, 'Missing actual application viewport diagnostic'
-        return json.loads(rows[-1])
+        return latest_display(adb('logcat','-d'))
     def tap(x,y):
         # Dialogue reports logical canvas points, not native display pixels.
         d=display_geometry()
@@ -142,6 +142,7 @@ try:
         raise RuntimeError('Missing production navigation target: '+action)
     ensure_foreground()
     geometry=display_geometry()
+    (out/'control-rectangles.json').write_text(json.dumps(control_rectangles(adb('logcat','-d')),indent=2))
     (out/'display-geometry.json').write_text(json.dumps({'android_wm':adb('shell','wm','size'),'application':geometry},indent=2))
     drawable=list(map(float,re.findall(r'[0-9.]+',geometry['drawable'])))
     logical=list(map(float,re.findall(r'[0-9.]+',geometry['logical'])))
