@@ -14,6 +14,7 @@ public partial class ExplorationMapLayout : VBoxContainer
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
         AddThemeConstantOverride("separation", 10);
         var region = ui.App.World.RegionsById[ui.App.World.Player.Region];
+        bool compact = ui.PackAvailableSize.X / ui.TextScale < 1000;
         if (ui.MapRegion != region.Id) { ui.MapRegion = region.Id; ui.MapCentre = null; }
         var toolbar = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         toolbar.AddThemeConstantOverride("separation", 10);
@@ -25,7 +26,10 @@ public partial class ExplorationMapLayout : VBoxContainer
         toolbar.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
         bool ruin = region.Id == "ruin";
         string where = ruin ? $"The Ruin · {MapScreen.ExploredPercent(region)}% explored" : "The Reach · fully known";
-        UiDesign.Chip(toolbar, where, ruin ? Tone.Arcane : Tone.Moss, ruin ? "eye" : "map").Name = "map_region";
+        // At large text sizes the region chip cannot share one row with both
+        // zoom tabs and Guide. Its own row keeps every action inside the safe area.
+        var regionLabel = UiDesign.Chip(compact ? this : toolbar, where, ruin ? Tone.Arcane : Tone.Moss, ruin ? "eye" : "map");
+        regionLabel.Name = "map_region";
         var guideToggle = new RichButton("Guide", 14, 6) { Name = "map_guide", CustomMinimumSize = new Vector2(120 * ui.TextScale, UiDesign.Target), TooltipText = ui.MapGuide ? "Hide the legend and rooms" : "Show the legend and rooms" };
         UiDesign.SetSelected(guideToggle, ui.MapGuide, "Button", "RowSelected");
         guideToggle.Content.Alignment = BoxContainer.AlignmentMode.Center;
@@ -34,7 +38,6 @@ public partial class ExplorationMapLayout : VBoxContainer
         guideToggle.Pressed += () => { ui.MapGuide = !ui.MapGuide; ui.Map(); };
         toolbar.AddChild(guideToggle);
         var regions = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill }; regions.AddThemeConstantOverride("separation", 12); AddChild(regions);
-        bool compact = ui.PackAvailableSize.X / ui.TextScale < 1000;
         var frame = new PanelContainer { Name = "map_frame", ThemeTypeVariation = "IconWell", SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsStretchRatio = .7f };
         regions.AddChild(frame); frame.Visible = !compact || !ui.MapGuide;
         var canvas = new Control { SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore, ClipContents = true };

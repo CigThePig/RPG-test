@@ -39,9 +39,11 @@ public static class PackScreen
         "damage" => "sword", "defence" => "shield", "power" => "bolt", "healing" => "leaf", "condition" => "star", "strength" => "sword", _ => "diamond"
     };
     /// <summary>Displayed stat rows in a fixed order: (stat, label, value).</summary>
-    public static IEnumerable<(string Stat, string Label, string Value)> StatRows(ItemView item)
+    public static IEnumerable<(string Stat, string Label, string Value)> StatRows(ItemView item, ItemView? current = null)
     {
-        foreach (var stat in StatOrder.Where(item.Properties.ContainsKey)) yield return (stat, Cap(stat), item.Properties[stat]);
+        foreach (var stat in StatOrder.Where(s => item.Properties.ContainsKey(s) ||
+                     (s != "healing" && current?.Properties.ContainsKey(s) == true)))
+            yield return (stat, Cap(stat), item.Properties.GetValueOrDefault(stat, "0"));
         if (item.Properties.TryGetValue("condition", out var c)) yield return ("condition", "Condition", c + "%");
     }
     /// <summary>Signed change against the equipped item in the same slot, or null when nothing changes.</summary>

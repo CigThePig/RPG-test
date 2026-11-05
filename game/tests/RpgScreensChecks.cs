@@ -44,6 +44,10 @@ public static class RpgScreensChecks
             check(sword.Properties["material"] == "iron" && sword.Properties["quality"] == "2" && sword.Stat("damage") > 8, "generated instance exposes material, quality and scaled damage");
             check(view.Where(v => v.Instance != "").Select(v => v.Instance).Distinct().Count() == view.Count(v => v.Instance != ""), "instance identities are unique in the view");
             check(PackScreen.Comparison(sword, null).Contains("Slot is empty"), "comparison against an empty slot");
+            var hybrid = sword with { Properties = new Dictionary<string, string>(sword.Properties) { ["power"] = "5" } };
+            check(PackScreen.StatRows(sword, hybrid).Any(r => r.Stat == "power" && r.Value == "0")
+                && PackScreen.Delta(sword, hybrid, "power") is { Better: false },
+                "comparison retains stats lost when replacing gear with a different attribute set");
 
             // Equip / unequip through Gloot slots, with events and no duplication.
             int unequipped = 0; void Count(WorldEvent e) { if (e.Kind == "item_unequipped") unequipped++; }
@@ -195,7 +199,7 @@ public static class RpgScreensChecks
             {
                 var scroll = ui.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>().FirstOrDefault(s => s.IsVisibleInTree() && s.IsAncestorOf(button));
                 if (scroll != null) { scroll.EnsureControlVisible(button); await Frames(3); }
-                var at = button.GetGlobalRect().GetCenter();
+                var at = app.GetViewport().GetScreenTransform() * button.GetGlobalRect().GetCenter();
                 Input.ParseInputEvent(new InputEventScreenTouch { Index = 15, Pressed = true, Position = at });
                 Input.ParseInputEvent(new InputEventScreenTouch { Index = 15, Pressed = false, Position = at });
             }
@@ -375,12 +379,41 @@ public static class RpgScreensChecks
             // Large text at a compact phone viewport: no control is clipped horizontally.
             window.Size = new Vector2I(900, 560); await Frames();
             var viewport = app.GetViewport().GetVisibleRect();
-            ui.VerificationSafeArea = new Rect2(viewport.Position + new Vector2(60, 28), viewport.Size - new Vector2(120, 56));
+            ui.VerificationSafeArea = new Rect2(viewport.Position + new Vector2(60, 28), new Vector2(780, 504));
             ui.SetTextScale(1.4f);
+            ui.JournalReading = false; ui.Journal(); await Frames(6);
+            await Press("journal_reading");
+            Require(ui.JournalReading && UiDesign.IsSelected(Find("journal_reading")), "Reading tab selects compact journal page");
+            await Press("journal_quests");
+            Require(!ui.JournalReading && UiDesign.IsSelected(Find("journal_quests")), "Quests tab remains usable after selecting Reading");
+            await Press("journal_reading"); await Press("journal_quests");
+            Require(!ui.JournalReading, "compact journal tabs support repeated round trips");
+            if (ui.MobileLayout)
+            {
+                var row = Find("quest_2");
+                var scroll = row.GetParent<Control>().GetParent<TouchScroll>();
+                scroll.EnsureControlVisible(row); await Frames(3);
+                var rowPoint = app.GetViewport().GetScreenTransform() * row.GetGlobalRect().GetCenter();
+                Input.ParseInputEvent(new InputEventScreenTouch { Index = 25, Pressed = true, Position = rowPoint });
+                Input.FlushBufferedEvents(); await Frames(1);
+                Require(row.Modulate != Colors.White, "journal row owns the first finger");
+                // Activate navigation independently (keyboard/controller) while the
+                // first touch is held; native GUI emulates only one mouse pointer.
+                Find("journal_reading").EmitSignal(Button.SignalName.Pressed);
+                Require(ui.JournalReading && row.Modulate == Colors.White,
+                    "switching journal panes cancels the hidden row's touch tint immediately");
+                Find("journal_quests").EmitSignal(Button.SignalName.Pressed);
+                Input.ParseInputEvent(new InputEventScreenTouch { Index = 25, Pressed = false, Position = rowPoint });
+                await Frames();
+                Require(!ui.JournalReading, "returning to Quests cannot revive the canceled first-finger tap");
+            }
             foreach (var open in new Action[] { () => { ui.PackTab = 0; ui.Inventory(); }, () => { ui.PackTab = 1; ui.Inventory(); }, ui.Journal, ui.Character, ui.Map })
             {
                 open(); await Frames(6);
                 var screen = ui.ScreenRect;
+                foreach (var name in new[] { "pack_nav", "single_region_switcher", "purse", "map_region", "map_guide" })
+                    if (ui.FindChild(name, true, false) is Control header && header.IsVisibleInTree())
+                        Require(screen.Grow(1).Encloses(header.GetGlobalRect()), $"{ui.Navigation.Screen}: header {name} stays inside the compact safe screen");
                 var scroll = ui.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>().FirstOrDefault(s => s.IsVisibleInTree());
                 if (scroll == null)
                 {

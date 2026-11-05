@@ -93,26 +93,28 @@ public partial class PackLayout : VBoxContainer
         }
         header.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
         int coins = bag.Where(v => v.Id == "coin").Sum(v => v.Count);
-        var purse = UiDesign.Chip(header, coins + " crowns", Tone.Gold, "coin");
-        purse.Name = "purse"; purse.TooltipText = "Crowns · " + bag.Count + (bag.Count == 1 ? " stack" : " stacks") + " in your backpack";
+        void Purse(Node parent)
+        {
+            var purse = UiDesign.Chip(parent, coins + " crowns", Tone.Gold, "coin");
+            purse.Name = "purse"; purse.TooltipText = "Crowns · " + bag.Count + (bag.Count == 1 ? " stack" : " stacks") + " in your backpack";
+        }
+        if (Mode != LayoutKind.Single) Purse(header);
         if (Mode == LayoutKind.Single)
         {
-            // Preserve a full tile row on small phones: keep the two local view
-            // switches beside the tabs instead of spending a second full-height row.
+            // One local destination at a time keeps the header compact and leaves
+            // enough vertical room for the inspector at the largest text size.
             var switcher = new HBoxContainer { Name = "single_region_switcher",
                 SizeFlagsHorizontal = SizeFlags.ShrinkEnd };
             switcher.AddThemeConstantOverride("separation", 6);
             header.AddChild(switcher);
-            void Mark() { UiDesign.SetSelected(switcher.GetChild<Button>(0), !state.GearOpen, "TabButton", "TabSelected"); UiDesign.SetSelected(switcher.GetChild<Button>(1), state.GearOpen, "TabButton", "TabSelected"); }
-            var backpack = UiDesign.Action(switcher, "Bag", () => { state.GearOpen = false; state.DetailOpen = false; UpdateVisibility(); Mark(); });
+            var backpack = UiDesign.Action(switcher, "Bag", () => { state.GearOpen = false; state.DetailOpen = false; UpdateVisibility(); });
             backpack.Name = "view_backpack"; backpack.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
             backpack.CustomMinimumSize = new Vector2(80 * ui.TextScale, UiDesign.Target);
             backpack.TooltipText = "View backpack items";
-            var equipment = UiDesign.Action(switcher, "Gear", () => { state.GearOpen = true; state.DetailOpen = false; UpdateVisibility(); Mark(); });
+            var equipment = UiDesign.Action(switcher, "Gear", () => { state.GearOpen = true; state.DetailOpen = false; UpdateVisibility(); });
             equipment.Name = "view_equipment"; equipment.SizeFlagsHorizontal = SizeFlags.ShrinkEnd;
             equipment.CustomMinimumSize = new Vector2(80 * ui.TextScale, UiDesign.Target);
             equipment.TooltipText = "View weapon and body equipment";
-            Mark();
         }
         var regions = new HBoxContainer { Name = "pack_regions",
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
@@ -125,7 +127,8 @@ public partial class PackLayout : VBoxContainer
         bagPanel = (Control)bagContent.GetParent();
         var bagHeader = bagContent.GetChild<HBoxContainer>(0);
         bagHeader.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
-        UiDesign.Caption(bagHeader, bag.Count + (bag.Count == 1 ? " stack" : " stacks"));
+        if (Mode == LayoutKind.Single) Purse(bagHeader);
+        else UiDesign.Caption(bagHeader, bag.Count + (bag.Count == 1 ? " stack" : " stacks"));
         var detailContent = UiDesign.InventoryPanel(regions, "inspector_panel", "INSPECT", "eye");
         detailPanel = (Control)detailContent.GetParent();
         if (Mode == LayoutKind.Wide)
@@ -357,7 +360,7 @@ public partial class PackLayout : VBoxContainer
         if (selected.Properties.TryGetValue("mass", out var mass)) UiDesign.Stat(facts, "dot", "Mass", mass, tone: Tone.Neutral);
 
         var current = selected.Slot != "" && state.EquippedSlot == null ? equipped.GetValueOrDefault(selected.Slot) : null;
-        var rows = PackScreen.StatRows(selected).ToList();
+        var rows = PackScreen.StatRows(selected, current).ToList();
         if (rows.Count > 0)
         {
             UiDesign.Heading(inspectorDetails, current != null ? "ATTRIBUTES · VS " + current.Title.ToUpperInvariant() : "ATTRIBUTES");
@@ -453,6 +456,8 @@ public partial class PackLayout : VBoxContainer
             gearPanel.Visible = !details && state.GearOpen;
             bagPanel.Visible = !details && !state.GearOpen;
             detailPanel.Visible = details;
+            if (FindChild("view_backpack", true, false) is Control bagSwitch) bagSwitch.Visible = details || state.GearOpen;
+            if (FindChild("view_equipment", true, false) is Control gearSwitch) gearSwitch.Visible = !details && !state.GearOpen;
         }
         // A simple view switch is local; the header remains fixed and accessible.
     }

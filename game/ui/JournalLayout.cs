@@ -117,8 +117,13 @@ public partial class JournalLayout : VBoxContainer
                     UiDesign.SetSelected(tab, selected, "TabButton", "TabSelected");
         // A second finger may switch pages while a scroll still owns a touch.
         // Cancel the hidden pane's gesture before it can activate a hidden row.
-        if (compact && ui.JournalReading && indexPane.Visible && indexPane is TouchScroll indexScroll) indexScroll.CancelGesture();
-        if (compact && !ui.JournalReading && detailPane.Visible && detailPane is TouchScroll readingScroll) readingScroll.CancelGesture();
+        void CancelScrolls(Control pane)
+        {
+            foreach (var scroll in pane.FindChildren("*", "ScrollContainer", true, false).OfType<TouchScroll>())
+                scroll.CancelGesture();
+        }
+        if (compact && ui.JournalReading && indexPane.Visible) CancelScrolls(indexPane);
+        if (compact && !ui.JournalReading && detailPane.Visible) CancelScrolls(detailPane);
         indexPane.Visible = !compact || !ui.JournalReading; detailPane.Visible = !compact || ui.JournalReading;
     }
     public bool DismissReading()

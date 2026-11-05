@@ -189,9 +189,9 @@ public partial class CommerceLayout : VBoxContainer
         if (item == null) return;
         UiDesign.Chip(chips, PackScreen.Kind(item), PackScreen.KindTone(item));
         if (PackScreen.Describe(item) != "") UiDesign.Chip(chips, PackScreen.Describe(item), Tone.Neutral);
-        var rows = PackScreen.StatRows(item).ToList();
-        if (rows.Count == 0) return;
         var current = item.Slot == "" ? null : ui.App.World.Items.View(ui.App.World.Player.Id).FirstOrDefault(i => i.Equipped && i.EquippedSlot == item.Slot);
+        var rows = PackScreen.StatRows(item, current).ToList();
+        if (rows.Count == 0) return;
         UiDesign.Heading(parent, current != null ? "ATTRIBUTES · VS " + current.Title.ToUpperInvariant() : "ATTRIBUTES");
         var sheet = UiDesign.Well(parent, "product_attributes");
         foreach (var (stat, label, value) in rows)

@@ -395,7 +395,12 @@ public static class UiDesign
         for (int i = 0; i < labels.Count; i++)
         {
             int index = i;
-            var tab = Action(row, labels[i], () => { if (index != selected) select(index); });
+            // Pages such as Journal switch in place and update the selection flag.
+            // The constructor's selected index becomes stale after that first switch.
+            var tab = Action(row, labels[i], () =>
+            {
+                if (row.GetChild<Control>(index) is Button current && !IsSelected(current)) select(index);
+            });
             tab.Name = namePrefix + labels[i].ToLowerInvariant();
             tab.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             tab.CustomMinimumSize = new Vector2(0, Target - 8);
