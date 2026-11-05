@@ -183,13 +183,25 @@ func generate_item(owner: String, prototype: String, material: String, quality: 
 	var item := bag(owner).create_item(prototype)
 	serial += 1
 	item.set_property("instance_id", "item:%d" % serial)
+	_apply_material(item, materials[material], material, quality)
+	return bag(owner).add_item(item)
+
+## Shared deterministic material rules. Preview uses an unattached disposable item, no bag or serial changes.
+func _apply_material(item: InventoryItem, properties: Dictionary, material: String, quality: int) -> void:
 	item.set_property("material", material)
 	item.set_property("quality", quality)
 	item.set_property("condition", 100)
-	item.set_property("mass", materials[material].mass)
+	item.set_property("mass", properties.mass)
 	for stat in ["damage", "defence", "power"]:
-		if item.has_property(stat): item.set_property(stat, float(item.get_property(stat)) * float(materials[material].get(stat, 1.0)) * (0.85 + quality * 0.15))
-	return bag(owner).add_item(item)
+		if item.has_property(stat): item.set_property(stat, float(item.get_property(stat)) * float(properties.get(stat, 1.0)) * (0.85 + quality * 0.15))
+
+func product_preview(prototype: String, material: String, quality: int) -> String:
+	if not can_produce(prototype, 1, material, quality): return "[]"
+	var item := InventoryItem.new(protos, prototype)
+	if material != "":
+		var materials: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://game/data/materials.json"))
+		_apply_material(item, materials[material], material, quality)
+	return JSON.stringify([item_row(item, false, "")])
 
 func equipment_appearance(owner: String) -> String:
 	var result := {"weapon": "none", "outfit": "none"}
@@ -269,3 +281,61 @@ func reward_add(owner: String, prototype: String, count: int) -> bool:
 	assert(restored, "Reward rollback failed")
 	if not restored: push_error("Reward rollback failed")
 	return false
+
+## Read-only structured inventory for the UI (PR #7 Part 3). Bag stacks and
+## equipped items, with actual Gloot selectors/instance IDs and properties.
+## Never mutates; callers must not cache it as authority.
+func inventory_view(owner: String) -> String:
+	var rows: Array = []
+	for item in bag(owner).get_items():
+		rows.append(item_row(item, false, ""))
+	for key in slots:
+		if not key.begins_with(owner + ":"): continue
+		var item: InventoryItem = slots[key].get_item()
+		if item != null: rows.append(item_row(item, true, key.get_slice(":", 1)))
+	return JSON.stringify(rows)
+
+func item_row(item: InventoryItem, equipped: bool, slot_name: String) -> Dictionary:
+	var id: String = item.get_prototype().get_prototype_id()
+	var props := {}
+	for property in ["material", "quality", "condition", "damage", "defence", "power", "mass", "healing"]:
+		if item.has_property(property): props[property] = item.get_property(property)
+	return {"selector": item.get_property("instance_id", id), "instance": item.get_property("instance_id", ""),
+		"id": id, "title": item.get_title(), "count": item.get_stack_size(), "max_stack": item.get_max_stack_size(),
+		"slot": item.get_property("slot", ""), "equipped": equipped, "equipped_slot": slot_name, "properties": props}
+
+## Read-only: what a slot currently holds ("" when empty).
+func equipped_selector(owner: String, slot_name: String) -> String:
+	var key := owner + ":" + slot_name
+	if not slots.has(key) or slots[key].get_item() == null: return ""
+	var item: InventoryItem = slots[key].get_item()
+	return item.get_property("instance_id", item.get_prototype().get_prototype_id())
+
+## Read-only: whether the bag could take this slot's item back.
+func can_unequip(owner: String, slot_name: String) -> bool:
+	var key := owner + ":" + slot_name
+	return slots.has(key) and slots[key].get_item() != null and bag(owner).can_add_item(slots[key].get_item())
+
+func unequip(owner: String, slot_name: String) -> bool:
+	if not can_unequip(owner, slot_name): return false
+	var key := owner + ":" + slot_name
+	var item: InventoryItem = slots[key].get_item()
+	slots[key]._inventory.remove_item(item)
+	return bag(owner).add_item(item)
+
+## Read-only display name of a prototype ("" when unknown).
+func prototype_title(prototype: String) -> String:
+	if not protos.data.has(prototype): return ""
+	return str(protos.data[prototype].get("name", prototype))
+
+## Read-only trade preflight on disposable copies of the two authoritative bags.
+## Use the same transfer order as Items.Trade: payment can free the output slot.
+func trade_delivery_preview(buyer: String, merchant: String, prototype: String, price: int) -> String:
+	var staged := ItemServiceFactory()
+	var copied: bool = staged.bag(buyer).deserialize(bag(buyer).serialize())
+	copied = copied and staged.bag(merchant).deserialize(bag(merchant).serialize())
+	var result := "failed"
+	if copied and (price == 0 or staged.transfer(buyer, merchant, "coin", price)):
+		result = "ready" if staged.transfer(merchant, buyer, prototype, 1) else "pack_full"
+	staged.free()
+	return result

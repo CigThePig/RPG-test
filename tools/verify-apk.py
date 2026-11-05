@@ -43,6 +43,15 @@ with zipfile.ZipFile(apk) as z:
     compiled_path = 'assets/' + imported.group(1).removeprefix('res://')
     assert compiled_path in names, f'Missing packaged compiled dialogue resource: {compiled_path}'
     assert z.getinfo(compiled_path).file_size > 0, f'Empty compiled dialogue resource: {compiled_path}'
+    # Fonts are imported resources too: verify the real payload, not just its remap.
+    # Export the accompanying OFL texts explicitly; all_resources omits plain TXT files.
+    for font in ['Cinzel-Variable', 'FiraSans-Regular', 'FiraSans-Medium', 'FiraSans-SemiBold']:
+        remap = z.read(require(f'game/ui/fonts/{font}.ttf.import')[0]).decode('utf-8')
+        imported = re.search(r'(?m)^path="(res://\.godot/imported/[^"]+\.fontdata)"\s*$', remap)
+        assert imported, f'Missing compiled font resource remap: {font}'
+        require(imported.group(1).removeprefix('res://'))
+    for license in ['OFL-Cinzel.txt', 'OFL-FiraSans.txt']:
+        require('game/ui/fonts/' + license)
     assert any('Foundation.tscn' in n or 'Foundation.scn' in n for n in names), 'Missing main scene or remap'
     require('libgodot_android.so')
     assert any('mono' in n.lower() and n.endswith('.so') for n in names), 'Missing Mono runtime'

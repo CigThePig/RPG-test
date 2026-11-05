@@ -8,7 +8,16 @@
 | fdlibm / Sun Microsystems | adaptation already present in pinned PPC | `Core/Math/DMath.cs` deterministic kernels | Permissive notice retained in source and PPC notices; not public domain |
 | PCG / Melissa O'Neill | adaptation already present in pinned PPC | `Core/Math/Random.cs` | Apache-2.0 notice/license retained in PPC notices |
 
-The asset build uses .NET's installed framework/compiler; no runtime/SDK binaries are distributed in this repository. No external sprite packs, music, generated image-service output, or downloaded fonts are bundled.
+The asset build uses .NET's installed framework/compiler; no runtime/SDK binaries are distributed in this repository. No external sprite packs, music or generated image-service output are bundled.
+
+## Interface fonts
+
+| Font | Source | Files | License and modifications |
+| --- | --- | --- | --- |
+| [Cinzel](https://github.com/NDISCOVER/Cinzel), The Cinzel Project Authors | Google Fonts repository (`ofl/cinzel`) | `game/ui/fonts/Cinzel-Variable.ttf` (renamed from `Cinzel[wght].ttf`) | SIL Open Font License 1.1, [license](game/ui/fonts/OFL-Cinzel.txt). Unmodified; used at weight 700 for titles and headings |
+| [Fira Sans](https://github.com/mozilla/Fira), The Mozilla Foundation and Telefonica S.A. | Google Fonts repository (`ofl/firasans`) | `game/ui/fonts/FiraSans-Regular.ttf`, `-Medium.ttf`, `-SemiBold.ttf` | SIL Open Font License 1.1, [license](game/ui/fonts/OFL-FiraSans.txt). Unmodified; body, buttons and figures |
+
+All interface icons (action, menu, map and status glyphs) are original vector drawings in `game/ui/UiKit.cs`; no icon packs are bundled.
 
 ## JavaScript development dependencies
 

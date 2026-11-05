@@ -9,6 +9,7 @@
 config_version=5
 
 [application]
+config/quit_on_go_back=false
 
 config/name="Mosslight"
 config/icon="res://game/art/icon.svg"
@@ -24,6 +25,7 @@ DialogueManager="*res://addons/dialogue_manager/dialogue_manager.gd"
 window/size/viewport_width=1280
 window/size/viewport_height=800
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 window/handheld/orientation=0
 
 [input_devices]

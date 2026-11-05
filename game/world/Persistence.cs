@@ -147,15 +147,17 @@ public static class Persistence
         w.RebuildSpells();
     }
 
+    /// <summary>Where manual slots and recovery autosaves live. Verification redirects both away from player saves.</summary>
+    public static string SlotDirectory { get; set; } = "user://";
     public static string SlotPath(int slot)
     {
         if (slot < 1 || slot > 3)
             throw new ArgumentOutOfRangeException(nameof(slot));
-        return ProjectSettings.GlobalizePath($"user://slot-{slot}.json");
+        return ProjectSettings.GlobalizePath($"{SlotDirectory}slot-{slot}.json");
     }
 
     public static double LastSaveMilliseconds { get; private set; }
-    public static string AutosavePath => ProjectSettings.GlobalizePath("user://autosave.json");
+    public static string AutosavePath => ProjectSettings.GlobalizePath($"{SlotDirectory}autosave.json");
     public static void SaveAutosave(World w, Node narrative)
     {
         PreserveOlderBackgroundSave(AutosavePath);
@@ -170,7 +172,7 @@ public static class Persistence
         {
             using var old=JsonDocument.Parse(File.ReadAllText(path));
             compatible=old.RootElement.ValueKind==JsonValueKind.Object&&old.RootElement.TryGetProperty("Generator",out var generator)&&generator.ValueKind==JsonValueKind.String&&generator.GetString()==Mosslight.Regions.Version&&
-                old.RootElement.TryGetProperty("Schema",out var schema)&&schema.TryGetInt32(out int version)&&version==1;
+                old.RootElement.TryGetProperty("Schema",out var schema)&&schema.ValueKind == JsonValueKind.Number && schema.TryGetInt32(out int version)&&version==1;
         }
         catch(JsonException) { } // Preserve malformed recovery files too, rather than discarding them.
         if(compatible)return;
@@ -201,4 +203,101 @@ public static class Persistence
     }
 
     public static void Load(World w, Node narrative, int slot) => Restore(w, narrative, File.ReadAllText(SlotPath(slot)));
+
+    /// <summary>
+    /// Read-only description of a save file for the Save & Load screen. Uses the same
+    /// validation as loading (<see cref="Parse"/>), so "Ready" means Load will accept it.
+    /// Never modifies, moves or deletes the file.
+    /// </summary>
+    public static SlotSummary Inspect(string path, Content content)
+    {
+        if (!File.Exists(path)) return new(SlotState.Empty, "Empty", 0, "", 0, 0, null);
+        DateTime? saved = File.GetLastWriteTime(path);
+        string text;
+        try { text = File.ReadAllText(path); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return new(SlotState.Damaged, "Cannot read this file", 0, "", 0, 0, saved); }
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return new(SlotState.Damaged, "Damaged save file", 0, "", 0, 0, saved);
+            if (!root.TryGetProperty("Generator", out var generator) || generator.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(generator.GetString())
+                || !root.TryGetProperty("Schema", out var schema) || schema.ValueKind != JsonValueKind.Number || !schema.TryGetInt32(out int version))
+                return new(SlotState.Damaged, "Damaged save metadata", 0, "", 0, 0, saved);
+            bool current = generator.GetString() == Mosslight.Regions.Version && version == 1;
+            if (!current) return new(SlotState.Incompatible, "From an older Mosslight build · kept safe, cannot be loaded here", 0, "", 0, 0, saved);
+        }
+        catch (JsonException) { return new(SlotState.Damaged, "Damaged save file", 0, "", 0, 0, saved); }
+        try
+        {
+            var data = Parse(text, content);
+            ValidateSubsystems(data);
+            var player = data.Actors["player"];
+            return new(SlotState.Ready, "Ready", player.Level, player.Region, data.Time, data.Tick, saved);
+        }
+        catch (Exception e) when (e is InvalidDataException or JsonException or KeyNotFoundException or ArgumentException or NotSupportedException or NullReferenceException or InvalidOperationException or OverflowException)
+        {
+            return new(SlotState.Damaged, "Damaged save file · " + e.Message, 0, "", 0, 0, saved);
+        }
+    }
+
+    // Run the same importers as Restore against disposable nodes. The narrative
+    // manager normally becomes a child in _Ready; attach it here without entering
+    // the scene tree or touching the live game and its UI.
+    static void ValidateSubsystems(SaveData data)
+    {
+        // Reject malformed JSON before Godot importers, whose parser logs errors.
+        using var itemJson = JsonDocument.Parse(data.Items ?? "");
+        using var narrativeJson = JsonDocument.Parse(data.Narrative ?? "");
+        var items = GD.Load<GDScript>("res://game/items/ItemService.gd").New().AsGodotObject() as Node
+            ?? throw new InvalidOperationException("Cannot create item validator");
+        Node? narrative = null;
+        try
+        {
+            narrative = GD.Load<GDScript>("res://game/narrative/Narrative.gd").New().AsGodotObject() as Node
+                ?? throw new InvalidOperationException("Cannot create narrative validator");
+            var manager = narrative.Get("manager").AsGodotObject() as Node
+                ?? throw new InvalidOperationException("Cannot create narrative manager");
+            narrative.AddChild(manager);
+            if (!items.Call("import_state", data.Items ?? "").AsBool() ||
+                !narrative.Call("import_state", data.Narrative ?? "").AsBool())
+                throw new InvalidDataException("Subsystem snapshot rejected");
+        }
+        finally
+        {
+            narrative?.Free();
+            items.Free();
+        }
+    }
+
+    /// <summary>
+    /// Explicitly replaces a damaged slot. The damaged file is first copied aside
+    /// (never deleted), then the slot is written normally.
+    /// </summary>
+    public static void ReplaceDamaged(World w, Node narrative, int slot)
+    {
+        string path = SlotPath(slot);
+        if (Inspect(path, w.Content).State != SlotState.Damaged) throw new InvalidOperationException("Only a damaged slot can be replaced");
+        int suffix = 1; string retained;
+        do { retained = path + $".damaged-{suffix++}.json"; } while (File.Exists(retained));
+        File.Copy(path, retained);
+        WriteSnapshot(w, narrative, path);
+    }
+}
+
+public enum SlotState { Empty, Ready, Incompatible, Damaged }
+
+/// <summary>Presentation summary of one save file. Not save data.</summary>
+public sealed record SlotSummary(SlotState State, string Message, int Level, string Region, double Time, long Tick, DateTime? Saved)
+{
+    public string Describe()
+    {
+        string when = Saved is { } at ? " · saved " + at.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) : "";
+        return State switch
+        {
+            SlotState.Ready => $"Level {Level} · {(Region == "ruin" ? "the ruin" : Region == "reach" ? "the Reach" : Region)} · day time {(int)(Time / 60) % 24:00}:{(int)Time % 60:00}{when}",
+            SlotState.Empty => "Empty",
+            _ => Message + when
+        };
+    }
 }

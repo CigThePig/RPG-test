@@ -45,8 +45,14 @@ public static class FoundationChecks
             DungeonEncounterChecks.Run(app, Check);
             MechanismChecks.Run(app, Check);
             MobileCombatControlsChecks.Run(Check);
+            UiNavigationChecks.Run(Check);
+            HudChecks.Run(app, Check);
+            RpgScreensChecks.Run(app, Check);
+            PackPresentationChecks.Run(app, Check);
+            AccessibilityChecks.Run(app, Check);
             EncounterChecks.Run(app,Check);
             ReviewChecks.Run(app, Check);
+            CraftingChecks.Run(app, Check);
             PlayabilityChecks.Run(app, Check);
             MovementChecks.Run(app, Check);
             CombatChecks.Run(app, Check);

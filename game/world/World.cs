@@ -832,6 +832,41 @@ public sealed class World
         return false;
     }
 
+    /// <summary>
+    /// Read-only preview of what <see cref="Interact"/> would do now, walking the same
+    /// targets in the same order. Never mutates regions, items or events. The HUD uses
+    /// this so the contextual Interact label names the action actually taken.
+    /// </summary>
+    public InteractionPreview PreviewInteraction(ActorState a)
+    {
+        if (!a.Alive) return InteractionPreview.None;
+        var r = RegionsById[a.Region];
+        bool keyRequired = false;
+        InteractionPreview? hint = null;
+        foreach (var (at, kind) in InteractionTargets(a))
+        {
+            switch (kind)
+            {
+                case "portcullis": hint = new("Gate shut", "Raised by a lever deeper in the ruin", false); continue;
+                case "seal": hint = new("Sealed", "Kindle every brazier in the nearby chamber", false); continue;
+                case "lever": if (DungeonMechanisms.CanPull(r, at)) return new("Pull lever", "Raise a portcullis", true); continue;
+                case "brazier": if (DungeonMechanisms.CanKindle(r, at)) return new("Kindle", "Light this brazier", true); continue;
+                case "lock":
+                    if (Items.Count(a.Id, "dungeon_key") > 0) return new("Unlock", "Use a ruin key", true);
+                    keyRequired = true; continue;
+                case "portal": return new("Enter ruin", "Enter the ruin", true);
+                case "exit": return new("Leave ruin", "Return to the Reach", true);
+                case "chest": return new("Open chest", "Collect the chest's contents", true);
+                case "herb" or "ore" or "wood": return new("Gather " + kind, "Collect " + kind, true);
+                case "relic": return new("Take relic", "Take the relic", true);
+                case "key": return new("Take key", "Take the ruin key", true);
+            }
+        }
+        if (LootTargets(a).Any()) return new("Loot", "Search the fallen foe", true);
+        if (keyRequired) return new("Need key", "A ruin key is required", false);
+        return hint ?? InteractionPreview.None;
+    }
+
     public void Enter(ActorState a, string region)
     {
         Cancel(a);
@@ -1031,4 +1066,10 @@ public sealed class World
         Items.Add("player", "herb", 4);
         InitializeContainers(r);
     }
+}
+
+/// <summary>Presentation-only description of the next interaction. Label is short enough for the touch button.</summary>
+public sealed record InteractionPreview(string Label, string Reason, bool Available)
+{
+    public static readonly InteractionPreview None = new("Interact", "Nothing to interact with nearby", false);
 }

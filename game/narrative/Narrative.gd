@@ -15,6 +15,8 @@ var text_label: Label
 var advancing := false
 var dialogue_epoch := 0
 var choices: VBoxContainer
+var dialogue_body: BoxContainer
+var story_scroll: ScrollContainer
 
 func _ready() -> void:
 	add_child(manager)
@@ -175,6 +177,77 @@ func journal() -> String:
 		if str(key).begins_with("lore:"): lines.append(flags[key])
 	return "\n\n".join(lines)
 
+## Read-only structured objective for the gameplay HUD. Never mutates quest state;
+## callers must not parse journal(). Returns {} when nothing needs tracking.
+## Priority: first active quest, then an unclaimed reward, then the next quest the
+## warden can offer (definition order throughout).
+func objective() -> Dictionary:
+	for q in definitions:
+		if manager.is_quest_active(q) and not q.failed: return objective_row(q, "active")
+	for q in definitions:
+		if completed(q.id) and not q.rewarded: return objective_row(q, "reward_pending")
+	for q in definitions:
+		if q.failed or manager.is_quest_active(q) or manager.is_quest_completed(q) or accepted(q.id): continue
+		if q.prerequisite > 0 and not completed(q.prerequisite): continue
+		return objective_row(q, "available")
+	return {}
+
+func objective_row(q: Quest, status: String) -> Dictionary:
+	var staged: bool = not q.stages.is_empty()
+	var stage: int = mini(q.stage_index, q.stages.size() - 1) if staged else 0
+	var text: String = q.quest_objective
+	if status == "available": text = "Speak to the warden in Reach."
+	elif status == "reward_pending": text = "Reward waiting — make pack space, then speak to the warden."
+	elif staged: text = q.stages[stage].text
+	return {
+		"id": q.id, "title": q.quest_name, "status": status, "objective": text,
+		"staged": staged, "stage_id": str(q.stages[stage].id) if staged else "",
+		"progress": q.stage_index if staged else q.progress,
+		"required": q.stages.size() if staged else q.required,
+		"pending_reward": completed(q.id) and not q.rewarded,
+		"reward": "%s ×%d" % [q.reward_item, q.reward_count],
+	}
+
+## Read-only journal rows for the Journal screen (PR #7 Part 3). One row per quest
+## in definition order, with stage history, prerequisites and reward state.
+## Never mutates; journal() remains for compatibility.
+func journal_rows() -> Array:
+	var rows: Array = []
+	for q in definitions:
+		var status: String = "completed" if manager.is_quest_completed(q) else "failed" if q.failed else "active" if manager.is_quest_active(q) else "available"
+		var prerequisite_met: bool = q.prerequisite <= 0 or completed(q.prerequisite)
+		if status == "available" and (accepted(q.id) or not prerequisite_met): status = "locked"
+		var stages: Array = []
+		for i in q.stages.size():
+			stages.append({"id": str(q.stages[i].id), "text": q.stages[i].text,
+				"done": i < q.stage_index or status == "completed", "current": status == "active" and i == q.stage_index})
+		var prerequisite_title := ""
+		if q.prerequisite > 0:
+			var p = manager._get_quest_by_id(q.prerequisite)
+			if p != null: prerequisite_title = p.quest_name
+		rows.append({"id": q.id, "title": q.quest_name, "description": q.quest_description, "status": status,
+			"objective": q.quest_objective, "staged": not q.stages.is_empty(), "stages": stages,
+			"progress": q.stage_index if not q.stages.is_empty() else q.progress,
+			"required": q.stages.size() if not q.stages.is_empty() else q.required,
+			"prerequisite": q.prerequisite, "prerequisite_title": prerequisite_title, "prerequisite_met": prerequisite_met,
+			"reward": "%s ×%d" % [q.reward_item, q.reward_count], "reward_item": q.reward_item, "reward_count": q.reward_count,
+			"rewarded": q.rewarded, "pending_reward": status == "completed" and not q.rewarded})
+	return rows
+
+## Read-only discoveries, mechanism counts and lore gathered from flags.
+func journal_extras() -> Dictionary:
+	var discoveries: Array = []
+	var lore: Array = []
+	var shortcuts := 0
+	var seals := 0
+	for key in flags:
+		var k := str(key)
+		if k.begins_with("discovery:"): discoveries.append(landmark_name(flags[key]))
+		elif k.begins_with("lore:"): lore.append(flags[key])
+		elif k.begins_with("mechanism:lever_pulled:"): shortcuts += 1
+		elif k.begins_with("mechanism:seal_broken:"): seals += 1
+	return {"discoveries": discoveries, "lore": lore, "shortcuts": shortcuts, "seals": seals}
+
 func export_state() -> String:
 	return JSON.stringify({"flags": flags, "pools": manager.pool_state_as_dict(), "quests": manager.serialize_quests()})
 
@@ -225,30 +298,125 @@ func talk() -> void:
 	ui.show()
 	advance("warden")
 
+## Presentation supplied by RpgUi: the shared theme and a safe-area rectangle. Dialogue
+## advancement, conditions and flags stay here; only layout and styling come from outside.
+var ui_theme: Theme
+var ui_rect := Rect2()
+var speaker_label: Label
+var choice_scroll: ScrollContainer
+
+func present(theme: Theme, rect: Rect2) -> void:
+	ui_theme = theme
+	ui_rect = rect
+	apply_presentation()
+
+func apply_presentation() -> void:
+	if ui == null: return
+	if ui_theme != null: ui.theme = ui_theme
+	if ui_rect.has_area():
+		ui.position = ui_rect.position
+		ui.size = ui_rect.size
+		ui.custom_minimum_size = Vector2.ZERO
+	if dialogue_body != null and ui_theme != null:
+		var scale := maxf(1.0, ui_theme.default_font_size / 20.0)
+		dialogue_body.vertical = ui_rect.size.x / scale < 960.0
+
+var portrait_frame: PanelContainer
+var portrait_rect: TextureRect
+
+## Optional speaker portrait supplied by RpgUi; presentation only.
+func set_portrait(texture: Texture2D) -> void:
+	if ui == null: build_ui()
+	portrait_rect.texture = texture
+	portrait_frame.visible = texture != null
+
 func build_ui() -> void:
 	var layer := CanvasLayer.new()
+	# Above the gameplay UI layer: dialogue owns presentation while it is active.
+	layer.layer = 2
 	add_child(layer)
 	ui = PanelContainer.new()
-	var theme := Theme.new()
-	theme.default_font_size = 22
-	ui.theme = theme
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.065, 0.1, 0.1, 0.98)
-	style.border_color = Color(0.48, 0.52, 0.34)
-	style.set_border_width_all(2)
-	style.set_content_margin_all(18)
-	ui.add_theme_stylebox_override("panel", style)
+	ui.name = "DialoguePanel"
+	if ui_theme == null:
+		var theme := Theme.new()
+		theme.default_font_size = 22
+		ui.theme = theme
 	ui.position = Vector2(180, 300)
 	ui.custom_minimum_size = Vector2(920, 240)
 	layer.add_child(ui)
 	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
 	ui.add_child(box)
+	dialogue_body = BoxContainer.new()
+	dialogue_body.name = "DialogueBody"
+	dialogue_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	dialogue_body.add_theme_constant_override("separation", 18)
+	box.add_child(dialogue_body)
+	# Story column: speaker portrait medallion, engraved name plate and the line.
+	var story_column := HBoxContainer.new()
+	story_column.name = "StoryColumn"
+	story_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	story_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	story_column.size_flags_stretch_ratio = 0.48
+	story_column.add_theme_constant_override("separation", 14)
+	dialogue_body.add_child(story_column)
+	portrait_frame = PanelContainer.new()
+	portrait_frame.name = "Portrait"
+	portrait_frame.theme_type_variation = "IconWell"
+	portrait_frame.custom_minimum_size = Vector2(84, 84)
+	portrait_frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait_frame.visible = false
+	story_column.add_child(portrait_frame)
+	portrait_rect = TextureRect.new()
+	portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	portrait_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait_frame.add_child(portrait_rect)
+	var story_stack := VBoxContainer.new()
+	story_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	story_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	story_stack.add_theme_constant_override("separation", 10)
+	story_column.add_child(story_stack)
+	var plate_row := HBoxContainer.new()
+	story_stack.add_child(plate_row)
+	var plate := PanelContainer.new()
+	plate.name = "SpeakerPlate"
+	plate.theme_type_variation = "Speaker"
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate_row.add_child(plate)
+	speaker_label = Label.new()
+	speaker_label.name = "Speaker"
+	speaker_label.theme_type_variation = "DialogueSpeaker"
+	plate.add_child(speaker_label)
 	text_label = Label.new()
+	text_label.name = "Line"
+	text_label.theme_type_variation = "DialogueLine"
 	text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	text_label.custom_minimum_size = Vector2(660, 70)
-	box.add_child(text_label)
+	text_label.custom_minimum_size = Vector2(0, 56)
+	story_scroll = load("res://game/ui/TouchScroll.cs").new()
+	story_scroll.name = "Story"
+	story_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	story_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	story_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	story_stack.add_child(story_scroll)
+	text_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	story_scroll.add_child(text_label)
+	# Touch-owned scrolling: a swipe over responses never selects one.
+	choice_scroll = load("res://game/ui/TouchScroll.cs").new()
+	choice_scroll.name = "Responses"
+	choice_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	choice_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	choice_scroll.scroll_deadzone = 12
+	choice_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	choice_scroll.size_flags_stretch_ratio = 0.52
+	dialogue_body.add_child(choice_scroll)
 	choices = VBoxContainer.new()
-	box.add_child(choices)
+	choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	choices.add_theme_constant_override("separation", 10)
+	choice_scroll.add_child(choices)
+	apply_presentation()
 
 func advance(cue: String) -> void:
 	if advancing: return
@@ -269,11 +437,16 @@ func advance(cue: String) -> void:
 		speaking = false
 		ui.hide()
 		return
-	text_label.text = current_line.character + ": " + current_line.text
+	speaker_label.text = current_line.character
+	text_label.text = current_line.text
+	choice_scroll.scroll_vertical = 0
+	story_scroll.scroll_vertical = 0
 	if current_line.responses.is_empty():
 		var button := Button.new()
 		button.custom_minimum_size.y = 64
+		button.name = "Continue"
 		button.text = "Continue"
+		button.theme_type_variation = "PrimaryButton"
 		button.pressed.connect(func(): advance(current_line.next_id))
 		choices.add_child(button)
 	else:
@@ -281,10 +454,18 @@ func advance(cue: String) -> void:
 			if not response.is_allowed: continue
 			var button := Button.new()
 			button.custom_minimum_size.y = 64
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.theme_type_variation = "DialogueChoice"
+			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			button.text = response.text
 			button.disabled = not response.is_allowed
 			button.pressed.connect(func(): advance(response.next_id))
 			choices.add_child(button)
+	# Keyboard/controller focus starts on the first response; Back cannot dismiss dialogue.
+	for child in choices.get_children():
+		if child is Button and child.visible and not child.disabled:
+			child.call_deferred("grab_focus")
+			break
 	if OS.has_feature("android"):
 		await get_tree().process_frame
 		if epoch != dialogue_epoch: return

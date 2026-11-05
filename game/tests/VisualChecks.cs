@@ -176,13 +176,13 @@ public static class VisualChecks
             {
                 var button=app.Ui.ActionControl("dodge");
                 var point=button.GetGlobalRect().GetCenter();
-                Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=point});
-                Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=point});
+                app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=true,Position=point});
+                app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=false,Position=point});
             }
             else
             {
-                Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=true});
-                Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=false});
+                app.GetViewport().InjectLocal(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=true});
+                app.GetViewport().InjectLocal(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=false});
             }
             Input.FlushBufferedEvents();
             await Until(app, () => p.State == ActionState.Dodging && p.ActionElapsed >= .08f, "Production dodge input did not start");
@@ -406,9 +406,9 @@ public static class VisualChecks
     static async System.Threading.Tasks.Task TapDialogueButton(Foundation app, Button button)
     {
         var point=button.GetGlobalRect().GetCenter();
-        Input.ParseInputEvent(new InputEventMouseButton{ButtonIndex=MouseButton.Left,Pressed=true,Position=point,GlobalPosition=point});
+        app.GetViewport().InjectLocal(new InputEventMouseButton{ButtonIndex=MouseButton.Left,Pressed=true,Position=point,GlobalPosition=point});
         Input.FlushBufferedEvents();await Frames(app,1);
-        Input.ParseInputEvent(new InputEventMouseButton{ButtonIndex=MouseButton.Left,Pressed=false,Position=point,GlobalPosition=point});
+        app.GetViewport().InjectLocal(new InputEventMouseButton{ButtonIndex=MouseButton.Left,Pressed=false,Position=point,GlobalPosition=point});
         Input.FlushBufferedEvents();await Frames(app,2);
     }
     static async System.Threading.Tasks.Task DialogueTouchChecks(Foundation app)
@@ -440,6 +440,10 @@ public static class VisualChecks
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         await Frames(app, 30);
+        if(OS.GetCmdlineUserArgs().Contains("--ui-gallery"))
+        { await UiGallery.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--widescreen-only"))
+        { await WidescreenChecks.Rendered(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--dialogue-only"))
         { app.ResumeGame();await DialogueTouchChecks(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--adventure-panels-only"))
@@ -458,6 +462,14 @@ public static class VisualChecks
         {
             await WallDepthChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return;
         }
+        if(OS.GetCmdlineUserArgs().Contains("--part4-only"))
+        { await AccessibilityChecks.Rendered(app); await UiNavigationChecks.Rendered(app); GD.Print("VISUAL CHECKS PASSED"); return; }
+        if(OS.GetCmdlineUserArgs().Contains("--screens-only"))
+        { await RpgScreensChecks.Rendered(app); await PackPresentationChecks.Rendered(app); await UiNavigationChecks.Rendered(app); GD.Print("VISUAL CHECKS PASSED"); return; }
+        if(OS.GetCmdlineUserArgs().Contains("--hud-only"))
+        { await HudChecks.Rendered(app); await MobileCombatControlsChecks.Rendered(app); await MobileCombatControlsChecks.InputPipeline(app); GD.Print("VISUAL CHECKS PASSED"); return; }
+        if(OS.GetCmdlineUserArgs().Contains("--ui-only"))
+        { await UiNavigationChecks.Rendered(app); GD.Print("VISUAL CHECKS PASSED"); return; }
         if(OS.GetCmdlineUserArgs().Contains("--controls-only"))
         {
             await MobileCombatControlsChecks.Rendered(app);
@@ -480,6 +492,11 @@ public static class VisualChecks
                     throw new InvalidOperationException("Missing synthesized combat audio sample: " + cue);
             }
         }
+        await UiNavigationChecks.Rendered(app);
+        await HudChecks.Rendered(app);
+        await RpgScreensChecks.Rendered(app);
+        await PackPresentationChecks.Rendered(app);
+        await AccessibilityChecks.Rendered(app);
         await MobileCombatControlsChecks.Rendered(app);
         await MobileCombatControlsChecks.InputPipeline(app);
         await Capture(app, "menu");
@@ -487,22 +504,25 @@ public static class VisualChecks
         {
             var scroller=app.Ui.FindChildren("*","ScrollContainer",true,false).OfType<ScrollContainer>().First(s=>s.IsVisibleInTree());
             var start=scroller.GetGlobalRect().GetCenter();
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=true,Position=start});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=9,Pressed=true,Position=start});
             await Frames(app,1);
             for(int i=1;i<=6;i++)
             {
-                Input.ParseInputEvent(new InputEventScreenDrag {Index=9,Position=start-new Vector2(0,i*30),Relative=new Vector2(0,-30)});
+                app.GetViewport().InjectLocal(new InputEventScreenDrag {Index=9,Position=start-new Vector2(0,i*30),Relative=new Vector2(0,-30)});
                 await Frames(app,1);
             }
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=false,Position=start-new Vector2(0,180)});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=9,Pressed=false,Position=start-new Vector2(0,180)});
             await Frames(app,2);
-            if(scroller.ScrollVertical<60 || !app.Ui.MenuOpen)throw new InvalidOperationException("Menu swipe over button rows did not scroll safely");
+            // Part 4 moved developer rows off the menu, so it may scroll less than before.
+            // Require the swipe to scroll as far as it can (up to 60) without activating a row.
+            float scrollable=(float)(scroller.GetVScrollBar().MaxValue-scroller.GetVScrollBar().Page);
+            if((scrollable>=1 && scroller.ScrollVertical<Math.Min(60,scrollable)-1) || !app.Ui.MenuOpen)throw new InvalidOperationException($"Menu swipe over button rows did not scroll safely ({scroller.ScrollVertical}/{scrollable})");
             scroller.ScrollVertical=0;
             await Frames(app,3);
-            var enter=app.Ui.FindChildren("*","Button",true,false).OfType<Button>().First(b=>b.Text=="Enter / Resume");
+            var enter=app.Ui.NavigationControl("resume");
             var enterPoint=enter.GetGlobalRect().GetCenter();
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=true,Position=enterPoint});
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=9,Pressed=false,Canceled=true,Position=enterPoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=9,Pressed=true,Position=enterPoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=9,Pressed=false,Canceled=true,Position=enterPoint});
             await Frames(app,2);
             if(!app.Ui.MenuOpen)throw new InvalidOperationException("Canceled menu touch activated Enter");
         }
@@ -514,11 +534,11 @@ public static class VisualChecks
             // suppress the OS-synthesized mouse pair after the owned touch.
             var menuButton=app.Ui.ActionControl("menu");
             var menuPoint=menuButton.GlobalPosition+new Vector2(menuButton.Size.X/2,5);
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=menuPoint});
-            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=menuPoint,GlobalPosition=menuPoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=true,Position=menuPoint});
+            app.GetViewport().InjectLocal(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=menuPoint,GlobalPosition=menuPoint});
             await Frames(app,1);
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=menuPoint});
-            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=menuPoint,GlobalPosition=menuPoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=false,Position=menuPoint});
+            app.GetViewport().InjectLocal(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=menuPoint,GlobalPosition=menuPoint});
             await Frames(app,2);
             if(!app.Ui.MenuOpen)throw new InvalidOperationException("Menu edge touch plus emulated mouse did not open exactly once");
             app.Ui.Menu();await Frames(app,2);
@@ -538,31 +558,31 @@ public static class VisualChecks
             app.World.CombatDiagnostic += OnCombat;
             var mobileStick=app.Ui.Stick;
             var stickPoint=mobileStick.GlobalPosition+mobileStick.Size/2;
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=7,Pressed=true,Position=stickPoint});
-            Input.ParseInputEvent(new InputEventScreenDrag {Index=7,Position=stickPoint+new Vector2(72,0)});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=7,Pressed=true,Position=stickPoint});
+            app.GetViewport().InjectLocal(new InputEventScreenDrag {Index=7,Position=stickPoint+new Vector2(72,0)});
             await Frames(app,2);
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
             await Frames(app,1);
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Canceled=true,Position=dodgePoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=false,Canceled=true,Position=dodgePoint});
             await Frames(app,2);
             if(starts!=0) throw new InvalidOperationException("Canceled Dodge touch activated");
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
             await Frames(app,1);
-            Input.ParseInputEvent(new InputEventScreenDrag {Index=8,Position=dodgePoint+new Vector2(-180,-180)});
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=dodgePoint+new Vector2(-180,-180)});
+            app.GetViewport().InjectLocal(new InputEventScreenDrag {Index=8,Position=dodgePoint+new Vector2(-180,-180)});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=false,Position=dodgePoint+new Vector2(-180,-180)});
             await Frames(app,2);
             if(starts!=0) throw new InvalidOperationException("Dodge touch released outside activated");
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
-            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=dodgePoint,GlobalPosition=dodgePoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=true,Position=dodgePoint});
+            app.GetViewport().InjectLocal(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=true,Position=dodgePoint,GlobalPosition=dodgePoint});
             await Frames(app,1);
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=8,Pressed=false,Position=dodgePoint});
-            Input.ParseInputEvent(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=dodgePoint,GlobalPosition=dodgePoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=8,Pressed=false,Position=dodgePoint});
+            app.GetViewport().InjectLocal(new InputEventMouseButton {Device=(int)InputEvent.DeviceIdEmulation,ButtonIndex=MouseButton.Left,Pressed=false,Position=dodgePoint,GlobalPosition=dodgePoint});
             await Frames(app,2);
             if(starts!=1 || mobilePlayer.State!=ActionState.Dodging || mobilePlayer.ActionDirectionX<.99f || mobileStick.Finger!=7)
                 throw new InvalidOperationException("Dodge multitouch, direction or emulated mouse ownership failed");
             if(dodge.Size!=dodgeSize) throw new InvalidOperationException("Dodge cooldown changed button dimensions");
             app.World.CancelPlayerDodge();
-            Input.ParseInputEvent(new InputEventScreenTouch {Index=7,Pressed=false,Position=stickPoint});
+            app.GetViewport().InjectLocal(new InputEventScreenTouch {Index=7,Pressed=false,Position=stickPoint});
             app.World.CombatDiagnostic -= OnCombat;
             Persistence.Restore(app.World,app.Narrative,snapshot); app.RebuildViews();
             await Frames(app,2);
@@ -584,8 +604,8 @@ public static class VisualChecks
             int starts=0;
             void OnDodge(string kind, System.Numerics.Vector2 direction, string context) { if(kind=="dodge_started") starts++; }
             app.World.CombatDiagnostic += OnDodge;
-            Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=true});
-            Input.ParseInputEvent(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=false});
+            app.GetViewport().InjectLocal(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=true});
+            app.GetViewport().InjectLocal(new InputEventKey {PhysicalKeycode=Key.Space,Pressed=false});
             await Frames(app,2);
             if(starts!=1 || p.State!=ActionState.Dodging || app.World.Items.Count("player","potion")!=potionsBefore)
                 throw new InvalidOperationException("Focused hotbar button consumed Space or Space activated more than one action");
@@ -598,9 +618,9 @@ public static class VisualChecks
         var draught=app.Ui.ActionControl("potion");
         var point=draught.GetGlobalRect().GetCenter();
         int potions=app.World.Items.Count("player","potion");
-        Input.ParseInputEvent(new InputEventMouseButton { Device=0,ButtonIndex=MouseButton.Left,Pressed=true,Position=point,GlobalPosition=point });
+        app.GetViewport().InjectLocal(new InputEventMouseButton { Device=0,ButtonIndex=MouseButton.Left,Pressed=true,Position=point,GlobalPosition=point });
         await Frames(app,1);
-        Input.ParseInputEvent(new InputEventMouseButton { Device=0,ButtonIndex=MouseButton.Left,Pressed=false,Position=point,GlobalPosition=point });
+        app.GetViewport().InjectLocal(new InputEventMouseButton { Device=0,ButtonIndex=MouseButton.Left,Pressed=false,Position=point,GlobalPosition=point });
         await Frames(app,2);
         if(app.World.Items.Count("player","potion")!=potions-1) throw new InvalidOperationException("Real desktop mouse hotbar dispatch failed");
         app.World.Items.Add("player","potion");

@@ -40,6 +40,76 @@ public sealed class Items(Node service, EventStream events)
         return ok;
     }
 
+    /// <summary>Returns a slot's item to the bag. Fails, changing nothing, if the bag cannot take it.</summary>
+    public bool Unequip(ActorState actor, string slot)
+    {
+        string selector = EquippedSelector(actor.Id, slot);
+        bool ok = selector != "" && service.Call("unequip", actor.Id, slot).AsBool();
+        if (ok)
+            events.Publish(new("item_unequipped", actor.Id, slot, selector));
+        return ok;
+    }
+    public string EquippedSelector(string owner, string slot) => service.Call("equipped_selector", owner, slot).AsString();
+    public bool CanUnequip(string owner, string slot) => service.Call("can_unequip", owner, slot).AsBool();
+    public bool HasSpace(string owner, string item, int count = 1) => service.Call("has_space", owner, item, count).AsBool();
+
+    /// <summary>Read-only structured rows for bag stacks and equipped items, straight from Gloot.</summary>
+    public IReadOnlyList<ItemView> View(string owner)
+        => ReadView(service.Call("inventory_view", owner).AsString());
+
+    public ItemView? ProductPreview(RecipeDef recipe) => ReadView(service.Call("product_preview", recipe.Output, recipe.Material, recipe.Quality).AsString()).FirstOrDefault();
+
+    static IReadOnlyList<ItemView> ReadView(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var rows = new List<ItemView>();
+        foreach (var row in doc.RootElement.EnumerateArray())
+        {
+            var props = new Dictionary<string, string>();
+            foreach (var p in row.GetProperty("properties").EnumerateObject())
+                props[p.Name] = p.Value.ValueKind == JsonValueKind.Number ? p.Value.GetDouble().ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : p.Value.ToString();
+            rows.Add(new(row.GetProperty("selector").GetString()!, row.GetProperty("instance").GetString()!, row.GetProperty("id").GetString()!,
+                row.GetProperty("title").GetString()!, row.GetProperty("count").GetInt32(), row.GetProperty("max_stack").GetInt32(),
+                row.GetProperty("slot").GetString()!, row.GetProperty("equipped").GetBoolean(), row.GetProperty("equipped_slot").GetString()!, props));
+        }
+        return rows;
+    }
+
+    public string Title(string prototype) { string t = service.Call("prototype_title", prototype).AsString(); return t == "" ? prototype : t; }
+
+    /// <summary>Merchant price. A single source shared by the trade screen and the transaction.</summary>
+    public static int Price(string item) => 5;
+
+    /// <summary>Why the last <see cref="Craft"/> call failed; None after success.</summary>
+    public CraftFailure LastCraftFailure { get; private set; }
+    /// <summary>Why the last <see cref="Trade"/> call failed; None after success.</summary>
+    public TradeFailure LastTradeFailure { get; private set; }
+
+    /// <summary>Read-only preflight of a recipe. Capacity is only known for certain after ingredients are taken.</summary>
+    public CraftFailure CraftPreview(string owner, RecipeDef recipe)
+    {
+        if (recipe.Ingredients.Count == 0 || recipe.Ingredients.Any(x => x.Value < 1) ||
+            !service.Call("can_produce", recipe.Output, recipe.Count, recipe.Material, recipe.Quality).AsBool())
+            return CraftFailure.CannotMake;
+        if (recipe.Ingredients.Any(x => Count(owner, x.Key) < x.Value)) return CraftFailure.MissingIngredients;
+        return CraftFailure.None;
+    }
+
+    public TradeFailure TradePreview(string buyer, string merchant, string item, int price)
+    {
+        if (price < 0) return TradeFailure.Invalid;
+        if (Count(merchant, item) < 1) return TradeFailure.OutOfStock;
+        if (Count(buyer, "coin") < price) return TradeFailure.InsufficientFunds;
+        // Payment can free a stack. Preview both transfers on isolated Gloot bags,
+        // using their real constraints and item properties without touching live state.
+        return service.Call("trade_delivery_preview", buyer, merchant, item, price).AsString() switch
+        {
+            "ready" => TradeFailure.None,
+            "pack_full" => TradeFailure.PackFull,
+            _ => TradeFailure.Failed
+        };
+    }
+
     public void Reconcile(ActorState actor) => service.Call("reconcile_equipment", actor.Id, actor.Grasps);
     public bool HasLoot(string owner) => service.Call("has_items", owner).AsBool();
     public bool LootAll(string source, string target)
@@ -63,36 +133,90 @@ public sealed class Items(Node service, EventStream events)
     public string Describe(string owner) => service.Call("describe", owner).AsString();
     public bool Craft(string owner, RecipeDef recipe)
     {
-        // Check room for the output before consuming any ingredient.
-        if (recipe.Ingredients.Count == 0 || recipe.Ingredients.Any(x => x.Value < 1 || Count(owner, x.Key) < x.Value) || !service.Call("can_produce", recipe.Output, recipe.Count, recipe.Material, recipe.Quality).AsBool() || !service.Call("has_space", owner, recipe.Output, recipe.Count).AsBool())
+        LastCraftFailure = CraftPreview(owner, recipe);
+        if (LastCraftFailure != CraftFailure.None) return false;
+        LastCraftFailure = CraftFailure.Failed;
+        // Ingredient removal may free the very slot the output needs. Validate the
+        // recipe and ingredient quantities first, then check capacity after removal.
+        // All Gloot mutations are synchronous, and no events escape until commit.
+        if (recipe.Ingredients.Count == 0 ||
+            recipe.Ingredients.Any(x => x.Value < 1 || Count(owner, x.Key) < x.Value) ||
+            !service.Call("can_produce", recipe.Output, recipe.Count, recipe.Material, recipe.Quality).AsBool())
             return false;
-        foreach (var x in recipe.Ingredients)
-            Take(owner, x.Key, x.Value);
-        int produced = 0;
-        if (recipe.Material != "")
+
+        // Capture the entire authoritative Gloot state, including equipment, item
+        // properties and instance IDs, rather than trying to reconstruct ingredients.
+        string before = service.Call("export_state").AsString();
+        bool produced = false;
+        Exception? failure = null;
+        try
         {
-            for (int i = 0; i < recipe.Count; i++)
-                if (service.Call("generate_item", owner, recipe.Output, recipe.Material, recipe.Quality).AsBool())
-                    produced++;
-            if (produced > 0)
-                events.Publish(new("item_acquired", owner, "", recipe.Output, produced));
+            bool consumed = true;
+            foreach (var ingredient in recipe.Ingredients)
+            {
+                if (service.Call("take", owner, ingredient.Key, ingredient.Value).AsBool())
+                    continue;
+                consumed = false;
+                break;
+            }
+
+            bool space = consumed && service.Call("has_space", owner, recipe.Output, recipe.Count).AsBool();
+            if (consumed && !space) LastCraftFailure = CraftFailure.PackFull;
+            if (space)
+            {
+                if (recipe.Material == "")
+                {
+                    produced = service.Call("add", owner, recipe.Output, recipe.Count).AsBool();
+                }
+                else
+                {
+                    produced = true;
+                    for (int i = 0; i < recipe.Count; i++)
+                    {
+                        if (service.Call("generate_item", owner, recipe.Output, recipe.Material, recipe.Quality).AsBool())
+                            continue;
+                        produced = false;
+                        break;
+                    }
+                }
+            }
         }
-        else if (Add(owner, recipe.Output, recipe.Count))
-            produced = recipe.Count;
-        if (produced == 0)
+        catch (Exception error)
+        {
+            failure = error;
+        }
+
+        // An exception after some generated items were added is never a success,
+        // even if the loop had not yet cleared its produced flag.
+        if (!produced || failure != null)
+        {
+            // Failed delivery, including a partially completed generated-item
+            // batch, restores every affected stack and the original serial.
+            // Never report a crafted item or quest progress on failure.
+            if (!service.Call("import_state", before).AsBool())
+                throw new InvalidOperationException("Crafting rollback failed; Gloot inventory state may be inconsistent.", failure);
+            if (failure != null)
+                GD.PushWarning("Crafting failed and was rolled back: " + failure);
             return false;
+        }
+
+        LastCraftFailure = CraftFailure.None;
+        events.Publish(new("item_acquired", owner, "", recipe.Output, recipe.Count));
         events.Publish(new("crafted", owner, "", recipe.Id));
         return true;
     }
 
     public bool Trade(string buyer, string merchant, string item, int price)
     {
-        if (price < 0 || Count(buyer, "coin") < price || Count(merchant, item) < 1)
+        LastTradeFailure = price < 0 ? TradeFailure.Invalid : Count(merchant, item) < 1 ? TradeFailure.OutOfStock : Count(buyer, "coin") < price ? TradeFailure.InsufficientFunds : TradeFailure.None;
+        if (LastTradeFailure != TradeFailure.None)
             return false;
+        LastTradeFailure = TradeFailure.Failed;
         // Take payment first and refund it if the goods cannot be delivered, so a
         // failed transfer can never hand over an item for free.
         if (price > 0 && !service.Call("transfer", buyer, merchant, "coin", price).AsBool())
             return false;
+        if (!HasSpace(buyer, item)) LastTradeFailure = TradeFailure.PackFull;
         if (!Transfer(merchant, buyer, item, 1))
         {
             if (price > 0)
@@ -101,7 +225,19 @@ public sealed class Items(Node service, EventStream events)
         }
         if (price > 0)
             events.Publish(new("item_acquired", merchant, buyer, "coin", price));
+        LastTradeFailure = TradeFailure.None;
         events.Publish(new("traded", buyer, merchant, item));
         return true;
     }
+}
+
+public enum CraftFailure { None, MissingIngredients, CannotMake, PackFull, Failed }
+public enum TradeFailure { None, Invalid, OutOfStock, InsufficientFunds, PackFull, Failed }
+
+/// <summary>Presentation copy of one Gloot stack or equipped item. Not an item store.</summary>
+public sealed record ItemView(string Selector, string Instance, string Id, string Title, int Count, int MaxStack,
+    string Slot, bool Equipped, string EquippedSlot, IReadOnlyDictionary<string, string> Properties)
+{
+    public float Stat(string name) => Properties.TryGetValue(name, out var v) && float.TryParse(v, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var f) ? f : 0;
+    public bool Usable => Stat("healing") > 0;
 }

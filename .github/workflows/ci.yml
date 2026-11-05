@@ -42,6 +42,8 @@ jobs:
         run: xvfb-run -a python3 tools/verify.py --visual
       - name: Phone layout and touch UI verification
         run: xvfb-run -a python3 tools/verify.py --visual --mobile
+      - name: Native widescreen surface, physical controls and responsive overlays
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --widescreen-only
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -56,6 +58,7 @@ jobs:
             build/adventure/
             build/encounter-measurements.json
             build/verification-*.log
+            build/widescreen/
   preserved-reference:
     runs-on: ubuntu-24.04
     defaults:
