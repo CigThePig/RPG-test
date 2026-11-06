@@ -1,0 +1,24 @@
+[
+  {
+    "style": "part2",
+    "p50ms": 15.752999999999929,
+    "p95ms": 25.910499999999956,
+    "environmentBuildMs": 369.5757,
+    "terrainBuildMs": 0.8418,
+    "atlasBytes": 1437696,
+    "atlasBuildMs": 14.5189,
+    "textureBytes": 15584547,
+    "bufferBytes": 7126884
+  },
+  {
+    "style": "part3",
+    "p50ms": 15.299499999999853,
+    "p95ms": 22.4966,
+    "environmentBuildMs": 68.0182,
+    "terrainBuildMs": 10.1925,
+    "atlasBytes": 1437696,
+    "atlasBuildMs": 14.5189,
+    "textureBytes": 15584547,
+    "bufferBytes": 7118244
+  }
+]

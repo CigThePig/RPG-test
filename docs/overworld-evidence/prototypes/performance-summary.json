@@ -1,0 +1,41 @@
+{
+  "baseline": {
+    "readyMs": 484.3757,
+    "terrainBuildMs": 3.6221,
+    "terrainVertexBytes": 706272,
+    "waterBuildMs": 0,
+    "waterVertexBytes": 0,
+    "waterLookupBytes": 0,
+    "p50ms": 35.50669999999991,
+    "p95ms": 62.45640000000003,
+    "managedBytes": 17596448,
+    "godotStaticBytes": 46045402,
+    "textureBytes": 12438991,
+    "bufferBytes": 7246892
+  },
+  "final": {
+    "readyMs": 480.4622,
+    "terrainBuildMs": 3.4368,
+    "terrainVertexBytes": 688128,
+    "waterBuildMs": 13.1395,
+    "waterVertexBytes": 18648,
+    "waterLookupBytes": 263682,
+    "p50ms": 34.409799999999905,
+    "p95ms": 65.27149999999983,
+    "managedBytes": 17793736,
+    "godotStaticBytes": 46081773,
+    "textureBytes": 12790055,
+    "bufferBytes": 7247180
+  },
+  "p95ChangePercent": 4.507304295476211,
+  "runtimeCommit": "c25393ace761aeb12a6f25c407b13e9daf5b09c9",
+  "environment": "Debian 13, Godot 4.6.1 .NET, GL Compatibility, Mesa llvmpipe LLVM 19.1.7; Xorg dummy over loopback TCP; 1280x800 mobile layout; frozen production fixture at unchanged 1.5x zoom; no VSync support",
+  "method": "Sequential baseline then final processes, no parallel local test/build work; six 120-frame intervals each; summary is median of interval statistics for iterations 1..5. This is one noisy hosted software-renderer pair, not a hardware benchmark.",
+  "limits": [
+    "Initial import/JIT/first GPU completion not isolated; readyMs includes 12 process frames and scheduling, not CPU build time.",
+    "No physical Samsung Galaxy S25 measurement.",
+    "Lookup bytes are RG8 payload; engine-wide texture/buffer counters include all game resources.",
+    "No GPU timer-query attribution or process working-set measurement.",
+    "Six same-fixture rebuilds are a bounded resource observation; existing environment suite additionally alternates production regions."
+  ]
+}

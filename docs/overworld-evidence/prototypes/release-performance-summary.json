@@ -1,0 +1,49 @@
+{
+  "baseline": {
+    "readyMs": 454.0162,
+    "terrainBuildMs": 2.88375,
+    "terrainVertexBytes": 706272.0,
+    "waterBuildMs": 0.0,
+    "waterVertexBytes": 0.0,
+    "waterLookupBytes": 0.0,
+    "p50ms": 34.29110000000014,
+    "p95ms": 53.92709999999988,
+    "managedBytes": 16550944.0,
+    "godotStaticBytes": 46065725.0,
+    "textureBytes": 12438991.0,
+    "bufferBytes": 7246892.0
+  },
+  "living-reach": {
+    "readyMs": 498.51635,
+    "terrainBuildMs": 3.2966499999999996,
+    "terrainVertexBytes": 640248.0,
+    "waterBuildMs": 14.74215,
+    "waterVertexBytes": 18648.0,
+    "waterLookupBytes": 263682.0,
+    "p50ms": 32.24520000000007,
+    "p95ms": 46.34890000000004,
+    "managedBytes": 15789856.0,
+    "godotStaticBytes": 46086873.0,
+    "textureBytes": 12790055.0,
+    "bufferBytes": 7219820.0
+  },
+  "runtimeCommit": "2173e5e8e80e3dfb6a57c5e586527eb983fe27a7",
+  "p95ChangePercent": -14.05267481470328,
+  "firstEnvironmentBuildMs": {
+    "baseline": 26.5742,
+    "living-reach": 84.8196
+  },
+  "firstTerrainDrawPreparationMs": {
+    "baseline": 37.062,
+    "living-reach": 21.5459
+  },
+  "method": "One frozen production fixture, twelve alternating old/new 120-frame intervals in one rendered process; median of six interval statistics per style. Every interval checks exact full world/narrative serialization equality. First-build values use separate fresh Godot processes and exclude deferred GPU completion.",
+  "environment": "Debian 13, Godot 4.6.1 .NET, GL Compatibility, llvmpipe LLVM 19.1.7, Xorg dummy loopback TCP, 1280x800 mobile layout, unchanged 1.5x zoom; no VSync. No other local test/build workload during the accepted comparison.",
+  "limits": [
+    "Hosted software renderer, not physical Galaxy S25 or emulator performance.",
+    "p95 is median of per-interval p95 statistics, not pooled percentile.",
+    "Earlier independent-process prototypes varied widely and included regressions; all raw comparisons are retained.",
+    "Cold machine startup, GPU completion/timer-query attribution and process working set are not isolated.",
+    "No long-session memory claim. Counters include all game textures/buffers."
+  ]
+}

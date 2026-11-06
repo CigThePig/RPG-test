@@ -1,16 +1,18 @@
 """Hosted x86_64 Android runtime smoke; ARM64 phone performance remains separate."""
 from pathlib import Path
-import os, subprocess, sys, time, re, json
+import os, subprocess, sys, time, re, json, shlex
 import xml.etree.ElementTree as ET
 from android_window import anr_messages, has_game_focus
-from android_layout import latest_display, control_rectangles
+from android_layout import latest_display, control_rectangles, LogHistory
 from PIL import Image
 from io import BytesIO
 display=next((arg.split('=',1)[1] for arg in sys.argv if arg.startswith('--display=')), '1280x800')
 assert re.fullmatch(r'[0-9]+x[0-9]+',display), 'Invalid emulator display'
 out=Path('build/android-runtime')/display;out.mkdir(parents=True,exist_ok=True)
 package='com.cigthepig.mosslight.dev'
-recorder=None
+recording_active=False
+recording_pid=None
+log_history=LogHistory()
 recording_start=None
 def run(*args, **kwargs):
     # Never let a disconnected ADB daemon strand the workflow indefinitely.
@@ -21,8 +23,10 @@ def adb(*args):
     # the game keeps running. Retry this read only; never repeat touch/install mutations.
     attempts=3 if args==('logcat','-d') else 1
     for attempt in range(attempts):
-        try: return run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True,
-                        timeout=60 if args and args[0]=='install' else 20).strip()
+        try:
+            value=run(os.path.join(os.environ['ANDROID_HOME'], 'platform-tools', 'adb'), *args, text=True,
+                      timeout=60 if args and args[0]=='install' else 20).strip()
+            return log_history.merge(value) if args==('logcat','-d') else value
         except subprocess.CalledProcessError as error:
             if attempts==1: raise
             (out/f'adb-logcat-read-{time.monotonic_ns()}.log').write_text(str(error)+"\n"+str(error.output))
@@ -161,7 +165,33 @@ try:
     else: raise RuntimeError('Resume tap never entered a gameplay session')
     # ADB screenrecord captures the actual Android surface, including frame pacing.
     recording_start=time.time()
-    recorder=subprocess.Popen([adb_path,'shell','screenrecord','--bit-rate','4000000','--time-limit','180','/sdcard/mosslight-playtest.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    # Detach the device process from ADB's transport. Hosted ADB streams can
+    # close mid-command; keeping screenrecord under that shell caused a silent
+    # early exit and a zero-byte MP4 despite healthy, moving game captures.
+    adb('shell','rm','-f','/sdcard/mosslight-screenrecord.pid','/sdcard/mosslight-screenrecord.log','/sdcard/mosslight-playtest.mp4')
+    remote='echo $$ > /sdcard/mosslight-screenrecord.pid; exec screenrecord --bit-rate 4000000 --time-limit 180 /sdcard/mosslight-playtest.mp4'
+    # screenrecord installs its own SIGHUP handler, so nohup alone is insufficient.
+    # A new session and closed standard streams remove the ADB shell dependency.
+    adb('shell','setsid sh -c '+shlex.quote(remote)+' </dev/null >/sdcard/mosslight-screenrecord.log 2>&1 &')
+    deadline=time.monotonic()+10
+    while time.monotonic()<deadline:
+        try:
+            recording_pid=adb('shell','cat','/sdcard/mosslight-screenrecord.pid').strip()
+            if recording_pid.isdigit(): break
+        except subprocess.CalledProcessError: pass
+        time.sleep(.2)
+    else: raise RuntimeError('Native recorder did not publish its PID: '+adb('shell','cat','/sdcard/mosslight-screenrecord.log'))
+    recording_active=True
+    def stop_recording():
+        if recording_pid in screenrecord_pids(): adb('shell','kill','-2',recording_pid)
+        deadline=time.monotonic()+15
+        while recording_pid in screenrecord_pids():
+            if time.monotonic()>=deadline: raise RuntimeError('Native screenrecord did not flush/exit after SIGINT')
+            time.sleep(.2)
+        (out/'screenrecord.log').write_text(adb('shell','cat','/sdcard/mosslight-screenrecord.log'))
+    time.sleep(.5)
+    assert recording_pid in screenrecord_pids(), 'Native screenrecord exited before gameplay capture'
+
     # Set a westward facing and leave the nearby enemy group alone while
     # checking repeated controls. The earlier chest-first ordering let active
     # enemies kill the player mid-test; it did not expose an input failure.
@@ -340,11 +370,8 @@ try:
     tap_action('inventory')
     time.sleep(1)
     capture('inventory.png')
-    pids=screenrecord_pids()
-    for pid in pids:
-        if pid.isdigit(): adb('shell','kill','-2',pid)
-    stdout,stderr=recorder.communicate(timeout=15)
-    (out/'screenrecord.log').write_bytes(stdout+stderr)
+    stop_recording()
+    recording_active=False
     adb('pull','/sdcard/mosslight-playtest.mp4',str(out/'gameplay.mp4'))
     assert (out/'gameplay.mp4').stat().st_size>10000,'Empty Android recording'
     run('ffmpeg','-v','error','-i',str(out/'gameplay.mp4'),'-vf','fps=2,scale=640:400',str(out/'frame-%03d.png'))
@@ -476,18 +503,12 @@ try:
 finally:
     # Preserve the real surface recording on failure as well as success. ADB
     # process termination alone can leave screenrecord running with an unclosed MP4.
-    if recorder is not None and recorder.poll() is None:
+    if recording_active:
         try:
-            for pid in screenrecord_pids():
-                if pid.isdigit(): adb('shell','kill','-2',pid)
-            recorder.communicate(timeout=15)
+            stop_recording()
             adb('pull','/sdcard/mosslight-playtest.mp4',str(out/'gameplay-failure.mp4'))
         except Exception as error:
             (out/'recording-cleanup.log').write_text(str(error))
-    if recorder is not None and recorder.poll() is None:
-        recorder.terminate()
-        try: recorder.wait(timeout=10)
-        except subprocess.TimeoutExpired: recorder.kill()
     try: (out/'logcat.log').write_text(adb('logcat','-d'))
     except Exception: pass
     if emulator.poll() is None:

@@ -31,3 +31,31 @@ def control_rectangles(logs):
     expected = {'attack', 'dodge', 'interact', 'ember', 'mend', 'potion', 'inventory', 'menu', 'stick', 'hud'}
     assert expected <= result.keys(), 'Missing physical control rectangles: ' + str(expected-result.keys())
     return result
+
+
+class LogHistory:
+    """Retain genuine app diagnostics/errors when noisy emulator buffers roll over.
+
+    Repeated dumps must not duplicate action events, and newer layout records
+    must remain last. No coordinates or application events are synthesized.
+    """
+    errors = ('FATAL EXCEPTION', 'Fatal signal', 'SCRIPT ERROR:',
+              'System.DllNotFoundException', 'Unhandled exception',
+              'E godot   : ERROR:', 'Program linking failed', 'unable to bind shader')
+
+    def __init__(self):
+        self.counts = {}
+        self.records = []
+
+    def merge(self, snapshot):
+        other = []
+        occurrences = {}
+        for line in snapshot.splitlines():
+            if 'MOSSLIGHT_' in line or any(error in line for error in self.errors) or any(tag in line for tag in ('ScreenRecord', 'MediaCodec', 'CCodec', 'MediaMuxer', 'MPEG4Writer')):
+                occurrences[line] = occurrences.get(line, 0) + 1
+                if occurrences[line] > self.counts.get(line, 0):
+                    self.counts[line] = occurrences[line]
+                    self.records.append(line)
+            else:
+                other.append(line)
+        return '\n'.join(other + self.records)

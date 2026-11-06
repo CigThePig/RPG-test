@@ -452,6 +452,10 @@ public static class VisualChecks
         { app.World.Enter(app.World.Player,"ruin");await MechanismVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--landmarks-only"))
         { await LandmarkVisualChecks.Run(app); GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--overworld-props-only"))
+        { await OverworldPropVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--overworld-only"))
+        { await OverworldVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--environment-only"))
         {
             app.World.Enter(app.World.Player,"ruin");
