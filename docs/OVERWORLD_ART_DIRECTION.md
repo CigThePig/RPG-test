@@ -1,6 +1,6 @@
 # The Living Reach — Mosslight environmental art standard
 
-Part 1 establishes the water/material foundation; Parts 2–4 extend it. Authority remains in `RegionState`, `World` and persistence. Art never changes saved geography or collision. Reference base: `ca60f3eda8153c0f7864703e52a1b09f5228f290`.
+Part 1 establishes the water/material foundation; Parts 2–4 extend it. Part 2 ground/banks and Part 3 environmental objects are now implemented; see [Part 3 design](OVERWORLD_PART3_DESIGN.md) and [handoff](OVERWORLD_PART3_HANDOFF.md). The contracts below record the original Part 1 foundation; the later implementation uses RGB8 water data plus a shared RGBA8 ground field, and Part 3 adds one fixed prop atlas. Part 4 remains open. Authority remains in `RegionState`, `World` and persistence. Art never changes saved geography or collision. Reference base: `ca60f3eda8153c0f7864703e52a1b09f5228f290`.
 
 ## Physical space and hierarchy
 

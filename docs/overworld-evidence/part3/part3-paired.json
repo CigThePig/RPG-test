@@ -1,23 +1,23 @@
 [
   {
     "style": "part2",
-    "p50ms": 13.850099999999884,
-    "p95ms": 20.1845,
-    "environmentBuildMs": 98.7866,
-    "terrainBuildMs": 0.6122,
+    "p50ms": 15.752999999999929,
+    "p95ms": 25.910499999999956,
+    "environmentBuildMs": 369.5757,
+    "terrainBuildMs": 0.8418,
     "atlasBytes": 1437696,
-    "atlasBuildMs": 12.6872,
+    "atlasBuildMs": 14.5189,
     "textureBytes": 15584547,
     "bufferBytes": 7126884
   },
   {
     "style": "part3",
-    "p50ms": 13.395899999999983,
-    "p95ms": 18.391800000000103,
-    "environmentBuildMs": 61.4839,
-    "terrainBuildMs": 8.6349,
+    "p50ms": 15.299499999999853,
+    "p95ms": 22.4966,
+    "environmentBuildMs": 68.0182,
+    "terrainBuildMs": 10.1925,
     "atlasBytes": 1437696,
-    "atlasBuildMs": 12.6872,
+    "atlasBuildMs": 14.5189,
     "textureBytes": 15584547,
     "bufferBytes": 7118244
   }
