@@ -8,6 +8,7 @@ public partial class EnvironmentDecoration : Node2D
     public Texture2D? Texture { get; init; }
     public Vector2 Pivot { get; init; }
     public bool Rubble { get; init; }
+    public int ReachModule {get;init;}=-1;
     public int PropModule { get; init; } = -1;
     public static List<EnvironmentDecoration> Create(RegionState r, Dictionary<string,Texture2D> art)
     {
@@ -40,7 +41,9 @@ public partial class EnvironmentDecoration : Node2D
                 result.Add(new EnvironmentDecoration
                 {
                     Position=GodotConvert.GroundToScreen((x+.5f)*24,(y+.5f)*24),
-                    Texture=tile==Terrain.Grass?texture:null, Rubble=tile==Terrain.Floor,
+                    ReachModule=tile==Terrain.Grass && r.Rooms.Count==0 && OverworldPropAtlas.Enabled
+                        ?OverworldPropArt.Module(key=="tree1"?ReachProp.Tree:key=="rock1"?ReachProp.Rock:ReachProp.Shrub,h):-1,
+                    Texture=tile==Terrain.Grass && !(r.Rooms.Count==0 && OverworldPropAtlas.Enabled)?texture:null, Rubble=tile==Terrain.Floor,
                     Pivot=key=="tree1"?new Vector2(36,100):key=="rock1"?new Vector2(12,16):new Vector2(17,23),
                     TextureFilter=TextureFilterEnum.Nearest
                 });
@@ -61,6 +64,7 @@ public partial class EnvironmentDecoration : Node2D
     public override void _Draw()
     {
         if(PropModule>=0)DrawTextureRectRegion(EnvironmentAssetCache.Props,new Rect2(-13,-62,26,64),new Rect2(PropModule*26,0,26,64));
+        if(ReachModule>=0)OverworldPropAtlas.Draw(this,ReachModule,Vector2.Zero);
         if(Texture!=null)DrawTexture(Texture,-Pivot);
         if(Rubble)
         {

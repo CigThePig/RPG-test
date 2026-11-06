@@ -718,7 +718,7 @@ public partial class Foundation : Node2D
             int[] gate = RegionState.IsGate(kind) ? gates[kind].Single(g => Array.BinarySearch(g, at) >= 0) : Array.Empty<int>();
             if (gate.Length > 0 && gate[0] != at) continue;
             var pos = r.Center(at);
-            var feature = new FeatureView { Kind = kind, Art = art, VisualSeed = EnvironmentStyle.Hash(r.Seed,at%r.Width,at/r.Width), GateCells = gate, Visible = showCharacters,
+            var feature = new FeatureView { Kind = kind, Art = art, LivingReach=r.Rooms.Count==0, VisualSeed = EnvironmentStyle.Hash(r.Seed,at%r.Width,at/r.Width), GateCells = gate, Visible = showCharacters,
                 GateOffsets = gate.Select(cell => GodotConvert.GroundToScreen(r.Center(cell).X-pos.X, r.Center(cell).Y-pos.Y)).ToArray(),
                 Spent = r.Depleted.Contains(at) || r.OpenDoors.Contains(at), Lit = r.Lit.Contains(at), Position = GodotConvert.GroundToScreen(pos.X,pos.Y) };
             feature.SetMeta("tile",at);
@@ -915,7 +915,19 @@ public partial class TerrainView : Node2D
                         DrawTextureRect(texture, new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), false, new Color(1, 1, 1, .32f));
         }
 
-        if(Art.TryGetValue("rock1",out var rock))
+        if(Region.Rooms.Count==0 && OverworldPropAtlas.Enabled)
+        {
+            var rocks=new TerrainBatch {Texture=OverworldPropAtlas.Texture};batches.Add(rocks);
+            for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+                if(Region.Tiles[y*Region.Width+x]==Terrain.Rock)
+                {
+                    var foot=GodotConvert.GroundToScreen(x*24+12,y*24+24);
+                    rocks.Sprite(new Rect2(foot-OverworldPropArt.Pivot,new Vector2(72,104)),
+                        OverworldPropArt.Source(OverworldPropArt.Module(ReachProp.Rock,EnvironmentStyle.Hash(Region.Seed,x,y))));
+                }
+            rocks.Draw(this);
+        }
+        else if(Art.TryGetValue("rock1",out var rock))
         {
             var rockBatch=new TerrainBatch { Texture=rock };batches.Add(rockBatch);
             for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
