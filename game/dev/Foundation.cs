@@ -864,6 +864,9 @@ public partial class TerrainView : Node2D
             for (int x = 0; x < Region.Width; x++)
             {
                 var tile = Region.Tiles[y * Region.Width + x];
+                // The Living Reach surface is opaque over the complete water footprint.
+                // Avoid a redundant water fill underneath its palette shader.
+                if(tile==Terrain.Water && Region.Rooms.Count==0 && OverworldWaterRenderer.UseLivingReach)continue;
                 var color = tile switch
                 {
                     Terrain.Water => new Color(.19f, .33f, .35f),

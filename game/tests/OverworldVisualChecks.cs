@@ -36,6 +36,8 @@ public static class OverworldVisualChecks
         var w=app.World;string original=Persistence.Capture(w,app.Narrative);var prefs=app.Ui.Preferences.Copy();
         double scale=Engine.TimeScale;var window=app.GetWindow();var size=window.Size;
         string version=OS.GetCmdlineUserArgs().Contains("--baseline-water")?"baseline":OS.GetCmdlineUserArgs().Contains("--water-static-fallback")?"fallback":"final";
+        bool compare=OS.GetCmdlineUserArgs().Contains("--compare-water");
+        bool originalLegacy=OverworldWaterRenderer.VerificationLegacy;
         var observations=new List<object>();
         try
         {
@@ -43,7 +45,7 @@ public static class OverworldVisualChecks
             foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="unused";
             var r=Fixture();w.RegionsById[r.Id]=r;var p=w.Player;p.Region=r.Id;p.X=32.5f*24;p.Y=34.5f*24;p.Health=p.MaxHealth;p.Invulnerable=10000;w.Cancel(p);
             int i=0;foreach(var a in w.Actors.Values.Where(a=>a.Id!="player").OrderBy(a=>a.Id,StringComparer.Ordinal).Take(3))
-            {a.Region=r.Id;a.X=(30+i*2)*24;a.Y=(32-i)*24;a.Health=a.MaxHealth;w.Cancel(a);i++;}
+            {a.Region=r.Id;var stand=r.FindPlacement(new V((30+i*2)*24,(32-i)*24),a,w.Actors.Values);a.X=stand.X;a.Y=stand.Y;a.Health=a.MaxHealth;w.Cancel(a);i++;}
             window.Size=new Vector2I(1280,800);app.RebuildViews();await Capture(app,version+"-reference");
             await Capture(app,version+"-multiple-creatures");
             if(version=="final" && !OS.GetCmdlineUserArgs().Contains("--water-static-fallback"))
@@ -74,17 +76,21 @@ public static class OverworldVisualChecks
             var reduced=prefs.Copy();reduced.ReducedMotion=true;app.Ui.ApplyPreferences(reduced,false);
             await Capture(app,version+"-reduced-motion");app.Ui.ApplyPreferences(prefs,false);
             window.Size=new Vector2I(1280,800);
-            for(int iteration=0;iteration<6;iteration++)
+            string frozen=Persistence.Capture(w,app.Narrative);
+            for(int iteration=0;iteration<(compare?12:6);iteration++)
             {
+                OverworldWaterRenderer.VerificationLegacy=compare && iteration%2==0;
                 var timer=Stopwatch.StartNew();app.RebuildViews();await Frames(app);double ready=timer.Elapsed.TotalMilliseconds;
                 long builds=OverworldWaterRenderer.BuildCount;
                 var intervals=new List<double>();timer.Restart();double last=0;
                 for(int f=0;f<120;f++){await Frames(app,1);double now=timer.Elapsed.TotalMilliseconds;intervals.Add(now-last);last=now;}
                 if(OverworldWaterRenderer.BuildCount!=builds)throw new InvalidOperationException("Water rebuilt during static interval");
-                intervals.Sort();observations.Add(new {iteration,initialEnvironmentBuildMs=Foundation.FirstEnvironmentBuildMilliseconds,initialTerrainDrawPreparationMs=TerrainView.FirstBuildMilliseconds,readyMs=ready,terrainBuildMs=TerrainView.LastBuildMilliseconds,terrainVertexBytes=TerrainView.LastVertexBytes,waterBuildMs=OverworldWaterRenderer.LastBuildMilliseconds,waterVertexBytes=OverworldWaterRenderer.LastVertexBytes,waterLookupBytes=OverworldWaterRenderer.LastLookupBytes,waterBuildCount=OverworldWaterRenderer.BuildCount,
+                if(Persistence.Capture(w,app.Narrative)!=frozen)throw new InvalidOperationException("Water renderer changed authoritative state");
+                intervals.Sort();observations.Add(new {iteration,waterStyle=OverworldWaterRenderer.UseLivingReach?"living-reach":"baseline",initialEnvironmentBuildMs=Foundation.FirstEnvironmentBuildMilliseconds,initialTerrainDrawPreparationMs=TerrainView.FirstBuildMilliseconds,readyMs=ready,terrainBuildMs=TerrainView.LastBuildMilliseconds,terrainVertexBytes=TerrainView.LastVertexBytes,waterBuildMs=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastBuildMilliseconds:0,waterVertexBytes=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastVertexBytes:0,waterLookupBytes=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastLookupBytes:0,waterBuildCount=OverworldWaterRenderer.BuildCount,
                     p50ms=intervals[60],p95ms=intervals[114],managedBytes=GC.GetTotalMemory(true),godotStaticBytes=OS.GetStaticMemoryUsage(),
                     textureBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TextureMemUsed),bufferBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.BufferMemUsed),renderer=RenderingServer.GetVideoAdapterName()});
             }
+            OverworldWaterRenderer.VerificationLegacy=false;
             foreach(int seed in new[]{1,42,1337})
             {
                 r=Regions.Overworld(seed);r.Id="living-reach-seed";w.RegionsById[r.Id]=r;p.Region=r.Id;
@@ -95,9 +101,9 @@ public static class OverworldVisualChecks
             string[] shapes={"#","###","##/.#",".#./###/.#.","#.#/.#./#.#","####/#..#/####","#../#../###","###/..#/###"};
             for(int s=0;s<shapes.Length;s++){var rows=shapes[s].Split('/');for(int y=0;y<rows.Length;y++)for(int x=0;x<rows[y].Length;x++)if(rows[y][x]=='#')r.Tiles[(25+s/4*7+y)*64+20+s%4*7+x]=Terrain.Water;}
             w.RegionsById[r.Id]=r;p.Region=r.Id;p.X=32*24;p.Y=32*24;app.RebuildViews();await Capture(app,version+"-edge-cases");
-            File.WriteAllText("build/overworld/"+version+".json",JsonSerializer.Serialize(observations,Content.Json));
+            File.WriteAllText("build/overworld/"+(compare?"paired":version)+".json",JsonSerializer.Serialize(observations,Content.Json));
             GD.Print("OVERWORLD VISUAL CHECKS PASSED: production references, six sizes, seeds, topology and rebuilds");
         }
-        finally {Engine.TimeScale=scale;window.Size=size;Persistence.Restore(w,app.Narrative,original);app.Ui.ApplyPreferences(prefs,false);app.RebuildViews();app.ResumeGame();}
+        finally {OverworldWaterRenderer.VerificationLegacy=originalLegacy;Engine.TimeScale=scale;window.Size=size;Persistence.Restore(w,app.Narrative,original);app.Ui.ApplyPreferences(prefs,false);app.RebuildViews();app.ResumeGame();}
     }
 }

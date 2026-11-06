@@ -7,7 +7,11 @@ public partial class OverworldWaterRenderer : Node2D
 {
     public RegionState Region { get; init; } = null!;
     public Func<bool> ReducedMotion { get; init; } = () => true;
-    public static bool UseLivingReach => !(OS.GetCmdlineUserArgs().Contains("--visual-check") && OS.GetCmdlineUserArgs().Contains("--baseline-water"));
+    static readonly bool visualVerification=OS.GetCmdlineUserArgs().Contains("--visual-check");
+    static readonly bool legacyCommand=OS.GetCmdlineUserArgs().Contains("--baseline-water");
+    // Test-only A/B switch; ordinary gameplay cannot select the obsolete renderer.
+    public static bool VerificationLegacy { get; set; }
+    public static bool UseLivingReach => !(visualVerification && (legacyCommand || VerificationLegacy));
     public static double LastBuildMilliseconds { get; private set; }
     public static long LastVertexBytes { get; private set; }
     public static long LastLookupBytes { get; private set; }
