@@ -27,6 +27,7 @@ public static class OverworldVisualChecks
             if(y is >=36 and <=38)r.Tiles[y*64+x]=Terrain.Earth;
         }
         r.Tiles[28*64+42]=Terrain.Grass; // island
+        r.Tiles[34*64+40]=Terrain.Rock; // Raised PPC rock over the northern water margin.
         foreach(var (x,y,kind) in new[]{(29,34,"chest"),(25,24,"wood"),(29,23,"wood"),(46,40,"wood"),(27,30,"ore"),(35,40,"herb")})r.Features[y*64+x]=kind;
         return r;
     }
@@ -48,6 +49,26 @@ public static class OverworldVisualChecks
             {a.Region=r.Id;var stand=r.FindPlacement(new V((30+i*2)*24,(32-i)*24),a,w.Actors.Values);a.X=stand.X;a.Y=stand.Y;a.Health=a.MaxHealth;w.Cancel(a);i++;}
             window.Size=new Vector2I(1280,800);app.RebuildViews();await Capture(app,version+"-reference");
             await Capture(app,version+"-multiple-creatures");
+            if(version=="final" && !OS.GetCmdlineUserArgs().Contains("--water-static-fallback"))
+            {
+                var water=app.GetTree().GetNodesInGroup("overworld-water").OfType<OverworldWaterRenderer>().Single();
+                try
+                {
+                    water.ZIndex=0;await Frames(app,2);await app.ToSignal(RenderingServer.Singleton,RenderingServer.SignalName.FramePostDraw);
+                    using var oldOrder=app.GetViewport().GetTexture().GetImage();
+                    water.ZIndex=-1;await Frames(app,2);await app.ToSignal(RenderingServer.Singleton,RenderingServer.SignalName.FramePostDraw);
+                    using var correct=app.GetViewport().GetTexture().GetImage();
+                    var transform=water.GetGlobalTransformWithCanvas();
+                    var lo=transform*new Vector2(40*24,34*12-7);var hi=transform*new Vector2(41*24,34*12);int restored=0;
+                    for(int y=(int)MathF.Ceiling(lo.Y);y<(int)hi.Y;y++)for(int x=(int)MathF.Ceiling(lo.X);x<(int)hi.X;x++)
+                        if(oldOrder.GetPixel(x,y)!=correct.GetPixel(x,y))restored++;
+                    if(restored<10)throw new InvalidOperationException("Raised shore rock was not restored over water: "+restored);
+                    oldOrder.SavePng("docs/overworld-screenshots/final-rock-old-order-reproduction.png");
+                    correct.SavePng("docs/overworld-screenshots/final-rock-correct-order.png");
+                    File.WriteAllText("build/overworld/rock-depth.json",JsonSerializer.Serialize(new {restoredRockPixels=restored},Content.Json));
+                }
+                finally {water.ZIndex=-1;}
+            }
             if(version=="final" && !OS.GetCmdlineUserArgs().Contains("--water-static-fallback"))
             {
                 async System.Threading.Tasks.Task<int> Changes(bool reducedMotion)
@@ -101,6 +122,9 @@ public static class OverworldVisualChecks
             string[] shapes={"#","###","##/.#",".#./###/.#.","#.#/.#./#.#","####/#..#/####","#../#../###","###/..#/###"};
             for(int s=0;s<shapes.Length;s++){var rows=shapes[s].Split('/');for(int y=0;y<rows.Length;y++)for(int x=0;x<rows[y].Length;x++)if(rows[y][x]=='#')r.Tiles[(25+s/4*7+y)*64+20+s%4*7+x]=Terrain.Water;}
             w.RegionsById[r.Id]=r;p.Region=r.Id;p.X=32*24;p.Y=32*24;app.RebuildViews();await Capture(app,version+"-edge-cases");
+            // Explicit water at the world boundary, including clipped bank vegetation.
+            for(int y=0;y<=18;y++)for(int x=56;x<64;x++)r.Tiles[y*64+x]=Terrain.Water;
+            p.X=53.5f*24;p.Y=20.5f*24;app.RebuildViews();await Capture(app,version+"-region-boundary");
             File.WriteAllText("build/overworld/"+(compare?"paired":version)+".json",JsonSerializer.Serialize(observations,Content.Json));
             GD.Print("OVERWORLD VISUAL CHECKS PASSED: production references, six sizes, seeds, topology and rebuilds");
         }

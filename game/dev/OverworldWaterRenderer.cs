@@ -26,6 +26,12 @@ public partial class OverworldWaterRenderer : Node2D
         AddToGroup("overworld-water");
         TextureFilter=TextureFilterEnum.Nearest;
         var timer=System.Diagnostics.Stopwatch.StartNew();
+        var regionBounds=new Rect2(0,0,Region.Width*24,Region.Height*12);
+        void Bank(Rect2 rectangle,Color color)
+        {
+            var clipped=rectangle.Intersection(regionBounds);
+            if(clipped.Size.X>0 && clipped.Size.Y>0)details.Rect(clipped,color);
+        }
         if(OS.GetCmdlineUserArgs().Contains("--water-static-fallback"))
         {
             foreach(var mark in OverworldWaterArt.Build(Region))surface.Rect(mark.Rect,OverworldWaterArt.Ramp[mark.Shade]);
@@ -64,17 +70,17 @@ public partial class OverworldWaterRenderer : Node2D
             if(!OverworldWaterArt.Water(Region,x,y-1) && bank%4==0)
             {
                 int bx=x*24+8+(int)(bank>>8)%8,by=y*12+1;
-                details.Rect(new Rect2(bx-2,by+1,8,2),new Color("3a5145"));
-                details.Rect(new Rect2(bx,by-3,1,5),new Color("71875b"));
-                details.Rect(new Rect2(bx+3,by-2,1,4),new Color("536d4b"));
-                details.Rect(new Rect2(bx+5,by,1,2),new Color("849366"));
+                Bank(new Rect2(bx-2,by+1,8,2),new Color("3a5145"));
+                Bank(new Rect2(bx,by-3,1,5),new Color("71875b"));
+                Bank(new Rect2(bx+3,by-2,1,4),new Color("536d4b"));
+                Bank(new Rect2(bx+5,by,1,2),new Color("849366"));
             }
             if(!OverworldWaterArt.Water(Region,x-1,y) && bank%9==0)
             {
                 int bx=x*24+2,by=y*12+6;
-                details.Rect(new Rect2(bx,by,5,2),new Color("354e47"));
-                details.Rect(new Rect2(bx,by-1,4,2),new Color("68766a"));
-                details.Rect(new Rect2(bx,by-1,2,1),new Color("89917b"));
+                Bank(new Rect2(bx,by,5,2),new Color("354e47"));
+                Bank(new Rect2(bx,by-1,4,2),new Color("68766a"));
+                Bank(new Rect2(bx,by-1,2,1),new Color("89917b"));
             }
             uint h=OverworldWaterArt.Hash(Region.Seed,x,y,7);if(h%7!=0)continue;
             int px=5+(int)(h>>8)%14,py=3+(int)(h>>16)%6;
@@ -83,7 +89,7 @@ public partial class OverworldWaterRenderer : Node2D
         }
         glintShader ??= new Shader {Code="shader_type canvas_item; render_mode unshaded; uniform float motion = 0.0; uniform float preview_time = -1.0; varying vec2 place; void vertex(){place=VERTEX;} void fragment(){float t=preview_time<0.0?TIME:preview_time;float wave=0.55+0.45*sin(t*0.7+place.x*0.018+place.y*0.009);COLOR.a*=mix(0.55,wave,motion);}"};
         glintMaterial=new ShaderMaterial {Shader=glintShader};reduced=ReducedMotion();glintMaterial.SetShaderParameter("motion",reduced?0f:1f);
-        AddChild(new WaterGlints {Batch=details});
+        AddChild(new WaterGlints {Batch=details,ZIndex=1});
         AddChild(new WaterGlints {Batch=glints,Material=glintMaterial});
         LastVertexBytes=surface.VertexBytes+details.VertexBytes+glints.VertexBytes;LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;BuildCount++;
     }

@@ -698,7 +698,7 @@ public partial class Foundation : Node2D
         };
         ground.AddChild(tilemap);
         if(r.Rooms.Count==0 && r.Tiles.Contains(Terrain.Water) && OverworldWaterRenderer.UseLivingReach)
-            ground.AddChild(new OverworldWaterRenderer {Region=r,ReducedMotion=()=>Ui.Preferences.ReducedMotion});
+            ground.AddChild(new OverworldWaterRenderer {Region=r,ReducedMotion=()=>Ui.Preferences.ReducedMotion,ZIndex=-1});
         foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
         wallRows.Clear();
         wallRows.AddRange(TerrainWallRow.Create(r));
