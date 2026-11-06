@@ -6,8 +6,10 @@ namespace Mosslight;
 public partial class OverworldGroundRenderer : Node2D
 {
     public RegionState Region {get;init;}=null!;
+    static readonly bool visualVerification=OS.GetCmdlineUserArgs().Contains("--visual-check");
+    static readonly bool previousCommand=OS.GetCmdlineUserArgs().Contains("--part1-ground");
     public static bool VerificationPrevious {get;set;}
-    public static bool Enabled=>OverworldWaterRenderer.UseLivingReach && !(OS.GetCmdlineUserArgs().Contains("--visual-check") && (VerificationPrevious || OS.GetCmdlineUserArgs().Contains("--part1-ground")));
+    public static bool Enabled=>OverworldWaterRenderer.UseLivingReach && !(visualVerification && (VerificationPrevious || previousCommand));
     public static long LastLookupBytes {get;private set;}
     public static long LastVertexBytes {get;private set;}
     public static double LastBuildMilliseconds {get;private set;}
