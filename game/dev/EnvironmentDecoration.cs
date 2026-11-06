@@ -42,7 +42,7 @@ public partial class EnvironmentDecoration : Node2D
                 {
                     Position=GodotConvert.GroundToScreen((x+.5f)*24,(y+.5f)*24),
                     ReachModule=tile==Terrain.Grass && r.Rooms.Count==0 && OverworldPropAtlas.Enabled
-                        ?OverworldPropArt.Module(key=="tree1"?ReachProp.Tree:key=="rock1"?ReachProp.Rock:ReachProp.Shrub,h):-1,
+                        ?OverworldPropArt.Module(key=="tree1"?ReachProp.Tree:key=="rock1"?ReachProp.Rock:ReachProp.Shrub,h>>8):-1,
                     Texture=tile==Terrain.Grass && !(r.Rooms.Count==0 && OverworldPropAtlas.Enabled)?texture:null, Rubble=tile==Terrain.Floor,
                     Pivot=key=="tree1"?new Vector2(36,100):key=="rock1"?new Vector2(12,16):new Vector2(17,23),
                     TextureFilter=TextureFilterEnum.Nearest

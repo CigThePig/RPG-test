@@ -27,6 +27,8 @@ public static class OverworldPropChecks
             var first=EnvironmentDecoration.Create(r,art);var second=EnvironmentDecoration.Create(r,art);
             check(first.Count<=EnvironmentDecoration.Maximum && first.Select(d=>(d.Position,d.ReachModule)).SequenceEqual(second.Select(d=>(d.Position,d.ReachModule))),"bounded stable Reach placement "+seed);
             check(first.All(d=>d.ReachModule is >=0 and <44),"overworld decorations use fixed modules "+seed);
+            check(first.Where(d=>d.ReachModule/4==(int)ReachProp.Tree).Select(d=>d.ReachModule%4).Distinct().Count()>1,
+                "decorative trees use independent crown variants "+seed);
             foreach(var d in first.Concat(second))d.Free();
             check(before==JsonSerializer.Serialize(r,Content.Json),"Reach props preserve saved geography "+seed);
         }
