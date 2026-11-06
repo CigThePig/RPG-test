@@ -46,6 +46,8 @@ jobs:
         run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --widescreen-only
       - name: Living Reach production water references and resource rebuild checks
         run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --overworld-only
+      - name: Living Reach ground transitions and Part 2 references
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --overworld-only --part2-reference
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

@@ -697,8 +697,11 @@ public partial class Foundation : Node2D
             Art = art
         };
         ground.AddChild(tilemap);
+        OverworldGroundRenderer? groundMaterial=null;
+        if(r.Rooms.Count==0 && OverworldGroundRenderer.Enabled)
+        {groundMaterial=new OverworldGroundRenderer {Region=r,ZIndex=-1};ground.AddChild(groundMaterial);}
         if(r.Rooms.Count==0 && r.Tiles.Contains(Terrain.Water) && OverworldWaterRenderer.UseLivingReach)
-            ground.AddChild(new OverworldWaterRenderer {Region=r,ReducedMotion=()=>Ui.Preferences.ReducedMotion,ZIndex=-1});
+            ground.AddChild(new OverworldWaterRenderer {Region=r,Ground=groundMaterial,ReducedMotion=()=>Ui.Preferences.ReducedMotion,ZIndex=-1});
         foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
         wallRows.Clear();
         wallRows.AddRange(TerrainWallRow.Create(r));
@@ -866,7 +869,7 @@ public partial class TerrainView : Node2D
                 var tile = Region.Tiles[y * Region.Width + x];
                 // The Living Reach surface is opaque over the complete water footprint.
                 // Avoid a redundant water fill underneath its palette shader.
-                if(tile==Terrain.Water && Region.Rooms.Count==0 && OverworldWaterRenderer.UseLivingReach)continue;
+                if(Region.Rooms.Count==0 && ((tile==Terrain.Water && OverworldWaterRenderer.UseLivingReach) || (OverworldGroundRenderer.Enabled && tile is Terrain.Grass or Terrain.Earth)))continue;
                 var color = tile switch
                 {
                     Terrain.Water => new Color(.19f, .33f, .35f),
@@ -903,7 +906,7 @@ public partial class TerrainView : Node2D
 
         )
         {
-            if (terrain==Terrain.Water && Region.Rooms.Count==0 && OverworldWaterRenderer.UseLivingReach) continue;
+            if(Region.Rooms.Count==0 && ((terrain==Terrain.Water && OverworldWaterRenderer.UseLivingReach) || (OverworldGroundRenderer.Enabled && terrain is Terrain.Grass or Terrain.Earth)))continue;
             if (!Art.TryGetValue(key, out var texture))
                 continue;
             for (int y = 0; y < Region.Height; y++)

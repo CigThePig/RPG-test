@@ -5,7 +5,8 @@ namespace Mosslight;
 /// No simulation state, Random, native resources or process-dependent hashes.</summary>
 public static class OverworldWaterArt
 {
-    public const int Revision = 1;
+    public const int Revision = 2;
+    public static bool Part1=>!OverworldGroundRenderer.Enabled;
     public readonly record struct Mark(Rect2 Rect, int Shade);
     public static readonly Color[] Ramp = {
         new("465e43"),new("4c5140"),new("596b50"),new("527e75"),new("487571"),
@@ -15,10 +16,11 @@ public static class OverworldWaterArt
     public static bool Water(RegionState r,int x,int y) => x>=0 && y>=0 && x<r.Width && y<r.Height && r.Tiles[y*r.Width+x]==Terrain.Water;
     public static int Mask(RegionState r,int x,int y)
     {int mask=0;for(int i=0;i<8;i++)if(Water(r,x+Neighbours[i].X,y+Neighbours[i].Y))mask|=1<<i;return mask;}
-    public static uint Hash(int seed,int x,int y,int slot=0) => EnvironmentStyle.Hash(seed,x,y,7300+Revision*31+slot);
+    public static uint Hash(int seed,int x,int y,int slot=0) => EnvironmentStyle.Hash(seed,x,y,7300+(Part1?1:Revision)*31+slot);
     public static float Variation(int seed,float x,float y)
     {
-        int ix=(int)MathF.Floor(x/7),iy=(int)MathF.Floor(y/10);float fx=x/7-ix,fy=y/10-iy;
+        float scaleX=Part1?7:30,scaleY=Part1?10:42;
+        int ix=(int)MathF.Floor(x/scaleX),iy=(int)MathF.Floor(y/scaleY);float fx=x/scaleX-ix,fy=y/scaleY-iy;
         float H(int a,int b)=>(Hash(seed,a,b)&255)/255f;
         return Mathf.Lerp(Mathf.Lerp(H(ix,iy),H(ix+1,iy),fx),Mathf.Lerp(H(ix,iy+1),H(ix+1,iy+1),fx),fy);
     }
@@ -31,14 +33,23 @@ public static class OverworldWaterArt
             float dx=Math.Max(Math.Max(x*24-px,px-(x+1)*24),0),dy=Math.Max(Math.Max(y*24-py,py-(y+1)*24),0);
             distance=Math.Min(distance,MathF.Sqrt(dx*dx+dy*dy));
         }
-        // Round convex water corners within twelve ground pixels. Cardinal connections stay open.
+        // Round convex water corners within sixteen ground pixels. Cardinal connections stay open.
+        float radius=Part1?12:16;
         for(int cy=0;cy<2;cy++)for(int cx=0;cx<2;cx++)
             if(!Water(r,tx+(cx==0?-1:1),ty) && !Water(r,tx,ty+(cy==0?-1:1)))
             {
                 float dx=cx==0?px-tx*24:(tx+1)*24-px,dy=cy==0?py-ty*24:(ty+1)*24-py;
-                if(dx<12 && dy<12)distance=Math.Min(distance,12-MathF.Sqrt((12-dx)*(12-dx)+(12-dy)*(12-dy)));
+                if(dx<radius && dy<radius)distance=Math.Min(distance,radius-MathF.Sqrt((radius-dx)*(radius-dx)+(radius-dy)*(radius-dy)));
             }
         return distance;
+    }
+    public static float BankInset(RegionState r,int tx,int ty,float px,float py)
+    {
+        if(Part1)return .2f+Variation(r.Seed,px,py)*2.6f;
+        float n=OverworldGroundArt.Noise(r.Seed,px/37f,py/49f,8);
+        float inset=.4f+6.6f*Math.Clamp((n-.28f)*1.9f,0,1);
+        bool tiny=(!Water(r,tx-1,ty)||!Water(r,tx+1,ty))&&(!Water(r,tx,ty-1)||!Water(r,tx,ty+1));
+        return Math.Min(inset,tiny?2.8f:7f);
     }
     // Contract: authoritative category -> stable material variant -> neighbour transition
     // -> surface detail -> optional animation. Part 2 may extend dry-side material recipes.
@@ -46,11 +57,11 @@ public static class OverworldWaterArt
     {
         float px=tx*24+sx+.5f,py=ty*24+sy*2+1;
         float d=Distance(r,tx,ty,px,py),v=Variation(r.Seed,px,py);
-        float edge=d-(.2f+v*2.6f);
+        float inset=BankInset(r,tx,ty,px,py),edge=d-inset;
         if(edge<.1f)return v<.42f?0:1;
         if(edge<1.3f)return v>.7f?2:1;
         if(edge<2.6f)return 2;
-        float depth=d+(v-.5f)*10;
+        float depth=d+(v-.5f)*10-(Part1?0:inset);
         int shade=depth<6?3:depth<12?4:depth<21?5:depth<33?6:7;
         uint h=Hash(r.Seed,(int)px/5,(int)py/6,1);
         // Sparse sediment/stone clusters and broken horizontal reflections; no per-pixel noise.

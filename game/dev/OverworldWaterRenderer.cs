@@ -6,6 +6,7 @@ namespace Mosslight;
 public partial class OverworldWaterRenderer : Node2D
 {
     public RegionState Region { get; init; } = null!;
+    public OverworldGroundRenderer? Ground {get;init;}
     public Func<bool> ReducedMotion { get; init; } = () => true;
     static readonly bool visualVerification=OS.GetCmdlineUserArgs().Contains("--visual-check");
     static readonly bool legacyCommand=OS.GetCmdlineUserArgs().Contains("--baseline-water");
@@ -40,18 +41,19 @@ public partial class OverworldWaterRenderer : Node2D
         // Three canvas pixels per distance sample. GPU interpolates the scalar field,
         // then quantizes material at integer canvas pixels: crisp art, not a blurred image.
         int width=Region.Width*8+1,height=Region.Height*4+1;
-        using(var image=Image.CreateEmpty(width,height,false,Image.Format.Rg8))
+        using(var image=Image.CreateEmpty(width,height,false,OverworldWaterArt.Part1?Image.Format.Rg8:Image.Format.Rgb8))
         {
             for(int y=0;y<height;y++)for(int x=0;x<width;x++)
             {
                 int tx=x/8,ty=y/4;float px=x*3,py=y*6;
                 float d=OverworldWaterArt.Water(Region,tx,ty)?OverworldWaterArt.Distance(Region,tx,ty,px,py):-2;
                 float v=OverworldWaterArt.Variation(Region.Seed,px,py);
-                image.SetPixel(x,y,new Color(Math.Clamp((d+8)/68,0,1),v,0));
+                float inset=OverworldWaterArt.BankInset(Region,tx,ty,px,py);
+                image.SetPixel(x,y,new Color(Math.Clamp((d+8)/68,0,1),v,inset/8));
             }
             field=ImageTexture.CreateFromImage(image);
         }
-        LastLookupBytes=(long)width*height*2;
+        LastLookupBytes=(long)width*height*(OverworldWaterArt.Part1?2:3);
         // Exactly the authoritative water footprint. Adjacent water rows share one quad.
         for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;)
         {
@@ -62,6 +64,8 @@ public partial class OverworldWaterRenderer : Node2D
         waterShader ??= GD.Load<Shader>("res://game/art/overworld_water.gdshader");
         surfaceMaterial=new ShaderMaterial {Shader=waterShader};surfaceMaterial.SetShaderParameter("depth_map",field);surfaceMaterial.SetShaderParameter("palette",OverworldWaterArt.Ramp);
         surfaceMaterial.SetShaderParameter("lookup_size",new Vector2(width,height));surfaceMaterial.SetShaderParameter("cosmetic_seed",(float)(OverworldWaterArt.Hash(Region.Seed,0,0)%65536));
+        surfaceMaterial.SetShaderParameter("part1",OverworldWaterArt.Part1);
+        Ground?.Configure(surfaceMaterial);
         Material=surfaceMaterial;
         for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
         {

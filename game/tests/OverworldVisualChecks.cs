@@ -36,8 +36,12 @@ public static class OverworldVisualChecks
         Directory.CreateDirectory("docs/overworld-screenshots");Directory.CreateDirectory("build/overworld");
         var w=app.World;string original=Persistence.Capture(w,app.Narrative);var prefs=app.Ui.Preferences.Copy();
         double scale=Engine.TimeScale;var window=app.GetWindow();var size=window.Size;
+        bool part2=OS.GetCmdlineUserArgs().Contains("--part2-reference");
+        bool previousGround=OverworldGroundRenderer.VerificationPrevious;
         string version=OS.GetCmdlineUserArgs().Contains("--baseline-water")?"baseline":OS.GetCmdlineUserArgs().Contains("--water-static-fallback")?"fallback":"final";
+        if(part2)version=OverworldGroundRenderer.Enabled?"part2-after":"part2-before";
         bool compare=OS.GetCmdlineUserArgs().Contains("--compare-water");
+        bool compareGround=OS.GetCmdlineUserArgs().Contains("--compare-ground");
         bool originalLegacy=OverworldWaterRenderer.VerificationLegacy;
         var observations=new List<object>();
         try
@@ -98,20 +102,22 @@ public static class OverworldVisualChecks
             await Capture(app,version+"-reduced-motion");app.Ui.ApplyPreferences(prefs,false);
             window.Size=new Vector2I(1280,800);
             string frozen=Persistence.Capture(w,app.Narrative);
-            for(int iteration=0;iteration<(compare?12:6);iteration++)
+            for(int iteration=0;iteration<((compare||compareGround)?12:6);iteration++)
             {
                 OverworldWaterRenderer.VerificationLegacy=compare && iteration%2==0;
+                OverworldGroundRenderer.VerificationPrevious=compareGround && iteration%2==0;
                 var timer=Stopwatch.StartNew();app.RebuildViews();await Frames(app);double ready=timer.Elapsed.TotalMilliseconds;
-                long builds=OverworldWaterRenderer.BuildCount;
+                long builds=OverworldWaterRenderer.BuildCount,groundBuilds=OverworldGroundRenderer.BuildCount;
                 var intervals=new List<double>();timer.Restart();double last=0;
                 for(int f=0;f<120;f++){await Frames(app,1);double now=timer.Elapsed.TotalMilliseconds;intervals.Add(now-last);last=now;}
+                if(OverworldGroundRenderer.BuildCount!=groundBuilds)throw new InvalidOperationException("Ground rebuilt during static interval");
                 if(OverworldWaterRenderer.BuildCount!=builds)throw new InvalidOperationException("Water rebuilt during static interval");
                 if(Persistence.Capture(w,app.Narrative)!=frozen)throw new InvalidOperationException("Water renderer changed authoritative state");
-                intervals.Sort();observations.Add(new {iteration,waterStyle=OverworldWaterRenderer.UseLivingReach?"living-reach":"baseline",initialEnvironmentBuildMs=Foundation.FirstEnvironmentBuildMilliseconds,initialTerrainDrawPreparationMs=TerrainView.FirstBuildMilliseconds,readyMs=ready,terrainBuildMs=TerrainView.LastBuildMilliseconds,terrainVertexBytes=TerrainView.LastVertexBytes,waterBuildMs=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastBuildMilliseconds:0,waterVertexBytes=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastVertexBytes:0,waterLookupBytes=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastLookupBytes:0,waterBuildCount=OverworldWaterRenderer.BuildCount,
+                intervals.Sort();observations.Add(new {iteration,groundStyle=OverworldGroundRenderer.Enabled?"part2":"part1",groundLookupBytes=OverworldGroundRenderer.Enabled?OverworldGroundRenderer.LastLookupBytes:0,groundVertexBytes=OverworldGroundRenderer.Enabled?OverworldGroundRenderer.LastVertexBytes:0,groundBuildMs=OverworldGroundRenderer.Enabled?OverworldGroundRenderer.LastBuildMilliseconds:0,waterStyle=OverworldWaterRenderer.UseLivingReach?"living-reach":"baseline",initialEnvironmentBuildMs=Foundation.FirstEnvironmentBuildMilliseconds,initialTerrainDrawPreparationMs=TerrainView.FirstBuildMilliseconds,readyMs=ready,terrainBuildMs=TerrainView.LastBuildMilliseconds,terrainVertexBytes=TerrainView.LastVertexBytes,waterBuildMs=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastBuildMilliseconds:0,waterVertexBytes=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastVertexBytes:0,waterLookupBytes=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastLookupBytes:0,waterBuildCount=OverworldWaterRenderer.BuildCount,
                     p50ms=intervals[60],p95ms=intervals[114],managedBytes=GC.GetTotalMemory(true),godotStaticBytes=OS.GetStaticMemoryUsage(),
                     textureBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TextureMemUsed),bufferBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.BufferMemUsed),renderer=RenderingServer.GetVideoAdapterName()});
             }
-            OverworldWaterRenderer.VerificationLegacy=false;
+            OverworldWaterRenderer.VerificationLegacy=false;OverworldGroundRenderer.VerificationPrevious=previousGround;
             foreach(int seed in new[]{1,42,1337})
             {
                 r=Regions.Overworld(seed);r.Id="living-reach-seed";w.RegionsById[r.Id]=r;p.Region=r.Id;
@@ -125,9 +131,19 @@ public static class OverworldVisualChecks
             // Explicit water at the world boundary, including clipped bank vegetation.
             for(int y=0;y<=18;y++)for(int x=56;x<64;x++)r.Tiles[y*64+x]=Terrain.Water;
             p.X=53.5f*24;p.Y=20.5f*24;app.RebuildViews();await Capture(app,version+"-region-boundary");
-            File.WriteAllText("build/overworld/"+(compare?"paired":version)+".json",JsonSerializer.Serialize(observations,Content.Json));
+            if(part2)
+            {
+                r=Fixture();r.Id="living-reach-ground-transitions";Array.Fill(r.Tiles,Terrain.Grass);r.Features.Clear();
+                for(int y=22;y<40;y++)for(int x=17;x<48;x++)
+                {
+                    if(y>=34 || (x>=22&&x<=24) || (x>=35&&y<29) || Math.Abs(x+y-58)<2)r.Tiles[y*64+x]=Terrain.Earth;
+                    if(x>=40&&y>=29&&y<=32)r.Tiles[y*64+x]=Terrain.Water;
+                }
+                w.RegionsById[r.Id]=r;p.Region=r.Id;p.X=32*24;p.Y=32*24;app.RebuildViews();await Capture(app,version+"-ground-transitions");
+            }
+            File.WriteAllText("build/overworld/"+(compareGround?"part2-paired":compare?"paired":version)+".json",JsonSerializer.Serialize(observations,Content.Json));
             GD.Print("OVERWORLD VISUAL CHECKS PASSED: production references, six sizes, seeds, topology and rebuilds");
         }
-        finally {OverworldWaterRenderer.VerificationLegacy=originalLegacy;Engine.TimeScale=scale;window.Size=size;Persistence.Restore(w,app.Narrative,original);app.Ui.ApplyPreferences(prefs,false);app.RebuildViews();app.ResumeGame();}
+        finally {OverworldGroundRenderer.VerificationPrevious=previousGround;OverworldWaterRenderer.VerificationLegacy=originalLegacy;Engine.TimeScale=scale;window.Size=size;Persistence.Restore(w,app.Narrative,original);app.Ui.ApplyPreferences(prefs,false);app.RebuildViews();app.ResumeGame();}
     }
 }

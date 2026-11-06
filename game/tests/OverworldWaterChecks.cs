@@ -35,7 +35,7 @@ public static class OverworldWaterChecks
             string Simulate(bool art)
             {
                 Persistence.Restore(w,app.Narrative,snapshot);
-                if(art)_=OverworldWaterArt.Build(w.RegionsById[w.Player.Region]);
+                if(art){var region=w.RegionsById[w.Player.Region];_=OverworldWaterArt.Build(region);for(int y=0;y<region.Height;y++)for(int x=0;x<region.Width;x++)_=OverworldGroundArt.Sample(region,x*24+12,y*24+12);}
                 for(int tick=0;tick<180;tick++){w.Move(w.Player,new System.Numerics.Vector2(.3f,.1f));w.Step(1f/60);}
                 return Persistence.Capture(w,app.Narrative);
             }
