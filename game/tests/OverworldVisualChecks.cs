@@ -81,7 +81,7 @@ public static class OverworldVisualChecks
                 var intervals=new List<double>();timer.Restart();double last=0;
                 for(int f=0;f<120;f++){await Frames(app,1);double now=timer.Elapsed.TotalMilliseconds;intervals.Add(now-last);last=now;}
                 if(OverworldWaterRenderer.BuildCount!=builds)throw new InvalidOperationException("Water rebuilt during static interval");
-                intervals.Sort();observations.Add(new {iteration,readyMs=ready,terrainBuildMs=TerrainView.LastBuildMilliseconds,terrainVertexBytes=TerrainView.LastVertexBytes,waterBuildMs=OverworldWaterRenderer.LastBuildMilliseconds,waterVertexBytes=OverworldWaterRenderer.LastVertexBytes,waterLookupBytes=OverworldWaterRenderer.LastLookupBytes,waterBuildCount=OverworldWaterRenderer.BuildCount,
+                intervals.Sort();observations.Add(new {iteration,initialEnvironmentBuildMs=Foundation.FirstEnvironmentBuildMilliseconds,initialTerrainDrawPreparationMs=TerrainView.FirstBuildMilliseconds,readyMs=ready,terrainBuildMs=TerrainView.LastBuildMilliseconds,terrainVertexBytes=TerrainView.LastVertexBytes,waterBuildMs=OverworldWaterRenderer.LastBuildMilliseconds,waterVertexBytes=OverworldWaterRenderer.LastVertexBytes,waterLookupBytes=OverworldWaterRenderer.LastLookupBytes,waterBuildCount=OverworldWaterRenderer.BuildCount,
                     p50ms=intervals[60],p95ms=intervals[114],managedBytes=GC.GetTotalMemory(true),godotStaticBytes=OS.GetStaticMemoryUsage(),
                     textureBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TextureMemUsed),bufferBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.BufferMemUsed),renderer=RenderingServer.GetVideoAdapterName()});
             }

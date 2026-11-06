@@ -679,8 +679,11 @@ public partial class Foundation : Node2D
         camera.Zoom = camera.Zoom.X > 2 ? new Vector2(1.25f, 1.25f) : camera.Zoom + new Vector2(.5f, .5f);
     }
 
+    public static double FirstEnvironmentBuildMilliseconds { get; private set; }
+    public static double LastEnvironmentBuildMilliseconds { get; private set; }
     void BuildTerrain()
     {
+        var environmentTimer=System.Diagnostics.Stopwatch.StartNew();
         foreach (var node in ground.GetChildren())
         {
             ground.RemoveChild(node);
@@ -694,7 +697,7 @@ public partial class Foundation : Node2D
             Art = art
         };
         ground.AddChild(tilemap);
-        if(r.Rooms.Count==0 && OverworldWaterRenderer.UseLivingReach)
+        if(r.Rooms.Count==0 && r.Tiles.Contains(Terrain.Water) && OverworldWaterRenderer.UseLivingReach)
             ground.AddChild(new OverworldWaterRenderer {Region=r,ReducedMotion=()=>Ui.Preferences.ReducedMotion});
         foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
         wallRows.Clear();
@@ -719,6 +722,8 @@ public partial class Foundation : Node2D
             actors.AddChild(feature); features.Add(feature);
         }
         camera.ResetSmoothing();
+        LastEnvironmentBuildMilliseconds=environmentTimer.Elapsed.TotalMilliseconds;
+        if(FirstEnvironmentBuildMilliseconds==0)FirstEnvironmentBuildMilliseconds=LastEnvironmentBuildMilliseconds;
     }
 
     public override void _Draw()
@@ -839,6 +844,7 @@ public partial class Foundation : Node2D
 public partial class TerrainView : Node2D
 {
     public static double LastBuildMilliseconds { get; private set; }
+    public static double FirstBuildMilliseconds { get; private set; }
     public static long BuildCount { get; private set; }
     public static long LastVertexBytes { get; private set; }
     public override void _ExitTree() { foreach(var batch in batches)batch.Dispose(); }
@@ -930,5 +936,6 @@ public partial class TerrainView : Node2D
         batch.Draw(this);
         LastVertexBytes=batches.Sum(b=>b.VertexBytes);
         LastBuildMilliseconds = buildTimer.Elapsed.TotalMilliseconds;
+        if(BuildCount==1)FirstBuildMilliseconds=LastBuildMilliseconds;
     }
 }
