@@ -12,7 +12,8 @@ public static class OverworldPropArt
     public static readonly int Modules=Enum.GetValues<ReachProp>().Length*Variants;
     public static readonly Vector2 Pivot=new(36,100);
     // 1-6 broadleaf, 7-10 conifer, 11 pale leaf tip, 12-16 bark, 17-18 birch bark,
-    // 19-24 stone, 25-27 crystal, 28-30 gold, 31-34 blossom, 35-36 shadow, 37 contour.
+    // 19-24 stone, 25-27 crystal, 28-30 gold, 31-34 blossom, 35-36 shadow, 37 contour,
+    // 38-39 the water surface's foam and ripple, 40 stems seen through the water.
     public static readonly Color[] Palette={Colors.Transparent,
         new("1d4034"),new("2a5a3a"),new("3a7a40"),new("55994a"),new("7ab852"),new("a6d463"),
         new("173a3a"),new("1f5045"),new("2d6b4c"),new("448653"),new("c8e07a"),
@@ -22,8 +23,9 @@ public static class OverworldPropArt
         new("2e8f96"),new("5cc7c0"),new("c4f3e2"),
         new("b9822f"),new("f0c659"),new("fff0b0"),
         new("f3ecd2"),new("d98bb6"),new("c9483e"),new("7d7fd6"),
-        new Color(.04f,.08f,.16f,.30f),new Color(.04f,.08f,.16f,.15f),new("172428")};
-    const byte Ink=37,Shadow=35,Penumbra=36;
+        new Color(.04f,.08f,.16f,.30f),new Color(.04f,.08f,.16f,.15f),new("172428"),
+        new("c9eedd"),new("86d2c6"),new Color(.07f,.20f,.33f,.55f)};
+    const byte Ink=37,Shadow=35,Penumbra=36,Foam=38,Ripple=39,Submerged=40;
     static readonly byte[] Leaf={1,2,2,3,3,4,5,6},Needle={7,7,8,8,9,9,10,4},Airy={2,3,4,4,5,5,6,11},
         Stone={19,20,20,21,21,22,23,24},Bark={12,13,14,14,15,16};
     public static int Module(ReachProp asset,uint seed)=>(int)asset*Variants+(int)(seed%Variants);
@@ -56,6 +58,7 @@ public static class OverworldPropArt
         }
         // Flat pads and loose blades read better without a hard edge.
         p.Contour(asset==ReachProp.WaterFlora&&v<2||asset==ReachProp.GroundFlora&&v==0);
+        if(asset==ReachProp.WaterFlora&&v>=2)p.Waterline(98);
         return p.Data;
     }
     static void Tree(Pixels p,int v)
@@ -347,6 +350,27 @@ public static class OverworldPropArt
         /// <summary>A few blades over the base so props sit in the turf rather than on it.</summary>
         public void Tuft(int x,int y,int blades)
         {for(int i=0;i<blades;i++){int bx=x+i*2-blades;Set(bx,y-1,3);Set(bx,y-2,i%2==0?(byte)5:(byte)4);if(i%2==0)Set(bx+1,y-3,5);}}
+        /// <summary>Stand stems in water: below the surface row the outline goes, stems show only as a
+        /// dim tint through the water, and a broken foam ring laps round them at the surface.</summary>
+        public void Waterline(int surface)
+        {
+            var stems=new List<int>();
+            for(int x=1;x<Width-1;x++)if(At(x,surface)!=0&&At(x,surface)!=Ink)stems.Add(x);
+            if(stems.Count==0)return;
+            int left=stems.Min(),right=stems.Max();
+            Rect(1,surface+1,Width-2,Height-surface-2,0);
+            // The ink under the last row of stems would read as a hard floor: clear it.
+            for(int x=left-1;x<=right+1;x++)if(At(x,surface)==Ink && !stems.Contains(x))Set(x,surface,0);
+            foreach(int x in stems){Set(x,surface+1,Submerged);if(x%2==0)Set(x,surface+2,Submerged);}
+            // Ring: brightest on the lit upper-left, broken on the shaded side, wider below.
+            for(int x=left-3;x<=right+3;x++)
+            {
+                bool gap=(x*7+surface)%5==0;
+                if(!stems.Contains(x) && x>=left-2 && x<=right+2 && !gap)Set(x,surface,x<(left+right)/2?Foam:Ripple);
+                if(!gap && (x<left || x>right || x%3!=0))Set(x,surface+1,x<(left+right)/2?Ripple:Submerged);
+            }
+            Set(left-4,surface+1,Ripple);Set(right+4,surface+2,Ripple);
+        }
         /// <summary>One-pixel dark contour round every opaque form; shadows stay soft.</summary>
         public void Contour(bool flat)
         {

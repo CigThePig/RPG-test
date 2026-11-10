@@ -35,6 +35,10 @@ public static class OverworldPropChecks
             check(growth.SequenceEqual(OverworldFlora.Plan(r)) && growth.Count<r.Tiles.Length/6,"bounded stable Reach flora "+seed);
             check(growth.All(g=>g.Module>=(int)ReachProp.WaterFlora*4 && g.Module<OverworldPropArt.Modules),"flora uses its own fixed modules "+seed);
             check(growth.All(g=>{int x=(int)(g.Foot.X/24),y=(int)(g.Foot.Y/12);return !r.Features.ContainsKey(y*r.Width+x) && r.Tiles[y*r.Width+x] is Terrain.Grass or Terrain.Water;}),"flora keeps features and bare ground clear "+seed);
+            var reeds=growth.Where(g=>g.Module/4==(int)ReachProp.WaterFlora && !g.Flat).ToList();
+            check(reeds.Count>0 && reeds.All(g=>{int x=(int)(g.Foot.X/24),y=(int)(g.Foot.Y/12);float gx=g.Foot.X,gy=g.Foot.Y*2;
+                float edge=OverworldWaterArt.Distance(r,x,y,gx,gy)-OverworldWaterArt.BankInset(r,x,y,gx,gy);
+                return r.Tiles[y*r.Width+x]==Terrain.Water && edge is >=4.9f and <=10.1f;}),"reeds root in the visible shallows "+seed);
             check(growth.Where(g=>g.Flat).All(g=>r.Tiles[(int)(g.Foot.Y/12)*r.Width+(int)(g.Foot.X/24)]==Terrain.Water),"only lily pads lie in the ground layer "+seed);
             for(int y=0;y<r.Height;y+=5)for(int x=0;x<r.Width;x+=5)
             {

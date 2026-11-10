@@ -22,8 +22,21 @@ vec4 reach_water(vec2 p){
     vec3 here=field(p);
     float edge=here.x,v=here.y;
     if(edge<0.1)return reach_ground(p);
-    float above=field(p-vec2(0.0,3.0)).x;
-    bool lip=above<edge-1.2;
+    // The raised bank only shades water lying straight below it. Measure that vertical
+    // drop to the visible shoreline (the field already includes the irregular inset)
+    // instead of guessing from the local slope, which flipped with the inset noise and
+    // at corners: shadow went missing under banks and leaked onto side shores.
+    float drop=-1.0,previous=edge;
+    for(int k=1;k<=6;k++){
+        float sample=field(p-vec2(0.0,float(k))).x;
+        if(sample<0.1){
+            // Screen rows are two ground units; interpolate where the shoreline crossed.
+            drop=2.0*(float(k)-1.0+clamp((previous-0.1)/max(previous-sample,0.001),0.0,1.0));
+            break;
+        }
+        previous=sample;
+    }
+    bool lip=drop>=0.0&&drop<8.5+v*3.0;
     float t=reach_time;
     float depth=edge+(v-0.5)*9.0+(bayer(p)-0.5)*3.4;
     int tone=depth<5.0?3:depth<12.0?4:depth<21.0?5:depth<33.0?6:7;
@@ -41,9 +54,9 @@ vec4 reach_water(vec2 p){
     if(crest&&sh>0.90&&span>2.0&&span<5.0&&sin(t*2.1+sh*90.0)>0.25)c=palette[9];
     if(lip){
         // The bank stands above the surface: soil face, then its shadow on the water.
-        if(edge<2.4)c=palette[0];
-        else if(edge<4.6)c=palette[1];
-        else if(edge<8.5+v*3.0)c=palette[2];
+        if(drop<2.4)c=palette[0];
+        else if(drop<4.6)c=palette[1];
+        else c=palette[2];
     }else{
         // Foam laps the low shores in broken, slowly breathing segments.
         float lap=sin(t*0.9+v*18.0+p.x*0.05)*0.9;

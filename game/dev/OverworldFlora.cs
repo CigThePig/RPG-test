@@ -1,5 +1,6 @@
 using Godot;
 using PixelCreatures.Runtime;
+using V=System.Numerics.Vector2;
 namespace Mosslight;
 
 /// <summary>Small nonblocking growth chosen from coordinates alone: ferns, toadstools,
@@ -13,6 +14,9 @@ public partial class OverworldFlora : Node2D
     readonly List<(Rect2 Destination,Rect2 Source)> sprites=new();
     public static bool Enabled=>OverworldRockRenderer.Enabled;
     public static int LastCount {get;private set;}
+    /// <summary>Screen pixels between a standing character's ground point and its lowest drawn
+    /// pixel (feet and contact shadow), measured on the production player view.</summary>
+    public const int ActorFootDrop=6;
     public static List<Placement> Plan(RegionState r)
     {
         var result=new List<Placement>();
@@ -26,9 +30,12 @@ public partial class OverworldFlora : Node2D
                 bool north=!Is(x,y-1,Terrain.Water),south=!Is(x,y+1,Terrain.Water),west=!Is(x-1,y,Terrain.Water),east=!Is(x+1,y,Terrain.Water);
                 if((north||south||west||east)&&h%5==0)
                 {
-                    // Reeds root in the shallows just off whichever bank is nearest.
-                    float gx=(x+.5f)*24+(west?-4:east?4:jitter),gy=(y+.5f)*24+(north?-3:south?5:0);
-                    result.Add(new(OverworldPropArt.Module(ReachProp.WaterFlora,2+(h>>8)%2),GodotConvert.GroundToScreen(gx,gy),false));
+                    // Reeds root in the shallows just off whichever bank is nearest. The drawn
+                    // shoreline is the distance field less its irregular inset, so walk from the
+                    // bank towards open water and stop where the stems would stand a little way
+                    // out from the visible waterline, never on the strand or the bank face.
+                    if(Shallows(r,x,y,west?-1:east?1:0,north?-1:south?1:0,jitter) is V root)
+                        result.Add(new(OverworldPropArt.Module(ReachProp.WaterFlora,2+(h>>8)%2),GodotConvert.GroundToScreen(root.X,root.Y),false));
                 }
                 else if(!north&&!south&&!west&&!east&&h%11==0)
                     result.Add(new(OverworldPropArt.Module(ReachProp.WaterFlora,(h>>8)%2),GodotConvert.GroundToScreen((x+.5f)*24+jitter,(y+.5f)*24),true));
@@ -46,6 +53,20 @@ public partial class OverworldFlora : Node2D
         }
         return result;
     }
+    /// <summary>Ground point inside water cell (x,y) whose visible distance from the bank lies in a
+    /// narrow shallow band, searched from the bank side (dx,dy) inwards; null when the cell has none.</summary>
+    static V? Shallows(RegionState r,int x,int y,int dx,int dy,float jitter)
+    {
+        const float Near=5f,Far=10f;
+        float Edge(float gx,float gy)=>OverworldWaterArt.Distance(r,x,y,gx,gy)-OverworldWaterArt.BankInset(r,x,y,gx,gy);
+        float cx=(x+.5f)*24+(dx==0?jitter:0),cy=(y+.5f)*24;
+        for(float step=11;step>=-11;step-=1)
+        {
+            float gx=cx+dx*step,gy=cy+dy*step;
+            if(Edge(gx,gy) is >=Near and <=Far)return new V(gx,gy);
+        }
+        return null;
+    }
     /// <summary>Row nodes for the Y-sorted actor layer plus one flat node for the ground layer.</summary>
     public static (List<OverworldFlora> Standing,OverworldFlora? Flat) Create(RegionState r)
     {
@@ -57,7 +78,10 @@ public partial class OverworldFlora : Node2D
             if(item.Flat)node=flat??=new OverworldFlora{TextureFilter=TextureFilterEnum.Nearest};
             else
             {
-                int row=(int)MathF.Round(item.Foot.Y);
+                // Y-sorting compares node origins, but a standing character's drawn feet sit
+                // ActorFootDrop below its ground point. Sort each plant by that same visible
+                // footing so an actor whose feet are below the stems draws in front of them.
+                int row=(int)MathF.Round(item.Foot.Y)-ActorFootDrop;
                 if(!rows.TryGetValue(row,out node!))rows[row]=node=new OverworldFlora{Position=new Vector2(0,row),TextureFilter=TextureFilterEnum.Nearest};
             }
             node.sprites.Add((new Rect2(item.Foot-node.Position-OverworldPropArt.Pivot,new Vector2(OverworldPropArt.Width,OverworldPropArt.Height)),OverworldPropArt.Source(item.Module)));

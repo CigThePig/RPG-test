@@ -104,6 +104,22 @@ For quick art review, `--visual-check --mobile-ui --overworld-preview [--preview
 five production captures and the atlas to `build/preview/` in about twenty seconds and asserts
 nothing.
 
+## Review fixes: bank shadow, reed footing and flora depth
+
+- **Bank shadow on water.** The shader decided "under a raised bank" from the local slope of the
+  shoreline distance field over three pixels. The irregular bank inset changes that slope, so the
+  shadow vanished along stretches of north bank, leaked onto west/east shores, and was cut off
+  diagonally at corners (foam showed where the shadow belonged). It now measures the vertical drop
+  to the visible shoreline straight above each pixel and shades only within that band.
+- **Reeds.** Roots were fixed offsets from the cell centre, which ignored the visible
+  shoreline (distance less inset), so clumps stood on the strand or bank. Roots are now searched
+  inward from the bank to the first point 5-10 ground units out from the drawn waterline, and the
+  stems end in a broken foam ring with tinted submerged stems instead of an ink floor line.
+  `OverworldPropChecks` asserts every reed root lies in that band.
+- **Flora depth.** A standing character's drawn feet sit 6 screen pixels below its ground point,
+  but flora rows sorted at the stems' exact base, so a character standing just in front of a
+  plant drew behind it. Standing flora rows now sort `OverworldFlora.ActorFootDrop` higher.
+
 ## Not verified
 
 Nothing here ran on a phone. Physical Galaxy S25 appearance, touch comfort, frame pacing and
