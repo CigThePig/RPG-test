@@ -5,9 +5,13 @@ namespace Mosslight;
 /// positive soil distance is earth, negative is grass. Never touches simulation RNG.</summary>
 public static class OverworldGroundArt
 {
-    public const int Revision=2;
-    public static readonly Color[] Ramp={new("304d3b"),new("416347"),new("486d4c"),new("507650"),new("6a8e61"),
-        new("514638"),new("735b45"),new("80634b"),new("8a6e51"),new("a08762"),new("42664a"),new("779464")};
+    public const int Revision=3;
+    // 0-5 turf shadow to blade tip, 6-10 soil, 11 damp soil, 12-14 wildflowers,
+    // 15-18 strand waterline, sand, pale sand and pebble, 19 spare.
+    public static readonly Color[] Ramp={new("2a5540"),new("376b44"),new("468045"),new("5a9648"),new("78ae50"),new("a3c95f"),
+        new("553f33"),new("6f533c"),new("8a6a47"),new("a48356"),new("c0a06d"),new("4a4436"),
+        new("f3ecd2"),new("f0c95a"),new("d98bb6"),
+        new("77705a"),new("a99f76"),new("c6bb8c"),new("ded6b4"),new("2a5540")};
     public static float Noise(int seed,float x,float y,int slot)
     {
         int ix=(int)MathF.Floor(x),iy=(int)MathF.Floor(y);float fx=x-ix,fy=y-iy;
@@ -15,6 +19,8 @@ public static class OverworldGroundArt
         float H(int a,int b)=>(EnvironmentStyle.Hash(seed,a,b,8100+Revision*17+slot)&65535)/65535f;
         return Mathf.Lerp(Mathf.Lerp(H(ix,iy),H(ix+1,iy),fx),Mathf.Lerp(H(ix,iy+1),H(ix+1,iy+1),fx),fy);
     }
+    /// <summary>Cells the ground material paints: dry land, plus the soil beneath outcrops.</summary>
+    public static bool Covered(RegionState r,int x,int y)=>Dry(r,x,y)||(OverworldRockRenderer.Enabled&&x>=0&&y>=0&&x<r.Width&&y<r.Height&&r.Tiles[y*r.Width+x]==Terrain.Rock);
     public static bool Dry(RegionState r,int x,int y)=>x>=0&&y>=0&&x<r.Width&&y<r.Height&&r.Tiles[y*r.Width+x] is Terrain.Grass or Terrain.Earth;
     public static float Proximity(RegionState r,int tx,int ty,float px,float py,Func<Terrain,bool> matches)
     {

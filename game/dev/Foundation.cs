@@ -127,6 +127,7 @@ public partial class Foundation : Node2D
     readonly List<FeatureView> features = new();
     readonly List<TerrainWallRow> wallRows = new();
     readonly List<EnvironmentDecoration> decorations = new();
+    readonly List<OverworldFlora> flora = new();
     public bool CollisionDebug { get; set; }
     public double SimulationMs { get; private set; }
     Node2D ground = null !;
@@ -700,8 +701,12 @@ public partial class Foundation : Node2D
         OverworldGroundRenderer? groundMaterial=null;
         if(r.Rooms.Count==0 && OverworldGroundRenderer.Enabled)
         {groundMaterial=new OverworldGroundRenderer {Region=r,ZIndex=-1};ground.AddChild(groundMaterial);}
+        if(r.Rooms.Count==0)ground.AddChild(new ReachAmbienceDriver {ReducedMotion=()=>Ui.Preferences.ReducedMotion});
+        // Outcrops precede water among siblings: their raised tops must stay above the surface.
+        if(r.Rooms.Count==0 && OverworldRockRenderer.Enabled && r.Tiles.Contains(Terrain.Rock))ground.AddChild(new OverworldRockRenderer {Region=r});
         if(r.Rooms.Count==0 && r.Tiles.Contains(Terrain.Water) && OverworldWaterRenderer.UseLivingReach)
             ground.AddChild(new OverworldWaterRenderer {Region=r,Ground=groundMaterial,ReducedMotion=()=>Ui.Preferences.ReducedMotion,ZIndex=-1});
+        if(r.Rooms.Count==0 && OverworldAtmosphere.Enabled)ground.AddChild(new OverworldAtmosphere {Region=r,ZIndex=30});
         foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
         wallRows.Clear();
         wallRows.AddRange(TerrainWallRow.Create(r));
@@ -710,6 +715,14 @@ public partial class Foundation : Node2D
         decorations.Clear();
         decorations.AddRange(EnvironmentDecoration.Create(r,art));
         foreach(var decoration in decorations)actors.AddChild(decoration);
+        foreach(var row in flora){actors.RemoveChild(row);row.QueueFree();}
+        flora.Clear();
+        if(r.Rooms.Count==0 && OverworldFlora.Enabled)
+        {
+            var growth=OverworldFlora.Create(r);flora.AddRange(growth.Standing);
+            foreach(var row in flora)actors.AddChild(row);
+            if(growth.Flat!=null)ground.AddChild(growth.Flat);
+        }
         foreach (var feature in features) { actors.RemoveChild(feature); feature.QueueFree(); }
         features.Clear();
         var gates = new[] { "lock", "portcullis", "seal" }.ToDictionary(k => k, k => r.GateGroups(k));
@@ -869,7 +882,7 @@ public partial class TerrainView : Node2D
                 var tile = Region.Tiles[y * Region.Width + x];
                 // The Living Reach surface is opaque over the complete water footprint.
                 // Avoid a redundant water fill underneath its palette shader.
-                if(Region.Rooms.Count==0 && ((tile==Terrain.Water && OverworldWaterRenderer.UseLivingReach) || (OverworldGroundRenderer.Enabled && tile is Terrain.Grass or Terrain.Earth)))continue;
+                if(Region.Rooms.Count==0 && ((tile==Terrain.Water && OverworldWaterRenderer.UseLivingReach) || (OverworldGroundRenderer.Enabled && tile is Terrain.Grass or Terrain.Earth) || (OverworldRockRenderer.Enabled && tile==Terrain.Rock)))continue;
                 var color = tile switch
                 {
                     Terrain.Water => new Color(.19f, .33f, .35f),
@@ -915,7 +928,9 @@ public partial class TerrainView : Node2D
                         DrawTextureRect(texture, new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), false, new Color(1, 1, 1, .32f));
         }
 
-        if(Region.Rooms.Count==0 && OverworldPropAtlas.Enabled)
+        // With outcrops enabled, OverworldRockRenderer draws every overworld rock cell.
+        bool outcrops=Region.Rooms.Count==0 && OverworldRockRenderer.Enabled;
+        if(!outcrops && Region.Rooms.Count==0 && OverworldPropAtlas.Enabled)
         {
             var rocks=new TerrainBatch {Texture=OverworldPropAtlas.Texture};batches.Add(rocks);
             for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
@@ -927,7 +942,7 @@ public partial class TerrainView : Node2D
                 }
             rocks.Draw(this);
         }
-        else if(Art.TryGetValue("rock1",out var rock))
+        else if(!outcrops && Art.TryGetValue("rock1",out var rock))
         {
             var rockBatch=new TerrainBatch { Texture=rock };batches.Add(rockBatch);
             for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)

@@ -20,7 +20,7 @@ public partial class OverworldWaterRenderer : Node2D
     readonly TerrainBatch surface=new(),glints=new(),details=new();
     ShaderMaterial? surfaceMaterial,glintMaterial;
     ImageTexture? field;
-    static Shader? waterShader,glintShader;
+    static Shader? waterShader,legacyShader,glintShader;
     bool reduced;
     public override void _Ready()
     {
@@ -61,12 +61,17 @@ public partial class OverworldWaterRenderer : Node2D
             int start=x;while(x<Region.Width && OverworldWaterArt.Water(Region,x,y))x++;
             surface.Rect(new Rect2(start*24,y*12,(x-start)*24,12),Colors.White);
         }
-        waterShader ??= GD.Load<Shader>("res://game/art/overworld_water.gdshader");
-        surfaceMaterial=new ShaderMaterial {Shader=waterShader};surfaceMaterial.SetShaderParameter("depth_map",field);surfaceMaterial.SetShaderParameter("palette",OverworldWaterArt.Ramp);
+        bool legacy=OverworldWaterArt.Part1;
+        if(legacy)legacyShader ??= GD.Load<Shader>("res://game/art/overworld_water_part1.gdshader");
+        else waterShader ??= GD.Load<Shader>("res://game/art/overworld_water.gdshader");
+        surfaceMaterial=new ShaderMaterial {Shader=legacy?legacyShader:waterShader};surfaceMaterial.SetShaderParameter("depth_map",field);
+        surfaceMaterial.SetShaderParameter("palette",legacy?OverworldWaterArt.Ramp:OverworldWaterArt.Living);
         surfaceMaterial.SetShaderParameter("lookup_size",new Vector2(width,height));surfaceMaterial.SetShaderParameter("cosmetic_seed",(float)(OverworldWaterArt.Hash(Region.Seed,0,0)%65536));
-        surfaceMaterial.SetShaderParameter("part1",OverworldWaterArt.Part1);
-        Ground?.Configure(surfaceMaterial);
+        if(!legacy){Ground?.Configure(surfaceMaterial);ReachAmbience.Register(surfaceMaterial);}
         Material=surfaceMaterial;
+        // Swell, foam and sparkle now live in the surface shader. The separate bank
+        // marks and glint batch remain only for the frozen Part 1 comparison.
+        if(!legacy){LastVertexBytes=surface.VertexBytes;LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;BuildCount++;SetProcess(false);return;}
         for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
         {
             if(!OverworldWaterArt.Water(Region,x,y))continue;
@@ -98,14 +103,15 @@ public partial class OverworldWaterRenderer : Node2D
         LastVertexBytes=surface.VertexBytes+details.VertexBytes+glints.VertexBytes;LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;BuildCount++;
     }
     // Deterministic shader-only clock for frozen visual fixtures; negative restores engine time.
-    public void SetAnimationPreviewTime(float time)=>glintMaterial?.SetShaderParameter("preview_time",time);
+    public void SetAnimationPreviewTime(float time){glintMaterial?.SetShaderParameter("preview_time",time);ReachAmbience.PreviewTime=time;}
     public override void _Process(double delta)
     {
+        if(glintMaterial==null)return;
         bool value=ReducedMotion();if(value==reduced)return;
         reduced=value;glintMaterial?.SetShaderParameter("motion",reduced?0f:1f);
     }
     public override void _Draw()=>surface.Draw(this);
-    public override void _ExitTree(){surface.Dispose();details.Dispose();glints.Dispose();surfaceMaterial?.Dispose();glintMaterial?.Dispose();field?.Dispose();}
+    public override void _ExitTree(){ReachAmbience.Unregister(surfaceMaterial);surface.Dispose();details.Dispose();glints.Dispose();surfaceMaterial?.Dispose();glintMaterial?.Dispose();field?.Dispose();}
 }
 public partial class WaterGlints : Node2D
 {

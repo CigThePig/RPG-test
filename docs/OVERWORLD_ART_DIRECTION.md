@@ -1,5 +1,12 @@
 # The Living Reach — Mosslight environmental art standard
 
+> **Part 4 supersedes the palette and several look rules below.** The Reach now uses brighter,
+> more saturated ramps, dithered water depth, foam, connected rock outcrops, new flora and a
+> light atmosphere pass; see [the Part 4 handoff](OVERWORLD_PART4_HANDOFF.md). The current ramps
+> live in `OverworldGroundArt.Ramp`, `OverworldWaterArt.Living`, `OverworldRockRenderer.Ramp` and
+> `OverworldPropArt.Palette`. The authority, determinism, layering and resource contracts in this
+> document still hold.
+
 Part 1 establishes the water/material foundation; Parts 2–4 extend it. Part 2 ground/banks and Part 3 environmental objects are now implemented; see [Part 3 design](OVERWORLD_PART3_DESIGN.md) and [handoff](OVERWORLD_PART3_HANDOFF.md). The contracts below record the original Part 1 foundation; the later implementation uses RGB8 water data plus a shared RGBA8 ground field, and Part 3 adds one fixed prop atlas. Part 4 remains open. Authority remains in `RegionState`, `World` and persistence. Art never changes saved geography or collision. Reference base: `ca60f3eda8153c0f7864703e52a1b09f5228f290`.
 
 ## Physical space and hierarchy

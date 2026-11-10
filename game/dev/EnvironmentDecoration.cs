@@ -36,7 +36,10 @@ public partial class EnvironmentDecoration : Node2D
                 // Keep all feature stands, doorway lanes and arrival clear of tall silhouettes.
                 if(r.Features.Keys.Any(f=>Math.Abs(f%r.Width-x)<3 && Math.Abs(f/r.Width-y)<3))continue;
                 if(tile==Terrain.Floor && !RubbleAllowed(r,x,y))continue;
-                string key=h%4==0?"tree1":h%4==1?"rock1":"bush1";
+                // The Reach leans on its trees; the frozen pre-Part-3 comparison keeps its old mix.
+                bool reach=tile==Terrain.Grass && r.Rooms.Count==0 && OverworldPropAtlas.Enabled;
+                uint pick=reach?(h>>3)%8:99;
+                string key=reach?(pick<3?"tree1":pick==3?"rock1":"bush1"):h%4==0?"tree1":h%4==1?"rock1":"bush1";
                 art.TryGetValue(key,out var texture);
                 result.Add(new EnvironmentDecoration
                 {

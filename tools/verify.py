@@ -11,13 +11,14 @@ if "--mobile" in sys.argv: command.append("--mobile-ui")
 if "--overworld-props-only" in sys.argv: command.append("--overworld-props-only")
 try:
     # Budget for hosted runners' software (llvmpipe) rendering: the painted UI adds
-    # draw calls per frame there, while a genuine hang still fails well inside the job limit.
-    result = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=360)
+    # draw calls per frame there and the Living Reach shades every terrain pixel, while a
+    # genuine hang still fails well inside the job limit.
+    result = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=480)
     text, returncode = result.stdout + result.stderr, result.returncode
 except subprocess.TimeoutExpired as timeout:
     # Keep the partial engine output: a hang is exactly when the log matters most.
     def decode(stream): return stream.decode(errors="replace") if isinstance(stream, bytes) else stream or ""
-    text, returncode = decode(timeout.stdout) + decode(timeout.stderr) + "\nVERIFY TIMEOUT after 360 s\n", 1
+    text, returncode = decode(timeout.stdout) + decode(timeout.stderr) + "\nVERIFY TIMEOUT after 480 s\n", 1
 (root / "build").mkdir(exist_ok=True)
 (root / "build" / ("verification-overworld-props.log" if "--overworld-props-only" in sys.argv else "verification-mobile.log" if "--mobile" in sys.argv else "verification-visual.log" if visual else "verification-integration.log")).write_text(text)
 print(text)

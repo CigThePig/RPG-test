@@ -34,22 +34,23 @@ public partial class OverworldGroundRenderer : Node2D
         }
         for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;)
         {
-            if(!OverworldGroundArt.Dry(Region,x,y)){x++;continue;}
-            int start=x;while(x<Region.Width&&OverworldGroundArt.Dry(Region,x,y))x++;
+            if(!OverworldGroundArt.Covered(Region,x,y)){x++;continue;}
+            int start=x;while(x<Region.Width&&OverworldGroundArt.Covered(Region,x,y))x++;
             batch.Rect(new Rect2(start*24,y*12,(x-start)*24,12),Colors.White);
         }
         shader??=GD.Load<Shader>("res://game/art/overworld_ground.gdshader");
-        material=new ShaderMaterial{Shader=shader};Configure(material);
+        material=new ShaderMaterial{Shader=shader};Configure(material);ReachAmbience.Register(material);
         Material=material;LastLookupBytes=(long)width*height*4;LastVertexBytes=batch.VertexBytes;
         LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;BuildCount++;
     }
     public void Configure(ShaderMaterial target)
     {
+        OverworldAtmosphere.Configure(target,Region);
         target.SetShaderParameter("ground_map",lookup!);
         target.SetShaderParameter("ground_lookup_size",new Vector2(Region.Width*8+1,Region.Height*4+1));
         target.SetShaderParameter("ground_palette",OverworldGroundArt.Ramp);
         target.SetShaderParameter("ground_seed",(int)(OverworldWaterArt.Hash(Region.Seed,0,0,OverworldGroundArt.Revision)%4096));
     }
     public override void _Draw()=>batch.Draw(this);
-    public override void _ExitTree(){batch.Dispose();material?.Dispose();lookup?.Dispose();}
+    public override void _ExitTree(){ReachAmbience.Unregister(material);batch.Dispose();material?.Dispose();lookup?.Dispose();}
 }

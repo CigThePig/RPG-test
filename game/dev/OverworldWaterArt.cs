@@ -11,6 +11,11 @@ public static class OverworldWaterArt
     public static readonly Color[] Ramp = {
         new("465e43"),new("4c5140"),new("596b50"),new("527e75"),new("487571"),
         new("3e686b"),new("325b65"),new("294f60"),new("2d5361"),new("658d80"),new("45695b"),new("244b59") };
+    // Living Reach surface: 0-2 bank face, wet foot and its shadow on the water,
+    // 3-7 shallow to deep, 8 spare, 9 sparkle, 10 foam, 11 ripple.
+    public static readonly Color[] Living = {
+        new("5a4636"),new("33343a"),new("1d4468"),new("5fb7b0"),new("439fae"),
+        new("3184a2"),new("286b91"),new("21557e"),new("3184a2"),new("eefbe9"),new("c9eedd"),new("86d2c6") };
     // Bits clockwise from north, including diagonals. Outside the region is dry bank.
     public static readonly (int X,int Y)[] Neighbours = {(0,-1),(1,-1),(1,0),(1,1),(0,1),(-1,1),(-1,0),(-1,-1)};
     public static bool Water(RegionState r,int x,int y) => x>=0 && y>=0 && x<r.Width && y<r.Height && r.Tiles[y*r.Width+x]==Terrain.Water;
