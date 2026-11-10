@@ -21,7 +21,6 @@ public static class OverworldPropVisualChecks
         Directory.CreateDirectory("docs/overworld-screenshots");Directory.CreateDirectory("build/overworld");
         var w=app.World;string snapshot=Persistence.Capture(w,app.Narrative);double scale=Engine.TimeScale;
         var size=app.GetWindow().Size;bool previous=OverworldPropAtlas.VerificationPrevious;var prefs=app.Ui.Preferences.Copy();
-        var observations=new List<object>();var comparisons=new List<object>();
         try
         {
             Engine.TimeScale=0;app.ResumeGame();w.Projectiles.Clear();
@@ -30,18 +29,8 @@ public static class OverworldPropVisualChecks
             var fixture=OverworldVisualChecks.Fixture();fixture.Id="reach-prop-reference";
             w.RegionsById[fixture.Id]=fixture;p.Region=fixture.Id;p.X=32.5f*24;p.Y=34.5f*24;
             app.GetWindow().Size=new Vector2I(1280,800);
-            foreach(bool old in new[]{true,false})
-            {
-                OverworldPropAtlas.VerificationPrevious=old;app.RebuildViews();
-                // The committed Part 3 captures are the "before"; the frozen pre-Part-3 props are only timed.
-                using var reference=await Capture(app,old?null:"after-reference");
-                var intervals=new List<double>();var timer=System.Diagnostics.Stopwatch.StartNew();double last=0;
-                for(int frame=0;frame<120;frame++){await Frames(app,1);double now=timer.Elapsed.TotalMilliseconds;intervals.Add(now-last);last=now;}
-                intervals.Sort();comparisons.Add(new {style=old?"pre-part3-props":"part4",p50ms=intervals[60],p95ms=intervals[114],
-                    environmentBuildMs=Foundation.LastEnvironmentBuildMilliseconds,terrainBuildMs=TerrainView.LastBuildMilliseconds,
-                    atlasBytes=OverworldPropAtlas.PixelBytes,atlasBuildMs=OverworldPropAtlas.BuildMilliseconds,
-                    textureBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TextureMemUsed),bufferBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.BufferMemUsed)});
-            }
+            OverworldPropAtlas.VerificationPrevious=false;app.RebuildViews();
+            using(var reference=await Capture(app,"after-reference")){}
             foreach(var resolution in WidescreenChecks.Sizes)
             {app.GetWindow().Size=resolution;using var capture=await Capture(app,"after-"+resolution.X+"x"+resolution.Y);}
             app.GetWindow().Size=new Vector2I(1280,800);
@@ -98,18 +87,11 @@ public static class OverworldPropVisualChecks
                 p.Region=dungeon.Id;p.X=dungeon.Center(dungeon.Entrance).X;p.Y=dungeon.Center(dungeon.Entrance).Y;app.RebuildViews();await Frames(app,12);
                 p.Region=fixture.Id;p.X=32.5f*24;p.Y=34.5f*24;
                 app.RebuildViews();await Frames(app,24);
-                observations.Add(new {iteration,environmentBuildMs=Foundation.LastEnvironmentBuildMilliseconds,atlasBytes=OverworldPropAtlas.PixelBytes,atlasBuildMs=OverworldPropAtlas.BuildMilliseconds,
-                    atlasBuildCount=OverworldPropAtlas.BuildCount,decorationNodes=app.Views["player"].GetParent().GetChildren().OfType<EnvironmentDecoration>().Count(),
-                    floraRows=app.Views["player"].GetParent().GetChildren().OfType<OverworldFlora>().Count(),floraSprites=OverworldFlora.LastCount,
-                    rockLookupBytes=OverworldRockRenderer.LastLookupBytes,rockBuildMs=OverworldRockRenderer.LastBuildMilliseconds,
-                    textureBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TextureMemUsed),bufferBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.BufferMemUsed)});
             }
             if(OverworldPropAtlas.BuildCount!=builds)throw new InvalidOperationException("Prop atlas grew during region changes");
             // Restore fixture position before comparing authoritative state.
             p.Region=gallery.Id;p.X=root.X;p.Y=root.Y+12;
             if(Persistence.Capture(w,app.Narrative)!=frozen)throw new InvalidOperationException("Prop region rebuild changed saved state");
-            File.WriteAllText("build/overworld/part4-paired.json",JsonSerializer.Serialize(comparisons,Content.Json));
-            File.WriteAllText("build/overworld/part4-resources.json",JsonSerializer.Serialize(observations,Content.Json));
             GD.Print($"OVERWORLD PROP CHECKS PASSED: six sizes, seeds, resource states, depth={covered}/{revealed}, six dungeon roundtrips");
         }
         finally{ReachAmbience.PreviewTime=-1;OverworldPropAtlas.VerificationPrevious=previous;Engine.TimeScale=scale;app.GetWindow().Size=size;app.ShowCharacters(true);Persistence.Restore(w,app.Narrative,snapshot);app.Ui.ApplyPreferences(prefs,false);app.RebuildViews();app.ResumeGame();}

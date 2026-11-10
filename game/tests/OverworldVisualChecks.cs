@@ -1,5 +1,4 @@
 using Godot;
-using System.Diagnostics;
 using System.Text.Json;
 using V = System.Numerics.Vector2;
 namespace Mosslight;
@@ -43,7 +42,6 @@ public static class OverworldVisualChecks
         bool compare=OS.GetCmdlineUserArgs().Contains("--compare-water");
         bool compareGround=OS.GetCmdlineUserArgs().Contains("--compare-ground");
         bool originalLegacy=OverworldWaterRenderer.VerificationLegacy;
-        var observations=new List<object>();
         try
         {
             Engine.TimeScale=0;app.ResumeGame();w.Projectiles.Clear();
@@ -106,16 +104,12 @@ public static class OverworldVisualChecks
             {
                 OverworldWaterRenderer.VerificationLegacy=compare && iteration%2==0;
                 OverworldGroundRenderer.VerificationPrevious=compareGround && iteration%2==0;
-                var timer=Stopwatch.StartNew();app.RebuildViews();await Frames(app);double ready=timer.Elapsed.TotalMilliseconds;
+                app.RebuildViews();await Frames(app);
                 long builds=OverworldWaterRenderer.BuildCount,groundBuilds=OverworldGroundRenderer.BuildCount;
-                var intervals=new List<double>();timer.Restart();double last=0;
-                for(int f=0;f<120;f++){await Frames(app,1);double now=timer.Elapsed.TotalMilliseconds;intervals.Add(now-last);last=now;}
+                await Frames(app,120);
                 if(OverworldGroundRenderer.BuildCount!=groundBuilds)throw new InvalidOperationException("Ground rebuilt during static interval");
                 if(OverworldWaterRenderer.BuildCount!=builds)throw new InvalidOperationException("Water rebuilt during static interval");
                 if(Persistence.Capture(w,app.Narrative)!=frozen)throw new InvalidOperationException("Water renderer changed authoritative state");
-                intervals.Sort();observations.Add(new {iteration,groundStyle=OverworldGroundRenderer.Enabled?"part2":"part1",groundLookupBytes=OverworldGroundRenderer.Enabled?OverworldGroundRenderer.LastLookupBytes:0,groundVertexBytes=OverworldGroundRenderer.Enabled?OverworldGroundRenderer.LastVertexBytes:0,groundBuildMs=OverworldGroundRenderer.Enabled?OverworldGroundRenderer.LastBuildMilliseconds:0,waterStyle=OverworldWaterRenderer.UseLivingReach?"living-reach":"baseline",initialEnvironmentBuildMs=Foundation.FirstEnvironmentBuildMilliseconds,initialTerrainDrawPreparationMs=TerrainView.FirstBuildMilliseconds,readyMs=ready,terrainBuildMs=TerrainView.LastBuildMilliseconds,terrainVertexBytes=TerrainView.LastVertexBytes,waterBuildMs=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastBuildMilliseconds:0,waterVertexBytes=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastVertexBytes:0,waterLookupBytes=OverworldWaterRenderer.UseLivingReach?OverworldWaterRenderer.LastLookupBytes:0,waterBuildCount=OverworldWaterRenderer.BuildCount,
-                    p50ms=intervals[60],p95ms=intervals[114],managedBytes=GC.GetTotalMemory(true),godotStaticBytes=OS.GetStaticMemoryUsage(),
-                    textureBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TextureMemUsed),bufferBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.BufferMemUsed),renderer=RenderingServer.GetVideoAdapterName()});
             }
             OverworldWaterRenderer.VerificationLegacy=false;OverworldGroundRenderer.VerificationPrevious=previousGround;
             foreach(int seed in new[]{1,42,1337})
@@ -141,7 +135,6 @@ public static class OverworldVisualChecks
                 }
                 w.RegionsById[r.Id]=r;p.Region=r.Id;p.X=32*24;p.Y=32*24;app.RebuildViews();await Capture(app,version+"-ground-transitions");
             }
-            File.WriteAllText("build/overworld/"+(compareGround?"part2-paired":compare?"paired":version)+".json",JsonSerializer.Serialize(observations,Content.Json));
             GD.Print("OVERWORLD VISUAL CHECKS PASSED: production references, six sizes, seeds, topology and rebuilds");
         }
         finally {OverworldGroundRenderer.VerificationPrevious=previousGround;OverworldWaterRenderer.VerificationLegacy=originalLegacy;Engine.TimeScale=scale;window.Size=size;Persistence.Restore(w,app.Narrative,original);app.Ui.ApplyPreferences(prefs,false);app.RebuildViews();app.ResumeGame();}
