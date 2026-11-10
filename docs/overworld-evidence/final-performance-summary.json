@@ -1,0 +1,50 @@
+{
+  "baseline": {
+    "readyMs": 417.00964999999997,
+    "terrainBuildMs": 3.6914,
+    "terrainVertexBytes": 707160.0,
+    "waterBuildMs": 0.0,
+    "waterVertexBytes": 0.0,
+    "waterLookupBytes": 0.0,
+    "p50ms": 31.37715000000003,
+    "p95ms": 46.67845,
+    "managedBytes": 17503196.0,
+    "godotStaticBytes": 46067537.0,
+    "textureBytes": 12438991.0,
+    "bufferBytes": 7247420.0
+  },
+  "living-reach": {
+    "readyMs": 434.62715,
+    "terrainBuildMs": 2.67195,
+    "terrainVertexBytes": 640632.0,
+    "waterBuildMs": 13.218350000000001,
+    "waterVertexBytes": 18648.0,
+    "waterLookupBytes": 263682.0,
+    "p50ms": 30.80574999999976,
+    "p95ms": 44.88350000000011,
+    "managedBytes": 17300700.0,
+    "godotStaticBytes": 46089633.0,
+    "textureBytes": 12790055.0,
+    "bufferBytes": 7220060.0
+  },
+  "runtimeCommit": "5a67da01be3d583699c658db33f3e1dda398a7df",
+  "p95ChangePercent": -3.845350477575593,
+  "firstEnvironmentBuildMs": {
+    "baseline": 34.3153,
+    "living-reach": 72.3932
+  },
+  "firstTerrainDrawPreparationMs": {
+    "baseline": 31.6748,
+    "living-reach": 19.5111
+  },
+  "method": "Twelve alternating 120-frame old/new intervals in one frozen production fixture; median of six interval statistics per style, not pooled p95. Exact full world/narrative serialization equality checked after every interval. Separate process-first construction observations include JIT/lazy loading but not deferred GPU completion.",
+  "environment": "Debian 13; Godot 4.6.1 .NET; GL Compatibility; llvmpipe LLVM 19.1.7; Xorg dummy over TCP; 1280x800 mobile layout; 1.5x unchanged zoom; no VSync. No concurrent local test/build workload during the accepted comparison.",
+  "limits": [
+    "Not physical Galaxy S25 or emulator performance.",
+    "Earlier prototypes and independent-process pairs varied widely, including regressions; raw observations are retained.",
+    "No GPU timer-query attribution, cold-machine or process working-set measurement.",
+    "Native counters cover all game textures/buffers; staging vertex payload is an estimator, not isolated GPU VBO memory.",
+    "Batched vertex counts exclude the unchanged immediate grass/dirt texture quads and actors/UI.",
+    "A bounded rebuild observation is not long-session leak proof."
+  ]
+}

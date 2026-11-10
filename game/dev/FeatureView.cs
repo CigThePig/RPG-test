@@ -4,6 +4,7 @@ namespace Mosslight;
 public partial class FeatureView : Node2D
 {
     public Dictionary<string,Texture2D>? Art { get; set; }
+    public bool LivingReach {get;set;}
     public uint VisualSeed { get; set; }
     public string Kind { get; set; } = "";
     public int[] GateCells { get; set; } = Array.Empty<int>();
@@ -22,12 +23,20 @@ public partial class FeatureView : Node2D
     void Gem(Vector2 p, float s, Color c) => DrawColoredPolygon(new[] { p + new Vector2(0,-s), p + new Vector2(s,0), p + new Vector2(0,s), p + new Vector2(-s,0) },c);
     public override void _Draw()
     {
-        if (Spent && Kind is not ("chest" or "lock" or "lever" or "brazier" or "portcullis" or "seal")) return;
+        bool reach=LivingReach && OverworldPropAtlas.Enabled && OverworldPropArt.TryFeature(Kind,Spent,out _);
+        if (!reach && Spent && Kind is not ("chest" or "lock" or "lever" or "brazier" or "portcullis" or "seal")) return;
         DrawSetTransform(Vector2.Zero, 0, new Vector2(1,.45f));
-        if (Kind is not ("portcullis" or "seal")) DrawCircle(new Vector2(0,2), Kind is "portal" or "exit" ? 24 : 17, new Color(0,0,0,.25f));
+        if (!reach && Kind is not ("portcullis" or "seal")) DrawCircle(new Vector2(0,2), Kind is "portal" or "exit" ? 24 : 17, new Color(0,0,0,.25f));
         if (Kind == "brazier" && Lit) DrawCircle(new Vector2(0,2), 34 + Flicker(7,0)*4, new Color(Flame, .10f));
         if (Selected) DrawArc(Vector2.Zero,23,0,Mathf.Tau,24,Gold,2);
         DrawSetTransform(Vector2.Zero);
+        if(reach)
+        {
+            OverworldPropArt.TryFeature(Kind,Spent,out var asset);
+            OverworldPropAtlas.Draw(this,OverworldPropArt.Module(asset,VisualSeed),Vector2.Zero);
+            if(Selected)DrawString(ThemeDB.FallbackFont,new Vector2(-25,Kind=="wood"&&!Spent?-104:-55),Label(),HorizontalAlignment.Left,-1,13,Gold);
+            return;
+        }
         switch (Kind)
         {
             case "chest":
@@ -152,6 +161,9 @@ public partial class FeatureView : Node2D
     string Label() => Kind switch
     {
         "chest" when Spent => "Empty chest",
+        "wood" when Spent => "Stump",
+        "ore" when Spent => "Mined stone",
+        "herb" when Spent => "Gathered herb",
         "lever" => Spent ? "Pulled lever" : "Lever",
         "brazier" => Lit ? "Burning brazier" : "Cold brazier",
         "portcullis" => "Portcullis",

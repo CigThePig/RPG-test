@@ -1,0 +1,30 @@
+{
+  "captureStartUnix": 1793928450.6950645,
+  "source": "3b54709ab40234b3ac4f9be0749d6507464efdee",
+  "platform": "hosted x86_64 Android emulator",
+  "input": "ADB OS touch events",
+  "positions": [
+    [
+      "179.77",
+      "588.00"
+    ],
+    [
+      "229.11",
+      "588.00"
+    ],
+    [
+      "254.83",
+      "588.00"
+    ],
+    [
+      "272.39",
+      "588.00"
+    ],
+    [
+      "294.29",
+      "588.00"
+    ]
+  ],
+  "fps": "screenrecord variable; inspect video PTS",
+  "synchronization": "captureStartUnix anchors screenrecord; logcat timestamps and MOSSLIGHT_TOUCH_RELEASE provide coarse input/displacement correlation, not sub-frame latency"
+}

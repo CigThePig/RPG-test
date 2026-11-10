@@ -1,0 +1,9 @@
+Runtime 5a67da01be3d583699c658db33f3e1dda398a7df
+Godot Engine v4.6.1.stable.mono.official.14d19694e - https://godotengine.org
+
+MOSSLIGHT_DIALOGUE_READY
+MOSSLIGHT_READY actors=9 families=9 framework=.NET 8.0.15 source=local-uncommitted
+PASS compiled dialogue resolves through resource importer
+PASS compiled environment textures resolve through resource importer
+PASS adventure bounded eight-actor population 0
+FOUNDATION CHECKS PASSED: 10367

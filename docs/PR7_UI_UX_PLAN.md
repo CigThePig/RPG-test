@@ -17,7 +17,7 @@ Actual Galaxy S25 playtesting found an architectural/visual problem beyond the b
 2. **Visual objects, not document forms.** Equipment should occupy recognizable slots, backpack items should have consistent icons or silhouettes, actions appear beside the currently selected object. Keep item names, quantities and stat changes legible alongside iconography.
 3. **Mobile landscape first.** Design for the actual Galaxy S25 plus 1280x720, 1280x800, 1920x864, 1024x768 and 900x560 logical viewports, nonzero safe-area insets and text scales 1.0–1.4. Choose adaptive arrangements rather than simply shrinking controls or forcing horizontal scroll.
 4. **Fantasy identity, restrained execution.** Mosslight’s overgrown-ruins/forest palette, stone/bronze framing, subtle parchment-like panels and readable pixel-world-friendly item imagery. Avoid copying another game's art, oversaturated rarity glows, excessive decorations, generic admin-dashboard cards, or bespoke effects that conflict with the world.
-5. **Shared art pipeline.** First check existing item data, procedural/world art and available licensed assets. Introduce a small deterministic, cached item icon/portrait/slot visual pipeline where needed. Draw a clear icon even when an item has no bespoke asset. Avoid per-frame asset regeneration and large texture allocations.
+5. **Shared art pipeline.** First check existing item data, procedural/world art and available licensed assets. Introduce a small deterministic, cached item icon/portrait/slot visual pipeline where needed. Draw a clear icon even when an item has no bespoke asset.
 6. **Touchable and understandable.** One tap selects an item, explicit buttons invoke destructive/equipment actions, swipe scrolls without selection, Back behaves consistently, no hidden essential long-press/double-tap actions. Selected vs focused vs pressed must be visually distinct; disabled controls must explain why.
 7. **No gameplay fork.** `World`, `Foundation`, Gloot/`Items`, `Narrative.gd`, `RegionState`, persistence and skill rules remain authoritative. No parallel inventory, stat cache, quest progress, merchant stock or unapproved world-save migrations.
 8. **Preserve integration contracts.** Stable action IDs and `RpgUi` compatibility methods, multitouch ownership, touch cancellation, Android Back deduplication, combat hit/miss semantics, save-slot protections, craft/trade atomicity, accessibility preferences and visual/headless CI checks all remain in force.
@@ -138,7 +138,7 @@ The priorities, in order:
 2. **Thumb ergonomics and input reliability:** stable left-stick movement, attack/dodge/interact emphasis, reliable simultaneous fingers and dismissal behavior.
 3. **Clarity and accessibility:** legible scaling, high contrast, non-color-only feedback, touch targets and predictable navigation.
 4. **Coherent fantasy presentation:** restrained stone/forest/parchment/bronze visual language with consistent icons, typography and panels, without covering the world or sacrificing responsiveness.
-5. **Preserve gameplay and performance:** no new authority, no save-breaking state or replay regressions, no per-frame UI allocations that degrade the S25.
+5. **Preserve gameplay:** no new authority, no save-breaking state or replay regressions.
 
 The current code is largely assembled in `game/ui/RpgUi.cs` (~680 lines), with `MobileCombatControls.cs`, `TouchStick.cs`, `TouchScroll.cs`, `game/narrative/Narrative.gd`, `game/dev/Foundation.cs`, Gloot and QuestSystem. The current dialogue has a separate absolute-position panel. Refactor these incrementally; do not replace stable systems wholesale.
 
@@ -213,7 +213,7 @@ At minimum verify exact source via `dotnet build`, `python3 tools/import-project
 - Prioritize Attack, Dodge and Interact. Keep existing action IDs, touch geometry and gameplay commands but evaluate thumb reach and screen occlusion; refine sizes/placement deliberately, not gratuitously. Support constrained layouts and keep secondary spells/potion discoverable.
 - Contextual Interact should display real current action (Talk/Open/Loot/Activate/Enter/Use, as appropriate) based on the same targets and precedence the authoritative interaction path uses. If no valid interaction, show consistent unavailable state; avoid lying when multiple targets compete.
 - Show cooldowns, mana restrictions, target requirements, potion quantities, active state, and concise reasons for disabled controls. Keep hit and miss feedback semantically separate. Provide notifications for quest progression, discovery, loot, craft success/failure and important world events without covering combat telegraphs.
-- Prevent HUD refresh/animation from shifting touch rectangles or consuming excessive frame/GC budget. No new targeting system, combat mechanic or character movement behavior.
+- Prevent HUD refresh/animation from shifting touch rectangles. No new targeting system, combat mechanic or character movement behavior.
 
 **Acceptance / regressions**
 - Production combat with left-thumb movement and right-thumb attack/dodge/spells/potion/interact, overlapping fingers, canceled touches, focus loss, opening a panel mid-gesture, and defeat recovery.

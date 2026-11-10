@@ -14,7 +14,7 @@ env:
 jobs:
   native:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -44,6 +44,12 @@ jobs:
         run: xvfb-run -a python3 tools/verify.py --visual --mobile
       - name: Native widescreen surface, physical controls and responsive overlays
         run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --widescreen-only
+      - name: Living Reach production water references and resource rebuild checks
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --overworld-only
+      - name: Living Reach ground transitions and Part 2 references
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --overworld-only --part2-reference
+      - name: Living Reach environmental props, depletion and actor depth
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' python3 tools/verify.py --visual --mobile --overworld-props-only
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -51,6 +57,8 @@ jobs:
           path: |
             docs/native-screenshots/
             docs/landmark-screenshots/
+            docs/overworld-screenshots/
+            build/overworld/
             docs/audio-samples/
             docs/verification.json
             docs/render-verification*.json

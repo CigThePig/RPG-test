@@ -1,0 +1,9 @@
+11-06 01:31:34.970  2596  2596 V Godot   : OnPause: GodotFragment{7e37413} (15e1331d-1a27-4929-bc4e-55e102600e08 id=0x7f070033)
+11-06 01:31:36.959  2596  2596 E Surface : freeAllBuffers: 1 buffers were freed while being dequeued!
+11-06 01:31:37.146  2596  2596 V Godot   : OnStop: GodotFragment{7e37413} (15e1331d-1a27-4929-bc4e-55e102600e08 id=0x7f070033)
+11-06 01:31:37.892  2596  2596 V Godot   : OnStart: GodotFragment{7e37413} (15e1331d-1a27-4929-bc4e-55e102600e08 id=0x7f070033)
+11-06 01:31:37.956  2596  2596 V Godot   : OnResume: GodotFragment{7e37413} (15e1331d-1a27-4929-bc4e-55e102600e08 id=0x7f070033)
+11-06 01:31:38.130  2596  2681 E BufferQueueProducer: [SurfaceView[com.cigthepig.mosslight.dev/com.godot.game.GodotAppLauncher]#1(BLAST Consumer)1](id:a2400000001,api:0,p:-1,c:2596) dequeueBuffer: BufferQueue has been abandoned
+11-06 01:31:38.130  2596  2681 E EGL_emulation: tid 2681: swapBuffers(789): error 0x300d (EGL_BAD_SURFACE)
+11-06 01:31:38.131  2596  2681 W GLThread: eglSwapBuffers failed: EGL_BAD_SURFACE
+11-06 01:31:38.209  2596  2681 W GLSurfaceView: Warning, !readyToDraw() but waiting for draw finished! Early reporting draw finished.

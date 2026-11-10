@@ -36,6 +36,7 @@ public sealed class TerrainBatch : IDisposable
         var arrays=new Godot.Collections.Array();arrays.Resize((int)Mesh.ArrayType.Max);
         arrays[(int)Mesh.ArrayType.Vertex]=vertices.ToArray();arrays[(int)Mesh.ArrayType.Color]=colors.ToArray();
         if(uvs.Count>0)arrays[(int)Mesh.ArrayType.TexUV]=uvs.ToArray();
+        mesh?.Dispose();
         mesh=new ArrayMesh();mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles,arrays);
         target.DrawMesh(mesh,Texture);
     }

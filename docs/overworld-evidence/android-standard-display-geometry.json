@@ -1,0 +1,17 @@
+{
+  "android_wm": "Physical size: 1280x800",
+  "application": {
+    "physical": "(1280, 800)",
+    "drawable": "(1280, 800)",
+    "logical": "(1280, 800)",
+    "safe": "(0, 0), (1280, 800)",
+    "gameplay": "(0, 0), (1280, 800)",
+    "scale": 1,
+    "scaleY": 1,
+    "originX": 0,
+    "originY": 0,
+    "stickWidth": 200,
+    "zoom": "(1.5, 1.5)",
+    "worldSpan": "(853.3333, 533.3333)"
+  }
+}
