@@ -35,7 +35,7 @@ The visual-verification-only `--part2-props` / paired switch retains the previou
 1. Engine build and full headless integration, including all indexed modules, transparent gutters, state differences, bounded atlas reuse, deterministic decoration placement, serialized geography and identical real movement/AI/combat continuation.
 2. Production viewport comparisons of the same Part 2 ground/water fixture before/after; all six supported aspect ratios, canonical overworld seeds 1/42/1337, resource states, and reduced motion.
 3. Actual pixel occlusion: a tree covers the actor standing behind its root and the actor covers the tree when standing in front. Retain existing dungeon wall/prop and raised shore-rock checks.
-4. Repeated dungeon/overworld rebuilds with atlas build count, texture/buffer totals and environment preparation measurements; paired frame intervals at a fixed resolution. Software-renderer measurements must not be described as S25 FPS.
-5. Existing gameplay replay/adventure CI, signed ARM64 packaging validation and both installed Android emulator layouts. Physical S25 art, touch and sustained performance remain a user playtest gate.
+4. Repeated dungeon/overworld rebuilds still produce correct, unchanged scenery.
+5. Existing gameplay replay/adventure CI, signed ARM64 packaging validation and both installed Android emulator layouts. Physical S25 art and touch remain a user playtest gate; S25 performance has been confirmed good by the owner.
 
 Keep PR #8 draft and unmerged. Record verified source, exact commands, evidence and any failed attempt in the Part 3 handoff before calling automated delivery complete.

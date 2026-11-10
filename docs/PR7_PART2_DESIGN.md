@@ -317,9 +317,9 @@ Capture in **standard and --mobile-ui** where applicable, using actual rendered 
 
 At minimum run 1280x720, 1280x800, 1920x864, 1024x768 and 900x560 with nonzero insets. Check **visual density and actual information architecture**, not just that nothing crosses a rectangle bound.
 
-### Provisional performance budgets (targets, not claims)
+### Performance
 
-Aim for no perceptible stutter when selecting an item, an inventory open/close that feels immediate on a physical S25, and no repeated asset allocation on item selection. Instrument first-open icon generation, cached reopen, frame latency and image/texture count. Proposed targets for review: no item-icon textures allocated per selection frame, initial generation of the ten current icons under a small measured startup budget, and a bounded cache rather than textures keyed per unique gear instance. Reject visual effects that materially regress phone frame pacing.
+Performance on the physical Galaxy S25 has been confirmed good by the owner. No performance budgets, instrumentation or measurements are required for this work.
 
 ### Final phone acceptance checklist
 

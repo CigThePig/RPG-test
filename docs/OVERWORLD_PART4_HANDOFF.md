@@ -122,6 +122,6 @@ nothing.
 
 ## Not verified
 
-Nothing here ran on a phone. Physical Galaxy S25 appearance, touch comfort, frame pacing and
-long-session behaviour remain open, as does the intermittent Android resume issue recorded in the
+Performance is accepted: the owner ran the PR #8 ARM64 APK on the physical Galaxy S25 and reports a
+stable frame rate. Physical Galaxy S25 appearance and touch comfort remain open, as does the intermittent Android resume issue recorded in the
 Part 1 handoff. The Android and gameplay-replay workflows were not run locally for this part.
