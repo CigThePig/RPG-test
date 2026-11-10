@@ -42,10 +42,9 @@ Part 4 captures beside them (`part4-after-*.png`, `part4-seed*.png`, `part4-reso
   scaled process time, so it stops when the game is frozen; reduced motion pins it to zero, which
   makes water, turf, cloud and pollen a single still frame; fixtures can hold it with
   `ReachAmbience.PreviewTime`.
-- **Atmosphere without an extra pass.** Cloud shadow is one 128×128 R8 tileable field
-  (16,384 bytes, built once per process) that the ground, water and rock shaders sample
-  themselves, so it costs one texture read rather than a blended full-screen layer. It falls on
-  terrain only; props and actors stay fully lit. `OverworldAtmosphere` draws the pollen as a few
+- **Atmosphere.** Cloud shadow is one 128×128 R8 tileable field (16,384 bytes, built once per
+  process) multiplied over the finished world by `overworld_atmosphere.gdshader`, so it crosses
+  terrain, props and actors alike. `OverworldAtmosphere` also draws the pollen as a few
   one-pixel rectangles over the cells near the camera.
 
 Unchanged: geography, collision, world RNG, movement, combat, rewards, save data, PPC
@@ -83,10 +82,11 @@ Local results on the final source:
 | Phone rendered UI suite | Passed, 213 s |
 | Normal-health adventure | Passed, 10,966 ticks, 84 health |
 
-The 1280×800 reference frame measured a median 28.8 ms with Part 4 against 24.9 ms with the
-outcrops, flora and pollen switched off, on llvmpipe. Because the rendered suites take about a
-sixth longer under software rendering, `tools/verify.py` now allows 480 s per suite (was 360 s)
-and the native CI job 25 minutes (was 20). Hosted CI has not run on this source.
+The table above was recorded before cloud shadow was restored as a whole-scene multiply pass.
+After that change the headless, props, water-reference and Part 2 suites were re-run and pass;
+the widescreen and two rendered UI suites were still running when this was pushed. Software
+rendering is slower with Part 4, so `tools/verify.py` now allows 480 s per suite (was 360 s) and
+the native CI job 25 minutes (was 20). Hosted CI has not run on this source.
 
 New and changed checks:
 

@@ -1,10 +1,10 @@
 // Living Reach dry ground. Everything is chosen from absolute canvas pixels, the
 // region lookup and a cosmetic seed: stable under camera motion and zoom.
-#include "res://game/art/overworld_cloud.gdshaderinc"
 uniform sampler2D ground_map : filter_linear, repeat_disable;
 uniform vec2 ground_lookup_size;
 uniform vec4 ground_palette[20];
 uniform uint ground_seed;
+uniform float reach_time;
 float ground_hash(vec2 p){
     uint h=uint(int(p.x)+4096)*374761393u+uint(int(p.y)+4096)*668265263u+ground_seed*1442695041u;
     h=(h^(h>>13u))*1274126177u;

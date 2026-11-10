@@ -1,8 +1,7 @@
 shader_type canvas_item;
 render_mode unshaded;
 // Rock cells become one connected outcrop: a bevelled, mossed top lifted above the
-// ground, a stratified south face and a soft cast shadow. Only cloud shadow moves.
-#include "res://game/art/overworld_cloud.gdshaderinc"
+// ground, a stratified south face and a soft cast shadow. Static; no clock.
 uniform sampler2D rock_map : filter_linear, repeat_disable;
 uniform vec2 rock_lookup_size;
 uniform vec4 rock_palette[12];
@@ -46,7 +45,7 @@ void fragment(){
         // Moss settles on the sheltered flats and creeps toward lit edges.
         float moss=v+(rock_hash(p/vec2(2.0,1.0))-0.5)*0.14+(sh-0.5)*0.10;
         if(d>3.0&&moss>0.58)t=moss>0.68?(grain>0.72?10:9):8;
-        COLOR=vec4(reach_cloud(rock_palette[t].rgb,p),1.0);
+        COLOR=rock_palette[t];
     }else{
         vec2 here=rock(p);
         bool a=rock(p+vec2(0.0,LIFT*0.25)).x>0.0,b=rock(p+vec2(0.0,LIFT*0.5)).x>0.0,c=rock(p+vec2(0.0,LIFT*0.75)).x>0.0;
@@ -61,7 +60,7 @@ void fragment(){
             if(level==3&&here.x<2.5)t=0;
             if(mod(p.x+wander,6.0)<1.0&&column>0.35)t=max(t-1,0);
             if(level==0&&rock_hash(p/vec2(4.0,1.0))>0.6)t=min(t+1,4);
-            COLOR=vec4(reach_cloud(rock_palette[t].rgb,p),1.0);
+            COLOR=rock_palette[t];
         }else{
             // Shadow thrown down-right across the ground.
             float cast=max(rock(p+vec2(-5.0,-2.0)).x,rock(p+vec2(-2.0,-3.0)).x);

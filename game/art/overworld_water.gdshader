@@ -55,4 +55,4 @@ vec4 reach_water(vec2 p){
     }
     return c;
 }
-void fragment(){vec2 p=floor(place)+vec2(0.5);COLOR=vec4(reach_cloud(reach_water(p).rgb,p),1.0);}
+void fragment(){COLOR=reach_water(floor(place)+vec2(0.5));}

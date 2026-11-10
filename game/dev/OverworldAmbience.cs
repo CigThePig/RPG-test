@@ -59,9 +59,9 @@ public partial class ReachAmbienceDriver : Node
     public override void _Process(double delta)=>ReachAmbience.Advance(delta,ReducedMotion());
 }
 
-/// <summary>The Reach's air: one small process-lifetime cloud field that every terrain
-/// shader samples for drifting shadow, and a few motes of pollen drawn above the world
-/// and beneath the interface. No extra full-screen pass, particles or per-frame allocation.</summary>
+/// <summary>The Reach's air, above the world and beneath the interface: drifting cloud
+/// shadow multiplied over terrain, props and actors from one small process-lifetime
+/// field, and a few motes of pollen. No particles or per-frame allocation.</summary>
 public partial class OverworldAtmosphere : Node2D
 {
     public const int CloudSize=128,CloudCells=8;
@@ -69,6 +69,8 @@ public partial class OverworldAtmosphere : Node2D
     public RegionState Region {get;init;}=null!;
     public static bool Enabled=>OverworldRockRenderer.Enabled;
     static ImageTexture? clouds;
+    static Shader? shader;
+    ShaderMaterial? material;
     float drawn=float.NaN;
     Vector2 centre;
     /// <summary>Two octaves of periodic value noise, 0..1, identical in every process.</summary>
@@ -83,8 +85,7 @@ public partial class OverworldAtmosphere : Node2D
         }
         return Octave(CloudCells,0)*.65f+Octave(CloudCells*2+2,1)*.35f;
     }
-    /// <summary>Give a terrain material the shared cloud field and this region's offset.</summary>
-    public static void Configure(ShaderMaterial material,RegionState region)
+    static void Configure(ShaderMaterial material,RegionState region)
     {
         if(clouds==null)
         {
@@ -104,7 +105,20 @@ public partial class OverworldAtmosphere : Node2D
         var drift=new Vector2(MathF.Sin(time*.31f+h*6.28f)*22,MathF.Cos(time*.23f+k*6.28f)*13-(time*2+h*40)%40*.4f);
         return ((home+drift).Floor(),.5f+.5f*MathF.Sin(time*1.4f+k*30));
     }
-    public override void _Ready()=>AddToGroup("overworld-atmosphere");
+    public override void _Ready()
+    {
+        AddToGroup("overworld-atmosphere");
+        shader??=GD.Load<Shader>("res://game/art/overworld_atmosphere.gdshader");
+        material=new ShaderMaterial{Shader=shader};Configure(material,Region);ReachAmbience.Register(material);
+        // The shadow is its own item so the pollen above it keeps ordinary blending.
+        AddChild(new CloudShadow{Size=new Vector2(Region.Width*24,Region.Height*12),Material=material,ShowBehindParent=true});
+    }
+    public override void _ExitTree(){ReachAmbience.Unregister(material);material?.Dispose();}
+    partial class CloudShadow : Node2D
+    {
+        public Vector2 Size {get;init;}
+        public override void _Draw()=>DrawRect(new Rect2(Vector2.Zero,Size),Colors.White);
+    }
     public override void _Process(double delta)
     {
         // Redraw only when the clock moved or the camera uncovered other cells.

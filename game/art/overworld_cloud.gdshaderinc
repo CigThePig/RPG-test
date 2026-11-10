@@ -1,4 +1,4 @@
-// Slow cloud shadow shared by every Living Reach terrain shader. One small tileable
+// Slow cloud shadow for the Living Reach atmosphere pass. One small tileable
 // field, sampled in chunky two-pixel steps and quantised into three bands.
 uniform sampler2D cloud_map : filter_linear, repeat_enable;
 uniform float cloud_seed;

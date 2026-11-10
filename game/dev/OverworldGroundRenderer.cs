@@ -45,7 +45,6 @@ public partial class OverworldGroundRenderer : Node2D
     }
     public void Configure(ShaderMaterial target)
     {
-        OverworldAtmosphere.Configure(target,Region);
         target.SetShaderParameter("ground_map",lookup!);
         target.SetShaderParameter("ground_lookup_size",new Vector2(Region.Width*8+1,Region.Height*4+1));
         target.SetShaderParameter("ground_palette",OverworldGroundArt.Ramp);

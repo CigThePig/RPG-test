@@ -65,9 +65,8 @@ public partial class OverworldRockRenderer : Node2D
         material=new ShaderMaterial{Shader=shader};
         material.SetShaderParameter("rock_map",lookup);material.SetShaderParameter("rock_lookup_size",new Vector2(width,height));
         material.SetShaderParameter("rock_palette",Ramp);material.SetShaderParameter("rock_seed",(float)(EnvironmentStyle.Hash(Region.Seed,0,0,9300)%97));
-        OverworldAtmosphere.Configure(material,Region);ReachAmbience.Register(material);
         Material=material;LastLookupBytes=(long)width*height*3;LastVertexBytes=batch.VertexBytes+boulders.VertexBytes;LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;
     }
     public override void _Draw()=>batch.Draw(this);
-    public override void _ExitTree(){ReachAmbience.Unregister(material);batch.Dispose();boulders.Dispose();material?.Dispose();lookup?.Dispose();}
+    public override void _ExitTree(){batch.Dispose();boulders.Dispose();material?.Dispose();lookup?.Dispose();}
 }
