@@ -2,7 +2,7 @@
 
 Runtime: **`5a67da01be3d583699c658db33f3e1dda398a7df`**. Base: **`ca60f3eda8153c0f7864703e52a1b09f5228f290`**, the inspected main containing merged PR7. Branch: `feat/overworld-visual-overhaul`. [Draft PR #8](https://github.com/CigThePig/RPG-test/pull/8). Do not merge; Parts 2–4 remain unimplemented. Game rendering code is unchanged after this runtime. Verification-only Python changes end at `3b54709ab40234b3ac4f9be0749d6507464efdee`; the final delivery commit contains documentation/evidence only (see this file’s commit history and PR head).
 
-Implementation and native verification are complete. **Native and baseline/precise gameplay CI passed on the game runtime above. Both installed Android matrix jobs passed, with the standard job passing on an unchanged rerun after an intermittent blank resume. Physical Galaxy S25 acceptance has not been performed. Part 1 is not marked fully accepted while this lifecycle gap remains.**
+Implementation and native verification are complete. **Native and baseline/precise gameplay CI passed on the game runtime above. Both installed Android matrix jobs passed, with the standard job passing on an unchanged rerun after an intermittent blank resume. Physical Galaxy S25 acceptance: the owner ran the PR #8 ARM64 APK on the physical Galaxy S25 and accepted its appearance, touch controls and performance. Part 1 is not marked fully accepted while this lifecycle gap remains.**
 
 ## Baseline audit and scope
 
@@ -80,7 +80,7 @@ Use the pinned Godot 4.6.1 .NET and SDKs 8.0.408/9.0.203. Local rendered command
 | `--water-static-fallback --quit-after 90` | Actual reference rendered and inspected; this bounded capture is not a full fixture-suite run |
 | `tools/gameplay-verify.py --presets baseline` and `--presets precise` | Passed in hosted CI, including independent repeats, precise dungeon expedition and rendered normal-health adventure |
 | Signed ARM64 package and installed Android runtime matrix | Signed ARM64 validation passed; x86_64 installed runtime passed at 1560×720 and 1280×800 (standard layout required one unchanged rerun; intermittent resume defect remains documented) |
-| Physical Samsung Galaxy S25 | **Not performed** |
+| Physical Samsung Galaxy S25 | **Accepted by the owner** (appearance, touch controls, performance) on the PR #8 APK |
 
 [Native CI](https://github.com/CigThePig/RPG-test/actions/runs/42142826134) · [Native evidence](https://github.com/CigThePig/RPG-test/actions/runs/42142826134/artifacts/13468893022) · [Gameplay CI](https://github.com/CigThePig/RPG-test/actions/runs/42142826131) · [Android CI](https://github.com/CigThePig/RPG-test/actions/runs/42142826132).
 

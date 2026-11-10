@@ -49,7 +49,7 @@ All hosted workflows passed at **`fec28d79c099fecd3931184a8ea752669f52a764`**:
 
 The installed wide exploration capture was also inspected: it shows the new props, open chest and unchanged PPC actors/UI in the exported Android application. The Android OS-touch suite does not cover the complete relic/return/reward adventure; that full flow passed the rendered desktop gameplay suite.
 
-The final handoff/capture update is documentation/evidence only and leaves that verified game/test implementation unchanged. Its fresh CI may be running; the source and APK above identify the tested runtime exactly. Part 3 implementation and automated verification are complete. Physical Galaxy S25 installation, subjective art/touch acceptance, sustained pacing and long-session behavior remain unverified. New art has no dependency on physical-device acceptance; do not describe emulator results as S25 results.
+The final handoff/capture update is documentation/evidence only and leaves that verified game/test implementation unchanged. Its fresh CI may be running; the source and APK above identify the tested runtime exactly. Part 3 implementation and automated verification are complete. Physical Galaxy S25 acceptance: the owner ran the PR #8 ARM64 APK on the physical Galaxy S25 and accepted its appearance, touch controls and performance.
 
 ## Review captures
 

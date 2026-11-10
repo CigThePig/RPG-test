@@ -120,8 +120,7 @@ nothing.
   but flora rows sorted at the stems' exact base, so a character standing just in front of a
   plant drew behind it. Standing flora rows now sort `OverworldFlora.ActorFootDrop` higher.
 
-## Not verified
+## Phone acceptance and remaining issue
 
-Performance is accepted: the owner ran the PR #8 ARM64 APK on the physical Galaxy S25 and reports a
-stable frame rate. Physical Galaxy S25 appearance and touch comfort remain open, as does the intermittent Android resume issue recorded in the
-Part 1 handoff. The Android and gameplay-replay workflows were not run locally for this part.
+Accepted on the phone: the owner ran the PR #8 ARM64 APK on the physical Galaxy S25 and accepted its appearance, touch controls and performance (stable frame rate) for the
+purposes of PR #8. The intermittent Android resume issue recorded in the Part 1 handoff remains open. The Android and gameplay-replay workflows were not run locally for this part.

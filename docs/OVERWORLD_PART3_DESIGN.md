@@ -36,6 +36,6 @@ The visual-verification-only `--part2-props` / paired switch retains the previou
 2. Production viewport comparisons of the same Part 2 ground/water fixture before/after; all six supported aspect ratios, canonical overworld seeds 1/42/1337, resource states, and reduced motion.
 3. Actual pixel occlusion: a tree covers the actor standing behind its root and the actor covers the tree when standing in front. Retain existing dungeon wall/prop and raised shore-rock checks.
 4. Repeated dungeon/overworld rebuilds still produce correct, unchanged scenery.
-5. Existing gameplay replay/adventure CI, signed ARM64 packaging validation and both installed Android emulator layouts. Physical S25 art and touch remain a user playtest gate; S25 performance has been confirmed good by the owner.
+5. Existing gameplay replay/adventure CI, signed ARM64 packaging validation and both installed Android emulator layouts. Physical S25 acceptance: the owner ran the PR #8 ARM64 APK on the physical Galaxy S25 and accepted its appearance, touch controls and performance.
 
 Keep PR #8 draft and unmerged. Record verified source, exact commands, evidence and any failed attempt in the Part 3 handoff before calling automated delivery complete.
