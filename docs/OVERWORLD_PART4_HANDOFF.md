@@ -82,11 +82,11 @@ Local results on the final source:
 | Phone rendered UI suite | Passed, 213 s |
 | Normal-health adventure | Passed, 10,966 ticks, 84 health |
 
-The table above was recorded before cloud shadow was restored as a whole-scene multiply pass.
-After that change the headless, props, water-reference and Part 2 suites were re-run and pass;
-the widescreen and two rendered UI suites were still running when this was pushed. Software
-rendering is slower with Part 4, so `tools/verify.py` now allows 480 s per suite (was 360 s) and
-the native CI job 25 minutes (was 20). Hosted CI has not run on this source.
+Cloud shadow was then restored as a whole-scene multiply pass and every suite above was run
+again on that source: all pass, with 14,328 headless assertions, tree depth 1,853 / 1,312, and
+209 s and 216 s for the desktop and phone UI suites. Software rendering is slower with Part 4,
+so `tools/verify.py` now allows 480 s per suite (was 360 s) and the native CI job 25 minutes
+(was 20).
 
 New and changed checks:
 
