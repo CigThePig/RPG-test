@@ -2,7 +2,7 @@
 
 Verified implementation source: **`fec28d79c099fecd3931184a8ea752669f52a764`**.
 
-Part 3 implements the environmental object family described in [the design](OVERWORLD_PART3_DESIGN.md). It is layered over Part 2 (`acf694d312f0da1cf9d26c68e23525e8fe639e19`) on `feat/overworld-visual-overhaul`. Keep PR #8 draft and unmerged; Part 4 remains open.
+Part 3 implements the environmental object family described in [the design](OVERWORLD_PART3_DESIGN.md). It is layered over Part 2 (`acf694d312f0da1cf9d26c68e23525e8fe639e19`) on `feat/overworld-visual-overhaul`. Parts 1–4 of PR #8 are now complete.
 
 ## Implementation
 

@@ -123,4 +123,5 @@ nothing.
 ## Phone acceptance and remaining issue
 
 Accepted on the phone: the owner ran the PR #8 ARM64 APK on the physical Galaxy S25 and accepted its appearance, touch controls and performance (stable frame rate) for the
-purposes of PR #8. The intermittent Android resume issue recorded in the Part 1 handoff remains open. The Android and gameplay-replay workflows were not run locally for this part.
+purposes of PR #8. The owner has never seen the blank-resume screen
+recorded in the Part 1 handoff on the phone. Parts 1–4 are complete. The Android and gameplay-replay workflows were not run locally for this part.
