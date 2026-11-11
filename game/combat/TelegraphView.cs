@@ -19,10 +19,24 @@ public partial class TelegraphView : Node2D
     {
         if (actor.Id == "player" || !actor.Alive || actor.Region != world.Player.Region ||
             actor.State != ActionState.Windup || ability == null || ability.Id != actor.PendingAbility ||
-            ability.Windup < MinimumWindup || ability.Telegraph?.Style is not ("target" or "cone")) return false;
+            ability.Windup < MinimumWindup || ability.Telegraph?.Style is not ("target" or "cone" or "line")) return false;
         if (ability.Telegraph.Style == "target")
             return world.Actors.TryGetValue(actor.Target, out var target) && target.Alive && target.Region == actor.Region;
-        return ability.Geometry?.Shape == "cone" && CombatGeometry.TryNormalize(new V(actor.ActionDirectionX, actor.ActionDirectionY), out _);
+        return World.Directed(ability) && CombatGeometry.TryNormalize(new V(actor.ActionDirectionX, actor.ActionDirectionY), out _);
+    }
+
+    /// <summary>A charge still tearing down its lane: the warning stays until it lands or stops.</summary>
+    public static bool IsCharging(World world, ActorState actor, AbilityDef? ability) =>
+        actor.Id != "player" && actor.Alive && actor.Region == world.Player.Region && actor.State == ActionState.Recovery &&
+        ability?.Charge is { } charge && ability.Id == actor.RecoveryAbility && !actor.ActionConnected &&
+        actor.ActionElapsed - ability.Windup < charge.Duration;
+
+    /// <summary>Ground still to be covered by a leap, so its danger zone is drawn where it lands.</summary>
+    public static float RemainingLunge(ActorState actor, AbilityDef ability)
+    {
+        if (ability.Lunge is not { } lunge) return 0;
+        float u = Math.Clamp((actor.ActionElapsed - lunge.Start) / (lunge.End - lunge.Start), 0, 1);
+        return lunge.Distance * (1 - u * u * (3 - 2 * u));
     }
 
     public override void _Draw()
@@ -31,20 +45,64 @@ public partial class TelegraphView : Node2D
         markedTargets.Clear();
         foreach (var actor in World.Actors.Values)
         {
-            if (actor.Id == "player" || actor.State != ActionState.Windup || actor.PendingAbility == "") continue;
+            if (actor.Id == "player") continue;
+            if (actor.State == ActionState.Recovery && World.FindAbility(actor.RecoveryAbility) is { } running && IsCharging(World, actor, running))
+            { DrawLane(actor, running, 1, (actor.ActionElapsed - running.Windup) * running.Charge!.Speed); continue; }
+            if (actor.State != ActionState.Windup || actor.PendingAbility == "") continue;
             var ability = World.FindAbility(actor.PendingAbility);
             if (!IsActive(World, actor, ability)) continue;
             float progress = Math.Clamp(1 - actor.StateRemaining / ability!.Windup, 0, 1);
-            if (ability.Telegraph!.Style == "cone") DrawCone(actor, ability.Geometry!, progress);
+            if (ability.Telegraph!.Style == "line") DrawLane(actor, ability, progress, 0);
+            else if (ability.Telegraph!.Style == "cone") DrawCone(actor, ability.Geometry!, progress, RemainingLunge(actor, ability));
             else DrawTarget(actor, World.Actors[actor.Target], progress, markedTargets.Add(actor.Target));
         }
     }
 
     static Vector2 Project(V p) => GodotConvert.GroundToScreen(p.X, p.Y);
 
-    void DrawCone(ActorState actor, AttackGeometryDef geometry, float progress)
+    readonly Vector2[] lane = new Vector2[4];
+    readonly Vector2[] laneOutline = new Vector2[5];
+
+    // The committed lane of a charge: as wide as the body that will come down it, as long
+    // as the run, cut short where terrain will stop it.
+    void DrawLane(ActorState actor, AbilityDef ability, float progress, float covered)
     {
-        var origin = actor.Position;
+        var charge = ability.Charge!;
+        var direction = new V(actor.ActionDirectionX, actor.ActionDirectionY);
+        var side = new V(-direction.Y, direction.X);
+        float length = Math.Max(0, charge.Distance - covered);
+        if (World.RegionsById.TryGetValue(actor.Region, out var region))
+            for (float d = 8; d <= length; d += 8)
+                if (!region.CanStand(actor.Position + direction * d, actor)) { length = Math.Max(0, d - 8); break; }
+        if (length < 4) return;
+        float half = actor.Radius + charge.Reach + 4;
+        var near = actor.Position; var far = actor.Position + direction * (length + actor.Radius);
+        lane[0] = Project(near + side * half); lane[1] = Project(far + side * half);
+        lane[2] = Project(far - side * half); lane[3] = Project(near - side * half);
+        Array.Copy(lane, laneOutline, 4); laneOutline[4] = lane[0];
+        DrawColoredPolygon(lane, new Color(1f, .25f, .12f, .12f + progress * .16f));
+        DrawPolyline(laneOutline, new Color(.18f, .04f, .03f, .9f), 4, true);
+        DrawPolyline(laneOutline, new Color(1f, .64f + .2f * progress, .28f, .95f), 2, true);
+        // Chevrons point the way it will come; more of them light as the windup completes.
+        int chevrons = Math.Max(1, (int)(length / 34));
+        for (int i = 0; i < chevrons; i++)
+        {
+            float at = (i + .6f) / chevrons * length;
+            if ((i + 1f) / chevrons > progress + .001f && covered == 0) break;
+            var tip = near + direction * (at + 8);
+            var bright = new Color(1, .92f, .58f, .9f);
+            DrawLine(Project(tip), Project(tip - direction * 9 + side * half * .55f), bright, 2, true);
+            DrawLine(Project(tip), Project(tip - direction * 9 - side * half * .55f), bright, 2, true);
+        }
+    }
+
+    void DrawCone(ActorState actor, AttackGeometryDef geometry, float progress, float ahead = 0)
+    {
+        // A leap is drawn at its landing spot, which stays put while the body flies to it.
+        var origin = actor.Position + new V(actor.ActionDirectionX, actor.ActionDirectionY) * ahead;
+        if (ahead > 2)
+            for (int i = 0; i < 4; i += 2)
+                DrawLine(Project(V.Lerp(actor.Position, origin, i / 4f)), Project(V.Lerp(actor.Position, origin, (i + 1) / 4f)), new Color(1f, .7f, .3f, .8f), 2, true);
         float heading = MathF.Atan2(actor.ActionDirectionY, actor.ActionDirectionX);
         float half = geometry.HalfAngleDegrees * MathF.PI / 180;
         sector[0] = Project(origin);

@@ -4,7 +4,7 @@ using Ground = System.Numerics.Vector2;
 
 namespace Mosslight;
 
-public enum CombatEffectKind { Hit, HeavyHit, Whiff, Dodge, Interrupt, ProjectileRelease, ProjectileCollision, Death, Periodic, TerrainCollision }
+public enum CombatEffectKind { Hit, HeavyHit, Whiff, Dodge, Interrupt, ProjectileRelease, ProjectileCollision, Death, Periodic, TerrainCollision, Alert, GuardBreak, Crash, Rally, Guarded }
 
 /// <summary>One bounded world-space draw layer. Fragments are derived from the event seed, not stored as nodes.</summary>
 public partial class CombatEffects : Node2D
@@ -16,7 +16,7 @@ public partial class CombatEffects : Node2D
         public bool Active;
         public CombatEffectKind Kind;
         public Vector2 Anchor, Direction;
-        public float Age, Lifetime;
+        public float Age, Lifetime, Size;
         public uint Seed;
         public int Priority;
     }
@@ -29,8 +29,8 @@ public partial class CombatEffects : Node2D
 
     static int Priority(CombatEffectKind kind) => kind switch
     {
-        CombatEffectKind.Death or CombatEffectKind.HeavyHit => 3,
-        CombatEffectKind.Hit or CombatEffectKind.Dodge or CombatEffectKind.ProjectileCollision => 2,
+        CombatEffectKind.Death or CombatEffectKind.HeavyHit or CombatEffectKind.GuardBreak or CombatEffectKind.Crash => 3,
+        CombatEffectKind.Hit or CombatEffectKind.Dodge or CombatEffectKind.ProjectileCollision or CombatEffectKind.Alert or CombatEffectKind.Rally => 2,
         _ => 1
     };
     static float Duration(CombatEffectKind kind) => kind switch
@@ -39,10 +39,14 @@ public partial class CombatEffects : Node2D
         CombatEffectKind.HeavyHit => .46f,
         CombatEffectKind.Hit => .34f,
         CombatEffectKind.Periodic => .26f,
+        CombatEffectKind.Rally => .7f,
+        CombatEffectKind.GuardBreak or CombatEffectKind.Crash => .5f,
+        CombatEffectKind.Alert => .4f,
+        CombatEffectKind.Guarded => .22f,
         _ => .32f
     };
 
-    public bool Emit(CombatEffectKind kind, Ground position, Ground direction, long tick, string actorId, string targetId = "")
+    public bool Emit(CombatEffectKind kind, Ground position, Ground direction, long tick, string actorId, string targetId = "", float size = 0)
     {
         int priority = Priority(kind), slot = -1, replacement = -1;
         float oldest = -1;
@@ -60,7 +64,7 @@ public partial class CombatEffects : Node2D
         else d = d.Normalized();
         uint seed = unchecked((uint)World.StableId(actorId) ^ (uint)World.StableId(targetId) * 3266489917u ^ (uint)tick * 2654435761u ^ (uint)kind * 2246822519u);
         effects[slot] = new Effect { Active = true, Kind = kind, Anchor = projected, Direction = d,
-            Lifetime = Duration(kind), Seed = seed, Priority = priority };
+            Lifetime = Duration(kind), Seed = seed, Priority = priority, Size = size };
         LastAnchor = projected; LastKind = kind; EmittedCount++;
         QueueRedraw();
         return true;
@@ -92,6 +96,90 @@ public partial class CombatEffects : Node2D
         n = unchecked((n ^ (n >> 16)) * 2246822519u);
         return (n & 65535) / 65535f;
     }
+    // Behaviour beats: the alarm, a broken guard, a charge meeting a wall, a rallying cry.
+    void DrawBehaviour(Effect e, float t, float fade)
+    {
+        switch (e.Kind)
+        {
+            case CombatEffectKind.Alert:
+            {
+                // Sharp ticks fanning out above the head.
+                var head = e.Anchor + new Vector2(0, -58);
+                var c = new Color(1f, .86f, .35f, fade);
+                for (int j = 0; j < 5; j++)
+                {
+                    float angle = -Mathf.Pi / 2 + (j - 2) * .5f;
+                    var ray = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+                    DrawLine(head + ray * (11 + t * 9), head + ray * (17 + t * 13), c, 2.5f);
+                }
+                break;
+            }
+            case CombatEffectKind.GuardBreak:
+            {
+                var at = e.Anchor + new Vector2(0, -14);
+                var c = new Color(.75f, .9f, 1f, fade);
+                DrawArc(at, 9 + t * 22, 0, Mathf.Tau, 20, new Color(c, fade * .7f), 3);
+                for (int j = 0; j < 7; j++)
+                {
+                    float angle = Variation(e.Seed, j) * Mathf.Tau;
+                    var radial = new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .7f);
+                    var start = at + radial * (8 + t * (24 + Variation(e.Seed, j + 7) * 14));
+                    // Shards: short thick slivers turning as they fly.
+                    var across = new Vector2(-radial.Y, radial.X) * (3 - 2 * t);
+                    DrawLine(start - across, start + across + radial * 4, c, 3);
+                }
+                if (t < .3f) DrawCircle(at, 7, new Color(1, 1, 1, (1 - t / .3f) * .85f));
+                break;
+            }
+            case CombatEffectKind.Crash:
+            {
+                var at = e.Anchor + new Vector2(0, -10);
+                var dust = new Color(.8f, .76f, .64f, fade * .8f);
+                for (int j = 0; j < 6; j++)
+                {
+                    float angle = Variation(e.Seed, j) * Mathf.Tau;
+                    var radial = new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .6f);
+                    DrawCircle(at + radial * (6 + t * 22), 5 * (1 - t) + 2, dust);
+                }
+                var spark = new Color(1f, .95f, .7f, fade);
+                for (int j = 0; j < 4; j++)
+                {
+                    float angle = -Mathf.Pi / 2 + (Variation(e.Seed, j + 20) - .5f) * 2.4f;
+                    var ray = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+                    DrawLine(at + ray * (8 + t * 14), at + ray * (13 + t * 20), spark, 2.5f);
+                }
+                break;
+            }
+            case CombatEffectKind.Rally:
+            {
+                // Two rings sweep out over the ground to the edge of the cry.
+                var c = new Color(1f, .82f, .3f);
+                DrawSetTransform(e.Anchor, 0, new Vector2(1, .5f));
+                for (int ring = 0; ring < 2; ring++)
+                {
+                    float u = Math.Clamp(t * 1.25f - ring * .22f, 0, 1);
+                    if (u <= 0) continue;
+                    float eased = 1 - (1 - u) * (1 - u);
+                    DrawArc(Vector2.Zero, 14 + eased * Math.Max(20, e.Size - 14), 0, Mathf.Tau, 40, new Color(c, (1 - u) * .8f), 3 - ring);
+                }
+                DrawSetTransform(Vector2.Zero);
+                break;
+            }
+            case CombatEffectKind.Guarded:
+            {
+                var c = new Color(.72f, .82f, .92f, fade);
+                var at = e.Anchor + new Vector2(0, -12);
+                for (int j = 0; j < 3; j++)
+                {
+                    float angle = Variation(e.Seed, j) * Mathf.Tau;
+                    var radial = new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .65f);
+                    DrawLine(at + radial * (4 + t * 8), at + radial * (8 + t * 12), c, 2);
+                }
+                break;
+            }
+        }
+    }
+
     public override void _Draw()
     {
         for (int i = 0; i < effects.Length; i++)
@@ -101,6 +189,8 @@ public partial class CombatEffects : Node2D
             float t = Math.Clamp(e.Age / e.Lifetime, 0, 1);
             float fade = (1 - t) * (1 - t);
             Vector2 at = e.Anchor + new Vector2(0, e.Kind == CombatEffectKind.Death ? -7 : -12);
+            if (e.Kind is CombatEffectKind.Alert or CombatEffectKind.GuardBreak or CombatEffectKind.Crash or CombatEffectKind.Rally or CombatEffectKind.Guarded)
+            { DrawBehaviour(e, t, fade); continue; }
             Color c = e.Kind switch
             {
                 CombatEffectKind.Dodge => new Color(.54f, .9f, .91f),

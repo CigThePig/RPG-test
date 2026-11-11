@@ -140,6 +140,9 @@ namespace PixelCreatures.Core.Motion
             double strideLen = _legLen * DMath.Lerp(1.05, 2.3, r) * DMath.Lerp(0.95, 1.1, traits.Energy);
             if (_legCount > 4) strideLen *= 0.75;
             double fMin = 0.9 / ts, fMax = 3.6 / ts;
+            // Driven far beyond its own top speed (a charge), the legs scramble to keep up
+            // rather than trailing at full stretch behind the body.
+            fMax *= DMath.Clamp(speed / Math.Max(1.0, traits.RunSpeed * 1.25), 1.0, 2.6);
             _freq = DMath.Clamp(speed / Math.Max(1e-6, strideLen), fMin, fMax);
             if (!double.IsNaN(ctx.CycleFrequencyOverride)) _freq = ctx.CycleFrequencyOverride;
 
@@ -356,6 +359,7 @@ namespace PixelCreatures.Core.Motion
                     target = target + new Vec3(0, DMath.Clamp(offset, -leg.TotalLength * 0.35, leg.TotalLength * 0.35), 0);
                 }
                 if (tuck > 0) target = Vec3.Lerp(footC, TuckTarget(leg, hip), tuck);
+                if (p.LegLimp > 0) target = Vec3.Lerp(target, LimpTarget(ctx, leg, hip, pose), DMath.Saturate(p.LegLimp));
                 if (p.FrontReach != 0 && leg.Pair == 0)
                     target = target + new Vec3(p.FrontReach * _legLen, Math.Max(0, p.FrontReach) * _legLen * 0.35, 0);
                 double lift = leg.Pair == 0 ? DMath.Clamp(p.FrontLift, 0, 1.2) : 0;
@@ -369,7 +373,7 @@ namespace PixelCreatures.Core.Motion
                 Vec3 outward = new Vec3(0, 0, leg.Side == 0 ? 1 : leg.Side);
                 Limbs.Solve(leg, hip, target, bodyFwd, outward, roll, _joints);
                 SetLegBones(pose, leg, bodyFwd, roll);
-                output.Contacts.Add(new ContactPoint { Position = target, Planted = !s.Swinging && tuck < 0.5 && lift < 0.15, Leg = s.Index });
+                output.Contacts.Add(new ContactPoint { Position = target, Planted = !s.Swinging && tuck < 0.5 && lift < 0.15 && p.LegLimp < 0.5, Leg = s.Index });
             }
             // arms swing opposite to the legs (bipeds); actions may raise/reach
             foreach (var a in _arms)
@@ -385,6 +389,7 @@ namespace PixelCreatures.Core.Motion
                 Vec3 target = shoulder + restOff + new Vec3(swing * len * 0.28 + p.ArmReach * act * len * 0.6 + raise * len * 0.15, raise * len * 1.05, 0);
                 double tuck = p.LegTuck;
                 if (tuck > 0) target = Vec3.Lerp(target, shoulder + new Vec3(len * 0.45, -len * 0.4, arm.Side * len * 0.25), tuck);
+                if (p.LegLimp > 0) target = Vec3.Lerp(target, LimpTarget(ctx, arm, shoulder, pose), DMath.Saturate(p.LegLimp));
                 Vec3 outward = new Vec3(0, 0, arm.Side == 0 ? 1 : arm.Side);
                 Limbs.Solve(arm, shoulder, target, bodyFwd, outward, 0, _joints);
                 SetLegBones(pose, arm, bodyFwd, 0);
@@ -445,6 +450,24 @@ namespace PixelCreatures.Core.Motion
             }
             Vec3 toeDir = (fwd * DMath.Cos(roll) - Vec3.UnitY * DMath.Sin(roll)).NormalizedOr(fwd);
             pose.SetOverride(leg.JointBones[2], new Xform(Mat3.LookAlong(toeDir, Vec3.UnitY), _joints[3]));
+        }
+
+        // A limp limb keeps its resting shape relative to the body, so a creature lying on its
+        // side has its legs lying out beside it instead of reaching for where it last stood.
+        private static Vec3 LimpTarget(MotorContext ctx, LegRig leg, Vec3 root, SkeletonPose pose)
+        {
+            Vec3 restRoot = ctx.Anatomy.Skeleton.RestWorld(leg.RootBone).Origin;
+            Vec3 offset = (leg.RestFoot - restRoot) * 0.82;
+            if (ctx.Rig.Pelvis >= 0)
+            {
+                // Carry the offset from the body's rest frame into its current one.
+                Mat3 now = pose.World[ctx.Rig.Pelvis].Basis, rest = ctx.Anatomy.Skeleton.RestWorld(ctx.Rig.Pelvis).Basis;
+                offset = now.Mul(rest.Transposed.Mul(offset));
+            }
+            Vec3 target = root + offset;
+            // Gravity: the far end sags toward the ground but never through it.
+            double y = DMath.Lerp(target.Y, leg.SoleHeight, 0.55);
+            return new Vec3(target.X, Math.Max(leg.SoleHeight, y), target.Z);
         }
 
         private static double TuckAmount(MotorContext ctx, LegRig leg, double tuck)

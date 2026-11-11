@@ -73,7 +73,7 @@ public sealed class CombatPresentationController : IDisposable
     {
         if (pendingProjectileImpact is { } pending && !ImpactFollowup(pending,e)) FlushPending();
         if (avoidanceTick != e.Tick) { avoided = null; avoidanceTick = e.Tick; }
-        string subject = e.Kind is CombatPresentationKind.Hit or CombatPresentationKind.Death ? e.TargetId : e.ActorId;
+        string subject = e.Kind is CombatPresentationKind.Hit or CombatPresentationKind.Death or CombatPresentationKind.GuardBroken ? e.TargetId : e.ActorId;
         if (!Visible(subject)) return;
         var ability = world.FindAbility(e.AbilityId);
         var view = View(subject);
@@ -87,7 +87,7 @@ public sealed class CombatPresentationController : IDisposable
                 // Sword windup is silent. The air-only whoosh belongs to the
                 // authoritative strike boundary, whether it hits or misses.
                 if (e.AbilityId != "slash")
-                    Sound(ability.Type == "healing" ? "cast" : ability.ActionStyle == "Bite" ? "bite" : "attack", e.Origin);
+                    Sound(ability.Type == "healing" ? "cast" : ability.ActionStyle == "Roar" ? "roar" : ability.ActionStyle == "Bite" ? "bite" : "attack", e.Origin);
                 break;
             case CombatPresentationKind.AttackCommitted:
                 // Commitment starts no second animation or audio cue.
@@ -148,22 +148,56 @@ public sealed class CombatPresentationController : IDisposable
             case CombatPresentationKind.Hit:
                 bool periodic = e.Outcome == "periodic";
                 bool heavy = Heavy(ability);
-                view?.ReactToHit(e.Origin, e.Position, heavy ? 1.35f : periodic ? .55f : 1f);
+                bool guarded = e.Outcome == "guarded";
+                if (e.Outcome == "ambush") heavy = true;
+                view?.ReactToHit(e.Origin, e.Position, guarded ? .45f : heavy ? 1.35f : periodic ? .55f : 1f);
                 if (pendingProjectileImpact is { } hitImpact && SameImpact(hitImpact,e))
                 {
                     pendingProjectileImpact = null;
                     Emit(CombatEffectKind.ProjectileCollision, hitImpact, hitImpact.Position);
                 }
-                else Emit(periodic ? CombatEffectKind.Periodic : heavy ? CombatEffectKind.HeavyHit : CombatEffectKind.Hit, e, Contact(e));
+                else Emit(periodic ? CombatEffectKind.Periodic : guarded ? CombatEffectKind.Guarded : heavy ? CombatEffectKind.HeavyHit : CombatEffectKind.Hit, e, Contact(e));
                 if (!periodic)
                 {
-                    Sound(e.TargetId == "player" ? "player_hit" : ability?.ProjectileSpeed > 0 ? "projectile_impact" : heavy ? "heavy_hit" : "hit", e.Position);
+                    Sound(e.TargetId == "player" ? "player_hit" : guarded ? "guard" : ability?.ProjectileSpeed > 0 ? "projectile_impact" : heavy ? "heavy_hit" : "hit", e.Position);
                     if (Nearby(e.Position, 240)) camera.Impact(e.TargetId == "player" ? 2.2f : heavy ? 1.8f : 1.1f, e.Tick);
                 }
                 break;
             case CombatPresentationKind.Death:
-                view?.BeginDefeat();
+                view?.BeginDefeat(e.Origin, e.Position);
                 Emit(CombatEffectKind.Death, e, e.Position); Sound("death", e.Position);
+                break;
+            case CombatPresentationKind.Alerted:
+                world.Actors.TryGetValue(e.TargetId, out var quarry);
+                view?.Alert(e.Outcome, quarry);
+                // Only the one who actually spots the intruder cries out; the called simply start.
+                if (e.Outcome != "called") { Emit(CombatEffectKind.Alert, e, e.Origin); Sound("alert", e.Origin); }
+                break;
+            case CombatPresentationKind.AwarenessChanged:
+                // The overhead mark reads actor state directly; nothing to trigger here.
+                break;
+            case CombatPresentationKind.GuardBroken:
+            {
+                var broken = View(e.TargetId);
+                broken?.React(PixelCreatures.Core.Motion.ReactionKind.Reel);
+                broken?.Overlay?.GuardBroken();
+                if (Visible(e.TargetId))
+                {
+                    Emit(CombatEffectKind.GuardBreak, e, e.Position); Sound("guard_break", e.Position);
+                    if (Nearby(e.Position, 240)) camera.Impact(2f, e.Tick);
+                }
+                break;
+            }
+            case CombatPresentationKind.ChargeStarted:
+                Sound("charge", e.Origin);
+                break;
+            case CombatPresentationKind.ChargeCrashed:
+                view?.React(PixelCreatures.Core.Motion.ReactionKind.Crash);
+                Emit(CombatEffectKind.Crash, e, e.Origin + Direction(e) * 10); Sound("crash", e.Origin);
+                if (Nearby(e.Origin, 240)) camera.Impact(2.4f, e.Tick);
+                break;
+            case CombatPresentationKind.Rallied:
+                effects.Emit(CombatEffectKind.Rally, e.Origin, Direction(e), e.Tick, e.ActorId, e.TargetId, ability?.AllyRadius ?? 120);
                 break;
         }
     }

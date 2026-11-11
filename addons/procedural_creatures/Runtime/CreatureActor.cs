@@ -110,6 +110,8 @@ namespace PixelCreatures.Runtime
         private double? _facingRequest;
         private bool _exactFacingRequest;
         private bool _restRequest;
+        private bool _deadRequest;
+        private StanceKind _stanceRequest;
         private bool _started;
         private bool _culled;
         private bool _wasActionRendering;
@@ -212,6 +214,9 @@ namespace PixelCreatures.Runtime
             if (oldMotor != null && oldMotor.Resting) Motor.SnapRest(true);
             else if (_restRequest) Motor.SnapRest(true);
             Motor.Resting = _restRequest;
+            // A rebuilt body keeps its temperament, and a corpse stays a corpse.
+            Motor.SnapStance(_stanceRequest);
+            if (_deadRequest) Motor.SnapDead();
             _renderPose = new CreaturePose(model.Anatomy.Skeleton);
             ContentExtent = Vector2I.Zero;
             _extentMin = new Vector2I(int.MaxValue, int.MaxValue);
@@ -285,6 +290,54 @@ namespace PixelCreatures.Runtime
                 _restRequest = value;
                 if (Motor != null) Motor.Resting = value;
             }
+        }
+
+        /// <summary>Persistent posture layered over locomotion (wary, combat ready, searching...).</summary>
+        public StanceKind Stance
+        {
+            get => _stanceRequest;
+            set
+            {
+                if (_stanceRequest == value) return;
+                _stanceRequest = value;
+                if (Motor != null) Motor.Stance = value;
+            }
+        }
+
+        /// <summary>Short reaction played over the current motion (startled hop, reeling, dazed).</summary>
+        public void TriggerReaction(ReactionKind kind, float duration = 0)
+        {
+            Motor?.TriggerReaction(kind, duration);
+            RequestRender();
+        }
+
+        public bool Dead => _deadRequest;
+
+        /// <summary>Starts the collapse. The ground direction points from the creature to what struck it.</summary>
+        public void Die(Vector2 fromDirection)
+        {
+            if (_deadRequest) return;
+            _deadRequest = true;
+            _restRequest = false;
+            Motor?.Die(new Vec3(fromDirection.X, 0, fromDirection.Y));
+            RequestRender();
+        }
+
+        /// <summary>Lying dead at once, without the collapse.</summary>
+        public void SnapDead()
+        {
+            _deadRequest = true;
+            _restRequest = false;
+            Motor?.SnapDead();
+            RequestRender();
+        }
+
+        public void Revive()
+        {
+            if (!_deadRequest) return;
+            _deadRequest = false;
+            Motor?.Revive();
+            RequestRender();
         }
 
         public void TriggerGameplayAction(float windup, float recovery) => Motor?.TriggerGameplayAction(windup, recovery);

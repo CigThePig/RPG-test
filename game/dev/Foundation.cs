@@ -38,8 +38,7 @@ public partial class Foundation : Node2D
         view.PreferMeasuredExternalVelocity=Feel.Id!="baseline";
         view.Creature.UseMeasuredExternalVelocity=view.PreferMeasuredExternalVelocity;
         view.Creature.AnimationFps=view.State.Id=="player" && Feel.Id!="baseline" ? 20 : 10;
-        if (view.State.Id == "player")
-            view.GroundTerrain = actor =>
+        view.GroundTerrain = actor =>
             {
                 if (!World.RegionsById.TryGetValue(actor.Region, out var region)) return Terrain.Grass;
                 int index = region.Index(actor.Position);
@@ -73,6 +72,9 @@ public partial class Foundation : Node2D
         string[] profiles=encounter switch {
             "prowler" => new[]{"prowler"}, "brute" => new[]{"brute"},
             "spitter" or "projectiles" => new[]{"spitter"},
+            "stalker" => new[]{"stalker"}, "howler" => new[]{"howler","prowler"},
+            "pack" => new[]{"prowler","prowler","prowler","prowler"},
+            "ruin" => new[]{"brute","prowler","prowler","spitter","stalker","howler"},
             "two melee" => new[]{"prowler","brute"},
             "four mixed" => new[]{"prowler","brute","spitter","prowler"},
             "crowd" => Enumerable.Range(0,8).Select(i=>new[]{"prowler","brute","spitter"}[i%3]).ToArray(),
@@ -82,12 +84,15 @@ public partial class Foundation : Node2D
         {
             string id=profiles[i];
             float x=380+(i/3)*42,y=275+(i%3)*30;
+            float health=id switch {"prowler"=>65,"brute"=>120,"stalker"=>45,"howler"=>50,_=>55};
             if(id=="spitter")x+=65;
-            var a=new ActorState{Id="lab:"+id+(i<3 ? "" : ":"+i),Name=id,Region=p.Region,Faction="beasts",Profile="beast",CombatProfile=id,
-                Appearance=new(){Family=id=="prowler" ? "quadruped" : id=="brute" ? "reptile" : "amorphous",Seed=seed+(ulong)i},
-                X=x,Y=y,HomeX=x,HomeY=y,Health=id=="prowler"?65:id=="brute"?120:55,MaxHealth=id=="prowler"?65:id=="brute"?120:55,
-                Abilities=World.Content.CombatProfiles.Single(c=>c.Id==id).Priorities.Keys.ToList()};
-            AnatomyAdapter.Apply(a);a.Speed=id=="prowler"?88:id=="brute"?46:62;World.Actors[a.Id]=a;
+            var a=new ActorState{Id="lab:"+id+(i<3 && !World.Actors.ContainsKey("lab:"+id) ? "" : ":"+i),Name=id,Region=p.Region,Faction="beasts",Profile="beast",CombatProfile=id,
+                Appearance=new(){Family=id switch {"prowler"=>"quadruped","brute"=>"reptile","stalker"=>"arthropod","howler"=>"winged",_=>"amorphous"},Seed=seed+(ulong)i},
+                X=x,Y=y,HomeX=x,HomeY=y,Health=health,MaxHealth=health,
+                Abilities=World.Content.CombatProfiles.Single(c=>c.Id==id).Loadout()};
+            AnatomyAdapter.Apply(a);a.Speed=id switch {"prowler"=>88,"brute"=>46,"stalker"=>96,"howler"=>70,_=>62};
+            // Lab inhabitants start facing the player, so the fight begins with a sighting.
+            a.FacingX=-1;World.Actors[a.Id]=a;
         }
         Trace.Marker($"combat-course/{encounter}/seed-{seed}/{(protectedPlayer ? "protected" : "normal")}");
         Ui.Notify($"Combat lab: {encounter} · {(protectedPlayer ? "protected observation" : "normal health")} · reset / return through Feel lab");
@@ -288,6 +293,13 @@ public partial class Foundation : Node2D
         var dump=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--dump-dungeons="))?.Split('=',2)[1];
         if(dump!=null)
         { foreach(int seed in dump.Split(',').Select(int.Parse))GD.Print(DungeonLayout.Ascii(Regions.Dungeon(seed)));GetTree().Quit();return; }
+        var sheets=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x=="--enemy-animation-sheets" || x.StartsWith("--enemy-animation-sheets="));
+        if(sheets!=null)
+        {
+            // Authoring aid: contact sheets of every enemy animation, no display needed.
+            EnemyAnimationPreview.Write("build/enemy-animation", only: sheets.Contains('=') ? sheets.Split('=',2)[1] : null);
+            GetTree().Quit();return;
+        }
         if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
         if (OS.GetCmdlineUserArgs().Contains("--adventure-visual")) CallDeferred(nameof(RunAdventureVisual));
         if (OS.GetCmdlineUserArgs().Contains("--adventure-check")) CallDeferred(nameof(RunAdventure));
@@ -325,6 +337,10 @@ public partial class Foundation : Node2D
                 GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0}");
             if(Trace.Active && e.Kind is "region_entered" or "resource_depleted" or "ability_started" or "defeated")Trace.Marker(e.Kind+"/"+e.Value);
             Narrative.Call("receive", e.Kind, e.Actor, e.Target, e.Value, e.Count);
+            if (e.Kind == "afflicted" && e.Target == "player")
+                ui?.Notify(e.Value == "venom" ? $"Envenomed · it wears off in {e.Count}s" : $"Afflicted: {e.Value} · {e.Count}s", minor: true);
+            if (e.Kind == "ambush" && e.Actor == "player")
+                ui?.Notify("Ambush · struck before it noticed you", minor: true);
             if (e.Kind == "level_gained" && e.Actor == "player")
                 ui?.Notify($"Level up · now level {e.Value} · a skill point is ready in Character");
             if (e.Kind == "region_entered")
@@ -374,6 +390,8 @@ public partial class Foundation : Node2D
         {
             var view = new CharacterView();
             actors.AddChild(view);
+            view.World = World;
+            view.ReducedMotion = () => ui?.Preferences.ReducedMotion ?? false;
             view.Setup(a);
             ConfigureView(view);
             Views[a.Id] = view;

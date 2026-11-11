@@ -10,13 +10,54 @@ namespace Mosslight;
 public static class FoundationChecks
 {
     static int assertions;
+    static readonly List<string> failures = new();
     static void Check(bool value, string name)
     {
         assertions++;
         if (!value)
-            throw new InvalidOperationException("CHECK FAILED: " + name);
+        {
+            // `--test-keep-going` reports every failure in one run instead of stopping at the first.
+            if (!OS.GetCmdlineUserArgs().Contains("--test-keep-going")) throw new InvalidOperationException("CHECK FAILED: " + name);
+            failures.Add(name);
+            GD.Print("FAIL " + name);
+            return;
+        }
         GD.Print("PASS " + name);
     }
+
+    /// <summary>Self-contained suites, in run order. Each restores the world it found.</summary>
+    static readonly (string Name, Action<Foundation, Action<bool, string>> Run)[] Suites =
+    {
+        (nameof(AdventureChecks), AdventureChecks.Run),
+        (nameof(LandmarkChecks), LandmarkChecks.Run),
+        (nameof(EnvironmentArtChecks), EnvironmentArtChecks.Run),
+        (nameof(OverworldWaterChecks), OverworldWaterChecks.Run),
+        (nameof(OverworldGroundChecks), (_, check) => OverworldGroundChecks.Run(check)),
+        (nameof(OverworldPropChecks), OverworldPropChecks.Run),
+        (nameof(DungeonChecks), DungeonChecks.Run),
+        (nameof(DungeonEncounterChecks), DungeonEncounterChecks.Run),
+        (nameof(MechanismChecks), MechanismChecks.Run),
+        (nameof(MobileCombatControlsChecks), (_, check) => MobileCombatControlsChecks.Run(check)),
+        (nameof(UiNavigationChecks), (_, check) => UiNavigationChecks.Run(check)),
+        (nameof(HudChecks), HudChecks.Run),
+        (nameof(RpgScreensChecks), RpgScreensChecks.Run),
+        (nameof(PackPresentationChecks), PackPresentationChecks.Run),
+        (nameof(AccessibilityChecks), AccessibilityChecks.Run),
+        (nameof(EncounterChecks), EncounterChecks.Run),
+        (nameof(ReviewChecks), ReviewChecks.Run),
+        (nameof(CraftingChecks), CraftingChecks.Run),
+        (nameof(PlayabilityChecks), PlayabilityChecks.Run),
+        (nameof(MovementChecks), MovementChecks.Run),
+        (nameof(CombatChecks), CombatChecks.Run),
+        (nameof(DodgeChecks), DodgeChecks.Run),
+        (nameof(CombatTelegraphChecks), CombatTelegraphChecks.Run),
+        (nameof(CombatPresentationChecks), CombatPresentationChecks.Run),
+        (nameof(CombatAiChecks), CombatAiChecks.Run),
+        (nameof(EnemyBehaviorChecks), EnemyBehaviorChecks.Run),
+        (nameof(EnemyAnimationChecks), EnemyAnimationChecks.Run),
+        (nameof(ActorSeparationChecks), ActorSeparationChecks.Run),
+        (nameof(ProjectileChecks), ProjectileChecks.Run),
+    };
 
     static void Advance(World w, float seconds)
     {
@@ -38,33 +79,18 @@ public static class FoundationChecks
         var watch = Stopwatch.StartNew();
         try
         {
-            AdventureChecks.Run(app,Check);
-            LandmarkChecks.Run(app,Check);
-            EnvironmentArtChecks.Run(app,Check);
-            OverworldWaterChecks.Run(app,Check);
-            OverworldGroundChecks.Run(Check);
-            OverworldPropChecks.Run(app,Check);
-            DungeonChecks.Run(app, Check);
-            DungeonEncounterChecks.Run(app, Check);
-            MechanismChecks.Run(app, Check);
-            MobileCombatControlsChecks.Run(Check);
-            UiNavigationChecks.Run(Check);
-            HudChecks.Run(app, Check);
-            RpgScreensChecks.Run(app, Check);
-            PackPresentationChecks.Run(app, Check);
-            AccessibilityChecks.Run(app, Check);
-            EncounterChecks.Run(app,Check);
-            ReviewChecks.Run(app, Check);
-            CraftingChecks.Run(app, Check);
-            PlayabilityChecks.Run(app, Check);
-            MovementChecks.Run(app, Check);
-            CombatChecks.Run(app, Check);
-            DodgeChecks.Run(app, Check);
-            CombatTelegraphChecks.Run(app, Check);
-            CombatPresentationChecks.Run(app, Check);
-            CombatAiChecks.Run(app, Check);
-            ActorSeparationChecks.Run(app, Check);
-            ProjectileChecks.Run(app, Check);
+            // `--test-only=CombatAiChecks,EnemyBehaviorChecks` runs just the named suites, for quick iteration.
+            var only = OS.GetCmdlineUserArgs().FirstOrDefault(x => x.StartsWith("--test-only="))?.Split('=', 2)[1].Split(',');
+            if (only != null && only.Except(Suites.Select(x => x.Name)).Any())
+                throw new InvalidOperationException("Unknown check suite: " + string.Join(",", only.Except(Suites.Select(x => x.Name))));
+            foreach (var (name, run) in Suites)
+                if (only == null || only.Contains(name)) run(app, Check);
+            if (failures.Count > 0) throw new InvalidOperationException("CHECKS FAILED: " + string.Join(" | ", failures));
+            if (only != null)
+            {
+                GD.Print($"SELECTED CHECKS PASSED: {assertions} ({string.Join(",", only)})");
+                return;
+            }
             string beforeLab=Persistence.Capture(w,app.Narrative);
             bool labReleased=false;
             void ObserveLab(CombatPresentationEvent e){if(e.ActorId=="lab:spitter" && e.Kind==CombatPresentationKind.ProjectileReleased)labReleased=true;}
@@ -517,6 +543,7 @@ public static class FoundationChecks
                 };
             }
 
+            if (failures.Count > 0) throw new InvalidOperationException("CHECKS FAILED: " + string.Join(" | ", failures));
             measurements["assertions"] = assertions;
             measurements["elapsedSeconds"] = watch.Elapsed.TotalSeconds;
             measurements["environment"] = $"{OS.GetName()} {OS.GetProcessorName()} · Godot {Engine.GetVersionInfo()["string"]}";

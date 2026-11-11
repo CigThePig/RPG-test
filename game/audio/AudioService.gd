@@ -39,6 +39,13 @@ func _ready() -> void:
 		"death": [Config.WaveType.SAWTOOTH, .13, -.30, .06, .30, .12],
 		"cast": [Config.WaveType.SINE_WAVE, .35, -.30, .06, .22, .0],
 		"step": [Config.WaveType.NOISE, .12, -.20, .02, .08, .35],
+		# Enemy behaviour: a rising yelp of alarm, a falling growl, hooves, steel and stone.
+		"alert": [Config.WaveType.SQUARE_WAVE, .30, .34, .04, .14, .25],
+		"roar": [Config.WaveType.SAWTOOTH, .11, -.10, .22, .34, .05],
+		"charge": [Config.WaveType.NOISE, .10, .18, .16, .30, .08],
+		"guard": [Config.WaveType.SQUARE_WAVE, .46, -.20, .02, .10, .45],
+		"guard_break": [Config.WaveType.NOISE, .34, -.48, .05, .30, .30],
+		"crash": [Config.WaveType.NOISE, .07, -.20, .08, .34, .05],
 		"ui": [Config.WaveType.SINE_WAVE, .30, .10, .025, .15, .0]
 	}
 	for kind in specs:
@@ -50,12 +57,12 @@ func _ready() -> void:
 		config.p_env_sustain = spec[3]
 		config.p_env_decay = spec[4]
 		config.p_hpf_freq = spec[5]
-		config.p_env_punch = .25 if kind in ["hit", "heavy_hit", "player_hit", "bite"] else 0.0
+		config.p_env_punch = .25 if kind in ["hit", "heavy_hit", "player_hit", "bite", "guard_break", "crash"] else 0.0
 		effects[kind] = Generator.new().generate_audio_stream(config)
 
 func priority(kind: String) -> int:
-	if kind in ["player_hit", "heavy_hit", "death"]: return 3
-	if kind in ["hit", "avoid", "projectile_impact", "ui"]: return 2
+	if kind in ["player_hit", "heavy_hit", "death", "guard_break", "crash"]: return 3
+	if kind in ["hit", "avoid", "projectile_impact", "ui", "alert", "roar"]: return 2
 	return 1
 
 func cue(kind: String) -> void:
