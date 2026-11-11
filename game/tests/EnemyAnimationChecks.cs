@@ -197,10 +197,27 @@ public static class EnemyAnimationChecks
             var charge = w.FindAbility("charge")!;
             brute.Statuses.Clear(); w.Cancel(brute); p.X = brute.X - 140; p.Y = brute.Y; brute.Cooldowns.Clear();
             check(w.Activate(brute.Id, "charge", p.Id) && TelegraphView.IsActive(w, brute, charge), "the charge lane is telegraphed through the windup");
+            double chargeYaw = PixelCamera.GroundVelocityToYaw(brute.ActionDirectionX, brute.ActionDirectionY);
+            p.Y += 100; // Sidestep while the warning and simulation direction stay fixed.
+            for (int i = 0; i < 15; i++) { Sync(); guard.Creature._Process(1.0 / 60); }
+            check(Math.Abs(DMath.WrapAngle(guard.Creature.Motor!.Yaw - chargeYaw)) < .001,
+                "a charge windup keeps its committed facing when the target sidesteps");
             for (int i = 0; i < (int)(charge.Windup * 60) + 4; i++) { w.Step(1f / 60); brute.NextTacticalTime = 1e9; }
             Sync();
             check(guard.Charging && guard.Stance == StanceKind.Charge && TelegraphView.IsCharging(w, brute, charge) && guard.Dust!.Active,
                 "the run itself is a head-down charge that kicks up dust, still warned");
+            // A fresh view reconstructed during the run must also recover the lane facing.
+            var restoredCharge = new CharacterView { World = w };
+            app.AddChild(restoredCharge);
+            try
+            {
+                restoredCharge.Setup(brute);
+                restoredCharge.SyncCombatFacing(w);
+                restoredCharge.Creature._Process(1.0 / 60);
+                check(Math.Abs(DMath.WrapAngle(restoredCharge.Creature.Motor!.Yaw - chargeYaw)) < .001,
+                    "a charge restored in recovery faces its committed lane");
+            }
+            finally { restoredCharge.Free(); }
             brute.ActionConnected = true; Sync();
             check(!guard.Charging && guard.Stance != StanceKind.Charge && !TelegraphView.IsCharging(w, brute, charge),
                 "a connected charge leaves its running stance together with its warning");

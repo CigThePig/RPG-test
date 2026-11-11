@@ -257,6 +257,27 @@ public static class EnemyBehaviorChecks
         check(stepped && p.Health == health && Saw(CombatPresentationKind.Miss, a.Id), "stepping out of the committed line makes the pounce miss");
         check(MathF.Abs(landing - 360) < 2, "a pounce does not steer after its target");
 
+        // A stationary quarry must remain in front of the landing cone.
+        foreach (float distance in new[] { 50f, 54f, 57f, 59f, 60f, 65f, 74f })
+        {
+            Arena();
+            a = Spawn("b:pounce-range", "prowler", p.X - distance, p.Y, V.UnitX); Engage(a);
+            var rangeIntent = CombatBrain.Select(w, a, p, w.FindProfile("prowler"), false);
+            if (distance < 60)
+            {
+                check(rangeIntent.Ability != "pounce" && !w.CanActivate(a, p, def),
+                    $"pounce rejects a target inside its safe landing distance at {distance} pixels");
+                continue;
+            }
+            check(rangeIntent.Ability == "pounce" && w.Activate(a.Id, "pounce", p.Id),
+                $"pounce accepts a stationary target at {distance} pixels");
+            health = p.Health;
+            for (int i = 0; i < (int)MathF.Ceiling(def.Windup * 60) + 2; i++)
+            { a.NextTacticalTime = w.Time + 1; w.Step(Dt); }
+            check(p.Health < health && Saw(CombatPresentationKind.Hit, a.Id),
+                $"the selected pounce hits its stationary target at {distance} pixels");
+        }
+
         // No leap into a wall.
         Arena();
         a = Spawn("b:pouncer", "prowler", 480 - 74, 360, V.UnitX); Engage(a);

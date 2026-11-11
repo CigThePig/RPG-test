@@ -205,7 +205,7 @@ public partial class CharacterView : Node2D
     {
         if (cue is "attack" or "cast")
         {
-            if (State.FreeSlash || ability?.Geometry?.Shape == "cone")
+            if (State.FreeSlash || (ability?.Geometry?.Shape is "cone" or "line"))
             {
                 var ground = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
                 Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(ground.X, ground.Y));
@@ -300,7 +300,7 @@ public partial class CharacterView : Node2D
     }
 
     // Reconstructed views derive facing from the same state as the warning. A
-    // target-locked strike tracks its target; a cone keeps its committed yaw.
+    // target-locked strike tracks its target; a cone or charge keeps its committed yaw.
     public void SyncCombatFacing(World world)
     {
         if (State.State == ActionState.Recovery && State.RecoveryAbility != "")
@@ -308,6 +308,9 @@ public partial class CharacterView : Node2D
             var recovery = world.FindAbility(State.RecoveryAbility);
             if (recovery != null)
             {
+                if ((recovery.Geometry?.Shape is "cone" or "line") &&
+                    CombatGeometry.TryNormalize(new System.Numerics.Vector2(State.ActionDirectionX, State.ActionDirectionY), out var direction))
+                    Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(direction.X, direction.Y));
                 attackTime = Math.Clamp(recovery.Windup + recovery.Recovery - State.StateRemaining, 0, recovery.Windup + recovery.Recovery);
                 attackTimeSynchronized = true;
                 Creature.Motor?.SynchronizeGameplayAction(attackTime);
@@ -322,7 +325,7 @@ public partial class CharacterView : Node2D
             attackTimeSynchronized = true;
             Creature.Motor?.SynchronizeGameplayAction(attackTime);
         }
-        if (State.FreeSlash || ability?.Geometry?.Shape == "cone")
+        if (State.FreeSlash || (ability?.Geometry?.Shape is "cone" or "line"))
         {
             if (CombatGeometry.TryNormalize(new System.Numerics.Vector2(State.ActionDirectionX, State.ActionDirectionY), out var direction))
                 Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(direction.X, direction.Y));

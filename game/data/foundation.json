@@ -156,7 +156,7 @@
       "Id": "pounce",
       "Name": "Pounce",
       "Range": 96,
-      "MinRange": 50,
+      "MinRange": 60,
       "Damage": 11,
       "Cost": 0,
       "Cooldown": 3.6,
