@@ -5,7 +5,9 @@ namespace Mosslight;
 public enum CombatPresentationKind
 {
     AttackStarted, AttackCommitted, AttackImpact, ProjectileReleased, ProjectileImpact,
-    Hit, Miss, AttackCanceled, ActionCompleted, DefensiveAvoidance, DodgeStarted, DodgeCanceled, Death
+    Hit, Miss, AttackCanceled, ActionCompleted, DefensiveAvoidance, DodgeStarted, DodgeCanceled, Death,
+    // Enemy behaviour beats. Outcome carries the cause ("sighted", "called", "hurt", "lost", "home").
+    Alerted, AwarenessChanged, GuardBroken, ChargeStarted, ChargeCrashed, Rallied
 }
 
 /// <summary>Immutable cosmetic observation; no subscriber owns gameplay outcomes.</summary>

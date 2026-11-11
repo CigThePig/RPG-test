@@ -23,7 +23,31 @@
         "family": "amorphous",
         "speed": 62,
         "health": 55
+      },
+      {
+        "profile": "stalker",
+        "name": "Ruin stalker",
+        "family": "arthropod",
+        "speed": 96,
+        "health": 45
+      },
+      {
+        "profile": "howler",
+        "name": "Ruin howler",
+        "family": "winged",
+        "speed": 70,
+        "health": 50
       }
+    ],
+    "roster": [
+      "brute",
+      "prowler",
+      "prowler",
+      "spitter",
+      "stalker",
+      "howler",
+      "prowler",
+      "spitter"
     ]
   }
 }

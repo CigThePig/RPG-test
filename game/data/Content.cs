@@ -27,6 +27,35 @@ public sealed class AbilityDef
     public TelegraphDef? Telegraph { get; set; }
     // Optional PPC action; an omitted or anatomy-incompatible style uses the rig default.
     public string ActionStyle { get; set; } = "";
+    // The tactician does not start this closer than MinRange (gap closers, charges).
+    public float MinRange { get; set; }
+    // Ground pixels a direct hit pushes its victim.
+    public float Knockback { get; set; } = 15;
+    // Committed movement along the locked action direction during the windup.
+    public LungeDef? Lunge { get; set; }
+    // A "line" attack: after the windup the actor runs down its committed lane.
+    public ChargeDef? Charge { get; set; }
+    // Self abilities with a status also grant it to allies this close.
+    public float AllyRadius { get; set; }
+}
+
+public sealed class LungeDef
+{
+    public float Distance { get; set; }
+    // Seconds from the start of the action.
+    public float Start { get; set; }
+    public float End { get; set; }
+}
+
+public sealed class ChargeDef
+{
+    public float Distance { get; set; }
+    public float Speed { get; set; }
+    // Extra contact margin beyond the two body radii.
+    public float Reach { get; set; } = 6;
+    // Seconds stunned after running into terrain without hitting anything.
+    public float CrashStagger { get; set; } = 1;
+    public float Duration => Speed > 0 ? Distance / Speed : 0;
 }
 
 public sealed class ProjectileDef
@@ -37,6 +66,9 @@ public sealed class ProjectileDef
     public float Radius { get; set; } = 2;
     public string Visual { get; set; } = "ember";
     public bool InterceptHostiles { get; set; }
+    // A volley fans Count shots evenly across SpreadDegrees.
+    public int Count { get; set; } = 1;
+    public float SpreadDegrees { get; set; }
 }
 
 public sealed class CombatProfileDef
@@ -51,6 +83,39 @@ public sealed class CombatProfileDef
     public float Reposition { get; set; }
     public string Behaviour { get; set; } = "melee";
     public Dictionary<string, float> Priorities { get; set; } = new();
+    // Perception. Zero sight falls back to PursuitDistance.
+    public float SightDistance { get; set; }
+    public float SightHalfAngle { get; set; } = 105;
+    // Close enough to be noticed from any side.
+    public float HearingDistance { get; set; } = 60;
+    // The alarm beat between noticing and acting.
+    public float NoticeSeconds { get; set; } = .45f;
+    public float CallRadius { get; set; } = 150;
+    // How long a lost quarry is still chased, then how long the area is searched.
+    public float MemorySeconds { get; set; } = 3.5f;
+    public float SearchSeconds { get; set; } = 5;
+    public float LeashDistance { get; set; } = 420;
+    // Idle wandering radius around home; zero stands guard.
+    public float RoamDistance { get; set; } = 64;
+    // Lies still until something comes close.
+    public bool Ambusher { get; set; }
+    // Guard that absorbs this much direct damage before a hit staggers. Zero always staggers.
+    public float Poise { get; set; }
+    // Chance to hop clear when the quarry starts an attack, and how far.
+    public float EvadeChance { get; set; }
+    public float EvadeDistance { get; set; } = 44;
+    public float EvadeCooldown { get; set; } = 4;
+    // Self ability used once health falls below this fraction.
+    public float EnrageThreshold { get; set; }
+    public string EnrageAbility { get; set; } = "";
+    // Self ability with AllyRadius used to embolden nearby allies.
+    public string RallyAbility { get; set; } = "";
+
+    public float Sight => SightDistance > 0 ? SightDistance : PursuitDistance;
+    /// <summary>Every ability an actor of this kind carries, in stable order.</summary>
+    public List<string> Loadout() => Priorities.Keys.Concat(new[] { EnrageAbility, RallyAbility }.Where(id => id != "")).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToList();
+    /// <summary>Tactics for actors saved before profiles existed, or with none authored.</summary>
+    public static readonly CombatProfileDef Legacy = new() { Id = "" };
 }
 
 public sealed class AttackGeometryDef
@@ -76,6 +141,8 @@ public sealed class StatusDef
     public int MaxStacks { get; set; }
     public string Type { get; set; } = "physical";
     public bool BlocksActions { get; set; }
+    // Further stat changes beside ModifierStat, per stack.
+    public Dictionary<string, float> Modifiers { get; set; } = new();
 }
 
 public sealed class RecipeDef
@@ -147,8 +214,18 @@ public sealed class Content
         foreach (var p in CombatProfiles)
         {
             var values = new[] { p.MinimumDistance, p.PreferredDistance, p.ApproachDistance, p.PursuitDistance, p.RetreatThreshold, p.DecisionSeconds, p.Reposition };
-            if (values.Any(v => !float.IsFinite(v) || v < 0) || p.MinimumDistance > p.PreferredDistance || p.PreferredDistance > p.ApproachDistance || p.ApproachDistance > p.PursuitDistance || p.PursuitDistance > 360 || p.RetreatThreshold > 1 || p.DecisionSeconds < .2f || p.DecisionSeconds > 2 || p.Reposition > 1 || p.Behaviour is not ("melee" or "ranged") || p.Priorities.Count == 0 || p.Priorities.Any(x => !Abilities.Any(a => a.Id == x.Key && !a.Self) || !float.IsFinite(x.Value) || x.Value <= 0))
+            if (values.Any(v => !float.IsFinite(v) || v < 0) || p.MinimumDistance > p.PreferredDistance || p.PreferredDistance > p.ApproachDistance || p.ApproachDistance > p.PursuitDistance || p.PursuitDistance > 360 || p.RetreatThreshold > 1 || p.DecisionSeconds < .2f || p.DecisionSeconds > 2 || p.Reposition > 1 || p.Behaviour is not ("melee" or "ranged" or "skirmish" or "support") || p.Priorities.Count == 0 || p.Priorities.Any(x => !Abilities.Any(a => a.Id == x.Key && !a.Self) || !float.IsFinite(x.Value) || x.Value <= 0))
                 errors.Add($"combat profile {p.Id}: invalid distances, cadence, behaviour or abilities");
+            var senses = new[] { p.SightDistance, p.SightHalfAngle, p.HearingDistance, p.NoticeSeconds, p.CallRadius, p.MemorySeconds, p.SearchSeconds, p.LeashDistance, p.RoamDistance, p.Poise, p.EvadeChance, p.EvadeDistance, p.EvadeCooldown, p.EnrageThreshold };
+            if (senses.Any(v => !float.IsFinite(v) || v < 0) || p.SightDistance > 360 || p.SightHalfAngle > 180 || p.HearingDistance > p.Sight || p.NoticeSeconds > 2 ||
+                p.CallRadius > 360 || p.MemorySeconds > 30 || p.SearchSeconds > 30 || p.LeashDistance < p.PursuitDistance || p.RoamDistance > 200 || p.EvadeChance > 1 || p.EvadeDistance > 90 ||
+                (p.EvadeChance > 0 && p.EvadeCooldown < 1) || p.EnrageThreshold >= 1)
+                errors.Add($"combat profile {p.Id}: invalid senses, leash, guard or evasion");
+            foreach (string own in new[] { p.EnrageAbility, p.RallyAbility })
+                if (own != "" && !Abilities.Any(a => a.Id == own && a.Self && a.Status != ""))
+                    errors.Add($"combat profile {p.Id}: '{own}' is not a self ability that grants a status");
+            if ((p.EnrageThreshold > 0) != (p.EnrageAbility != "") || (p.RallyAbility != "" && Abilities.Any(a => a.Id == p.RallyAbility && a.AllyRadius <= 0)))
+                errors.Add($"combat profile {p.Id}: enrage or rally is only half authored");
         }
         Unique(Skills.Select(x => x.Id), "skill");
         foreach (var skill in Skills)
@@ -165,26 +242,38 @@ public sealed class Content
                 !Nonnegative(a.Windup) || !Nonnegative(a.Recovery) || !Nonnegative(a.ProjectileSpeed) ||
                 !float.IsFinite(a.Damage) || (!string.IsNullOrEmpty(a.Status) && !Statuses.Any(s => s.Id == a.Status)))
                 errors.Add($"ability {a.Id}: invalid timing, cost, damage or status reference");
+            if (!Nonnegative(a.MinRange) || a.MinRange > a.Range || !Nonnegative(a.Knockback) || a.Knockback > 80 || !Nonnegative(a.AllyRadius) || a.AllyRadius > 360 || (a.AllyRadius > 0 && (!a.Self || a.Status == "")))
+                errors.Add($"ability {a.Id}: invalid minimum range, knockback or ally radius");
+            if (a.Lunge is { } lunge && (!Nonnegative(lunge.Distance) || lunge.Distance <= 0 || lunge.Distance > 120 || !Nonnegative(lunge.Start) || !(lunge.End > lunge.Start) ||
+                lunge.End > a.Windup + a.Recovery || a.Self || a.ProjectileSpeed > 0 || a.Charge != null || a.Id == "slash"))
+                errors.Add($"ability {a.Id}: invalid lunge");
+            if (a.Charge is { } charge && (!Nonnegative(charge.Distance) || charge.Distance <= 0 || charge.Distance > 320 || !Nonnegative(charge.Speed) || charge.Speed <= 0 || charge.Speed > 600 ||
+                !Nonnegative(charge.Reach) || charge.Reach > 24 || !Nonnegative(charge.CrashStagger) || charge.CrashStagger > 3 || charge.Duration > a.Recovery || a.Geometry?.Shape != "line"))
+                errors.Add($"ability {a.Id}: invalid charge");
+            if (a.Projectile is { } volley && (volley.Count < 1 || volley.Count > 7 || !Nonnegative(volley.SpreadDegrees) || volley.SpreadDegrees > 120 || (volley.Count == 1 && volley.SpreadDegrees != 0)))
+                errors.Add($"ability {a.Id}: invalid volley");
             if (a.Projectile is { } p && (a.ProjectileSpeed <= 0 || p.Mode is not ("legacy" or "straight" or "bounded_homing") || !Nonnegative(p.TurnDegrees) || p.TurnDegrees > 720 || !Nonnegative(p.Radius) || p.Radius > 12 || !Nonnegative(p.Lifetime) || p.Lifetime <= 0 || p.Lifetime > 30 || p.Visual is not ("ember" or "spit")))
                 errors.Add($"ability {a.Id}: invalid projectile configuration");
             string? shape = a.Geometry == null ? "target" : a.Geometry.Shape;
             string? style = a.Telegraph == null ? "none" : a.Telegraph.Style;
-            if (shape is not ("target" or "cone"))
+            if (shape is not ("target" or "cone" or "line"))
                 errors.Add($"ability {a.Id}: unsupported attack shape '{shape}'");
             if (a.Geometry != null && (!Nonnegative(a.Geometry.Range) || !Nonnegative(a.Geometry.HalfAngleDegrees) ||
-                a.Geometry.HalfAngleDegrees > 180 || (shape == "cone" && (a.Geometry.Range <= 0 || a.Geometry.HalfAngleDegrees <= 0)) ||
+                a.Geometry.HalfAngleDegrees > 180 || (shape == "cone" && (a.Geometry.Range <= 0 || a.Geometry.HalfAngleDegrees <= 0)) || (shape == "line" && a.Geometry.Range <= 0) ||
                 (shape == "target" && (a.Geometry.Range != 0 || a.Geometry.HalfAngleDegrees != 0))))
                 errors.Add($"ability {a.Id}: invalid attack geometry");
-            if (shape == "cone" && (a.Self || a.ProjectileSpeed > 0 || a.Damage <= 0 || a.Id == "slash"))
+            if (shape is "cone" or "line" && (a.Self || a.ProjectileSpeed > 0 || a.Damage <= 0 || a.Id == "slash"))
                 errors.Add($"ability {a.Id}: cone requires a direct hostile damaging ability");
-            if (style is not ("none" or "target" or "cone") ||
+            if (shape == "line" && (a.Charge == null || a.Geometry!.Range != a.Charge.Distance || a.Geometry.HalfAngleDegrees != 0))
+                errors.Add($"ability {a.Id}: a line attack is a charge whose range is its distance");
+            if (style is not ("none" or "target" or "cone" or "line") ||
                 (style != "none" && (style != shape || a.Self || a.Damage <= 0 || a.ProjectileSpeed > 0)))
                 errors.Add($"ability {a.Id}: telegraph does not match implemented danger");
             if (a.ActionStyle != "" && (!Enum.TryParse<PixelCreatures.Core.Anatomy.ActionStyle>(a.ActionStyle, out var actionStyle) || !Enum.IsDefined(actionStyle) || actionStyle.ToString() != a.ActionStyle))
                 errors.Add($"ability {a.Id}: unknown procedural action style");
         }
         foreach (var s in Statuses)
-            if (s.Duration <= 0 || s.Interval <= 0 || s.MaxStacks < 1)
+            if (s.Duration <= 0 || s.Interval <= 0 || s.MaxStacks < 1 || s.Modifiers == null || s.Modifiers.Any(m => !float.IsFinite(m.Value) || m.Key is not ("strength" or "defence" or "speed" or "damage" or "power")))
                 errors.Add($"status {s.Id}: invalid stacking/timing");
         foreach (var r in Recipes)
             if (!items.Contains(r.Output) || r.Count < 1 || r.Ingredients.Count == 0 || r.Ingredients.Any(i => !items.Contains(i.Key) || i.Value < 1))

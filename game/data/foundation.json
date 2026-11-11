@@ -151,6 +151,162 @@
         "Visual": "spit",
         "InterceptHostiles": true
       }
+    },
+    {
+      "Id": "pounce",
+      "Name": "Pounce",
+      "Range": 96,
+      "MinRange": 50,
+      "Damage": 11,
+      "Cost": 0,
+      "Cooldown": 3.6,
+      "Windup": 0.55,
+      "Recovery": 0.5,
+      "Type": "physical",
+      "Geometry": {
+        "Shape": "cone",
+        "Range": 30,
+        "HalfAngleDegrees": 70
+      },
+      "Telegraph": {
+        "Style": "cone"
+      },
+      "ActionStyle": "Pounce",
+      "Lunge": {
+        "Distance": 58,
+        "Start": 0.36,
+        "End": 0.56
+      },
+      "Knockback": 20,
+      "PlayerLearnable": false
+    },
+    {
+      "Id": "charge",
+      "Name": "Trampling charge",
+      "Range": 180,
+      "MinRange": 84,
+      "Damage": 16,
+      "Cost": 0,
+      "Cooldown": 6,
+      "Windup": 0.8,
+      "Recovery": 1.05,
+      "Type": "physical",
+      "Geometry": {
+        "Shape": "line",
+        "Range": 170,
+        "HalfAngleDegrees": 0
+      },
+      "Telegraph": {
+        "Style": "line"
+      },
+      "ActionStyle": "Charge",
+      "Charge": {
+        "Distance": 170,
+        "Speed": 250,
+        "Reach": 6,
+        "CrashStagger": 1.2
+      },
+      "Knockback": 36,
+      "PlayerLearnable": false
+    },
+    {
+      "Id": "sting",
+      "Name": "Venom sting",
+      "Range": 52,
+      "Damage": 6,
+      "Cost": 0,
+      "Cooldown": 1.7,
+      "Windup": 0.3,
+      "Recovery": 0.4,
+      "Type": "physical",
+      "Status": "venom",
+      "Telegraph": {
+        "Style": "target"
+      },
+      "ActionStyle": "Sting",
+      "Lunge": {
+        "Distance": 22,
+        "Start": 0.14,
+        "End": 0.3
+      },
+      "PlayerLearnable": false
+    },
+    {
+      "Id": "gust",
+      "Name": "Wing gust",
+      "Range": 58,
+      "Damage": 4,
+      "Cost": 0,
+      "Cooldown": 3.2,
+      "Windup": 0.5,
+      "Recovery": 0.5,
+      "Type": "physical",
+      "Geometry": {
+        "Shape": "cone",
+        "Range": 62,
+        "HalfAngleDegrees": 50
+      },
+      "Telegraph": {
+        "Style": "cone"
+      },
+      "ActionStyle": "WingBuffet",
+      "Knockback": 52,
+      "PlayerLearnable": false
+    },
+    {
+      "Id": "volley",
+      "Name": "Acid volley",
+      "Range": 150,
+      "MinRange": 70,
+      "Damage": 5,
+      "Cost": 8,
+      "Cooldown": 5.5,
+      "Windup": 0.7,
+      "Recovery": 0.6,
+      "Type": "acid",
+      "ProjectileSpeed": 125,
+      "ActionStyle": "Spray",
+      "Projectile": {
+        "Mode": "straight",
+        "Lifetime": 1.6,
+        "Radius": 3,
+        "Visual": "spit",
+        "InterceptHostiles": true,
+        "Count": 3,
+        "SpreadDegrees": 26
+      },
+      "PlayerLearnable": false
+    },
+    {
+      "Id": "screech",
+      "Name": "Rallying screech",
+      "Range": 0,
+      "Damage": 0,
+      "Cost": 15,
+      "Cooldown": 11,
+      "Windup": 0.6,
+      "Recovery": 0.5,
+      "Type": "rally",
+      "Self": true,
+      "Status": "frenzy",
+      "AllyRadius": 170,
+      "ActionStyle": "Roar",
+      "PlayerLearnable": false
+    },
+    {
+      "Id": "bellow",
+      "Name": "Enraged bellow",
+      "Range": 0,
+      "Damage": 0,
+      "Cost": 0,
+      "Cooldown": 30,
+      "Windup": 0.7,
+      "Recovery": 0.4,
+      "Type": "rally",
+      "Self": true,
+      "Status": "rage",
+      "ActionStyle": "Roar",
+      "PlayerLearnable": false
     }
   ],
   "statuses": [
@@ -179,6 +335,38 @@
       "Type": "physical",
       "ModifierStat": "defence",
       "Modifier": 8
+    },
+    {
+      "Id": "venom",
+      "Duration": 5,
+      "Interval": 1,
+      "Damage": 2,
+      "MaxStacks": 3,
+      "Type": "poison"
+    },
+    {
+      "Id": "frenzy",
+      "Duration": 7,
+      "Interval": 1,
+      "Damage": 0,
+      "MaxStacks": 1,
+      "ModifierStat": "speed",
+      "Modifier": 20,
+      "Modifiers": {
+        "strength": 2
+      }
+    },
+    {
+      "Id": "rage",
+      "Duration": 18,
+      "Interval": 1,
+      "Damage": 0,
+      "MaxStacks": 1,
+      "ModifierStat": "speed",
+      "Modifier": 16,
+      "Modifiers": {
+        "strength": 4
+      }
     }
   ],
   "recipes": [
@@ -286,44 +474,147 @@
       "MinimumDistance": 0,
       "PreferredDistance": 26,
       "ApproachDistance": 36,
-      "PursuitDistance": 180,
+      "PursuitDistance": 230,
       "RetreatThreshold": 0.12,
       "DecisionSeconds": 0.2,
       "Reposition": 0.65,
       "Behaviour": "melee",
       "Priorities": {
-        "bite": 2
-      }
+        "bite": 2,
+        "pounce": 3
+      },
+      "SightDistance": 170,
+      "SightHalfAngle": 100,
+      "HearingDistance": 56,
+      "NoticeSeconds": 0.4,
+      "CallRadius": 170,
+      "LeashDistance": 430,
+      "RoamDistance": 60,
+      "EvadeChance": 0.3,
+      "EvadeDistance": 42,
+      "EvadeCooldown": 5
     },
     {
       "Id": "brute",
       "MinimumDistance": 0,
       "PreferredDistance": 30,
       "ApproachDistance": 42,
-      "PursuitDistance": 180,
+      "PursuitDistance": 230,
       "RetreatThreshold": 0.08,
       "DecisionSeconds": 0.4,
       "Reposition": 0.1,
       "Behaviour": "melee",
       "Priorities": {
         "slam": 3,
+        "charge": 2.5,
         "bite": 1
-      }
+      },
+      "SightDistance": 150,
+      "SightHalfAngle": 85,
+      "HearingDistance": 50,
+      "NoticeSeconds": 0.6,
+      "CallRadius": 190,
+      "LeashDistance": 400,
+      "RoamDistance": 30,
+      "Poise": 40,
+      "EnrageThreshold": 0.4,
+      "EnrageAbility": "bellow"
     },
     {
       "Id": "spitter",
       "MinimumDistance": 72,
       "PreferredDistance": 110,
       "ApproachDistance": 140,
-      "PursuitDistance": 210,
+      "PursuitDistance": 240,
       "RetreatThreshold": 0.18,
       "DecisionSeconds": 0.4,
-      "Reposition": 0.5,
+      "Reposition": 0.6,
       "Behaviour": "ranged",
       "Priorities": {
         "spit": 3,
+        "volley": 3.5,
         "bite": 0.5
-      }
+      },
+      "SightDistance": 200,
+      "SightHalfAngle": 110,
+      "HearingDistance": 56,
+      "NoticeSeconds": 0.5,
+      "CallRadius": 150,
+      "LeashDistance": 420,
+      "RoamDistance": 40,
+      "EvadeChance": 0.25,
+      "EvadeDistance": 46,
+      "EvadeCooldown": 6
+    },
+    {
+      "Id": "stalker",
+      "MinimumDistance": 0,
+      "PreferredDistance": 74,
+      "ApproachDistance": 96,
+      "PursuitDistance": 220,
+      "RetreatThreshold": 0,
+      "DecisionSeconds": 0.2,
+      "Reposition": 0.8,
+      "Behaviour": "skirmish",
+      "Priorities": {
+        "sting": 3
+      },
+      "Ambusher": true,
+      "SightDistance": 92,
+      "SightHalfAngle": 180,
+      "HearingDistance": 60,
+      "NoticeSeconds": 0.25,
+      "CallRadius": 0,
+      "MemorySeconds": 2.5,
+      "SearchSeconds": 3,
+      "LeashDistance": 380,
+      "RoamDistance": 0,
+      "EvadeChance": 0.45,
+      "EvadeDistance": 40,
+      "EvadeCooldown": 3.5
+    },
+    {
+      "Id": "howler",
+      "MinimumDistance": 40,
+      "PreferredDistance": 104,
+      "ApproachDistance": 130,
+      "PursuitDistance": 240,
+      "RetreatThreshold": 0.3,
+      "DecisionSeconds": 0.3,
+      "Reposition": 0.7,
+      "Behaviour": "support",
+      "Priorities": {
+        "gust": 3
+      },
+      "RallyAbility": "screech",
+      "SightDistance": 210,
+      "SightHalfAngle": 120,
+      "HearingDistance": 60,
+      "NoticeSeconds": 0.5,
+      "CallRadius": 230,
+      "LeashDistance": 420,
+      "RoamDistance": 50
+    },
+    {
+      "Id": "mire",
+      "MinimumDistance": 0,
+      "PreferredDistance": 26,
+      "ApproachDistance": 36,
+      "PursuitDistance": 220,
+      "RetreatThreshold": 0.15,
+      "DecisionSeconds": 0.2,
+      "Reposition": 0.5,
+      "Behaviour": "melee",
+      "Priorities": {
+        "bite": 2
+      },
+      "SightDistance": 130,
+      "SightHalfAngle": 95,
+      "HearingDistance": 50,
+      "NoticeSeconds": 0.5,
+      "CallRadius": 120,
+      "LeashDistance": 420,
+      "RoamDistance": 45
     }
   ]
 }

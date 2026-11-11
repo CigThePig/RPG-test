@@ -13,6 +13,17 @@ public enum ActionState
     Dodging = 6
 }
 
+/// <summary>What a non-player actor currently knows about its quarry. Saved; default is legacy-compatible.</summary>
+public enum Awareness
+{
+    Unaware = 0,
+    Suspicious = 1,
+    Alerted = 2,
+    Engaged = 3,
+    Searching = 4,
+    Returning = 5
+}
+
 public sealed class Appearance
 {
     public string Family { get; set; } = "biped";
@@ -83,7 +94,30 @@ public sealed class ActorState : ISpellCaster, ISpellTarget
     public float ActionElapsed { get; set; }
     public float ActionDirectionX { get; set; }
     public float ActionDirectionY { get; set; }
+    // Optional schema-1 perception and tactics fields. Defaults describe an actor that
+    // has noticed nothing, so older saves load as a calm world.
+    public Awareness Awareness { get; set; }
+    /// <summary>Detection meter, 0..1. Reaching 1 turns suspicion into alarm.</summary>
+    public float Alertness { get; set; }
+    /// <summary>Seconds left in the current alarm beat or search.</summary>
+    public float AwarenessRemaining { get; set; }
+    public float LastKnownX { get; set; }
+    public float LastKnownY { get; set; }
+    public double LastSeenTime { get; set; }
+    /// <summary>Authoritative ground facing; zero means "not yet established" and sees all around.</summary>
+    public float FacingX { get; set; }
+    public float FacingY { get; set; }
+    /// <summary>Remaining guard for profiles with poise; a hit that leaves some does not stagger.</summary>
+    public float Poise { get; set; }
+    public float PoiseDelay { get; set; }
+    /// <summary>Alarmed by an ally's call rather than its own senses; such actors do not call again.</summary>
+    public bool Called { get; set; }
+    /// <summary>The current charge or lunge has already landed its one hit.</summary>
+    public bool ActionConnected { get; set; }
     public Vector2 Position => new(X, Y);
+    public Vector2 Facing => new(FacingX, FacingY);
+    public Vector2 LastKnown => new(LastKnownX, LastKnownY);
+    public Vector2 Home => new(HomeX, HomeY);
     public bool Alive => Health > 0;
 }
 

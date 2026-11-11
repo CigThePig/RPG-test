@@ -18,6 +18,9 @@ public static class ContentAudit
         {
             if (region.Value.GetProperty("count").GetInt32() is < 3 or > 32)
                 errors.Add($"spawn {region.Name}: invalid count");
+            if (region.Value.TryGetProperty("roster", out var roster) && (roster.GetArrayLength() == 0 || roster.EnumerateArray().Any(entry =>
+                !region.Value.GetProperty("archetypes").EnumerateArray().Any(x => x.GetProperty("profile").GetString() == entry.GetString()))))
+                errors.Add($"spawn {region.Name}: roster names an unknown archetype");
             foreach (var archetype in region.Value.GetProperty("archetypes").EnumerateArray())
             {
                 if (!CreatureRuntime.Registry.TryGetFamily(archetype.GetProperty("family").GetString()!, out _))

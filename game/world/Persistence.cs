@@ -44,6 +44,9 @@ public static class Persistence
                 throw new InvalidDataException($"Invalid actor {id}");
             if (a.Appearance.Generator != "ppc-a2207c4" || !CreatureRuntime.Registry.TryGetFamily(a.Appearance.Family, out _) || (a.Appearance.GenomeJson != "" && !CreatureRuntime.Serializer.Deserialize(a.Appearance.GenomeJson).Ok) || a.PendingAbility != "" && !content.Abilities.Any(d => d.Id == a.PendingAbility) || a.RecoveryAbility != "" && !content.Abilities.Any(d => d.Id == a.RecoveryAbility) || !float.IsFinite(a.ActionElapsed) || !float.IsFinite(a.ActionDirectionX) || !float.IsFinite(a.ActionDirectionY))
                 throw new InvalidDataException($"Invalid appearance or pending action {id}");
+            if (!Enum.IsDefined(a.Awareness) || !float.IsFinite(a.Alertness) || a.Alertness < 0 || a.Alertness > 1 || !float.IsFinite(a.AwarenessRemaining) || !float.IsFinite(a.LastKnownX) || !float.IsFinite(a.LastKnownY) ||
+                !double.IsFinite(a.LastSeenTime) || !float.IsFinite(a.FacingX) || !float.IsFinite(a.FacingY) || !float.IsFinite(a.Poise) || !float.IsFinite(a.PoiseDelay) || a.PoiseDelay < 0)
+                throw new InvalidDataException($"Invalid awareness {id}");
         }
 
         foreach (var p in s.Projectiles)
@@ -76,7 +79,7 @@ public static class Persistence
                 float blockedFor = actor.Statuses.Where(st => st.Remaining > 0 && content.Statuses.Any(def => def.Id == st.Id && def.BlocksActions))
                     .Select(st => st.Remaining).DefaultIfEmpty(0).Max();
                 bool invalid = !actor.Alive || blockedFor > 0 ||
-                    (ability.Geometry?.Shape == "cone" && !CombatGeometry.TryNormalize(new System.Numerics.Vector2(actor.ActionDirectionX, actor.ActionDirectionY), out _));
+                    ((World.Directed(ability) || ability.Lunge != null) && !CombatGeometry.TryNormalize(new System.Numerics.Vector2(actor.ActionDirectionX, actor.ActionDirectionY), out _));
                 if (invalid)
                 {
                     actor.State = !actor.Alive ? ActionState.Dead : blockedFor > 0 ? ActionState.Staggered : ActionState.Idle;
@@ -94,6 +97,13 @@ public static class Persistence
                 actor.ActionDirectionX = actor.ActionDirectionY = 0;
                 actor.MotionX = actor.MotionY = 0;
             }
+            // A charge cannot resume without its lane; let the actor simply recover.
+            if (actor.State == ActionState.Recovery && actor.RecoveryAbility != "" && content.Abilities.Single(d => d.Id == actor.RecoveryAbility).Charge != null &&
+                !CombatGeometry.TryNormalize(new System.Numerics.Vector2(actor.ActionDirectionX, actor.ActionDirectionY), out _))
+                actor.ActionConnected = true;
+            // Awareness of an actor that no longer exists decays to calm rather than failing the load.
+            if (actor.Awareness is Awareness.Alerted or Awareness.Engaged && (actor.Id == "player" || !s.Actors.TryGetValue(actor.Target, out var quarry) || !quarry.Alive))
+            { actor.Awareness = Awareness.Unaware; actor.Alertness = actor.AwarenessRemaining = 0; }
             if (!double.IsFinite(actor.NextTacticalTime) || actor.NextTacticalTime < 0 || actor.NextTacticalTime > s.Time + 2)
                 throw new InvalidDataException("Invalid tactical cadence");
             // Unknown optional profiles fall back to legacy tactics, preserving old actors.
