@@ -15,6 +15,8 @@ Use Godot **4.6.1 .NET**, SDK **9.0.203** (with the .NET 8 runtime/targeting pac
 
 PR #4 Part 1 adds `CombatTelegraphChecks` to the existing integration runner, plus desktop and `--mobile` viewport captures and four production replay scenarios (`telegraph-bite`, `telegraph-dodge`, `telegraph-interrupt`, and `telegraph-cone`). Run `xvfb-run -a python3 tools/gameplay-verify.py --presets baseline,precise` to record the actual renderer and extract labelled early, middle and post-impact frames. The visual screenshot fixture slows engine time for reliable capture; the fixed-clock gameplay movies exercise the normal simulation cadence. Inspect the resulting images and movies as well as the assertions. Hosted workflows upload exact-head artifacts; neither software rendering nor an emulator establishes physical phone performance or feel.
 
+Enemy behaviour and animation are covered by `EnemyBehaviorChecks` and `EnemyAnimationChecks` in the integration runner and by seven `behaviour-*` scenes in the gameplay replay; what each covers, and the contact-sheet and capture tools for looking at the result, are in [ENEMY_BEHAVIOR.md](ENEMY_BEHAVIOR.md#tools-and-checks). `tools/verify.py --headless --test-only=<Suite,...>` runs selected suites.
+
 ## Executed evidence
 
 - **213 production integration assertions** pass inside Godot, spanning C#, GDScript and imported addon implementations. Source: `game/tests/FoundationChecks.cs`; raw timings: `docs/verification.json`.

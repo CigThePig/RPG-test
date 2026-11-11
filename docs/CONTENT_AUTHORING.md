@@ -12,13 +12,13 @@ All example definitions are in `game/data/`. `ContentAudit` runs at application 
 | Recipes | `foundation.json: recipes` | Ingredient ID/quantity map, output ID and count; optional material/quality constructs an instance with transformed properties. The same Gloot transaction path is available to NPCs. |
 | Loot | `foundation.json: loot` | Chance and bounded quantity per actual item ID. Instances go into the defeated actor's container. |
 | NPCs/schedules | `foundation.json: npcProfiles` | Family, profession/faction and ordered hourly activities. Profiles share World actions and the planner. |
-| Combat profiles | `foundation.json: combatProfiles` | Stable ID, minimum/preferred/approach/pursuit distances, retreat health fraction, decision seconds, reposition fraction, melee/ranged behaviour and positive per-ability priorities. |
+| Combat profiles | `foundation.json: combatProfiles` | Stable ID, minimum/preferred/approach/pursuit distances, retreat health fraction, decision seconds, reposition fraction, melee/ranged/skirmish/support behaviour and positive per-ability priorities. Optional senses, leash, guard, evasion, enrage and rally fields: see [enemy behaviour](ENEMY_BEHAVIOR.md#authoring). |
 | Factions | `foundation.json: factions` | Directed `source:target` opinion; per-actor reputation can modify it. Relations and knowledge are persistent. |
 | Quests | `quests.json` | Upstream Quest extension: unique integer ID, event/value objective, count, prerequisite and reward. Objective targets use actual event values, actor/region IDs remain available in event arguments. |
 | Dialogue | `warden.dialogue` | Edit in Dialogue Manager. For v4 response conditions use `[if condition /]`. Mutations call `accept_quest`; queries use `completed`/flags. |
 | Regions | `Regions.Overworld` | Seed/size and generation constraints. `RegionState` owns tiles, features and persistent changes. Add region definitions through this boundary. |
 | Dungeons | `third_party/graph_dungeon/grammar`, recipe/start files | Original mission and layout grammar. Run `python3 tools/pack-dungeon-rules.py` after edits; no hand-editing the packaged JSON. |
-| Spawns | `spawns.json` | Count, faction and archetypes (combat profile, registered family, name, speed, health). Stable actor IDs are derived from region and spawn index. |
+| Spawns | `spawns.json` | Count, faction, archetypes (combat profile, registered family, name, speed, health) and an optional `roster` naming which archetype each spawn index gets. Stable actor IDs are derived from region and spawn index. |
 | Creature identity | Workshop / PPC JSON | Select any registered family/seed, preview, mutate and export original PPC genome. Full genome, not just a PNG or family label, is stored. |
 | Audio | `AudioService.gd` | Original gdfxr parameter configs and editor; `export_effects()` writes reproducible WAVs. Supply AudioStreams for ambience/music. |
 
