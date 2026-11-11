@@ -81,6 +81,7 @@ public static class EnemyBehaviorChecks
             Pounce(check);
             Charge(check);
             Guard(check);
+            SelfBuffMemory(app, check);
             Evasion(check);
             Stalker(check);
             Howler(check);
@@ -289,6 +290,61 @@ public static class EnemyBehaviorChecks
         check(dodged && p.Health == health && Saw(CombatPresentationKind.ChargeCrashed, a.Id), "a charge that meets a wall crashes");
         check(dazed > def.Charge!.CrashStagger - .1f && r.CanStand(a.Position, a), "the crash leaves the brute dazed and inside the arena");
 
+        // Diagonal contact must not take the ordinary movement tangent along a wall.
+        foreach (float sign in new[] { -1f, 1f })
+        {
+            Arena(490, 360 + sign * 80);
+            a = Spawn("b:diagonal", "brute", 410, 360, V.UnitX); Engage(a);
+            check(w.Activate(a.Id, "charge", p.Id), "diagonal charge fixture starts");
+            var origin = a.Position;
+            var direction = new V(a.ActionDirectionX, a.ActionDirectionY);
+            for (int y = 0; y < r.Height; y++) r.Tiles[y * r.Width + 22] = Terrain.Wall;
+            p.X = 200; p.Y = 200;
+            float drift = 0;
+            for (int i = 0; i < 100 && !Saw(CombatPresentationKind.ChargeCrashed, a.Id); i++)
+            {
+                a.NextTacticalTime = w.Time + 1;
+                w.Step(Dt);
+                var offset = a.Position - origin;
+                drift = Math.Max(drift, MathF.Abs(offset.X * direction.Y - offset.Y * direction.X));
+            }
+            check(Saw(CombatPresentationKind.ChargeCrashed, a.Id) && a.State == ActionState.Staggered && drift < .01f,
+                "an oblique charge stops on its lane at the first wall contact");
+        }
+
+        // Landing ends the run, including movement after its warning disappears.
+        Arena();
+        a = Spawn("b:contact-stop", "brute", 370, 360, V.UnitX); Engage(a);
+        check(w.Activate(a.Id, "charge", p.Id), "contact-stop fixture starts");
+        for (int i = 0; i < 100 && !a.ActionConnected; i++) { a.NextTacticalTime = w.Time + 1; w.Step(Dt); }
+        var contact = a.Position;
+        bool landed = Saw(CombatPresentationKind.Hit, a.Id);
+        Run(8, _ => a.NextTacticalTime = w.Time + 1);
+        check(landed && a.Position == contact && !TelegraphView.IsCharging(w, a, def), "a landed charge stops moving when its warning ends");
+
+        // A wider authored reach must still respect cover at a wall corner.
+        Arena();
+        a = Spawn("b:covered", "brute", 370, 360, V.UnitX); Engage(a);
+        w.BeginAbility(a, p, def);
+        a.State = ActionState.Recovery; a.PendingAbility = ""; a.RecoveryAbility = def.Id;
+        a.ActionElapsed = def.Windup; a.StateRemaining = def.Recovery;
+        a.X = 480 - a.Radius - 1; a.Y = 360 + a.Radius + 6;
+        p.X = 480 + p.Radius + 6; p.Y = 360 - p.Radius - 1;
+        r.Tiles[15 * r.Width + 20] = Terrain.Wall;
+        float reach = def.Charge!.Reach;
+        try
+        {
+            def.Charge.Reach = 24; // Valid authoring limit; the victim is close but occluded.
+            check(r.CanStand(a.Position, a) && r.CanStand(p.Position, p) && !w.LineOfSight(a, p) &&
+                V.Distance(a.Position, p.Position) <= a.Radius + p.Radius + def.Charge.Reach,
+                "corner fixture has two legal bodies within charge reach separated by cover");
+            health = p.Health;
+            a.NextTacticalTime = w.Time + 1;
+            w.Step(Dt);
+            check(p.Health == health && !Saw(CombatPresentationKind.Hit, a.Id), "charge reach cannot damage a body through cover");
+        }
+        finally { def.Charge.Reach = reach; }
+
         // A missed charge in the open ends as a miss, not a crash.
         Arena(480, 360);
         a = Spawn("b:charger", "brute", 480 - 110, 360, V.UnitX); Engage(a);
@@ -334,6 +390,31 @@ public static class EnemyBehaviorChecks
         int bellows = w.Events.Recent.Count(e => e.Kind == "ability_started" && e.Actor == a.Id && e.Value == "bellow");
         Run(240, _ => a.Cooldowns["charge"] = 30);
         check(bellows == 1 && w.Events.Recent.Count(e => e.Kind == "ability_started" && e.Actor == a.Id && e.Value == "bellow") == 1, "it does not bellow again while the rage lasts");
+    }
+
+    static void SelfBuffMemory(Foundation app, Action<bool, string> check)
+    {
+        foreach (var (profile, ability, status) in new[] { ("brute", "bellow", "rage"), ("howler", "screech", "frenzy") })
+        {
+            Arena();
+            var a = Spawn("b:buff-memory", profile, 380, 360, V.UnitX); Engage(a);
+            var d = w.FindAbility(ability)!;
+            check(w.Activate(a.Id, ability, a.Id) && a.Target == p.Id, ability + " preserves the engaged quarry during its windup");
+            var parsed = Persistence.Parse(Persistence.Capture(w, app.Narrative), w.Content);
+            check(parsed.Actors[a.Id].Target == p.Id && parsed.Actors[a.Id].PendingAbility == ability,
+                ability + " saves its quarry and self recipient independently");
+            // Resume the cast itself, not just its parsed fields.
+            Persistence.Restore(w, app.Narrative, Persistence.Capture(w, app.Narrative));
+            a = w.Actors[a.Id]; p = w.Player; r = w.RegionsById[r.Id];
+            // The player disappears while the creature is busy casting.
+            p.X = 600;
+            for (int y = 0; y < r.Height; y++) r.Tiles[y * r.Width + 22] = Terrain.Wall;
+            for (int i = 0; i < (int)MathF.Ceiling((d.Windup + d.Recovery) * 60) + 3; i++)
+            { a.NextTacticalTime = w.Time + 1; w.Step(Dt); }
+            EnemyMind.Think(w, a, w.FindProfile(profile), .2f);
+            check(a.Statuses.Any(s => s.Id == status) && a.Target == p.Id && a.Awareness == Awareness.Engaged && a.TacticalIntent == "pursue",
+                ability + " buffs the caster then pursues the hidden quarry from memory");
+        }
     }
 
     static void Evasion(Action<bool, string> check)

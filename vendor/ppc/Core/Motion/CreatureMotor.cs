@@ -248,12 +248,15 @@ namespace PixelCreatures.Core.Motion
         }
 
         /// <summary>Hit from a world direction (vector pointing from the attacker to the creature is derived internally).</summary>
-        public void TriggerHit(Vec3 fromDirectionWorld, double strength = 1.0)
+        public void TriggerHit(Vec3 fromDirectionWorld, double strength = 1.0, bool interruptAction = true)
         {
             if (_rest.Progress > 0.01) _rest.Requested = false;
-            _pendingAction = false;
-            _gameplayActionTime = null;
-            _action.Cancel();
+            if (interruptAction)
+            {
+                _pendingAction = false;
+                _gameplayActionTime = null;
+                _action.Cancel();
+            }
             _hitSamplingUntil = _ctx.Time + .38;
             _hit.Trigger(_ctx, fromDirectionWorld, strength);
             _driver.Tail?.Impulse(new Vec3(-fromDirectionWorld.X, 0.5, -fromDirectionWorld.Z).NormalizedOr(Vec3.UnitY) * 40, FixedClock.DefaultStep);

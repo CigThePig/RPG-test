@@ -77,7 +77,7 @@ public partial class CharacterView : Node2D
     AbilityDef? CurrentAbility => World?.FindAbility(State.State == ActionState.Windup ? State.PendingAbility : State.State == ActionState.Recovery ? State.RecoveryAbility : "");
 
     /// <summary>Running down a committed charge lane right now.</summary>
-    public bool Charging => State.State == ActionState.Recovery && CurrentAbility is { Charge: { } charge } ability &&
+    public bool Charging => !State.ActionConnected && State.State == ActionState.Recovery && CurrentAbility is { Charge: { } charge } ability &&
         State.ActionElapsed >= ability.Windup && State.ActionElapsed - ability.Windup < charge.Duration;
 
     // The posture is a pure reading of saved actor state, so a restored view shows the same mood.
@@ -249,12 +249,12 @@ public partial class CharacterView : Node2D
     }
 
     /// <summary>Use captured pre-knockback positions; never rotate the victim to face the source.</summary>
-    public void ReactToHit(System.Numerics.Vector2 origin, System.Numerics.Vector2 impact, float strength)
+    public void ReactToHit(System.Numerics.Vector2 origin, System.Numerics.Vector2 impact, float strength, bool interruptAction = true)
     {
         if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
         var from = new Vector2(origin.X - impact.X, origin.Y - impact.Y);
-        Creature.TriggerHit(from.LengthSquared() > .001f ? from.Normalized() : Vector2.Left, strength);
-        attackDuration = 0;
+        Creature.TriggerHit(from.LengthSquared() > .001f ? from.Normalized() : Vector2.Left, strength, interruptAction);
+        if (interruptAction) attackDuration = 0;
     }
 
     /// <summary>Collapse away from the blow. Captured positions; the corpse itself is never moved.</summary>

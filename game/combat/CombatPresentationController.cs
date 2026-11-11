@@ -150,7 +150,10 @@ public sealed class CombatPresentationController : IDisposable
                 bool heavy = Heavy(ability);
                 bool guarded = e.Outcome == "guarded";
                 if (e.Outcome == "ambush") heavy = true;
-                view?.ReactToHit(e.Origin, e.Position, guarded ? .45f : heavy ? 1.35f : periodic ? .55f : 1f);
+                // Read the resolved state: ambush/periodic outcomes can also leave a guarded action running.
+                bool actionSurvives = world.Actors.TryGetValue(e.TargetId, out var hitActor) &&
+                    hitActor.State is ActionState.Windup or ActionState.Recovery or ActionState.Dodging;
+                view?.ReactToHit(e.Origin, e.Position, guarded ? .45f : heavy ? 1.35f : periodic ? .55f : 1f, !actionSurvives);
                 if (pendingProjectileImpact is { } hitImpact && SameImpact(hitImpact,e))
                 {
                     pendingProjectileImpact = null;

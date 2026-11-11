@@ -95,6 +95,17 @@ public static class EnemyAnimationChecks
                 check(acting && !motor.ActionActive, $"{label}: {ability.Id} plays through its windup and recovery");
             }
 
+            var preserved = Motor(family, seed);
+            preserved.TriggerGameplayAction(.4, .3, ActionStyle.Bite);
+            Advance(preserved, .1);
+            double actionTime = preserved.ActionTime;
+            preserved.TriggerHit(Vec3.UnitX, .45, interruptAction: false);
+            Advance(preserved, .1);
+            check(preserved.ActionActive && preserved.ActionTime > actionTime && preserved.ActionTriggerCount == 1,
+                label + ": a non-interrupting hit layers over the running action");
+            Advance(preserved, .6);
+            check(!preserved.ActionActive, label + ": the preserved action finishes on its original timeline");
+
             // A hop for bodies that cannot roll: off the ground mid-way, back down at the end.
             var hopper = Motor(family, seed); Advance(hopper, .3);
             hopper.DodgeBiped = false; hopper.DodgeProgress = .5; Advance(hopper, 1.0 / 60);
@@ -159,6 +170,29 @@ public static class EnemyAnimationChecks
             check(guard.Overlay.DazeVisible, "a long stagger shows as a daze");
             brute.State = ActionState.Idle; brute.StateRemaining = 0;
 
+            // Production damage events must agree with the action that survived in simulation.
+            brute.Statuses.Clear(); w.Cancel(brute); brute.Invulnerable = 0;
+            brute.PoiseDelay = 0; brute.Health = brute.MaxHealth;
+            brute.Awareness = Awareness.Unaware; // Ambush outcome still leaves poise intact.
+            w.BeginAbility(brute, p, w.FindAbility("slam")!);
+            w.Damage(p, brute, 1, "physical", ability: "slash");
+            check(brute.State == ActionState.Windup && guard.Creature.Motor!.ActionActive,
+                "a guarded ambush hit preserves the authoritative attack animation");
+            w.Damage(p, brute, 1, "fire", periodic: true);
+            check(brute.State == ActionState.Windup && guard.Creature.Motor!.ActionActive,
+                "periodic damage preserves a guarded enemy's animation");
+            brute.Invulnerable = 0;
+            w.Damage(p, brute, w.FindProfile("brute")!.Poise + w.Stat(brute, "defence"), "physical", ability: "slash");
+            check(brute.State == ActionState.Staggered && !guard.Creature.Motor!.ActionActive,
+                "a guard-breaking hit still cancels the attack animation");
+            var playerView = app.Views[p.Id];
+            w.Cancel(p); p.Health = p.MaxHealth; p.Invulnerable = 0;
+            w.BeginAbility(p, brute, w.FindAbility("slash")!);
+            w.Damage(brute, p, 1, "fire", periodic: true);
+            check(p.State == ActionState.Windup && playerView.Creature.Motor!.ActionActive,
+                "periodic damage preserves an attacking player's animation");
+            w.Cancel(p); w.Cancel(brute); brute.Health = brute.MaxHealth;
+
             // A charge: the lane is warned during the windup and while it is being run.
             var charge = w.FindAbility("charge")!;
             brute.Statuses.Clear(); w.Cancel(brute); p.X = brute.X - 140; p.Y = brute.Y; brute.Cooldowns.Clear();
@@ -167,6 +201,10 @@ public static class EnemyAnimationChecks
             Sync();
             check(guard.Charging && guard.Stance == StanceKind.Charge && TelegraphView.IsCharging(w, brute, charge) && guard.Dust!.Active,
                 "the run itself is a head-down charge that kicks up dust, still warned");
+            brute.ActionConnected = true; Sync();
+            check(!guard.Charging && guard.Stance != StanceKind.Charge && !TelegraphView.IsCharging(w, brute, charge),
+                "a connected charge leaves its running stance together with its warning");
+            brute.ActionConnected = false;
             for (int i = 0; i < 90; i++) { w.Step(1f / 60); brute.NextTacticalTime = 1e9; }
             Sync();
             check(!guard.Charging && !TelegraphView.IsCharging(w, brute, charge) && !TelegraphView.IsActive(w, brute, charge), "the warning ends with the charge");

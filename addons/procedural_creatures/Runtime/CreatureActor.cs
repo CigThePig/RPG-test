@@ -357,9 +357,9 @@ namespace PixelCreatures.Runtime
         public void TriggerAction() => Motor?.TriggerAction();
 
         /// <summary>Hit coming from a ground direction (x east, y south) pointing from the creature to the attacker.</summary>
-        public void TriggerHit(Vector2 fromDirection, float strength = 1f)
+        public void TriggerHit(Vector2 fromDirection, float strength = 1f, bool interruptAction = true)
         {
-            Motor?.TriggerHit(new Vec3(fromDirection.X, 0, fromDirection.Y), strength);
+            Motor?.TriggerHit(new Vec3(fromDirection.X, 0, fromDirection.Y), strength, interruptAction);
             RequestRender();
         }
 

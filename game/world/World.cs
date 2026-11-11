@@ -301,17 +301,17 @@ public sealed class World
             return;
         }
         var charge = d.Charge!;
-        if (a.State != ActionState.Recovery) return;
+        if (a.State != ActionState.Recovery || a.ActionConnected) return;
         float running = a.ActionElapsed - d.Windup, before = previous - d.Windup;
         if (before >= charge.Duration) return;
         float travel = charge.Speed * (Math.Min(running, charge.Duration) - Math.Max(before, 0));
         var from = a.Position;
-        Move(a, direction * travel);
+        Move(a, direction * travel, slide: false, out bool blocked);
         if (!a.ActionConnected)
         {
             // The nearest hostile body in the lane takes the one hit; stable IDs break ties.
             var victim = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) &&
-                    Vector2.Distance(a.Position, b.Position) <= a.Radius + b.Radius + charge.Reach && Vector2.Dot(b.Position - from, direction) > -b.Radius)
+                    Vector2.Distance(a.Position, b.Position) <= a.Radius + b.Radius + charge.Reach && Vector2.Dot(b.Position - from, direction) > -b.Radius && LineOfSight(a, b))
                 .OrderBy(b => Vector2.DistanceSquared(a.Position, b.Position)).ThenBy(b => b.Id, StringComparer.Ordinal).FirstOrDefault();
             if (victim != null)
             {
@@ -323,7 +323,7 @@ public sealed class World
                 return;
             }
         }
-        if (!a.ActionConnected && travel > .01f && Vector2.Distance(from, a.Position) < travel * .35f)
+        if (blocked)
         {
             // Ran into terrain: the charge ends in a daze instead of an ordinary recovery.
             Present(CombatPresentationKind.ChargeCrashed, a, a.Target, d.Id);
@@ -382,7 +382,8 @@ public sealed class World
         a.StateRemaining = d.Windup;
         a.PendingAbility = d.Id;
         a.RecoveryAbility = "";
-        a.Target = b.Id;
+        // Self abilities have a fixed recipient; Target remains the AI's combat quarry.
+        if (!d.Self) a.Target = b.Id;
         a.FreeSlash = false;
         a.ActionElapsed = 0;
         a.ActionConnected = false;
@@ -640,7 +641,7 @@ public sealed class World
                             }
                             if (victims.Length == 0) Present(CombatPresentationKind.Miss, a, a.Target, d.Id, outcome: "miss");
                         }
-                        else if (Actors.TryGetValue(a.Target, out var t))
+                        else if (Actors.TryGetValue(d.Self ? a.Id : a.Target, out var t))
                         {
                             if (d.ProjectileSpeed > 0)
                             {
@@ -763,8 +764,11 @@ public sealed class World
     }
 
     public bool LineOfSight(ActorState a, ActorState b) => a.Region == b.Region && VisibleTo(a, b.Position);
-    public bool Move(ActorState a, Vector2 delta)
+    public bool Move(ActorState a, Vector2 delta) => Move(a, delta, slide: true, out _);
+
+    bool Move(ActorState a, Vector2 delta, bool slide, out bool blocked)
     {
+        blocked = false;
         if (!a.Alive || !float.IsFinite(delta.X) || !float.IsFinite(delta.Y))
             return false;
         var r = RegionsById[a.Region];
@@ -780,6 +784,7 @@ public sealed class World
                 moved |= delta.LengthSquared() > 0;
                 continue;
             }
+            blocked = true;
             if (a.Id == "player")
             {
                 CollisionAttempts++;
@@ -793,15 +798,17 @@ public sealed class World
             for(int k=0;k<6;k++) { float mid=(lo+hi)*.5f; if(r.CanStand(a.Position+delta*mid,a))lo=mid;else hi=mid; }
             var accepted=delta*lo;
             a.X+=accepted.X;a.Y+=accepted.Y;moved |= accepted.LengthSquared()>0;
+            // Committed charges stop at the first contact and retain their warned lane.
+            if (!slide) break;
             var remainder=delta*(1-lo);
             // Prefer the larger tangent request rather than always preferring X.
             bool xFirst=Math.Abs(remainder.X)>=Math.Abs(remainder.Y);
             for(int axis=0;axis<2;axis++)
             {
                 bool horizontal=(axis==0)==xFirst;
-                var slide=horizontal ? new Vector2(remainder.X,0) : new Vector2(0,remainder.Y);
-                if(slide.LengthSquared()==0 || !r.CanStand(a.Position+slide,a))continue;
-                a.X+=slide.X;a.Y+=slide.Y;moved=true;
+                var tangent=horizontal ? new Vector2(remainder.X,0) : new Vector2(0,remainder.Y);
+                if(tangent.LengthSquared()==0 || !r.CanStand(a.Position+tangent,a))continue;
+                a.X+=tangent.X;a.Y+=tangent.Y;moved=true;
                 if(a.Id=="player")CollisionSlides++;
             }
         }
