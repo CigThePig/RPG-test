@@ -78,21 +78,29 @@ public partial class Foundation : Node2D
             "two melee" => new[]{"prowler","brute"},
             "four mixed" => new[]{"prowler","brute","spitter","prowler"},
             "crowd" => Enumerable.Range(0,8).Select(i=>new[]{"prowler","brute","spitter"}[i%3]).ToArray(),
+            "alpha" => new[]{"alpha","prowler","prowler","prowler"},
+            "shellback" => new[]{"shellback"}, "lasher" => new[]{"lasher"},
+            "mender" => new[]{"mender","prowler","prowler"},
+            // A den at rest: two asleep, one keeping watch.
+            "sleepers" => new[]{"prowler","prowler","prowler"},
+            "depths" => new[]{"alpha","prowler","shellback","mender","lasher","spitter"},
             _ => new[]{"prowler","brute","spitter"}
         };
         for(int i=0;i<profiles.Length;i++)
         {
             string id=profiles[i];
             float x=380+(i/3)*42,y=275+(i%3)*30;
-            float health=id switch {"prowler"=>65,"brute"=>120,"stalker"=>45,"howler"=>50,_=>55};
             if(id=="spitter")x+=65;
-            var a=new ActorState{Id="lab:"+id+(i<3 && !World.Actors.ContainsKey("lab:"+id) ? "" : ":"+i),Name=id,Region=p.Region,Faction="beasts",Profile="beast",CombatProfile=id,
-                Appearance=new(){Family=id switch {"prowler"=>"quadruped","brute"=>"reptile","stalker"=>"arthropod","howler"=>"winged",_=>"amorphous"},Seed=seed+(ulong)i},
-                X=x,Y=y,HomeX=x,HomeY=y,Health=health,MaxHealth=health,
-                Abilities=World.Content.CombatProfiles.Single(c=>c.Id==id).Loadout()};
-            AnatomyAdapter.Apply(a);a.Speed=id switch {"prowler"=>88,"brute"=>46,"stalker"=>96,"howler"=>70,_=>62};
             // Lab inhabitants start facing the player, so the fight begins with a sighting.
-            a.FacingX=-1;World.Actors[a.Id]=a;
+            var a=EnemyRoster.Create(World,"lab:"+id+(i<3 && !World.Actors.ContainsKey("lab:"+id) ? "" : ":"+i),id,p.Region,new(x,y),new(-1,0),seed+(ulong)i);
+            a.Name=id;
+            if(encounter=="sleepers")
+            {
+                // The watcher looks away from the door; the sleepers lie beyond it.
+                a.Sleeper=i>0;
+                EnemyMind.Resettle(a,new(430+i*34,270+i*38),new(1,0));
+            }
+            World.Actors[a.Id]=a;
         }
         Trace.Marker($"combat-course/{encounter}/seed-{seed}/{(protectedPlayer ? "protected" : "normal")}");
         Ui.Notify($"Combat lab: {encounter} · {(protectedPlayer ? "protected observation" : "normal health")} · reset / return through Feel lab");

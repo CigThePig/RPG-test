@@ -80,7 +80,7 @@ public static class DungeonChecks
             var r=w.RegionsById["ruin"];var p=w.Player;
             var inhabitants=w.Actors.Values.Where(a=>a.Id.StartsWith("ruin:spawn:")&&a.Region=="ruin").ToArray();
             check(r.CanStand(p.Position,p) && r.Features.Keys.All(at=>V.Distance(p.Position,r.Center(at))>=40),"arrival clears walls and return marker "+seed);
-            check(inhabitants.Length==8 && inhabitants.All(a=>r.CanStand(a.Position,a) && V.Distance(a.Position,p.Position)>a.Radius+p.Radius+16),"eight production inhabitants and safe entrance "+seed);
+            check(inhabitants.Length==10 && inhabitants.All(a=>r.CanStand(a.Position,a) && V.Distance(a.Position,p.Position)>a.Radius+p.Radius+16),"ten production inhabitants and safe entrance "+seed);
             check(inhabitants.All(a=>r.Features.Keys.All(at=>V.Distance(a.Position,r.Center(at))>=40) && inhabitants.Where(b=>b.Id!=a.Id).All(b=>V.Distance(a.Position,b.Position)>=a.Radius+b.Radius+16)),"spawn separation from features/actors "+seed);
             // Seeded inhabitants may start beyond a locked gate; placement must not pull them to the entrance side.
             var closed=Reachable(r,p);

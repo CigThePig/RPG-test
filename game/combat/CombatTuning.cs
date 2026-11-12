@@ -27,4 +27,29 @@ public static class CombatTuning
     public const float PoiseRecoverySeconds = 3f;
     // Fraction of maximum health regained per second while walking home.
     public const float ReturnHealing = .12f;
+    // Sound. A quarry moving slower than SneakPace of its top speed, and not acting, is quiet:
+    // it is heard only inside QuietHearing of a listener's hearing distance.
+    public const float SneakPace = .6f;
+    public const float QuietHearing = .45f;
+    // How far the noise of each kind of event carries; walls muffle it.
+    public const float FightNoise = 170f;
+    public const float SwingNoise = 55f;
+    public const float RollNoise = 70f;
+    public const float CrashNoise = 230f;
+    public const float MechanismNoise = 180f;
+    public const float MuffledNoise = .6f;
+    // Sleepers: hear half as far, take a long moment to rouse, and are struck twice as hard.
+    public const float SleepingHearing = .5f;
+    public const float WakeSeconds = .9f;
+    public const float SleepingMultiplier = 2f;
+    // After a hunt or a disturbing find an actor stays up and notices faster for this long.
+    public const float WarySeconds = 25f;
+    public const float WaryNotice = .6f;
+    // Broken nerve: seconds on the run after an ally, or the pack's leader, falls in view.
+    public const float RoutSeconds = 3.5f;
+    public const float LeaderRoutSeconds = 5.5f;
+    // A routed actor runs this far from its quarry and no further.
+    public const float RoutDistance = 170f;
+    // A slow turner only starts an attack on something this close to dead ahead.
+    public const float TurnAttackHalfAngle = 55f;
 }

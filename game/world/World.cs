@@ -18,6 +18,9 @@ public sealed class World
     public Dictionary<string, ActorState> Actors { get; set; } = new();
     public Dictionary<string, RegionState> RegionsById { get; set; } = new();
     public List<ProjectileState> Projectiles { get; set; } = new();
+    public List<HazardState> Hazards { get; set; } = new();
+    /// <summary>How hard the player is moving, 0..1 of full pace. Input, not saved: a slow step is a quiet one.</summary>
+    public float PlayerPace { get; private set; }
     public Content Content { get; }
     public Items Items { get; }
     public EventStream Events { get; } = new();
@@ -194,6 +197,7 @@ public sealed class World
         Events.Publish(new("ability_started", a.Id, "", d.Id));
         CombatDiagnostic?.Invoke("attack_started", strike, "slash");
         ThreatenFrom(a, strike, d.Range + a.NaturalReach + CombatTuning.SlashImpactTolerance + CombatTuning.SlashLungeDistance, CombatTuning.SlashArcHalfDegrees);
+        EnemyMind.Noise(this, a, a.Position, CombatTuning.SwingNoise);
         return true;
     }
 
@@ -212,6 +216,7 @@ public sealed class World
         ClearPlayerMotion();
         Present(CombatPresentationKind.DodgeStarted, a, ability: "dodge");
         CombatDiagnostic?.Invoke("dodge_started", facing, "dodge");
+        EnemyMind.Noise(this, a, a.Position, CombatTuning.RollNoise);
         return true;
     }
 
@@ -328,6 +333,7 @@ public sealed class World
             // Ran into terrain: the charge ends in a daze instead of an ordinary recovery.
             Present(CombatPresentationKind.ChargeCrashed, a, a.Target, d.Id);
             CombatDiagnostic?.Invoke("charge_crashed", direction, a.Id);
+            if (Actors.TryGetValue(a.Target, out var quarry)) EnemyMind.Noise(this, quarry, a.Position, CombatTuning.CrashNoise);
             Cancel(a);
             a.State = ActionState.Staggered;
             a.StateRemaining = charge.CrashStagger;
@@ -392,6 +398,8 @@ public sealed class World
         { a.ActionDirectionX = direction.X; a.ActionDirectionY = direction.Y; }
         else a.ActionDirectionX = a.ActionDirectionY = 0;
         if (a.ActionDirectionX != 0 || a.ActionDirectionY != 0) { a.FacingX = a.ActionDirectionX; a.FacingY = a.ActionDirectionY; }
+        // A lobbed attack is thrown at the ground where the target stands now.
+        a.AimX = d.Blast != null ? b.X : 0; a.AimY = d.Blast != null ? b.Y : 0;
         Present(CombatPresentationKind.AttackStarted, a, b.Id, d.Id, b.Position);
         Present(CombatPresentationKind.AttackCommitted, a, b.Id, d.Id, b.Position);
         Events.Publish(new("ability_started", a.Id, b.Id, d.Id));
@@ -434,7 +442,10 @@ public sealed class World
         var impactPosition = target.Position;
         // Striking a foe that has not noticed its attacker lands harder.
         bool ambush = !periodic && source.Id == "player" && target.Id != "player" && target.Awareness is Awareness.Unaware or Awareness.Suspicious;
-        if (ambush) amount *= CombatTuning.AmbushMultiplier;
+        if (ambush) amount *= EnemyMind.Asleep(target) ? CombatTuning.SleepingMultiplier : CombatTuning.AmbushMultiplier;
+        // A hard front turns most of a blow that arrives on it.
+        bool blocked = !periodic && Shielded(target, source.Position);
+        if (blocked) amount *= FindProfile(target.CombatProfile)!.ShieldFactor;
         float resistance = type == "physical" ? Stat(target, "defence") : 0;
         float actual = Math.Max(1, amount - resistance);
         target.Health = Math.Max(0, target.Health - actual);
@@ -444,7 +455,8 @@ public sealed class World
         // Guarded foes shrug off blows until their poise is spent; the breaking hit staggers for longer.
         var guard = target.Alive ? FindProfile(target.CombatProfile) : null;
         bool guarded = false, broken = false;
-        if (guard is { Poise: > 0 })
+        if (blocked) guarded = true;
+        else if (guard is { Poise: > 0 })
         {
             if (target.PoiseDelay <= 0) target.Poise = guard.Poise;
             if (!periodic) { target.Poise -= actual; target.PoiseDelay = CombatTuning.PoiseRecoverySeconds; }
@@ -462,15 +474,22 @@ public sealed class World
         var away = target.Position - source.Position;
         if (!periodic && away.LengthSquared() > 0)
             Move(target, Vector2.Normalize(away) * (guarded ? 4 : FindAbility(ability)?.Knockback ?? 15));
-        Present(CombatPresentationKind.Hit, source, target.Id, ability, impactPosition, periodic ? "periodic" : ambush ? "ambush" : guarded ? "guarded" : "hit");
+        Present(CombatPresentationKind.Hit, source, target.Id, ability, impactPosition, periodic ? "periodic" : ambush ? "ambush" : blocked ? "blocked" : guarded ? "guarded" : "hit");
         if (broken) Present(CombatPresentationKind.GuardBroken, source, target.Id, ability, impactPosition);
         Events.Publish(new("damage", source.Id, target.Id, type, (int)actual));
         if (ambush) Events.Publish(new("ambush", source.Id, target.Id, type, (int)actual));
         target.Knowledge[source.Id] = "attacker";
         target.Relationships[source.Id] = target.Relationships.GetValueOrDefault(source.Id) - actual;
         EnemyMind.Hurt(this, target, source);
+        if (!periodic)
+        {
+            // A fight is loud: anything calm that hears it, and has reason to, comes to look.
+            EnemyMind.Noise(this, source, impactPosition, CombatTuning.FightNoise);
+            EnemyMind.Noise(this, target, impactPosition, CombatTuning.FightNoise);
+        }
         if (!target.Alive)
         {
+            EnemyMind.Fallen(this, target, source);
             Items.Service.Call("unequip_all", target.Id);
             target.PendingAbility = "";
             Present(CombatPresentationKind.Death, source, target.Id, ability, impactPosition);
@@ -483,6 +502,12 @@ public sealed class World
         }
         return true;
     }
+
+    /// <summary>Is a blow from that point turned by the target's hard front right now?</summary>
+    public bool Shielded(ActorState target, Vector2 from) =>
+        target.Alive && FindProfile(target.CombatProfile) is { ShieldArc: > 0 } profile && target.Awareness is Awareness.Alerted or Awareness.Engaged &&
+        target.State is ActionState.Idle or ActionState.Moving or ActionState.Windup && CombatGeometry.TryNormalize(target.Facing, out var front) &&
+        CombatGeometry.InCone(target.Position, from, front, Vector2.Distance(target.Position, from) + 1, profile.ShieldArc);
 
     public static int StableId(string text)
     {
@@ -581,6 +606,11 @@ public sealed class World
                     Damage(source, a, d.Damage * s.Stacks, d.Type, periodic: true);
                     s.UntilTick += d.Interval;
                 }
+                else if (s.UntilTick <= 0 && d.Heal > 0)
+                {
+                    a.Health = Math.Min(a.MaxHealth, a.Health + d.Heal * s.Stacks);
+                    s.UntilTick += d.Interval;
+                }
 
                 if (s.Remaining <= 0)
                     a.Statuses.Remove(s);
@@ -625,13 +655,21 @@ public sealed class World
                             // The lane is committed; contact is resolved while running it.
                             Present(CombatPresentationKind.ChargeStarted, a, a.Target, d.Id);
                         }
-                        else if (d.Geometry?.Shape == "cone")
+                        else if (d.Blast is { } blast)
+                        {
+                            // Thrown: the landing spot stays warned while it is in the air.
+                            Hazards.Add(new HazardState { Source = a.Id, Ability = d.Id, Region = a.Region, X = a.AimX, Y = a.AimY, OriginX = a.X, OriginY = a.Y, Fuse = Math.Max(.01f, blast.Delay) });
+                            Present(CombatPresentationKind.BlastLaunched, a, a.Target, d.Id, a.Aim);
+                        }
+                        else if (d.Geometry?.Shape is "cone" or "burst")
                         {
                             Present(CombatPresentationKind.AttackImpact, a, a.Target, d.Id);
                             var direction = new Vector2(a.ActionDirectionX, a.ActionDirectionY);
+                            bool burst = d.Geometry.Shape == "burst";
                             // Stable IDs define the order independently of dictionary insertion.
                             var victims = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) &&
-                                CombatGeometry.InCone(a.Position, b.Position, direction, d.Geometry.Range, d.Geometry.HalfAngleDegrees) && LineOfSight(a, b))
+                                (burst ? CombatGeometry.InCircle(a.Position, b.Position, d.Geometry.Range)
+                                    : CombatGeometry.InCone(a.Position, b.Position, direction, d.Geometry.Range, d.Geometry.HalfAngleDegrees)) && LineOfSight(a, b))
                                 .OrderBy(b => b.Id, StringComparer.Ordinal).ToArray();
                             foreach (var victim in victims)
                             {
@@ -695,7 +733,7 @@ public sealed class World
                         Think(a, .2f);
                         if(ProfileCombat) TacticalMilliseconds += Milliseconds(start);
                     }
-                    EnemyMind.Face(this, a);
+                    EnemyMind.Face(this, a, dt);
                     if (a.State is ActionState.Idle or ActionState.Moving)
                     {
                         long start = ProfileCombat ? Stamp() : 0;
@@ -707,6 +745,8 @@ public sealed class World
                             ? separation.Velocity(a, RegionsById[a.Region], desired, Math.Max(0, Stat(a, "speed")), dt)
                             : desired;
                         if(ProfileCombat) AvoidanceMilliseconds += Milliseconds(start);
+                        // A sleeper is not nudged off its spot by whoever creeps past it.
+                        if (EnemyMind.Asleep(a)) velocity = Vector2.Zero;
                         Move(a, velocity * dt);
                     }
                 }
@@ -743,7 +783,57 @@ public sealed class World
             // Expiration/target loss is diagnostic only, never a fabricated impact.
             Projectiles.RemoveAt(i);
         }
+        AdvanceHazards(dt);
         if(ProfileCombat) ProjectileMilliseconds = Milliseconds(projectileStart);
+    }
+
+    // Lobbed attacks on the ground: in the air until the fuse runs out, then landing on
+    // whoever is still standing there, then (for some) a pool that lingers.
+    void AdvanceHazards(float dt)
+    {
+        for (int i = Hazards.Count - 1; i >= 0; i--)
+        {
+            var h = Hazards[i];
+            var d = FindAbility(h.Ability);
+            if (d?.Blast == null || !RegionsById.ContainsKey(h.Region)) { Hazards.RemoveAt(i); continue; }
+            Actors.TryGetValue(h.Source, out var source);
+            IEnumerable<ActorState> Inside() => source == null ? Array.Empty<ActorState>() : Actors.Values.Where(b => b.Alive && b.Region == h.Region && Hostile(source, b) &&
+                Vector2.Distance(b.Position, h.Position) <= d.Blast.Radius + b.Radius * .5f).OrderBy(b => b.Id, StringComparer.Ordinal).ToArray();
+            if (!h.Landed)
+            {
+                h.Fuse -= dt;
+                if (h.Fuse > 0) continue;
+                h.Fuse = 0;
+                if (source != null)
+                {
+                    Present(CombatPresentationKind.BlastLanded, source, ability: d.Id, position: h.Position);
+                    CombatDiagnostic?.Invoke("blast_landed", h.Position, d.Id);
+                    // The thrower must still be alive and here for the landing itself to hurt.
+                    if (source.Alive && source.Region == h.Region)
+                        foreach (var victim in Inside())
+                        {
+                            var position = victim.Position;
+                            if (!Resolve(source, victim, d, geometryValidated: true))
+                                Present(CombatPresentationKind.Miss, source, victim.Id, d.Id, position, "miss");
+                        }
+                }
+                if (d.Pool == null) { Hazards.RemoveAt(i); continue; }
+                h.Remaining = d.Pool.Duration; h.UntilTick = d.Pool.Interval;
+                continue;
+            }
+            if (d.Pool == null) { Hazards.RemoveAt(i); continue; }
+            h.Remaining -= dt; h.UntilTick -= dt;
+            if (h.UntilTick <= 0)
+            {
+                h.UntilTick += d.Pool.Interval;
+                foreach (var victim in Inside())
+                {
+                    if (d.Pool.Damage > 0) Damage(source!, victim, d.Pool.Damage, d.Type, periodic: true, ability: d.Id);
+                    if (victim.Alive && d.Pool.Status != "") ApplyStatus(victim, d.Pool.Status, source!.Id);
+                }
+            }
+            if (h.Remaining <= 0) Hazards.RemoveAt(i);
+        }
     }
 
     public bool VisibleTo(ActorState actor, Vector2 point, bool allowBlockedTarget = false)
@@ -816,11 +906,12 @@ public sealed class World
         return moved;
     }
 
-    public void ClearPlayerMotion() { ActualVelocity=RequestedVelocity=Vector2.Zero; LastInput=Vector2.Zero; LastBlockedReason=""; CollisionAttempts=CollisionSlides=0; }
+    public void ClearPlayerMotion() { PlayerPace=0; ActualVelocity=RequestedVelocity=Vector2.Zero; LastInput=Vector2.Zero; LastBlockedReason=""; CollisionAttempts=CollisionSlides=0; }
 
     public bool PlayerMove(Vector2 direction, float dt, float speedScale=1, bool projected=false)
     {
         var a = Player;
+        PlayerPace=0;
         ActualVelocity=RequestedVelocity=Vector2.Zero;
         CollisionAttempts=CollisionSlides=0;
         LastInput=float.IsFinite(direction.X) && float.IsFinite(direction.Y) ? direction : Vector2.Zero; LastBlockedReason="";
@@ -835,6 +926,7 @@ public sealed class World
         bool moved = Move(a, RequestedVelocity * dt);
         ActualVelocity = dt > 0 ? (a.Position - before) / dt : Vector2.Zero;
         a.State = moved ? ActionState.Moving : ActionState.Idle;
+        PlayerPace = moved ? Math.Min(1, magnitude) : 0;
         return moved;
     }
 
@@ -844,6 +936,7 @@ public sealed class World
         a.Activity = profile?.Schedule.Where(s => s.Hour <= ((Time / 60) % 24)).OrderBy(s => s.Hour).LastOrDefault()?.Activity ?? "patrol";
         // An undisturbed ambusher lies folded on its spot whatever the hour.
         if (a.Awareness == Awareness.Unaware && FindProfile(a.CombatProfile)?.Ambusher == true) a.Activity = "ambush";
+        if (EnemyMind.Asleep(a)) a.Activity = "sleep";
     }
 
     public bool Rest(ActorState a, float dt)
@@ -922,6 +1015,7 @@ public sealed class World
                 var raised = DungeonMechanisms.Pull(r, at);
                 if (raised.Length == 0) continue;
                 InteractionFeedback = "Lever pulled — a portcullis grinds open";
+                EnemyMind.Noise(this, a, r.Center(at), CombatTuning.MechanismNoise);
                 Events.Publish(new("lever_pulled", a.Id, a.Region, at.ToString()));
                 return true;
             }
@@ -942,6 +1036,7 @@ public sealed class World
                 if (!Items.Take(a.Id, "dungeon_key", 1))
                 { keyRequired = true; continue; }
                 InteractionFeedback = "Door unlocked";
+                EnemyMind.Noise(this, a, r.Center(at), CombatTuning.MechanismNoise);
                 foreach (int cell in r.GateAt(at)) r.OpenDoors.Add(cell);
                 Events.Publish(new("door_unlocked", a.Id, a.Region, at.ToString()));
                 return true;
@@ -1057,6 +1152,8 @@ public sealed class World
         var archetypes = def.GetProperty("archetypes").EnumerateArray().ToArray();
         // An authored roster fixes the mix; without one the archetypes simply take turns.
         string[] roster = def.TryGetProperty("roster", out var listed) ? listed.EnumerateArray().Select(x => x.GetString()!).ToArray() : Array.Empty<string>();
+        // Roster slots found dozing at their posts.
+        var asleep = def.TryGetProperty("asleep", out var dozing) ? dozing.EnumerateArray().Select(x => x.GetInt32()).ToHashSet() : new HashSet<int>();
         var r = RegionsById[region];
         r.EncountersInitialized = true;
         for (int i = 0; i < count; i++)
@@ -1084,7 +1181,8 @@ public sealed class World
                 Y = pos.Y,
                 HomeX = pos.X,
                 HomeY = pos.Y,
-                Abilities = combat.Loadout()
+                Abilities = combat.Loadout(),
+                Sleeper = asleep.Contains(i)
             };
             var looking = EnemyMind.Hash01(StableId(actor.Id), Seed, 4) * MathF.Tau;
             actor.FacingX = MathF.Cos(looking); actor.FacingY = MathF.Sin(looking);
@@ -1212,6 +1310,8 @@ public sealed class World
             AnatomyAdapter.Apply(a);
             var placed = r.FindPlacement(a.Position, a, Actors.Values);
             a.X = a.HomeX = placed.X; a.Y = a.HomeY = placed.Y;
+            // The last of the pack is found dozing in the grass.
+            a.Sleeper = i == 7;
             if (i >= 2)
             {
                 float looking = EnemyMind.Hash01(StableId(a.Id), Seed, 4) * MathF.Tau;

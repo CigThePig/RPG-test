@@ -37,6 +37,26 @@ public sealed class AbilityDef
     public ChargeDef? Charge { get; set; }
     // Self abilities with a status also grant it to allies this close.
     public float AllyRadius { get; set; }
+    // A "blast" attack: lobbed at the ground where the target stands when it is thrown.
+    public BlastDef? Blast { get; set; }
+    // What a blast leaves behind on the ground.
+    public PoolDef? Pool { get; set; }
+}
+
+public sealed class BlastDef
+{
+    public float Radius { get; set; }
+    // Seconds in the air after the windup, during which the landing spot is still warned.
+    public float Delay { get; set; } = .6f;
+}
+
+public sealed class PoolDef
+{
+    public float Duration { get; set; }
+    public float Interval { get; set; } = .5f;
+    // Periodic damage to hostiles standing in it; never interrupts.
+    public float Damage { get; set; }
+    public string Status { get; set; } = "";
 }
 
 public sealed class LungeDef
@@ -108,8 +128,19 @@ public sealed class CombatProfileDef
     // Self ability used once health falls below this fraction.
     public float EnrageThreshold { get; set; }
     public string EnrageAbility { get; set; } = "";
-    // Self ability with AllyRadius used to embolden nearby allies.
+    // Self ability with AllyRadius used to embolden nearby allies, or to mend them if its status heals.
     public string RallyAbility { get; set; } = "";
+    // A hard front: direct hits arriving within this many degrees of its facing are turned.
+    // Open while it recovers from its own attack, while staggered, and before it has noticed.
+    public float ShieldArc { get; set; }
+    // Fraction of a turned hit's damage that still gets through.
+    public float ShieldFactor { get; set; } = .25f;
+    // Degrees per second it can turn while fighting; zero turns at once.
+    public float TurnDegrees { get; set; }
+    // Its fall breaks the nerve of every follower that sees it.
+    public bool Leader { get; set; }
+    // Chance to hold its nerve when an ally falls in view. One never breaks.
+    public float Morale { get; set; } = 1;
 
     public float Sight => SightDistance > 0 ? SightDistance : PursuitDistance;
     /// <summary>Every ability an actor of this kind carries, in stable order.</summary>
@@ -143,6 +174,8 @@ public sealed class StatusDef
     public bool BlocksActions { get; set; }
     // Further stat changes beside ModifierStat, per stack.
     public Dictionary<string, float> Modifiers { get; set; } = new();
+    // Health restored each interval, per stack.
+    public float Heal { get; set; }
 }
 
 public sealed class RecipeDef
@@ -221,6 +254,10 @@ public sealed class Content
                 p.CallRadius > 360 || p.MemorySeconds > 30 || p.SearchSeconds > 30 || p.LeashDistance < p.PursuitDistance || p.RoamDistance > 200 || p.EvadeChance > 1 || p.EvadeDistance > 90 ||
                 (p.EvadeChance > 0 && p.EvadeCooldown < 1) || p.EnrageThreshold >= 1)
                 errors.Add($"combat profile {p.Id}: invalid senses, leash, guard or evasion");
+            var temper = new[] { p.ShieldArc, p.ShieldFactor, p.TurnDegrees, p.Morale };
+            if (temper.Any(v => !float.IsFinite(v) || v < 0) || p.ShieldArc > 150 || p.ShieldFactor > 1 || p.TurnDegrees > 720 || p.Morale > 1 ||
+                (p.ShieldArc > 0 && p.TurnDegrees <= 0) || (p.Leader && p.Morale < 1))
+                errors.Add($"combat profile {p.Id}: invalid shield, turning or morale");
             foreach (string own in new[] { p.EnrageAbility, p.RallyAbility })
                 if (own != "" && !Abilities.Any(a => a.Id == own && a.Self && a.Status != ""))
                     errors.Add($"combat profile {p.Id}: '{own}' is not a self ability that grants a status");
@@ -256,24 +293,32 @@ public sealed class Content
                 errors.Add($"ability {a.Id}: invalid projectile configuration");
             string? shape = a.Geometry == null ? "target" : a.Geometry.Shape;
             string? style = a.Telegraph == null ? "none" : a.Telegraph.Style;
-            if (shape is not ("target" or "cone" or "line"))
+            if (shape is not ("target" or "cone" or "line" or "blast" or "burst"))
                 errors.Add($"ability {a.Id}: unsupported attack shape '{shape}'");
             if (a.Geometry != null && (!Nonnegative(a.Geometry.Range) || !Nonnegative(a.Geometry.HalfAngleDegrees) ||
                 a.Geometry.HalfAngleDegrees > 180 || (shape == "cone" && (a.Geometry.Range <= 0 || a.Geometry.HalfAngleDegrees <= 0)) || (shape == "line" && a.Geometry.Range <= 0) ||
+                (shape is "blast" or "burst" && (a.Geometry.Range <= 0 || a.Geometry.Range > 120 || a.Geometry.HalfAngleDegrees != 0)) ||
                 (shape == "target" && (a.Geometry.Range != 0 || a.Geometry.HalfAngleDegrees != 0))))
                 errors.Add($"ability {a.Id}: invalid attack geometry");
-            if (shape is "cone" or "line" && (a.Self || a.ProjectileSpeed > 0 || a.Damage <= 0 || a.Id == "slash"))
+            if (shape is "cone" or "line" or "blast" or "burst" && (a.Self || a.ProjectileSpeed > 0 || a.Damage <= 0 || a.Id == "slash"))
                 errors.Add($"ability {a.Id}: cone requires a direct hostile damaging ability");
+            if ((shape == "blast") != (a.Blast != null) || (a.Blast is { } blast && (!Nonnegative(blast.Radius) || blast.Radius != a.Geometry!.Range || !Nonnegative(blast.Delay) || blast.Delay > 3 || a.Lunge != null || a.Charge != null)))
+                errors.Add($"ability {a.Id}: a blast attack needs a blast whose radius is its geometry range");
+            if (a.Pool is { } pool && (a.Blast == null || !Nonnegative(pool.Duration) || pool.Duration <= 0 || pool.Duration > 20 || !Nonnegative(pool.Interval) || pool.Interval < .2f ||
+                !Nonnegative(pool.Damage) || (pool.Damage <= 0 && pool.Status == "") || (pool.Status != "" && !Statuses.Any(s => s.Id == pool.Status))))
+                errors.Add($"ability {a.Id}: invalid pool");
+            if (shape == "burst" && (a.Lunge != null || a.Charge != null || a.Geometry!.Range < a.Range * .5f))
+                errors.Add($"ability {a.Id}: invalid burst");
             if (shape == "line" && (a.Charge == null || a.Geometry!.Range != a.Charge.Distance || a.Geometry.HalfAngleDegrees != 0))
                 errors.Add($"ability {a.Id}: a line attack is a charge whose range is its distance");
-            if (style is not ("none" or "target" or "cone" or "line") ||
+            if (style is not ("none" or "target" or "cone" or "line" or "blast" or "burst") ||
                 (style != "none" && (style != shape || a.Self || a.Damage <= 0 || a.ProjectileSpeed > 0)))
                 errors.Add($"ability {a.Id}: telegraph does not match implemented danger");
             if (a.ActionStyle != "" && (!Enum.TryParse<PixelCreatures.Core.Anatomy.ActionStyle>(a.ActionStyle, out var actionStyle) || !Enum.IsDefined(actionStyle) || actionStyle.ToString() != a.ActionStyle))
                 errors.Add($"ability {a.Id}: unknown procedural action style");
         }
         foreach (var s in Statuses)
-            if (s.Duration <= 0 || s.Interval <= 0 || s.MaxStacks < 1 || s.Modifiers == null || s.Modifiers.Any(m => !float.IsFinite(m.Value) || m.Key is not ("strength" or "defence" or "speed" or "damage" or "power")))
+            if (s.Duration <= 0 || s.Interval <= 0 || s.MaxStacks < 1 || !float.IsFinite(s.Heal) || s.Heal < 0 || (s.Heal > 0 && s.Damage > 0) || s.Modifiers == null || s.Modifiers.Any(m => !float.IsFinite(m.Value) || m.Key is not ("strength" or "defence" or "speed" or "damage" or "power")))
                 errors.Add($"status {s.Id}: invalid stacking/timing");
         foreach (var r in Recipes)
             if (!items.Contains(r.Output) || r.Count < 1 || r.Ingredients.Count == 0 || r.Ingredients.Any(i => !items.Contains(i.Key) || i.Value < 1))

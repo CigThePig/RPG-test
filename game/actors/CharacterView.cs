@@ -92,7 +92,7 @@ public partial class CharacterView : Node2D
             case Awareness.Alerted: return StanceKind.Combat;
             case Awareness.Engaged:
                 if (State.Statuses.Any(s => s.Id == "rage")) return StanceKind.Enraged;
-                return State.TacticalIntent == "retreat" && State.State is ActionState.Idle or ActionState.Moving ? StanceKind.Flee : StanceKind.Combat;
+                return State.TacticalIntent is "retreat" or "cower" && State.State is ActionState.Idle or ActionState.Moving ? StanceKind.Flee : StanceKind.Combat;
             default: return StanceKind.Relaxed;
         }
     }

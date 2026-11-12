@@ -13,6 +13,8 @@ public sealed class SaveData
     public Dictionary<string, ActorState> Actors { get; set; } = new();
     public Dictionary<string, RegionState> Regions { get; set; } = new();
     public List<ProjectileState> Projectiles { get; set; } = new();
+    // Optional schema-1 field: older saves simply have nothing lying on the ground.
+    public List<HazardState> Hazards { get; set; } = new();
     public List<WorldEvent> Events { get; set; } = new();
     public string Items { get; set; } = "";
     public string Narrative { get; set; } = "";
@@ -20,7 +22,7 @@ public sealed class SaveData
 
 public static class Persistence
 {
-    public static string Capture(World w, Node narrative) => JsonSerializer.Serialize(new SaveData { Seed = w.Seed, Tick = w.Tick, Time = w.Time, Actors = w.Actors, Regions = w.RegionsById, Projectiles = w.Projectiles, Events = w.Events.Recent, Items = w.Items.Service.Call("export_state").AsString(), Narrative = narrative.Call("export_state").AsString() }, Content.Json);
+    public static string Capture(World w, Node narrative) => JsonSerializer.Serialize(new SaveData { Seed = w.Seed, Tick = w.Tick, Time = w.Time, Actors = w.Actors, Regions = w.RegionsById, Projectiles = w.Projectiles, Hazards = w.Hazards, Events = w.Events.Recent, Items = w.Items.Service.Call("export_state").AsString(), Narrative = narrative.Call("export_state").AsString() }, Content.Json);
     public static SaveData Parse(string json, Content content)
     {
         var s = JsonSerializer.Deserialize<SaveData>(json, Content.Json) ?? throw new InvalidDataException("Empty save");
@@ -45,10 +47,19 @@ public static class Persistence
             if (a.Appearance.Generator != "ppc-a2207c4" || !CreatureRuntime.Registry.TryGetFamily(a.Appearance.Family, out _) || (a.Appearance.GenomeJson != "" && !CreatureRuntime.Serializer.Deserialize(a.Appearance.GenomeJson).Ok) || a.PendingAbility != "" && !content.Abilities.Any(d => d.Id == a.PendingAbility) || a.RecoveryAbility != "" && !content.Abilities.Any(d => d.Id == a.RecoveryAbility) || !float.IsFinite(a.ActionElapsed) || !float.IsFinite(a.ActionDirectionX) || !float.IsFinite(a.ActionDirectionY))
                 throw new InvalidDataException($"Invalid appearance or pending action {id}");
             if (!Enum.IsDefined(a.Awareness) || !float.IsFinite(a.Alertness) || a.Alertness < 0 || a.Alertness > 1 || !float.IsFinite(a.AwarenessRemaining) || !float.IsFinite(a.LastKnownX) || !float.IsFinite(a.LastKnownY) ||
-                !double.IsFinite(a.LastSeenTime) || !float.IsFinite(a.FacingX) || !float.IsFinite(a.FacingY) || !float.IsFinite(a.Poise) || !float.IsFinite(a.PoiseDelay) || a.PoiseDelay < 0)
+                !double.IsFinite(a.LastSeenTime) || !float.IsFinite(a.FacingX) || !float.IsFinite(a.FacingY) || !float.IsFinite(a.Poise) || !float.IsFinite(a.PoiseDelay) || a.PoiseDelay < 0 || !float.IsFinite(a.AimX) || !float.IsFinite(a.AimY))
                 throw new InvalidDataException($"Invalid awareness {id}");
         }
 
+        s.Hazards ??= new();
+        foreach (var h in s.Hazards)
+        {
+            var ability = content.Abilities.FirstOrDefault(a => a.Id == h.Ability);
+            if (ability?.Blast == null || !s.Actors.ContainsKey(h.Source) || !s.Regions.TryGetValue(h.Region, out var region) || !float.IsFinite(h.X) || !float.IsFinite(h.Y) ||
+                region.Index(new(h.X, h.Y)) < 0 || !float.IsFinite(h.OriginX) || !float.IsFinite(h.OriginY) || !float.IsFinite(h.Fuse) || h.Fuse < 0 || h.Fuse > 3 ||
+                !float.IsFinite(h.Remaining) || h.Remaining < 0 || h.Remaining > 20 || !float.IsFinite(h.UntilTick))
+                throw new InvalidDataException("Invalid hazard");
+        }
         foreach (var p in s.Projectiles)
         {
             var ability = content.Abilities.FirstOrDefault(a => a.Id == p.Ability);
@@ -149,6 +160,7 @@ public static class Persistence
         w.Actors = s.Actors;
         w.RegionsById = s.Regions;
         w.Projectiles = s.Projectiles;
+        w.Hazards = s.Hazards;
         w.Events.Recent = s.Events;
         narrative.Call("reconcile_world", w.Player.Region);
         foreach (var actor in w.Actors.Values)

@@ -114,11 +114,40 @@ public sealed class ActorState : ISpellCaster, ISpellTarget
     public bool Called { get; set; }
     /// <summary>The current charge or lunge has already landed its one hit.</summary>
     public bool ActionConnected { get; set; }
+    // Optional schema-1 fields; defaults describe an actor that never dozes and aims at nothing.
+    /// <summary>Dozes at its post whenever nothing has disturbed it lately.</summary>
+    public bool Sleeper { get; set; }
+    /// <summary>Ground point a lobbed attack was committed to when it started.</summary>
+    public float AimX { get; set; }
+    public float AimY { get; set; }
+    public Vector2 Aim => new(AimX, AimY);
     public Vector2 Position => new(X, Y);
     public Vector2 Facing => new(FacingX, FacingY);
     public Vector2 LastKnown => new(LastKnownX, LastKnownY);
     public Vector2 Home => new(HomeX, HomeY);
     public bool Alive => Health > 0;
+}
+
+/// <summary>
+/// Something left on the ground by a lobbed attack: first a fuse while it is in the air
+/// (the landing spot is warned throughout), then, for attacks that leave one, a lingering pool.
+/// </summary>
+public sealed class HazardState
+{
+    public string Source { get; set; } = "";
+    public string Ability { get; set; } = "";
+    public string Region { get; set; } = "";
+    public float X { get; set; }
+    public float Y { get; set; }
+    public float OriginX { get; set; }
+    public float OriginY { get; set; }
+    /// <summary>Seconds until it lands. Zero once it has.</summary>
+    public float Fuse { get; set; }
+    /// <summary>Seconds the pool lasts after landing.</summary>
+    public float Remaining { get; set; }
+    public float UntilTick { get; set; }
+    public Vector2 Position => new(X, Y);
+    public bool Landed => Fuse <= 0;
 }
 
 public sealed record WorldEvent(string Kind, string Actor, string Target, string Value, int Count = 1);

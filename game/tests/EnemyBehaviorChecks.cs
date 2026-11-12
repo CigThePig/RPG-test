@@ -16,20 +16,7 @@ public static class EnemyBehaviorChecks
 
     static ActorState Spawn(string id, string profile, float x, float y, V facing)
     {
-        var def = w.FindProfile(profile) ?? throw new InvalidOperationException("Missing profile " + profile);
-        var (family, speed, health) = profile switch
-        {
-            "prowler" or "mire" => ("quadruped", 88f, 65f),
-            "brute" => ("reptile", 46f, 120f),
-            "spitter" => ("amorphous", 62f, 55f),
-            "stalker" => ("arthropod", 96f, 45f),
-            _ => ("winged", 70f, 50f)
-        };
-        var a = new ActorState { Id = id, Name = profile, Region = r.Id, Faction = "beasts", Profile = "beast", CombatProfile = profile,
-            Appearance = new() { Family = family, Seed = 42 }, Abilities = def.Loadout(), Health = health, MaxHealth = health };
-        AnatomyAdapter.Apply(a);
-        a.Speed = speed;
-        EnemyMind.Resettle(a, new V(x, y), facing);
+        var a = EnemyRoster.Create(w, id, profile, r.Id, new V(x, y), facing);
         w.Actors[a.Id] = a;
         return a;
     }
@@ -40,6 +27,8 @@ public static class EnemyBehaviorChecks
         foreach (string id in w.Actors.Keys.Where(k => k.StartsWith("b:")).ToArray()) w.Actors.Remove(id);
         Array.Fill(r.Tiles, Terrain.Floor);
         w.Projectiles.Clear();
+        w.Hazards.Clear();
+        w.ClearPlayerMotion();
         w.Cancel(p);
         p.X = x; p.Y = y; p.Health = p.MaxHealth = 10000; p.Mana = p.MaxMana; p.Invulnerable = 0;
         p.Statuses.Clear(); p.Cooldowns.Clear();
@@ -87,6 +76,14 @@ public static class EnemyBehaviorChecks
             Howler(check);
             Volley(check);
             Roaming(check);
+            Sound(check);
+            Sleepers(app, check);
+            Evidence(check);
+            Morale(check);
+            Shell(check);
+            Blast(app, check);
+            Burst(check);
+            Mender(check);
             Saving(app, check);
             Authoring(check);
         }
@@ -108,9 +105,16 @@ public static class EnemyBehaviorChecks
         // The whole test must fit inside one roaming glance, so pin the facing each tick.
         Run(120, _ => { a.FacingX = -1; a.FacingY = 0; });
         check(a.Awareness == Awareness.Unaware && a.Alertness == 0 && !Saw(CombatPresentationKind.Alerted), "two seconds behind an unaware prowler raises no alarm");
+        // Creeping, even inside earshot, is still not heard; a careless stride is.
         p.X = a.X + sight.HearingDistance - 6;
-        Run(40, _ => { a.FacingX = -1; a.FacingY = 0; });
-        check(a.Awareness is Awareness.Alerted or Awareness.Engaged && Saw(CombatPresentationKind.Alerted, a.Id, "sighted"), "inside earshot it is heard from any side");
+        Run(30, _ => { a.FacingX = -1; a.FacingY = 0; w.PlayerMove(new V(-.4f, 0), Dt); });
+        check(a.Awareness == Awareness.Unaware && a.Alertness == 0 && p.X - a.X > sight.HearingDistance * CombatTuning.QuietHearing && p.X - a.X < sight.HearingDistance,
+            "a slow step inside earshot is too quiet to hear");
+        p.X = a.X + sight.HearingDistance - 6;
+        // Pace back and forth at full stride without closing the distance.
+        Run(40, i => { a.FacingX = -1; a.FacingY = 0; w.PlayerMove(new V(i / 6 % 2 == 0 ? 1 : -1, 0), Dt); });
+        check(a.Awareness is Awareness.Alerted or Awareness.Engaged && Saw(CombatPresentationKind.Alerted, a.Id, "sighted"), "a careless stride inside earshot is heard from any side");
+        w.ClearPlayerMotion();
 
         Arena();
         a = Spawn("b:front", "prowler", 480 - 150, 360, V.UnitX);
@@ -254,7 +258,7 @@ public static class EnemyBehaviorChecks
             if (a.PendingAbility == "pounce" && !stepped) { p.Y += 70; stepped = true; }
             if (stepped && float.IsNaN(landing) && a.State == ActionState.Recovery) landing = a.Y;
         });
-        check(stepped && p.Health == health && Saw(CombatPresentationKind.Miss, a.Id), "stepping out of the committed line makes the pounce miss");
+        check(stepped && Saw(CombatPresentationKind.Miss, a.Id) && !seen.Any(e => e.Kind == CombatPresentationKind.Hit && e.AbilityId == "pounce"), "stepping out of the committed line makes the pounce miss");
         check(MathF.Abs(landing - 360) < 2, "a pounce does not steer after its target");
 
         // A stationary quarry must remain in front of the landing cone.
@@ -584,6 +588,434 @@ public static class EnemyBehaviorChecks
         p.Region = r.Id; w.RegionsById.Remove(room.Id);
     }
 
+    static void Wall(int column, int from = 0, int to = int.MaxValue)
+    {
+        for (int y = Math.Max(0, from); y < Math.Min(r.Height, to); y++) r.Tiles[y * r.Width + column] = Terrain.Wall;
+    }
+
+    static void Sound(Action<bool, string> check)
+    {
+        // A noise is somewhere to go and look, not someone to chase.
+        Arena(900, 660);
+        var a = Spawn("b:listener", "prowler", 300, 360, -V.UnitX);
+        var point = new V(380, 360);
+        EnemyMind.Noise(w, p, point, 100);
+        check(a.Awareness == Awareness.Searching && a.Target == "" && Saw(CombatPresentationKind.Heard, a.Id, "heard") && V.Distance(a.LastKnown, point) < .01f,
+            "a noise in earshot sends a calm enemy to look, without telling it who made it");
+        float nearest = float.PositiveInfinity; var stages = new List<Awareness> { a.Awareness };
+        Run(900, _ => { nearest = Math.Min(nearest, V.Distance(a.Position, point)); if (stages[^1] != a.Awareness) stages.Add(a.Awareness); });
+        check(nearest < 14 && stages.SequenceEqual(new[] { Awareness.Searching, Awareness.Returning, Awareness.Unaware }),
+            $"it walks to the sound, searches there, and goes home (nearest {nearest:0}, {string.Join(">", stages)})");
+        check(a.Cooldowns.GetValueOrDefault("wary") > 0 && seen.Count(e => e.Kind == CombatPresentationKind.Heard) == 1, "one noise is one investigation, and leaves the listener wary");
+
+        // Walls muffle; distance ends it.
+        Arena(900, 660);
+        var open = Spawn("b:open", "prowler", 300, 300, -V.UnitX);
+        var behind = Spawn("b:behind", "prowler", 300, 420, -V.UnitX);
+        var close = Spawn("b:close", "prowler", 340, 420, -V.UnitX);
+        var far = Spawn("b:far", "prowler", 150, 300, -V.UnitX);
+        for (int x = 0; x < r.Width; x++) r.Tiles[15 * r.Width + x] = Terrain.Wall;
+        EnemyMind.Noise(w, p, new V(380, 300), 100);
+        check(open.Awareness == Awareness.Searching && far.Awareness == Awareness.Unaware, "a noise carries its radius in the open and no further");
+        check(behind.Awareness == Awareness.Unaware, "a wall muffles a noise that would otherwise carry");
+        EnemyMind.Noise(w, p, new V(380, 420), 100);
+        check(close.Awareness == Awareness.Searching, "the same noise on its own side of the wall is heard");
+
+        // Those already fighting, and an ambusher lying in wait, do not go to look.
+        Arena(900, 660);
+        var fighter = Spawn("b:fighter", "prowler", 300, 300, V.UnitX); Engage(fighter);
+        var lurker = Spawn("b:lurker", "stalker", 300, 400, V.UnitX);
+        EnemyMind.Noise(w, p, new V(340, 350), 150);
+        check(fighter.Awareness == Awareness.Engaged && lurker.Awareness == Awareness.Unaware && !Saw(CombatPresentationKind.Heard), "fighters and lurking ambushers ignore a noise");
+
+        // A fight is heard through a wall by a packmate who cannot see it and is not called.
+        Arena(480, 360);
+        var victim = Spawn("b:victim", "prowler", 510, 360, V.UnitX);
+        var mate = Spawn("b:mate", "prowler", 510, 450, V.UnitX);
+        for (int x = 0; x < r.Width; x++) r.Tiles[17 * r.Width + x] = Terrain.Wall;
+        victim.Health = victim.MaxHealth = 1000;
+        w.Damage(p, victim, 20, "physical");
+        check(!Saw(CombatPresentationKind.Alerted, mate.Id) && mate.Awareness == Awareness.Searching && mate.Target == "" && Saw(CombatPresentationKind.Heard, mate.Id),
+            "the sound of a fight draws a packmate who was not called and cannot see it");
+
+        // The player's own actions: a roll is heard nearby, a swing only very close.
+        Arena(480, 360);
+        a = Spawn("b:ear", "prowler", 480 - 62, 360, -V.UnitX);
+        Run(30, _ => { a.FacingX = -1; a.FacingY = 0; a.NextTacticalTime = w.Time + 1; });
+        check(a.Awareness == Awareness.Unaware, "standing still behind it, just outside earshot, goes unnoticed");
+        check(w.TryStartPlayerSlash(V.UnitX) && a.Awareness == Awareness.Unaware, "a sword swing is too soft to carry that far");
+        Run(60, _ => { a.FacingX = -1; a.FacingY = 0; a.NextTacticalTime = w.Time + 1; });
+        p.X = 480; // The swing carried the player a step forward.
+        check(w.TryStartPlayerDodge(V.UnitY) && a.Awareness == Awareness.Searching && Saw(CombatPresentationKind.Heard, a.Id), "a roll is heard");
+    }
+
+    static void Sleepers(Foundation app, Action<bool, string> check)
+    {
+        Arena();
+        var a = Spawn("b:sleeper", "prowler", 480 - 100, 360, V.UnitX); a.Sleeper = true;
+        Run(120);
+        check(EnemyMind.Asleep(a) && a.Awareness == Awareness.Unaware && a.Activity == "sleep" && a.TacticalIntent == "sleep" && a.Alertness == 0 && a.Position == a.Home,
+            "a sleeper dozes at its post with an intruder in plain view");
+        // Creeping right up to it.
+        p.X = a.X + 70;
+        Run(240, _ => { if (V.Distance(a.Position, p.Position) > 30) w.PlayerMove(new V(-.5f, 0), Dt); else w.ClearPlayerMotion(); });
+        check(EnemyMind.Asleep(a) && V.Distance(a.Position, p.Position) < 34, $"a careful approach does not wake it ({V.Distance(a.Position, p.Position):0} away)");
+        a.Health = a.MaxHealth = 1000;
+        check(w.Damage(p, a, 20, "physical") && Math.Abs(1000 - a.Health - Math.Max(1, 20 * CombatTuning.SleepingMultiplier - w.Stat(a, "defence"))) < .01f &&
+            a.Awareness == Awareness.Engaged && !EnemyMind.Asleep(a), "a blow on a sleeper lands for double and wakes it into the fight");
+
+        // A careless approach rouses it, slowly.
+        Arena();
+        a = Spawn("b:sleeper", "prowler", 480 - 80, 360, V.UnitX); a.Sleeper = true;
+        int woke = -1, engaged = -1;
+        Run(200, i =>
+        {
+            if (a.Awareness == Awareness.Unaware) w.PlayerMove(new V(-1, 0), Dt);
+            if (woke < 0 && a.Awareness == Awareness.Alerted) woke = i;
+            if (engaged < 0 && a.Awareness == Awareness.Engaged) engaged = i;
+        });
+        check(woke >= 0 && Saw(CombatPresentationKind.Woke, a.Id) && Saw(CombatPresentationKind.Alerted, a.Id, "sighted"), "a careless approach wakes it");
+        check(engaged - woke >= (int)(CombatTuning.WakeSeconds * 60) - 13, $"it takes a groggy moment to get up ({engaged - woke} ticks)");
+
+        // A packmate's call wakes a sleeper too.
+        Arena();
+        var caller = Spawn("b:caller", "prowler", 480 - 150, 360, V.UnitX);
+        a = Spawn("b:sleeper", "prowler", 480 - 230, 380, -V.UnitX); a.Sleeper = true;
+        Run(100);
+        check(Saw(CombatPresentationKind.Woke, a.Id) && Saw(CombatPresentationKind.Alerted, a.Id, "called") && caller.Awareness == Awareness.Engaged, "a call wakes a sleeping packmate");
+
+        // After a hunt it stays up for a while, then settles down again.
+        Arena();
+        a = Spawn("b:sleeper", "prowler", 480 - 60, 360, V.UnitX); a.Sleeper = true;
+        w.Damage(p, a, 1, "physical");
+        for (int x = 2; x < 38; x++) r.Tiles[6 * r.Width + x] = Terrain.Wall;
+        p.X = 480; p.Y = 60;
+        var profile = w.FindProfile("prowler")!;
+        bool home = false; double homeAt = 0; bool upWhileWary = true, settled = false; double settledAt = 0;
+        Run((int)((profile.MemorySeconds + profile.SearchSeconds + 14 + CombatTuning.WarySeconds) * 60), _ =>
+        {
+            if (!home && a.Awareness == Awareness.Unaware) { home = true; homeAt = w.Time; }
+            if (home && a.Cooldowns.GetValueOrDefault("wary") > 0) upWhileWary &= !EnemyMind.Asleep(a) && a.Activity != "sleep";
+            if (home && !settled && EnemyMind.Asleep(a)) { settled = true; settledAt = w.Time; }
+        });
+        check(home && upWhileWary, "back from a hunt, a sleeper stays up and watchful");
+        check(settled && a.Activity == "sleep" && settledAt - homeAt > 5, $"once the alarm has worn off it lies down again ({settledAt - homeAt:0.0}s after coming home)");
+        var parsed = Persistence.Parse(Persistence.Capture(w, app.Narrative), w.Content);
+        check(parsed.Actors[a.Id].Sleeper, "being a sleeper is saved");
+    }
+
+    static ActorState Corpse(string id, float x, float y, bool slain = true)
+    {
+        var body = Spawn(id, "prowler", x, y, V.UnitX);
+        body.Health = 0; body.State = ActionState.Dead;
+        if (slain) body.Knowledge[p.Id] = "attacker";
+        return body;
+    }
+
+    static void Evidence(Action<bool, string> check)
+    {
+        Arena(900, 660);
+        var finder = Spawn("b:finder", "prowler", 300, 360, V.UnitX);
+        var mate = Spawn("b:mate", "prowler", 250, 400, -V.UnitX);
+        var deaf = Spawn("b:deaf", "prowler", 300, 620, -V.UnitX);
+        var body = Corpse("b:body", 400, 360);
+        Run(60, _ => { finder.FacingX = 1; finder.FacingY = 0; foreach (var b in new[] { mate, deaf }) if (b.Awareness == Awareness.Unaware) { b.FacingX = -1; b.FacingY = 0; } });
+        check(Saw(CombatPresentationKind.Disturbed, finder.Id, "body") && finder.Awareness == Awareness.Searching && V.Distance(finder.LastKnown, body.Position) < .01f,
+            "an enemy that sees a slain packmate goes to search around the body");
+        check(Saw(CombatPresentationKind.Disturbed, mate.Id, "warned") && mate.Awareness == Awareness.Searching && !Saw(CombatPresentationKind.Disturbed, deaf.Id) && deaf.Awareness == Awareness.Unaware,
+            "it warns packmates in earshot, who search too; one out of earshot carries on");
+        check(finder.Knowledge.GetValueOrDefault(body.Id) == "found" && mate.Knowledge.GetValueOrDefault(body.Id) == "found" && finder.Target == "" && !Saw(CombatPresentationKind.Alerted),
+            "a body raises wariness, not an alarm");
+        Run(1500);
+        check(seen.Count(e => e.Kind == CombatPresentationKind.Disturbed && e.ActorId == finder.Id) == 1 && finder.Awareness == Awareness.Unaware,
+            "the same body does not disturb it twice");
+        float distance = 150;
+        check(finder.Cooldowns.GetValueOrDefault("wary") > 0, "having found a body it stays on edge");
+        // On edge, it recognises an intruder sooner than a calm packmate at the same distance.
+        int[] noticed = new int[2];
+        for (int trial = 0; trial < 2; trial++)
+        {
+            Arena(480, 360);
+            var watcher = Spawn("b:watcher", "prowler", 480 - distance, 360, V.UnitX);
+            if (trial == 1) watcher.Cooldowns["wary"] = CombatTuning.WarySeconds;
+            noticed[trial] = -1;
+            Run(120, i => { if (noticed[trial] < 0 && watcher.Awareness == Awareness.Alerted) noticed[trial] = i; });
+        }
+        check(noticed[1] >= 0 && noticed[0] > noticed[1], $"a wary enemy notices sooner (wary {noticed[1]}, calm {noticed[0]})");
+
+        // A body nothing hostile left there, and one seen falling, are not news.
+        Arena(900, 660);
+        finder = Spawn("b:finder", "prowler", 300, 360, V.UnitX);
+        Corpse("b:old", 400, 360, slain: false);
+        Run(60, _ => { finder.FacingX = 1; finder.FacingY = 0; });
+        check(finder.Awareness == Awareness.Unaware && !Saw(CombatPresentationKind.Disturbed), "a body with no hostile hand in it is ignored");
+    }
+
+    static void Morale(Action<bool, string> check)
+    {
+        // The leader's fall breaks the pack.
+        Arena();
+        var alpha = Spawn("b:alpha", "alpha", 480 - 40, 360, V.UnitX); Engage(alpha);
+        var pack = Enumerable.Range(0, 3).Select(i => Spawn("b:follower" + i, "prowler", 480 - 70, 310 + i * 50, V.UnitX)).ToArray();
+        var brute = Spawn("b:steady", "brute", 480 - 110, 360, V.UnitX); Engage(brute);
+        foreach (var a in pack) Engage(a);
+        float[] before = pack.Select(a => V.Distance(a.Position, p.Position)).ToArray();
+        check(w.FindProfile("alpha")!.Leader && w.Damage(p, alpha, 100000, "physical") && !alpha.Alive, "the alpha falls");
+        check(pack.All(a => Saw(CombatPresentationKind.Shaken, a.Id, "leader") && a.Cooldowns.GetValueOrDefault("rout") > CombatTuning.RoutSeconds),
+            "every follower that sees its leader fall loses its nerve");
+        check(!Saw(CombatPresentationKind.Shaken, brute.Id) && brute.Cooldowns.GetValueOrDefault("rout") <= 0, "a creature of steady nerve does not");
+        bool allFled = false; int fleeing = 0;
+        Run(90, _ => { fleeing = pack.Count(a => a.TacticalIntent == "retreat"); allFled |= fleeing == pack.Length; foreach (var a in pack) a.Cooldowns["pounce"] = 5; });
+        check(allFled && pack.Zip(before, (a, d) => V.Distance(a.Position, p.Position) > d + 20).All(x => x), "the routed pack runs from the fight");
+        Run((int)(CombatTuning.LeaderRoutSeconds * 60) + 60);
+        check(pack.All(a => a.Cooldowns.GetValueOrDefault("rout") <= 0 && a.Awareness == Awareness.Engaged && a.TacticalIntent != "retreat"), "its nerve returns and it comes back to fight");
+        check(pack.All(a => a.Knowledge.GetValueOrDefault(alpha.Id) == "found") && !Saw(CombatPresentationKind.Disturbed), "a death they watched is not discovered again later");
+
+        // An ordinary loss shakes only those whose nerve fails; morale is the chance of holding.
+        var prowler = w.FindProfile("prowler")!; float morale = prowler.Morale;
+        try
+        {
+            foreach (var (value, expected) in new[] { (0f, 3), (1f, 0) })
+            {
+                Arena();
+                prowler.Morale = value;
+                var fallen = Spawn("b:fallen", "prowler", 480 - 40, 360, V.UnitX); Engage(fallen);
+                pack = Enumerable.Range(0, 3).Select(i => Spawn("b:witness" + i, "prowler", 480 - 80, 310 + i * 50, V.UnitX)).ToArray();
+                foreach (var a in pack) Engage(a);
+                var unseen = Spawn("b:unseen", "prowler", 480 - 80, 600, V.UnitX); Engage(unseen);
+                for (int x = 0; x < r.Width; x++) r.Tiles[22 * r.Width + x] = Terrain.Wall;
+                w.Damage(p, fallen, 100000, "physical");
+                check(seen.Count(e => e.Kind == CombatPresentationKind.Shaken && e.Outcome == "loss") == expected && !Saw(CombatPresentationKind.Shaken, unseen.Id),
+                    $"with morale {value:0} a packmate's fall shakes {expected} of 3 witnesses, and never one that did not see it");
+            }
+        }
+        finally { prowler.Morale = morale; }
+
+        // A runner brings in allies who had not noticed the fight.
+        Arena();
+        var runner = Spawn("b:runner", "prowler", 480 - 40, 360, V.UnitX); Engage(runner);
+        runner.Cooldowns["rout"] = 6;
+        var idle = Spawn("b:idle", "prowler", 480 - 230, 360, -V.UnitX);
+        Run(150, _ => { if (idle.Awareness == Awareness.Unaware) { idle.FacingX = -1; idle.FacingY = 0; } runner.Cooldowns["pounce"] = 5; });
+        check(Saw(CombatPresentationKind.Alerted, idle.Id, "called") && idle.Target == p.Id && runner.Cooldowns.GetValueOrDefault("fetch") > 0,
+            "a routed enemy that reaches an unaware ally brings it into the fight");
+        check(seen.Count(e => e.Kind == CombatPresentationKind.Alerted && e.ActorId == idle.Id) == 1, "and fetches it once");
+
+        // The alpha's howl puts the pack in a frenzy.
+        Arena();
+        alpha = Spawn("b:alpha", "alpha", 480 - 120, 330, V.UnitX); Engage(alpha);
+        var follower = Spawn("b:follower", "prowler", 480 - 120, 400, V.UnitX); Engage(follower);
+        bool frenzy = false;
+        Run(180, _ => frenzy |= follower.Statuses.Any(st => st.Id == "frenzy"));
+        check(frenzy && Saw(CombatPresentationKind.Rallied, alpha.Id), "an alpha howls its pack into a frenzy");
+    }
+
+    static float Turned(V from, V to) => MathF.Abs(MathF.Atan2(from.X * to.Y - from.Y * to.X, V.Dot(from, to))) * 180 / MathF.PI;
+
+    static void Shell(Action<bool, string> check)
+    {
+        var profile = w.FindProfile("shellback")!;
+        Arena();
+        var a = Spawn("b:shell", "shellback", 480 - 34, 360, V.UnitX); Engage(a);
+        a.Health = a.MaxHealth = 1000; a.NextTacticalTime = 1e9;
+        float defence = w.Stat(a, "defence");
+        check(w.Shielded(a, p.Position) && w.Damage(p, a, 40, "physical") && Math.Abs(1000 - a.Health - Math.Max(1, 40 * profile.ShieldFactor - defence)) < .01f &&
+            a.State is ActionState.Idle or ActionState.Moving && seen.Last(e => e.Kind == CombatPresentationKind.Hit).Outcome == "blocked",
+            "a blow on a shellback's front is turned: little damage, no stagger");
+        // From behind there is nothing to turn it.
+        a.Invulnerable = 0; a.Health = 1000; a.X = 480 + 34; a.FacingX = 1; a.FacingY = 0;
+        check(!w.Shielded(a, p.Position) && w.Damage(p, a, 40, "physical") && Math.Abs(1000 - a.Health - (40 - defence)) < .01f && a.State == ActionState.Staggered &&
+            seen.Last(e => e.Kind == CombatPresentationKind.Hit).Outcome == "hit", "a blow from behind lands in full and staggers");
+        // Its own attack opens it: the windup is still covered, the recovery is not.
+        a.Invulnerable = 0; a.Health = 1000; w.Cancel(a); a.X = 480 - 34; a.FacingX = 1; a.FacingY = 0;
+        a.State = ActionState.Windup; a.PendingAbility = "pincer"; a.StateRemaining = .4f;
+        bool covered = w.Shielded(a, p.Position);
+        a.State = ActionState.Recovery; a.PendingAbility = ""; a.RecoveryAbility = "pincer"; a.StateRemaining = .4f;
+        check(covered && !w.Shielded(a, p.Position) && w.Damage(p, a, 40, "physical") && Math.Abs(1000 - a.Health - (40 - defence)) < .01f,
+            "the shell is up through its windup and open while it recovers from its own attack");
+        // Unnoticed, it has not raised its guard at all.
+        Arena();
+        a = Spawn("b:shell", "shellback", 480 - 34, 360, V.UnitX); a.Health = a.MaxHealth = 1000; a.NextTacticalTime = 1e9;
+        check(!w.Shielded(a, p.Position) && w.Damage(p, a, 40, "physical") && Math.Abs(1000 - a.Health - (40 * CombatTuning.AmbushMultiplier - defence)) < .01f,
+            "an unaware shellback takes the whole ambush");
+        // Burning ignores the shell.
+        Arena();
+        a = Spawn("b:shell", "shellback", 480 - 34, 360, V.UnitX); Engage(a); a.Health = a.MaxHealth = 1000; a.NextTacticalTime = 1e9;
+        w.Damage(p, a, 3, "fire", periodic: true);
+        check(Math.Abs(1000 - a.Health - 3) < .01f, "damage over time is not turned by a shell");
+
+        // It comes round slowly, and only strikes at what is in front of it.
+        Arena();
+        a = Spawn("b:shell", "shellback", 480 + 30, 360, V.UnitX); Engage(a);
+        a.FacingX = 1; a.FacingY = 0; // Back to the player.
+        float fastest = 0, offAxisAtStart = -1; var last = a.Facing; int startedAt = -1; bool hitFromBehind = false;
+        Run(240, i =>
+        {
+            if (startedAt < 0 && a.State == ActionState.Windup)
+            {
+                startedAt = i;
+                offAxisAtStart = Turned(last, V.Normalize(p.Position - a.Position));
+            }
+            if (startedAt < 0) fastest = Math.Max(fastest, Turned(last, a.Facing));
+            last = a.Facing;
+            hitFromBehind |= startedAt < 0 && i == 20 && !w.Shielded(a, p.Position);
+        });
+        check(fastest <= profile.TurnDegrees * Dt + .05f && fastest > 0, $"a shellback turns no faster than its rate ({fastest / Dt:0} of {profile.TurnDegrees:0} degrees a second)");
+        check(hitFromBehind, "which leaves its back open to whoever gets round it");
+        check(startedAt > (int)(60 * (180 - CombatTuning.TurnAttackHalfAngle) / profile.TurnDegrees) - 14 && offAxisAtStart >= 0 && offAxisAtStart <= CombatTuning.TurnAttackHalfAngle + 1,
+            $"it starts its attack only once its quarry is in front of it (tick {startedAt}, {offAxisAtStart:0} degrees off)");
+        check(p.Statuses.Any(st => st.Id == "snare") && w.Stat(p, "speed") < p.Speed - 20, "its pincer snares what it catches");
+        p.Statuses.Clear();
+    }
+
+    static void Blast(Foundation app, Action<bool, string> check)
+    {
+        var def = w.FindAbility("glob")!;
+        Arena();
+        var a = Spawn("b:lobber", "spitter", 480 - 140, 360, V.UnitX); Engage(a); a.NextTacticalTime = 1e9;
+        var mark = p.Position;
+        check(w.Activate(a.Id, "glob", p.Id) && a.Aim == mark && w.Hazards.Count == 0, "a lobbed attack commits to where its target stands when it starts");
+        float health = p.Health;
+        Run((int)MathF.Round(def.Windup * 60) + 1, _ => a.NextTacticalTime = 1e9);
+        check(w.Hazards.Count == 1 && !w.Hazards[0].Landed && w.Hazards[0].Position == mark && Saw(CombatPresentationKind.BlastLaunched, a.Id) && p.Health == health,
+            "after the windup it is in the air, and nothing has been hurt yet");
+        Run((int)MathF.Round(def.Blast!.Delay * 60) + 1, _ => a.NextTacticalTime = 1e9);
+        check(Saw(CombatPresentationKind.BlastLanded, a.Id) && seen.Count(e => e.Kind == CombatPresentationKind.Hit && e.AbilityId == "glob" && e.Outcome == "hit") == 1 && p.Health < health,
+            "it lands on a target that stayed put");
+        check(w.Hazards.Count == 1 && w.Hazards[0].Landed && Math.Abs(w.Hazards[0].Remaining - def.Pool!.Duration) < .05f, "and leaves a pool behind");
+        // Let the stagger of the landing itself pass, then stand in the pool and act.
+        Run(20, _ => a.NextTacticalTime = 1e9);
+        health = p.Health; bool interrupted = !w.TryStartPlayerSlash(V.UnitX);
+        Run((int)(def.Pool.Duration * 60) + 5, _ => { a.NextTacticalTime = 1e9; interrupted |= p.State == ActionState.Staggered; });
+        int burns = seen.Count(e => e.Kind == CombatPresentationKind.Hit && e.AbilityId == "glob" && e.Outcome == "periodic");
+        check(burns >= (int)(def.Pool.Duration / def.Pool.Interval) - 1 && burns <= (int)(def.Pool.Duration / def.Pool.Interval) + 1 && p.Health < health && !interrupted,
+            $"standing in the pool burns at each interval without interrupting ({burns} ticks)");
+        check(w.Hazards.Count == 0, "the pool dries up");
+
+        // Stepping off the mark: the landing misses, the pool stays where it was thrown.
+        Arena();
+        a = Spawn("b:lobber", "spitter", 480 - 140, 360, V.UnitX); Engage(a);
+        w.Activate(a.Id, "glob", p.Id); mark = p.Position; health = p.Health;
+        Run((int)MathF.Round(def.Windup * 60) + 2, _ => a.NextTacticalTime = 1e9);
+        p.Y += 80;
+        Run((int)((def.Blast.Delay + 2) * 60), _ => a.NextTacticalTime = 1e9);
+        check(p.Health == health && !Saw(CombatPresentationKind.Hit) && w.Hazards.Count == 1 && w.Hazards[0].Position == mark, "stepping off the mark avoids both the landing and the pool");
+
+        // Interrupting the throw: nothing leaves the hand.
+        Arena();
+        a = Spawn("b:lobber", "spitter", 480 - 140, 360, V.UnitX); Engage(a);
+        w.Activate(a.Id, "glob", p.Id);
+        Run(10, _ => a.NextTacticalTime = 1e9);
+        w.Damage(p, a, 5, "physical");
+        Run(120, _ => a.NextTacticalTime = 1e9);
+        check(w.Hazards.Count == 0 && !Saw(CombatPresentationKind.BlastLaunched), "a throw interrupted in its windup never leaves the hand");
+
+        // The thrower dies while it is in the air: it still lands and pools, but the landing itself is spent.
+        Arena();
+        a = Spawn("b:lobber", "spitter", 480 - 140, 360, V.UnitX); Engage(a);
+        w.Activate(a.Id, "glob", p.Id);
+        Run((int)MathF.Round(def.Windup * 60) + 2, _ => a.NextTacticalTime = 1e9);
+        a.Invulnerable = 0; w.Damage(p, a, 100000, "physical"); seen.Clear();
+        Run((int)MathF.Round(def.Blast.Delay * 60) + 2);
+        check(!a.Alive && Saw(CombatPresentationKind.BlastLanded) && !seen.Any(e => e.Kind == CombatPresentationKind.Hit && e.Outcome == "hit") && w.Hazards.Count == 1 && w.Hazards[0].Landed,
+            "a glob outlives its thrower: it lands without a blow and still pools");
+
+        // Left to itself a spitter lobs from long range, and the flight survives a save exactly.
+        Arena();
+        a = Spawn("b:lobber", "spitter", 480 - 150, 360, V.UnitX); Engage(a);
+        p.Invulnerable = 1000;
+        bool lobbed = false; string snapshot = "", flight = "";
+        Run(600, _ =>
+        {
+            a.Cooldowns["volley"] = 30;
+            if (!lobbed && w.Hazards.Count == 1 && !w.Hazards[0].Landed && w.Hazards[0].Fuse < def.Blast.Delay * .6f) { lobbed = true; snapshot = Persistence.Capture(w, app.Narrative); flight = System.Text.Json.JsonSerializer.Serialize(w.Hazards); }
+        });
+        check(lobbed, "a spitter at long range lobs a glob of its own accord");
+        if (lobbed)
+        {
+            Persistence.Restore(w, app.Narrative, snapshot);
+            p = w.Player; r = w.RegionsById[r.Id];
+            check(w.Hazards.Count == 1 && !w.Hazards[0].Landed && System.Text.Json.JsonSerializer.Serialize(w.Hazards) == flight,
+                "a glob in the air survives a save exactly");
+            seen.Clear();
+            Run((int)(def.Blast.Delay * 60) + 2);
+            check(Saw(CombatPresentationKind.BlastLanded) && w.Hazards.Count == 1 && w.Hazards[0].Landed, "and lands after loading");
+            var node = JsonNode.Parse(snapshot)!; node.AsObject().Remove("Hazards");
+            Persistence.Restore(w, app.Narrative, node.ToJsonString());
+            p = w.Player; r = w.RegionsById[r.Id];
+            check(w.Hazards.Count == 0, "a save from before hazards existed loads with clear ground");
+        }
+    }
+
+    static void Burst(Action<bool, string> check)
+    {
+        var coil = w.FindAbility("coil")!;
+        // All round the body: a quarry behind it is caught as surely as one in front.
+        foreach (float side in new[] { 1f, -1f })
+        {
+            Arena();
+            var a = Spawn("b:lasher", "lasher", 480 - 34 * side, 360, V.UnitX); Engage(a);
+            a.FacingX = 1; a.FacingY = 0; a.NextTacticalTime = 1e9;
+            float px = p.X, health = p.Health;
+            check(w.Activate(a.Id, "coil", p.Id), "coil fixture starts");
+            Run((int)MathF.Round(coil.Windup * 60) + 2, _ => a.NextTacticalTime = 1e9);
+            check(p.Health < health && (p.X - px) * side > coil.Knockback * .6f, "a coiling lash catches and throws back a quarry " + (side > 0 ? "in front" : "behind"));
+        }
+        Arena();
+        var lasher = Spawn("b:lasher", "lasher", 480 - 34, 360, V.UnitX); Engage(lasher); lasher.NextTacticalTime = 1e9;
+        w.Activate(lasher.Id, "coil", p.Id);
+        Run(8, _ => lasher.NextTacticalTime = 1e9);
+        p.X += 40; float unhurt = p.Health;
+        Run((int)MathF.Round(coil.Windup * 60), _ => lasher.NextTacticalTime = 1e9);
+        check(p.Health == unhurt && Saw(CombatPresentationKind.Miss, lasher.Id), "stepping out of the ring makes it miss");
+
+        // Choice by range: the fang lunge from a distance, the coil up close.
+        Arena();
+        lasher = Spawn("b:lasher", "lasher", 480 - 70, 360, V.UnitX); Engage(lasher);
+        check(CombatBrain.Select(w, lasher, p, w.FindProfile("lasher"), false).Ability == "fang", "from a few lengths away a lasher lunges with its fangs");
+        lasher.X = 480 - 34;
+        check(CombatBrain.Select(w, lasher, p, w.FindProfile("lasher"), false).Ability == "coil", "up close it coils and lashes");
+        lasher.X = 480 - 70;
+        bool venom = false;
+        Run(90, _ => venom |= p.Statuses.Any(st => st.Id == "venom"));
+        check(venom && Saw(CombatPresentationKind.Hit, lasher.Id), "its fangs carry venom");
+        p.Statuses.Clear();
+    }
+
+    static void Mender(Action<bool, string> check)
+    {
+        var status = w.Content.Statuses.Single(st => st.Id == "regrowth");
+        int Blooms() => w.Events.Recent.Count(e => e.Kind == "ability_started" && e.Value == "bloom");
+        // Everyone hale: nothing to mend.
+        Arena();
+        var m = Spawn("b:mender", "mender", 480 - 130, 320, V.UnitX); Engage(m);
+        var ally = Spawn("b:patient", "brute", 480 - 110, 400, V.UnitX); Engage(ally);
+        ally.NextTacticalTime = 1e9;
+        w.Events.Recent.Clear();
+        Run(150, _ => ally.NextTacticalTime = 1e9);
+        check(Blooms() == 0, "a mender does not spend its bloom while everyone is hale");
+        // A wounded ally in reach.
+        ally.Health = ally.MaxHealth * .4f; float low = ally.Health;
+        bool mending = false;
+        Run(120, _ => { ally.NextTacticalTime = 1e9; mending |= ally.Statuses.Any(st => st.Id == "regrowth"); });
+        check(Blooms() == 1 && mending && Saw(CombatPresentationKind.Rallied, m.Id), "it blooms when an ally in reach is wounded");
+        Run((int)(status.Duration * 60), _ => { ally.NextTacticalTime = 1e9; m.Cooldowns["bloom"] = 30; });
+        float gained = ally.Health - low;
+        check(Math.Abs(gained - status.Heal * MathF.Floor(status.Duration / status.Interval)) <= status.Heal + .01f && !ally.Statuses.Any(st => st.Id == "regrowth"),
+            $"regrowth restores health at each interval, then ends ({gained:0} health)");
+        ally.Health = ally.MaxHealth - 1; w.ApplyStatus(ally, "regrowth", m.Id);
+        Run(90, _ => { ally.NextTacticalTime = 1e9; m.Cooldowns["bloom"] = 30; });
+        check(ally.Health == ally.MaxHealth, "mending never exceeds full health");
+        // Hurt itself, with nobody else about, it tends its own wounds, and keeps away.
+        Arena();
+        m = Spawn("b:mender", "mender", 480 - 130, 360, V.UnitX); Engage(m);
+        m.Health = m.MaxHealth * .7f; w.Events.Recent.Clear();
+        float closest = float.PositiveInfinity;
+        Run(240, _ => closest = Math.Min(closest, V.Distance(m.Position, p.Position)));
+        check(Blooms() >= 1 && m.Statuses.Any(st => st.Id == "regrowth") || m.Health > m.MaxHealth * .7f, "a wounded mender tends itself");
+        check(closest > w.FindProfile("mender")!.MinimumDistance - 12, $"and keeps its distance rather than closing in ({closest:0})");
+    }
+
     static void Saving(Foundation app, Action<bool, string> check)
     {
         Arena();
@@ -593,8 +1025,13 @@ public static class EnemyBehaviorChecks
         Spawn("b:s3", "spitter", 480 + 160, 300, -V.UnitX);
         Spawn("b:s4", "stalker", 480 + 60, 440, V.UnitX);
         Spawn("b:s5", "howler", 480 - 120, 470, V.UnitX);
+        Spawn("b:s6", "alpha", 480 - 180, 300, V.UnitX);
+        Spawn("b:s7", "shellback", 480 + 120, 420, -V.UnitX);
+        Spawn("b:s8", "lasher", 480 + 150, 240, -V.UnitX);
+        Spawn("b:s9", "mender", 480 - 210, 440, V.UnitX).Sleeper = true;
         string Digest() => System.Text.Json.JsonSerializer.Serialize(w.Actors.Values.Where(a => a.Id.StartsWith("b:") || a.Id == "player").OrderBy(a => a.Id, StringComparer.Ordinal)
-            .Select(a => new { a.Id, a.X, a.Y, a.Health, a.Awareness, a.Alertness, a.TacticalIntent, a.State, a.PendingAbility, a.Poise, a.FacingX, a.FacingY, a.Target }));
+            .Select(a => new { a.Id, a.X, a.Y, a.Health, a.Awareness, a.Alertness, a.TacticalIntent, a.State, a.PendingAbility, a.Poise, a.FacingX, a.FacingY, a.Target, a.Sleeper, a.AimX, a.AimY })) +
+            System.Text.Json.JsonSerializer.Serialize(w.Hazards);
         // Save in the middle of the alarm, and again in the thick of the fight.
         foreach (int lead in new[] { 25, 150, 400 })
         {
@@ -614,7 +1051,8 @@ public static class EnemyBehaviorChecks
 
         // A save written before perception existed has none of the new fields.
         var node = JsonNode.Parse(Persistence.Capture(w, app.Narrative))!;
-        string[] added = { "Awareness", "Alertness", "AwarenessRemaining", "LastKnownX", "LastKnownY", "LastSeenTime", "FacingX", "FacingY", "Poise", "PoiseDelay", "Called", "ActionConnected" };
+        string[] added = { "Awareness", "Alertness", "AwarenessRemaining", "LastKnownX", "LastKnownY", "LastSeenTime", "FacingX", "FacingY", "Poise", "PoiseDelay", "Called", "ActionConnected", "Sleeper", "AimX", "AimY" };
+        node.AsObject().Remove("Hazards");
         foreach (var actor in node["Actors"]!.AsObject())
         {
             foreach (string field in added) actor.Value!.AsObject().Remove(field);
@@ -622,7 +1060,8 @@ public static class EnemyBehaviorChecks
         }
         Persistence.Restore(w, app.Narrative, node.ToJsonString());
         p = w.Player; r = w.RegionsById[r.Id];
-        check(w.Actors.Values.Where(a => a.Id.StartsWith("b:")).All(a => a.Awareness == Awareness.Unaware && a.Facing == V.Zero && a.Poise == 0), "an older save loads with every actor calm");
+        check(w.Actors.Values.Where(a => a.Id.StartsWith("b:")).All(a => a.Awareness == Awareness.Unaware && a.Facing == V.Zero && a.Poise == 0 && !a.Sleeper) && w.Hazards.Count == 0,
+            "an older save loads with every actor calm, awake and on clear ground");
         Run(600);
         check(w.Actors["b:s1"].CombatProfile == "" && w.Actors.Values.Count(a => a.Id.StartsWith("b:") && a.Awareness == Awareness.Engaged) >= 3 &&
             w.Actors.Values.All(a => float.IsFinite(a.X) && float.IsFinite(a.Y)), "actors from an older save notice and fight with the new senses, profiled or not");
@@ -648,6 +1087,16 @@ public static class EnemyBehaviorChecks
         check(Rejected(c => c.CombatProfiles.Single(x => x.Id == "prowler").LeashDistance = 10, "invalid senses"), "a leash shorter than the pursuit is rejected");
         check(Rejected(c => c.CombatProfiles.Single(x => x.Id == "prowler").EvadeCooldown = 0, "invalid senses"), "evasion without a cooldown is rejected");
         check(Rejected(c => c.Statuses.Single(x => x.Id == "rage").Modifiers["luck"] = 1, "status rage"), "a status modifier on an unknown stat is rejected");
+        check(Rejected(c => c.Abilities.Single(a => a.Id == "glob").Blast!.Radius = 20, "blast attack"), "a blast whose warning disagrees with its radius is rejected");
+        check(Rejected(c => c.Abilities.Single(a => a.Id == "glob").Blast = null, "blast attack"), "a blast shape without a blast is rejected");
+        check(Rejected(c => c.Abilities.Single(a => a.Id == "spit").Pool = new() { Duration = 2, Damage = 1 }, "invalid pool"), "a pool on an attack that is not lobbed is rejected");
+        check(Rejected(c => c.Abilities.Single(a => a.Id == "glob").Pool!.Damage = 0, "invalid pool"), "a pool that does nothing is rejected");
+        check(Rejected(c => c.Abilities.Single(a => a.Id == "coil").Geometry!.Range = 10, "invalid burst"), "a burst that cannot reach what it is aimed at is rejected");
+        check(Rejected(c => c.CombatProfiles.Single(x => x.Id == "shellback").TurnDegrees = 0, "shield, turning or morale"), "a shield that could never be got round is rejected");
+        check(Rejected(c => c.CombatProfiles.Single(x => x.Id == "alpha").Morale = .5f, "shield, turning or morale"), "a leader whose own nerve can break is rejected");
+        check(Rejected(c => c.Statuses.Single(x => x.Id == "regrowth").Damage = 1, "status regrowth"), "a status that both mends and harms is rejected");
+        check(EnemyRoster.Archetypes.Keys.OrderBy(x => x).SequenceEqual(Content.Load().CombatProfiles.Select(x => x.Id).OrderBy(x => x)),
+            "every combat profile has an authored body and every body a profile");
         var profiles = Content.Load().CombatProfiles;
         check(profiles.All(x => x.Loadout().SequenceEqual(x.Loadout().Distinct().OrderBy(id => id, StringComparer.Ordinal))) &&
             profiles.Single(x => x.Id == "brute").Loadout().Contains("bellow") && profiles.Single(x => x.Id == "howler").Loadout().Contains("screech"),

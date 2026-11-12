@@ -59,15 +59,35 @@ public static class EnemyMind
         else a.FacingX = a.FacingY = 0;
     }
 
+    /// <summary>Dozing at its post: a sleeper that nothing has disturbed lately.</summary>
+    public static bool Asleep(ActorState a) => a.Sleeper && a.Alive && a.Awareness == Awareness.Unaware &&
+        a.Cooldowns.GetValueOrDefault("wary") <= 0 && Vector2.DistanceSquared(a.Position, a.Home) <= 14 * 14;
+
+    /// <summary>Making enough noise to be heard at a listener's full hearing distance.</summary>
+    public static bool Loud(World w, ActorState b)
+    {
+        if (b.State is ActionState.Windup or ActionState.Recovery or ActionState.Dodging) return true;
+        if (b.Id == "player") return w.PlayerPace > CombatTuning.SneakPace;
+        float limit = Math.Max(1, w.Stat(b, "speed")) * CombatTuning.SneakPace;
+        return b.MotionX * b.MotionX + b.MotionY * b.MotionY > limit * limit;
+    }
+
+    /// <summary>How far this actor hears that one from right now.</summary>
+    public static float Earshot(World w, ActorState a, ActorState b, CombatProfileDef p) =>
+        p.HearingDistance * (Loud(w, b) ? 1 : CombatTuning.QuietHearing) * (Asleep(a) ? CombatTuning.SleepingHearing : 1);
+
     /// <summary>Can this actor notice that one right now, given its facing, range and sightline?</summary>
     public static bool Notices(World w, ActorState a, ActorState b, CombatProfileDef p)
     {
         if (!b.Alive || b.Region != a.Region || !w.Hostile(a, b)) return false;
         float distance = Vector2.Distance(a.Position, b.Position);
         if (distance > p.Sight) return false;
+        float earshot = Earshot(w, a, b, p);
+        // A sleeper sees nothing: only a careless step nearby, or being brushed against, rouses it.
+        if (Asleep(a)) return (distance <= earshot || distance <= a.Radius + b.Radius + 4) && w.LineOfSight(a, b);
         bool facing = CombatGeometry.TryNormalize(a.Facing, out var forward);
         // Close movement is heard from any side; otherwise the quarry must be in the view cone.
-        if (facing && distance > p.HearingDistance && p.SightHalfAngle < 180 &&
+        if (facing && distance > earshot && p.SightHalfAngle < 180 &&
             !CombatGeometry.InCone(a.Position, b.Position, forward, p.Sight, p.SightHalfAngle)) return false;
         return w.LineOfSight(a, b);
     }
@@ -90,11 +110,18 @@ public static class EnemyMind
     /// <summary>The alarm beat: a short startled pause, and a call that brings nearby allies.</summary>
     public static void Alarm(World w, ActorState a, ActorState quarry, CombatProfileDef p, bool called)
     {
+        bool asleep = Asleep(a);
         a.Target = quarry.Id;
         a.Alertness = 1;
         a.Called = called;
         // Called allies answer after a short, staggered delay so a pack does not turn as one.
         a.AwarenessRemaining = called ? .15f + ((uint)World.StableId(a.Id) % 5) * .06f : p.NoticeSeconds;
+        if (asleep)
+        {
+            // Roused from sleep: a longer, groggy beat before it can act.
+            a.AwarenessRemaining = Math.Max(a.AwarenessRemaining, CombatTuning.WakeSeconds);
+            w.Present(CombatPresentationKind.Woke, a, quarry.Id);
+        }
         a.LastKnownX = quarry.X; a.LastKnownY = quarry.Y; a.LastSeenTime = w.Time;
         a.Knowledge[quarry.Id] = "seen";
         a.MotionX = a.MotionY = 0;
@@ -104,22 +131,120 @@ public static class EnemyMind
         a.TacticalIntent = "alert";
         w.Present(CombatPresentationKind.Alerted, a, quarry.Id, outcome: called ? "called" : "sighted");
         w.Diagnose("ai_awareness", a.Position, a.Id + "/Alerted/" + (called ? "called" : "sighted"));
-        if (!called) Call(w, a, quarry, p);
+        if (!called) Call(w, a, quarry, p.CallRadius);
     }
 
     /// <summary>Allies in earshot join the hunt. Those brought by a call do not call in turn.</summary>
-    static void Call(World w, ActorState a, ActorState quarry, CombatProfileDef p)
+    static int Call(World w, ActorState a, ActorState quarry, float radius)
     {
-        if (p.CallRadius <= 0) return;
+        if (radius <= 0) return 0;
+        int answered = 0;
         foreach (var c in w.Actors.Values.OrderBy(c => c.Id, StringComparer.Ordinal))
         {
             if (c.Id == a.Id || c.Id == "player" || !c.Alive || c.Region != a.Region || c.Faction != a.Faction || w.Hostile(a, c) ||
                 c.Awareness is Awareness.Alerted or Awareness.Engaged || !w.Hostile(c, quarry)) continue;
             float distance = Vector2.Distance(a.Position, c.Position);
-            if (distance > p.CallRadius || (distance > 72 && !w.LineOfSight(a, c))) continue;
+            if (distance > radius || (distance > 72 && !w.LineOfSight(a, c))) continue;
             var theirs = w.FindProfile(c.CombatProfile) ?? CombatProfileDef.Legacy;
             if (!WithinLeash(c, quarry.Position, theirs)) continue;
             Alarm(w, c, quarry, theirs, called: true);
+            answered++;
+        }
+        return answered;
+    }
+
+    /// <summary>
+    /// A noise that betrays <paramref name="cause"/>: calm actors hostile to it within reach go to
+    /// look. They learn where the sound was, not who made it. Walls muffle; sleepers hear less;
+    /// an ambusher lying in wait does not stir.
+    /// </summary>
+    public static void Noise(World w, ActorState cause, Vector2 at, float radius)
+    {
+        if (radius <= 0) return;
+        foreach (var c in w.Actors.Values.OrderBy(c => c.Id, StringComparer.Ordinal))
+        {
+            if (c.Id == "player" || c.Id == cause.Id || !c.Alive || c.Region != cause.Region || !w.Hostile(c, cause) ||
+                c.Awareness is Awareness.Alerted or Awareness.Engaged || c.State is not (ActionState.Idle or ActionState.Moving) ||
+                c.Cooldowns.GetValueOrDefault("leash") > 0) continue;
+            float distance = Vector2.Distance(c.Position, at);
+            if (distance > radius) continue;
+            var p = w.FindProfile(c.CombatProfile) ?? CombatProfileDef.Legacy;
+            if (p.Ambusher || !WithinLeash(c, at, p)) continue;
+            float reach = radius * (w.VisibleTo(c, at) ? 1 : CombatTuning.MuffledNoise) * (Asleep(c) ? CombatTuning.SleepingHearing : 1);
+            if (distance > reach) continue;
+            Investigate(w, c, p, at, CombatPresentationKind.Heard, "heard");
+        }
+    }
+
+    /// <summary>Go and look at a point: a search with no quarry, which leaves the actor wary afterwards.</summary>
+    static void Investigate(World w, ActorState a, CombatProfileDef p, Vector2 at, CombatPresentationKind kind, string cause, string subject = "")
+    {
+        bool fresh = a.Awareness != Awareness.Searching || Vector2.Distance(a.LastKnown, at) > 40;
+        if (Asleep(a)) w.Present(CombatPresentationKind.Woke, a);
+        a.LastKnownX = at.X; a.LastKnownY = at.Y;
+        a.AwarenessRemaining = p.SearchSeconds;
+        a.Cooldowns["wary"] = CombatTuning.WarySeconds;
+        a.Target = "";
+        FaceToward(a, at);
+        Set(w, a, Awareness.Searching, cause);
+        if (fresh) w.Present(kind, a, subject, position: at, outcome: cause);
+    }
+
+    static ActorState? FindBody(World w, ActorState a, CombatProfileDef p)
+    {
+        bool facing = CombatGeometry.TryNormalize(a.Facing, out var forward);
+        foreach (var b in w.Actors.Values.OrderBy(b => b.Id, StringComparer.Ordinal))
+        {
+            if (b.Alive || b.Id == "player" || b.Region != a.Region || b.Faction != a.Faction || a.Knowledge.GetValueOrDefault(b.Id) == "found") continue;
+            float distance = Vector2.Distance(a.Position, b.Position);
+            if (distance > p.Sight || !WithinLeash(a, b.Position, p)) continue;
+            if (facing && distance > p.HearingDistance && p.SightHalfAngle < 180 && !CombatGeometry.InCone(a.Position, b.Position, forward, p.Sight, p.SightHalfAngle)) continue;
+            // Only a body that something hostile left there is worth a second look.
+            if (!b.Knowledge.Any(k => k.Value == "attacker" && w.Actors.TryGetValue(k.Key, out var killer) && w.Hostile(a, killer))) continue;
+            if (w.LineOfSight(a, b)) return b;
+        }
+        return null;
+    }
+
+    /// <summary>Finding a fallen ally: search around it, and warn those in earshot, who search too.</summary>
+    static void Discover(World w, ActorState a, CombatProfileDef p, ActorState body)
+    {
+        a.Knowledge[body.Id] = "found";
+        Investigate(w, a, p, body.Position, CombatPresentationKind.Disturbed, "body", body.Id);
+        foreach (var c in w.Actors.Values.OrderBy(c => c.Id, StringComparer.Ordinal))
+        {
+            if (c.Id == a.Id || c.Id == "player" || !c.Alive || c.Region != a.Region || c.Faction != a.Faction ||
+                c.Awareness is not (Awareness.Unaware or Awareness.Suspicious) || c.State is not (ActionState.Idle or ActionState.Moving)) continue;
+            float distance = Vector2.Distance(a.Position, c.Position);
+            if (distance > p.CallRadius || (distance > 72 && !w.LineOfSight(a, c))) continue;
+            var theirs = w.FindProfile(c.CombatProfile) ?? CombatProfileDef.Legacy;
+            if (theirs.Ambusher || !WithinLeash(c, body.Position, theirs)) continue;
+            c.Knowledge[body.Id] = "found";
+            Investigate(w, c, theirs, body.Position, CombatPresentationKind.Disturbed, "warned", body.Id);
+        }
+    }
+
+    /// <summary>
+    /// An ally has fallen. Those fighting beside it who saw it may lose their nerve; when it was
+    /// their leader, every follower does.
+    /// </summary>
+    public static void Fallen(World w, ActorState dead, ActorState killer)
+    {
+        if (dead.Id == "player") return;
+        bool leader = w.FindProfile(dead.CombatProfile)?.Leader == true;
+        foreach (var c in w.Actors.Values.OrderBy(c => c.Id, StringComparer.Ordinal))
+        {
+            if (c.Id == dead.Id || c.Id == "player" || !c.Alive || c.Region != dead.Region || c.Faction != dead.Faction ||
+                c.Awareness is not (Awareness.Alerted or Awareness.Engaged)) continue;
+            if (Vector2.Distance(c.Position, dead.Position) > 240 || !w.LineOfSight(c, dead)) continue;
+            // It watched this one die; the body will not surprise it later.
+            c.Knowledge[dead.Id] = "found";
+            var p = w.FindProfile(c.CombatProfile) ?? CombatProfileDef.Legacy;
+            if (p.Morale >= 1) continue;
+            if (!leader && Hash01(World.StableId(c.Id) ^ w.Seed, w.Tick, 23) < p.Morale) continue;
+            c.Cooldowns["rout"] = leader ? CombatTuning.LeaderRoutSeconds : CombatTuning.RoutSeconds;
+            w.Present(CombatPresentationKind.Shaken, c, killer.Id, outcome: leader ? "leader" : "loss");
+            w.Diagnose("ai_morale", c.Position, c.Id + "/" + (leader ? "leader" : "loss"));
         }
     }
 
@@ -147,7 +272,7 @@ public static class EnemyMind
             w.Diagnose("ai_awareness", victim.Position, victim.Id + "/Engaged/hurt");
         }
         // A cry of pain carries as far as a warning, even a dying one.
-        if (calm) Call(w, victim, source, p);
+        if (calm) Call(w, victim, source, p.CallRadius);
     }
 
     static void BeginSearch(World w, ActorState a, CombatProfileDef p)
@@ -162,6 +287,8 @@ public static class EnemyMind
         a.Alertness = a.AwarenessRemaining = 0;
         // A moment of resolve, so a leashed actor does not turn straight back.
         a.Cooldowns["leash"] = 1.5f;
+        // It stays up and on edge for a while after a hunt.
+        a.Cooldowns["wary"] = CombatTuning.WarySeconds;
         Set(w, a, Awareness.Returning, cause);
     }
 
@@ -204,6 +331,7 @@ public static class EnemyMind
             // Recognition is near instant up close and takes about a second at the edge of sight.
             float needed = distance <= p.HearingDistance ? .12f : .12f + .78f * Math.Clamp(distance / Math.Max(1, p.Sight), 0, 1);
             if (a.Awareness is Awareness.Searching or Awareness.Returning) needed *= .5f;
+            else if (a.Cooldowns.GetValueOrDefault("wary") > 0) needed *= CombatTuning.WaryNotice;
             a.Alertness = Math.Min(1, a.Alertness + dt / needed);
             a.LastKnownX = seen.X; a.LastKnownY = seen.Y;
             if (a.Alertness >= 1) { Alarm(w, a, seen, p, called: false); return null; }
@@ -213,6 +341,10 @@ public static class EnemyMind
         {
             a.Alertness = Math.Max(0, a.Alertness - dt / 2.5f);
             if (a.Awareness == Awareness.Suspicious && a.Alertness <= 0) Set(w, a, Awareness.Unaware, "calm");
+            // Nothing hostile in view, but a fallen ally is.
+            if (a.Awareness is Awareness.Unaware or Awareness.Suspicious or Awareness.Returning && !p.Ambusher && !Asleep(a) &&
+                a.Cooldowns.GetValueOrDefault("leash") <= 0 && a.State is ActionState.Idle or ActionState.Moving && FindBody(w, a, p) is { } body)
+            { Discover(w, a, p, body); return null; }
         }
         if (a.Awareness == Awareness.Searching)
         {
@@ -261,7 +393,8 @@ public static class EnemyMind
         // Low health shakes its nerve for a few seconds at a time, not for the rest of the fight.
         bool hurt = a.Health < a.MaxHealth * p.RetreatThreshold;
         if (hurt && a.Cooldowns.GetValueOrDefault("nerve") <= 0) a.Cooldowns["nerve"] = 9;
-        bool shaken = hurt && a.Cooldowns.GetValueOrDefault("nerve") > 6;
+        // Seeing an ally fall, or the leader, can break it outright for a moment.
+        bool shaken = a.Cooldowns.GetValueOrDefault("rout") > 0 || (hurt && a.Cooldowns.GetValueOrDefault("nerve") > 6);
         bool retreat = w.Plan(shaken ? "safe" : "defeated", true, shaken ? "retreat" : "attack") == "retreat";
         var intent = CombatBrain.Select(w, a, quarry, authored, retreat);
         a.TacticalIntent = intent.Kind;
@@ -278,6 +411,12 @@ public static class EnemyMind
             case "circle" or "flank" or "retreat" or "withdraw":
                 w.Follow(a, intent.Destination, step, intent.Pace);
                 break;
+        }
+        // A runner that reaches allies who have not noticed the fight brings them into it.
+        if (shaken && intent.Kind == "retreat" && a.Cooldowns.GetValueOrDefault("fetch") <= 0 && Call(w, a, quarry, 110) > 0)
+        {
+            a.Cooldowns["fetch"] = 10;
+            w.Diagnose("ai_fetch", a.Position, a.Id);
         }
     }
 
@@ -323,6 +462,18 @@ public static class EnemyMind
             a.TacticalIntent = "lurk";
             return;
         }
+        if (a.Sleeper && a.Cooldowns.GetValueOrDefault("wary") <= 0)
+        {
+            // Settled again: back to its spot and down.
+            if (Vector2.Distance(a.Position, a.Home) > 10)
+            {
+                w.Follow(a, a.Home, step, .45f);
+                if (a.MotionX != 0 || a.MotionY != 0) { a.TacticalIntent = "roam"; return; }
+            }
+            a.Activity = "sleep";
+            a.TacticalIntent = "sleep";
+            return;
+        }
         string action = w.Plan(a.Activity, false, a.Activity);
         a.TacticalIntent = "";
         if (action == "rest") { w.Rest(a, step); return; }
@@ -359,9 +510,23 @@ public static class EnemyMind
     }
 
     /// <summary>Authoritative facing, every tick. Fighters keep their eyes on the quarry while they circle or back away.</summary>
-    public static void Face(World w, ActorState a)
+    public static void Face(World w, ActorState a, float dt)
     {
         if (!a.Alive) return;
+        var before = a.Facing;
+        Turn(w, a);
+        // Heavy bodies come round slowly, which is what lets something quicker get behind them.
+        if (a.State is ActionState.Windup or ActionState.Recovery || w.FindProfile(a.CombatProfile) is not { TurnDegrees: > 0 } profile ||
+            !CombatGeometry.TryNormalize(before, out var from) || !CombatGeometry.TryNormalize(a.Facing, out var to)) return;
+        float limit = profile.TurnDegrees * MathF.PI / 180 * dt;
+        float angle = MathF.Atan2(from.X * to.Y - from.Y * to.X, Vector2.Dot(from, to));
+        if (MathF.Abs(angle) <= limit) return;
+        float c = MathF.Cos(limit), s = MathF.Sin(limit) * MathF.Sign(angle);
+        a.FacingX = from.X * c - from.Y * s; a.FacingY = from.X * s + from.Y * c;
+    }
+
+    static void Turn(World w, ActorState a)
+    {
         if (a.State is ActionState.Windup or ActionState.Recovery or ActionState.Dodging or ActionState.Staggered)
         {
             if (a.State is ActionState.Windup or ActionState.Recovery && (a.ActionDirectionX != 0 || a.ActionDirectionY != 0))
@@ -370,7 +535,7 @@ public static class EnemyMind
             return;
         }
         bool watching = a.Awareness is Awareness.Alerted or Awareness.Suspicious ||
-            (a.Awareness == Awareness.Engaged && a.TacticalIntent is "hold" or "circle" or "flank" or "withdraw" or "ability" or "wait" or "alert" or "retreat");
+            (a.Awareness == Awareness.Engaged && a.TacticalIntent is "hold" or "circle" or "flank" or "withdraw" or "ability" or "wait" or "alert" or "retreat" or "turn" or "cower");
         if (watching)
         {
             var point = a.Awareness == Awareness.Engaged && w.Actors.TryGetValue(a.Target, out var quarry) && quarry.Region == a.Region ? quarry.Position : a.LastKnown;

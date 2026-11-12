@@ -18,6 +18,8 @@ public static class CombatBrain
         if (retreat || (profile != null && distance < profile.MinimumDistance) ||
             (a.TacticalIntent == "retreat" && profile != null && distance < profile.MinimumDistance + 12))
         {
+            // Far enough: a routed actor stops running and watches from where it is.
+            if (retreat && distance >= CombatTuning.RoutDistance) return new("cower", a.Position);
             var escape = LocalDestination(w, a, retreat ? Rout(w, a, target, toward) : -toward, 42);
             if (escape != a.Position) return new("retreat", escape);
             // Cornered enemies may attack; never repeat an invalid escape vector.
@@ -48,7 +50,14 @@ public static class CombatBrain
             if (score > bestScore || (score == bestScore && StringComparer.Ordinal.Compare(ability.Id, best?.Id) < 0))
             { best = ability; bestScore = score; }
         }
-        if (best != null) return new("ability", a.Position, best.Id);
+        if (best != null)
+        {
+            // A slow turner must first bring its front round to what it means to hit.
+            if (profile is { TurnDegrees: > 0 } && CombatGeometry.TryNormalize(a.Facing, out var front) &&
+                !CombatGeometry.InCone(a.Position, target.Position, front, distance + 1, CombatTuning.TurnAttackHalfAngle))
+                return new("turn", a.Position);
+            return new("ability", a.Position, best.Id);
+        }
         if (profile == null) return new("approach", target.Position); // Legacy actors retain range-first eligible attacks and pursuit.
         float approach = profile.ApproachDistance;
         float preferred = profile.PreferredDistance;
@@ -83,6 +92,8 @@ public static class CombatBrain
             float reach = lunge.Distance + (ability.Geometry?.Shape == "cone" ? ability.Geometry.Range : ability.Range + a.NaturalReach);
             return distance <= reach && region.CanTravel(a.Position, a.Position + toward * Math.Min(distance, lunge.Distance), a);
         }
+        // A burst reaches all round the body but no further; leave a margin so a step back does not clear it at once.
+        if (ability.Geometry?.Shape == "burst") return distance <= ability.Geometry.Range - 6;
         return ability.Geometry?.Shape != "cone" || distance <= ability.Geometry.Range;
     }
 
@@ -91,10 +102,15 @@ public static class CombatBrain
         if (profile.EnrageAbility != "" && a.Health < a.MaxHealth * profile.EnrageThreshold && w.FindAbility(profile.EnrageAbility) is { } rage &&
             a.Abilities.Contains(rage.Id) && !a.Statuses.Any(s => s.Id == rage.Status) && w.CanActivate(a, a, rage))
             return rage.Id;
-        if (profile.RallyAbility != "" && w.FindAbility(profile.RallyAbility) is { } rally && a.Abilities.Contains(rally.Id) && w.CanActivate(a, a, rally) &&
-            w.Actors.Values.Any(c => c.Id != a.Id && c.Alive && c.Region == a.Region && c.Faction == a.Faction && c.Awareness == Awareness.Engaged &&
+        if (profile.RallyAbility != "" && w.FindAbility(profile.RallyAbility) is { } rally && a.Abilities.Contains(rally.Id) && w.CanActivate(a, a, rally))
+        {
+            // A mending status is for the wounded, itself included; any other is for allies in the fight.
+            bool mends = w.Content.Statuses.Any(s => s.Id == rally.Status && s.Heal > 0);
+            if (w.Actors.Values.Any(c => c.Alive && c.Region == a.Region && c.Faction == a.Faction && !w.Hostile(a, c) && (mends || c.Id != a.Id) &&
+                (mends ? c.Health < c.MaxHealth * .8f : c.Awareness == Awareness.Engaged) &&
                 Vector2.DistanceSquared(a.Position, c.Position) <= rally.AllyRadius * rally.AllyRadius && !c.Statuses.Any(s => s.Id == rally.Status)))
-            return rally.Id;
+                return rally.Id;
+        }
         return null;
     }
 
