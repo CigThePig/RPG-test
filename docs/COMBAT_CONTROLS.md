@@ -26,7 +26,11 @@ Bites and the verification cone use their authored PPC action styles. Successful
 
 ## Enemy awareness, tactics and animation
 
-Enemies now notice, call packmates, search for a lost quarry and return home; packs take turns and flank; and the ruin has pouncing prowlers, guarded charging brutes, volleying spitters, ambushing stalkers and rallying howlers. Striking a foe that has not noticed you deals bonus damage. See [enemy behaviour and animation](ENEMY_BEHAVIOR.md). The sections below describe the earlier foundation, which still holds unless that document says otherwise.
+Enemies now notice, call packmates, search for a lost quarry and return home; packs take turns and flank; and the ruin has pouncing prowlers, guarded charging brutes, volleying spitters, ambushing stalkers and rallying howlers. Striking a foe that has not noticed you deals bonus damage, double on one that is asleep.
+
+**Sneaking.** Hold Shift (keyboard) or push the touch stick only about halfway to walk softly: enemies hear a creeping step from less than half as far. Rolls, swings and fights make noise that draws calm enemies to look. While enemies nearby have not recognised you, their view cones and the distance at which they would hear you are drawn faintly on the ground, and an eye over your head says how much they know.
+
+The ruin also holds alphas whose fall routs their pack, shelled shellbacks to get round, lashers, menders that heal their allies, and spitters that lob acid which pools on the ground. See [enemy behaviour and animation](ENEMY_BEHAVIOR.md). The sections below describe the earlier foundation, which still holds unless that document says otherwise.
 
 ## Tactical enemies (Part 3)
 
