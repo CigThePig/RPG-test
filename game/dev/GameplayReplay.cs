@@ -382,6 +382,8 @@ public sealed class GameplayReplay
                     EnemyMind.Resettle(a,at,cast[i].Watching ? p.Position-at : at-p.Position);
                     // Scene dressing: a sleeper to creep up on, a leader one blow from falling, a patient for the mender.
                     a.Sleeper=s.Id=="behaviour-sneak";
+                    // Facing away when the roll comes: the first idle glance waits until just after it.
+                    if(s.Id=="behaviour-noise")a.NextTacticalTime=w.Time+.6;
                     if(s.Id=="behaviour-rout" && id=="alpha")a.Health=1;
                     if(s.Id=="behaviour-mend" && id=="prowler")a.Health=300;
                     tacticalActors.Add(a.Id);
@@ -442,7 +444,7 @@ public sealed class GameplayReplay
                 else { evadeAt=local; TapAction("attack"); }
             }
             // A roll behind a prowler's back; blows on a shellback's front; one blow for a wounded alpha.
-            if(test.Id=="behaviour-noise" && local==40)TapAction("dodge");
+            if(test.Id=="behaviour-noise" && local==20)TapAction("dodge");
             if(test.Id=="behaviour-shell" && local is 60 or 110 or 160)TapAction("attack");
             if(test.Id=="behaviour-rout" && local is 70 or 115 or 160)TapAction("attack");
             if(local%6==0)
@@ -676,7 +678,7 @@ public sealed class GameplayReplay
             if(s.Id=="behaviour-ambush")Expect(Seen("alerted/sighted")==1 && Seen("start/sting")>=1,"the stalker should wake and sting");
             if(s.Id=="behaviour-rally")Expect(Seen("rally")>=1,"the howler should rally its ally");
             if(s.Id=="behaviour-sneak")Expect(Seen("ambush")==1 && Seen("alerted/sighted")==0 && Seen("alerted/hurt")==1,"a sleeper crept up on should be struck before it notices");
-            if(s.Id=="behaviour-noise")Expect(Seen("heard")>=1,"a roll behind a prowler's back should be heard");
+            if(s.Id=="behaviour-noise")Expect(Seen("heard")==1 && behaviour.Keys.First(k=>k is "heard" or "alerted/sighted")=="heard","a roll behind a prowler's back should be heard before it is seen");
             if(s.Id=="behaviour-shell")Expect(Seen("blocked")>=1,"blows on a shellback's front should be turned");
             if(s.Id=="behaviour-glob")Expect(Seen("blastlaunched")>=1 && Seen("blastlanded")>=1,"the spitter should lob a glob that lands");
             if(s.Id=="behaviour-rout")Expect(Seen("shaken/leader")==2,"both followers should break when the alpha falls");
