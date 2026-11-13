@@ -18,6 +18,9 @@ public sealed class World
     public Dictionary<string, ActorState> Actors { get; set; } = new();
     public Dictionary<string, RegionState> RegionsById { get; set; } = new();
     public List<ProjectileState> Projectiles { get; set; } = new();
+    public List<HazardState> Hazards { get; set; } = new();
+    /// <summary>How hard the player is moving, 0..1 of full pace. Input, not saved: a slow step is a quiet one.</summary>
+    public float PlayerPace { get; private set; }
     public Content Content { get; }
     public Items Items { get; }
     public EventStream Events { get; } = new();
@@ -34,13 +37,17 @@ public sealed class World
     readonly ActorSeparation separation = new();
     readonly Dictionary<string, Spell> spells = new();
     readonly Dictionary<string, AbilityDef> abilityDefinitions = new();
+    readonly Dictionary<string, CombatProfileDef> profileDefinitions = new();
     public AbilityDef? FindAbility(string id) => abilityDefinitions.GetValueOrDefault(id);
+    /// <summary>Authored tactics for an actor, or null for legacy actors without a profile.</summary>
+    public CombatProfileDef? FindProfile(string id) => id == "" ? null : profileDefinitions.GetValueOrDefault(id);
     public Godot.Node? Planner { get; set; }
 
     public event Action<CombatPresentationEvent>? Presentation;
     // Separate from narrative events: opt-in, bounded by the existing trace writer.
     public event Action<string, Vector2, string>? CombatDiagnostic;
-    void Present(CombatPresentationKind kind, ActorState actor, string target = "", string ability = "", Vector2? position = null, string outcome = "") =>
+    internal void Diagnose(string kind, Vector2 at, string context) => CombatDiagnostic?.Invoke(kind, at, context);
+    internal void Present(CombatPresentationKind kind, ActorState actor, string target = "", string ability = "", Vector2? position = null, string outcome = "") =>
         Presentation?.Invoke(new(kind, actor.Id, target, ability, Tick, actor.Position, position ?? actor.Position,
             new Vector2(actor.ActionDirectionX, actor.ActionDirectionY), outcome));
     public World(Content content, Godot.Node itemService, int seed = 42)
@@ -56,6 +63,8 @@ public sealed class World
         Spells = new();
         spells.Clear();
         abilityDefinitions.Clear();
+        profileDefinitions.Clear();
+        foreach (var profile in Content.CombatProfiles) profileDefinitions[profile.Id] = profile;
         foreach (var d in Content.Abilities)
         {
             spells[d.Id] = new Spell(new RpgAbility(this, d));
@@ -80,13 +89,17 @@ public sealed class World
             var definition = Content.Statuses.Single(d => d.Id == status.Id);
             if (definition.ModifierStat == stat)
                 value += definition.Modifier * status.Stacks;
+            if (definition.Modifiers.TryGetValue(stat, out float extra))
+                value += extra * status.Stacks;
         }
 
         return value;
     }
 
     public bool Hostile(ActorState a, ActorState b) => a.Id != b.Id && (Content.Factions.GetValueOrDefault(a.Faction + ":" + b.Faction) + a.Reputation.GetValueOrDefault(b.Faction)) < 0;
-    public bool CanActivate(ActorState a, ActorState b, AbilityDef d) => a.Alive && b.Alive && a.Region == b.Region && a.Abilities.Contains(d.Id) && a.State is ActionState.Idle or ActionState.Moving && a.Mana >= d.Cost && a.Cooldowns.GetValueOrDefault(d.Id) <= 0 && (!d.RequiresWeapon || (a.Grasps && Items.Bonus(a, "damage") > 0)) && (d.Self ? a == b : Hostile(a, b)) && (d.Self || Vector2.Distance(a.Position, b.Position) <= d.Range + a.NaturalReach) && (d.Geometry?.Shape != "cone" || CombatGeometry.TryNormalize(b.Position - a.Position, out _)) && LineOfSight(a, b);
+    public bool CanActivate(ActorState a, ActorState b, AbilityDef d) => a.Alive && b.Alive && a.Region == b.Region && a.Abilities.Contains(d.Id) && a.State is ActionState.Idle or ActionState.Moving && a.Mana >= d.Cost && a.Cooldowns.GetValueOrDefault(d.Id) <= 0 && (!d.RequiresWeapon || (a.Grasps && Items.Bonus(a, "damage") > 0)) && (d.Self ? a == b : Hostile(a, b)) && (d.Self || Vector2.Distance(a.Position, b.Position) <= d.Range + a.NaturalReach) && (d.Self || d.MinRange <= 0 || Vector2.Distance(a.Position, b.Position) >= d.MinRange) && (!Directed(d) || CombatGeometry.TryNormalize(b.Position - a.Position, out _)) && LineOfSight(a, b);
+    /// <summary>Attacks that commit to a ground direction when they start.</summary>
+    public static bool Directed(AbilityDef? d) => d?.Geometry?.Shape is "cone" or "line";
     public bool Activate(string id, string ability, string target)
     {
         if (!Actors.TryGetValue(id, out var actor) || !Actors.TryGetValue(target, out var victim) || !spells.TryGetValue(ability, out var spell))
@@ -183,6 +196,8 @@ public sealed class World
         Present(CombatPresentationKind.AttackCommitted, a, ability: d.Id);
         Events.Publish(new("ability_started", a.Id, "", d.Id));
         CombatDiagnostic?.Invoke("attack_started", strike, "slash");
+        ThreatenFrom(a, strike, d.Range + a.NaturalReach + CombatTuning.SlashImpactTolerance + CombatTuning.SlashLungeDistance, CombatTuning.SlashArcHalfDegrees);
+        EnemyMind.Noise(this, a, a.Position, CombatTuning.SwingNoise);
         return true;
     }
 
@@ -201,12 +216,60 @@ public sealed class World
         ClearPlayerMotion();
         Present(CombatPresentationKind.DodgeStarted, a, ability: "dodge");
         CombatDiagnostic?.Invoke("dodge_started", facing, "dodge");
+        EnemyMind.Noise(this, a, a.Position, CombatTuning.RollNoise);
         return true;
     }
 
-    public static bool DodgeImmune(ActorState a) => a.State == ActionState.Dodging &&
-        a.ActionElapsed >= CombatTuning.DodgeInvulnerableStart &&
-        a.ActionElapsed < CombatTuning.DodgeInvulnerableEnd;
+    public static bool DodgeImmune(ActorState a) => a.State == ActionState.Dodging && (a.Id == "player"
+        ? a.ActionElapsed >= CombatTuning.DodgeInvulnerableStart && a.ActionElapsed < CombatTuning.DodgeInvulnerableEnd
+        : a.ActionElapsed >= CombatTuning.EvadeInvulnerableStart && a.ActionElapsed < CombatTuning.EvadeInvulnerableEnd);
+
+    static float DodgeDuration(ActorState a) => a.Id == "player" ? CombatTuning.DodgeDuration : CombatTuning.EvadeDuration;
+    float DodgeDistance(ActorState a) => a.Id == "player" ? CombatTuning.DodgeDistance : FindProfile(a.CombatProfile)?.EvadeDistance ?? 0;
+
+    /// <summary>A short hop clear of an incoming attack. Enemies only; the player's roll is input-driven.</summary>
+    public bool TryStartEvade(ActorState a, Vector2 direction)
+    {
+        var profile = FindProfile(a.CombatProfile);
+        if (a.Id == "player" || profile == null || profile.EvadeDistance <= 0 || !TryDirection(direction, out var facing) || !a.Alive ||
+            a.State is not (ActionState.Idle or ActionState.Moving) || a.Cooldowns.GetValueOrDefault("evade") > 0) return false;
+        a.MotionX = a.MotionY = 0;
+        a.FreeSlash = false;
+        a.ActionElapsed = 0;
+        a.ActionDirectionX = facing.X; a.ActionDirectionY = facing.Y;
+        a.State = ActionState.Dodging;
+        a.StateRemaining = CombatTuning.EvadeDuration;
+        a.Cooldowns["evade"] = profile.EvadeCooldown;
+        Present(CombatPresentationKind.DodgeStarted, a, ability: "evade");
+        CombatDiagnostic?.Invoke("evade_started", facing, a.Id);
+        return true;
+    }
+
+    // The player's committed attack is the cue. Each threatened enemy rolls once, from
+    // world state only, so a replay or a reloaded save makes the same choice.
+    void ThreatenFrom(ActorState attacker, Vector2 direction, float reach, float halfDegrees)
+    {
+        foreach (var b in Actors.Values.OrderBy(b => b.Id, StringComparer.Ordinal))
+        {
+            if (b.Id == attacker.Id || !b.Alive || b.Region != attacker.Region || b.Awareness != Awareness.Engaged || !Hostile(b, attacker)) continue;
+            var profile = FindProfile(b.CombatProfile);
+            if (profile == null || profile.EvadeChance <= 0 || b.State is not (ActionState.Idle or ActionState.Moving) || b.Cooldowns.GetValueOrDefault("evade") > 0) continue;
+            if (!CombatGeometry.InCone(attacker.Position, b.Position, direction, reach + b.Radius, halfDegrees)) continue;
+            if (EnemyMind.Hash01(StableId(b.Id) ^ Seed, Tick, 17) >= profile.EvadeChance) continue;
+            var away = CombatGeometry.TryNormalize(b.Position - attacker.Position, out var back) ? back : -direction;
+            var region = RegionsById[b.Region];
+            // Back and to a side first; straight back keeps the attacker's line.
+            float side = (StableId(b.Id) + Tick) % 2 == 0 ? 1 : -1;
+            foreach (float angle in new[] { .9f * side, -.9f * side, 0f, 1.57f * side, -1.57f * side })
+            {
+                float c = MathF.Cos(angle), s = MathF.Sin(angle);
+                var hop = new Vector2(away.X * c - away.Y * s, away.X * s + away.Y * c);
+                if (!region.CanTravel(b.Position, b.Position + hop * profile.EvadeDistance, b)) continue;
+                TryStartEvade(b, hop);
+                break;
+            }
+        }
+    }
 
     public void CancelPlayerDodge()
     {
@@ -217,12 +280,70 @@ public sealed class World
 
     void AdvanceDodge(ActorState a, float dt)
     {
-        float old = Math.Clamp(a.ActionElapsed / CombatTuning.DodgeDuration, 0, 1);
-        a.ActionElapsed = Math.Min(CombatTuning.DodgeDuration, a.ActionElapsed + dt);
-        float now = Math.Clamp(a.ActionElapsed / CombatTuning.DodgeDuration, 0, 1);
-        float distance = CombatTuning.DodgeDistance * ((1 - (1 - now) * (1 - now)) - (1 - (1 - old) * (1 - old)));
+        float duration = DodgeDuration(a);
+        float old = Math.Clamp(a.ActionElapsed / duration, 0, 1);
+        a.ActionElapsed = Math.Min(duration, a.ActionElapsed + dt);
+        float now = Math.Clamp(a.ActionElapsed / duration, 0, 1);
+        float distance = DodgeDistance(a) * ((1 - (1 - now) * (1 - now)) - (1 - (1 - old) * (1 - old)));
         Move(a, new Vector2(a.ActionDirectionX, a.ActionDirectionY) * distance);
-        a.StateRemaining = Math.Max(0, CombatTuning.DodgeDuration - a.ActionElapsed);
+        a.StateRemaining = Math.Max(0, duration - a.ActionElapsed);
+    }
+
+    // Committed movement inside an attack: a pounce or dart during its windup, or a
+    // charge down its lane once the windup ends. Travel stops at terrain like any move.
+    void AdvanceAttackMotion(ActorState a, float dt)
+    {
+        var d = FindAbility(a.State == ActionState.Windup ? a.PendingAbility : a.RecoveryAbility);
+        if (d == null || (d.Lunge == null && d.Charge == null)) return;
+        var direction = new Vector2(a.ActionDirectionX, a.ActionDirectionY);
+        float previous = a.ActionElapsed;
+        a.ActionElapsed += dt;
+        if (d.Lunge is { } lunge)
+        {
+            float span = lunge.End - lunge.Start;
+            float distance = lunge.Distance * (SmoothStep((a.ActionElapsed - lunge.Start) / span) - SmoothStep((previous - lunge.Start) / span));
+            if (distance > 0) Move(a, direction * distance);
+            return;
+        }
+        var charge = d.Charge!;
+        if (a.State != ActionState.Recovery || a.ActionConnected) return;
+        float running = a.ActionElapsed - d.Windup, before = previous - d.Windup;
+        if (before >= charge.Duration) return;
+        float travel = charge.Speed * (Math.Min(running, charge.Duration) - Math.Max(before, 0));
+        var from = a.Position;
+        Move(a, direction * travel, slide: false, out bool blocked);
+        if (!a.ActionConnected)
+        {
+            // The nearest hostile body in the lane takes the one hit; stable IDs break ties.
+            var victim = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) &&
+                    Vector2.Distance(a.Position, b.Position) <= a.Radius + b.Radius + charge.Reach && Vector2.Dot(b.Position - from, direction) > -b.Radius && LineOfSight(a, b))
+                .OrderBy(b => Vector2.DistanceSquared(a.Position, b.Position)).ThenBy(b => b.Id, StringComparer.Ordinal).FirstOrDefault();
+            if (victim != null)
+            {
+                a.ActionConnected = true;
+                var position = victim.Position;
+                Present(CombatPresentationKind.AttackImpact, a, victim.Id, d.Id, position);
+                if (!Resolve(a, victim, d, geometryValidated: true))
+                    Present(CombatPresentationKind.Miss, a, victim.Id, d.Id, position, "miss");
+                return;
+            }
+        }
+        if (blocked)
+        {
+            // Ran into terrain: the charge ends in a daze instead of an ordinary recovery.
+            Present(CombatPresentationKind.ChargeCrashed, a, a.Target, d.Id);
+            CombatDiagnostic?.Invoke("charge_crashed", direction, a.Id);
+            if (Actors.TryGetValue(a.Target, out var quarry)) EnemyMind.Noise(this, quarry, a.Position, CombatTuning.CrashNoise);
+            Cancel(a);
+            a.State = ActionState.Staggered;
+            a.StateRemaining = charge.CrashStagger;
+        }
+        else if (running >= charge.Duration && !a.ActionConnected)
+        {
+            a.ActionConnected = true;
+            Present(CombatPresentationKind.AttackImpact, a, a.Target, d.Id);
+            Present(CombatPresentationKind.Miss, a, a.Target, d.Id, outcome: "miss");
+        }
     }
 
     ActorState? PlayerSlashTarget(ActorState attacker, AbilityDef ability)
@@ -267,12 +388,18 @@ public sealed class World
         a.StateRemaining = d.Windup;
         a.PendingAbility = d.Id;
         a.RecoveryAbility = "";
-        a.Target = b.Id;
+        // Self abilities have a fixed recipient; Target remains the AI's combat quarry.
+        if (!d.Self) a.Target = b.Id;
         a.FreeSlash = false;
         a.ActionElapsed = 0;
-        if (d.Geometry?.Shape == "cone" && CombatGeometry.TryNormalize(b.Position - a.Position, out var direction))
+        a.ActionConnected = false;
+        // Directed attacks and lunges commit to where the target stands now.
+        if ((Directed(d) || d.Lunge != null) && CombatGeometry.TryNormalize(b.Position - a.Position, out var direction))
         { a.ActionDirectionX = direction.X; a.ActionDirectionY = direction.Y; }
         else a.ActionDirectionX = a.ActionDirectionY = 0;
+        if (a.ActionDirectionX != 0 || a.ActionDirectionY != 0) { a.FacingX = a.ActionDirectionX; a.FacingY = a.ActionDirectionY; }
+        // A lobbed attack is thrown at the ground where the target stands now.
+        a.AimX = d.Blast != null ? b.X : 0; a.AimY = d.Blast != null ? b.Y : 0;
         Present(CombatPresentationKind.AttackStarted, a, b.Id, d.Id, b.Position);
         Present(CombatPresentationKind.AttackCommitted, a, b.Id, d.Id, b.Position);
         Events.Publish(new("ability_started", a.Id, b.Id, d.Id));
@@ -291,6 +418,7 @@ public sealed class World
         a.RecoveryAbility = "";
         a.FreeSlash = false;
         a.ActionElapsed = 0;
+        a.ActionConnected = false;
         a.ActionDirectionX = a.ActionDirectionY = 0;
         a.State = a.Alive ? ActionState.Idle : ActionState.Dead;
         a.StateRemaining = 0;
@@ -312,24 +440,56 @@ public sealed class World
             return false;
         }
         var impactPosition = target.Position;
+        // Striking a foe that has not noticed its attacker lands harder.
+        bool ambush = !periodic && source.Id == "player" && target.Id != "player" && target.Awareness is Awareness.Unaware or Awareness.Suspicious;
+        if (ambush) amount *= EnemyMind.Asleep(target) ? CombatTuning.SleepingMultiplier : CombatTuning.AmbushMultiplier;
+        // A hard front turns most of a blow that arrives on it.
+        bool blocked = !periodic && Shielded(target, source.Position);
+        if (blocked) amount *= FindProfile(target.CombatProfile)!.ShieldFactor;
         float resistance = type == "physical" ? Stat(target, "defence") : 0;
         float actual = Math.Max(1, amount - resistance);
         target.Health = Math.Max(0, target.Health - actual);
         // Only direct hits grant the short post-hit window. A damage-over-time tick
         // must not make its victim immune to the next sword or projectile.
         if (!periodic) target.Invulnerable = .12f;
-        Cancel(target);
-        target.State = target.Alive ? ActionState.Staggered : ActionState.Dead;
-        target.StateRemaining = .22f;
+        // Guarded foes shrug off blows until their poise is spent; the breaking hit staggers for longer.
+        var guard = target.Alive ? FindProfile(target.CombatProfile) : null;
+        bool guarded = false, broken = false;
+        if (blocked) guarded = true;
+        else if (guard is { Poise: > 0 })
+        {
+            if (target.PoiseDelay <= 0) target.Poise = guard.Poise;
+            if (!periodic) { target.Poise -= actual; target.PoiseDelay = CombatTuning.PoiseRecoverySeconds; }
+            if (periodic || target.Poise > 0) guarded = true;
+            else { broken = true; target.Poise = guard.Poise; }
+        }
+        // Venom and burns hurt the player without stealing control every second.
+        if (periodic && target.Id == "player" && target.Alive) guarded = true;
+        if (!guarded)
+        {
+            Cancel(target);
+            target.State = target.Alive ? ActionState.Staggered : ActionState.Dead;
+            target.StateRemaining = broken ? CombatTuning.GuardBreakStagger : .22f;
+        }
         var away = target.Position - source.Position;
         if (!periodic && away.LengthSquared() > 0)
-            Move(target, Vector2.Normalize(away) * 15);
-        Present(CombatPresentationKind.Hit, source, target.Id, ability, impactPosition, periodic ? "periodic" : "hit");
+            Move(target, Vector2.Normalize(away) * (guarded ? 4 : FindAbility(ability)?.Knockback ?? 15));
+        Present(CombatPresentationKind.Hit, source, target.Id, ability, impactPosition, periodic ? "periodic" : ambush ? "ambush" : blocked ? "blocked" : guarded ? "guarded" : "hit");
+        if (broken) Present(CombatPresentationKind.GuardBroken, source, target.Id, ability, impactPosition);
         Events.Publish(new("damage", source.Id, target.Id, type, (int)actual));
+        if (ambush) Events.Publish(new("ambush", source.Id, target.Id, type, (int)actual));
         target.Knowledge[source.Id] = "attacker";
         target.Relationships[source.Id] = target.Relationships.GetValueOrDefault(source.Id) - actual;
+        EnemyMind.Hurt(this, target, source);
+        if (!periodic)
+        {
+            // A fight is loud: anything calm that hears it, and has reason to, comes to look.
+            EnemyMind.Noise(this, source, impactPosition, CombatTuning.FightNoise);
+            EnemyMind.Noise(this, target, impactPosition, CombatTuning.FightNoise);
+        }
         if (!target.Alive)
         {
+            EnemyMind.Fallen(this, target, source);
             Items.Service.Call("unequip_all", target.Id);
             target.PendingAbility = "";
             Present(CombatPresentationKind.Death, source, target.Id, ability, impactPosition);
@@ -342,6 +502,12 @@ public sealed class World
         }
         return true;
     }
+
+    /// <summary>Is a blow from that point turned by the target's hard front right now?</summary>
+    public bool Shielded(ActorState target, Vector2 from) =>
+        target.Alive && FindProfile(target.CombatProfile) is { ShieldArc: > 0 } profile && target.Awareness is Awareness.Alerted or Awareness.Engaged &&
+        target.State is ActionState.Idle or ActionState.Moving or ActionState.Windup && CombatGeometry.TryNormalize(target.Facing, out var front) &&
+        CombatGeometry.InCone(target.Position, from, front, Vector2.Distance(target.Position, from) + 1, profile.ShieldArc);
 
     public static int StableId(string text)
     {
@@ -367,6 +533,8 @@ public sealed class World
             s.Source = source;
         }
 
+        // The player is told what has taken hold; enemy afflictions are shown on the body instead.
+        if (a.Id == "player" && source != a.Id) Events.Publish(new("afflicted", source, a.Id, id, (int)MathF.Ceiling(d.Duration)));
         if (d.BlocksActions)
         {
             Cancel(a);
@@ -386,6 +554,13 @@ public sealed class World
             a.Health = Math.Min(a.MaxHealth, a.Health - d.Damage);
             if (d.Status != "")
                 ApplyStatus(a, d.Status, a.Id);
+            if (d.AllyRadius > 0 && d.Status != "")
+            {
+                foreach (var ally in Actors.Values.Where(c => c.Id != a.Id && c.Alive && c.Region == a.Region && c.Faction == a.Faction && !Hostile(a, c) &&
+                    Vector2.DistanceSquared(a.Position, c.Position) <= d.AllyRadius * d.AllyRadius).OrderBy(c => c.Id, StringComparer.Ordinal))
+                    ApplyStatus(ally, d.Status, a.Id);
+                Present(CombatPresentationKind.Rallied, a, a.Id, d.Id);
+            }
             return true;
         }
 
@@ -429,6 +604,13 @@ public sealed class World
                 if (s.UntilTick <= 0 && d.Damage > 0 && Actors.TryGetValue(s.Source, out var source))
                 {
                     Damage(source, a, d.Damage * s.Stacks, d.Type, periodic: true);
+                    // Defeat is final: later statuses must not heal this actor back to life.
+                    if (!a.Alive) break;
+                    s.UntilTick += d.Interval;
+                }
+                else if (s.UntilTick <= 0 && d.Heal > 0)
+                {
+                    a.Health = Math.Min(a.MaxHealth, a.Health + d.Heal * s.Stacks);
                     s.UntilTick += d.Interval;
                 }
 
@@ -438,11 +620,15 @@ public sealed class World
 
             if (!a.Alive)
                 continue;
+            if (a.PoiseDelay > 0) a.PoiseDelay = Math.Max(0, a.PoiseDelay - dt);
             if (a.FreeSlash && a.State is ActionState.Windup or ActionState.Recovery)
                 AdvanceSlashLunge(a, dt);
-            if (a.State == ActionState.Dodging && a.ActionElapsed >= CombatTuning.DodgeDuration)
+            else if (a.Id != "player" && a.State is ActionState.Windup or ActionState.Recovery)
+                AdvanceAttackMotion(a, dt);
+            if (a.Id != "player" && a.State == ActionState.Dodging) AdvanceDodge(a, dt);
+            if (a.State == ActionState.Dodging && a.ActionElapsed >= DodgeDuration(a))
             {
-                CombatDiagnostic?.Invoke("dodge_completed", new Vector2(a.ActionDirectionX, a.ActionDirectionY), "dodge");
+                CombatDiagnostic?.Invoke("dodge_completed", new Vector2(a.ActionDirectionX, a.ActionDirectionY), a.Id == "player" ? "dodge" : "evade");
                 a.State = ActionState.Idle;
                 a.StateRemaining = 0;
                 a.ActionElapsed = 0;
@@ -466,13 +652,26 @@ public sealed class World
                             if (!hit) Present(CombatPresentationKind.Miss, a, target?.Id ?? "", d.Id, target?.Position, "miss");
                             CombatDiagnostic?.Invoke("attack_impact", new Vector2(a.ActionDirectionX, a.ActionDirectionY), hit ? "hit/" + target!.Id : "miss");
                         }
-                        else if (d.Geometry?.Shape == "cone")
+                        else if (d.Charge != null)
+                        {
+                            // The lane is committed; contact is resolved while running it.
+                            Present(CombatPresentationKind.ChargeStarted, a, a.Target, d.Id);
+                        }
+                        else if (d.Blast is { } blast)
+                        {
+                            // Thrown: the landing spot stays warned while it is in the air.
+                            Hazards.Add(new HazardState { Source = a.Id, Ability = d.Id, Region = a.Region, X = a.AimX, Y = a.AimY, OriginX = a.X, OriginY = a.Y, Fuse = Math.Max(.01f, blast.Delay) });
+                            Present(CombatPresentationKind.BlastLaunched, a, a.Target, d.Id, a.Aim);
+                        }
+                        else if (d.Geometry?.Shape is "cone" or "burst")
                         {
                             Present(CombatPresentationKind.AttackImpact, a, a.Target, d.Id);
                             var direction = new Vector2(a.ActionDirectionX, a.ActionDirectionY);
+                            bool burst = d.Geometry.Shape == "burst";
                             // Stable IDs define the order independently of dictionary insertion.
                             var victims = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) &&
-                                CombatGeometry.InCone(a.Position, b.Position, direction, d.Geometry.Range, d.Geometry.HalfAngleDegrees) && LineOfSight(a, b))
+                                (burst ? CombatGeometry.InCircle(a.Position, b.Position, d.Geometry.Range)
+                                    : CombatGeometry.InCone(a.Position, b.Position, direction, d.Geometry.Range, d.Geometry.HalfAngleDegrees)) && LineOfSight(a, b))
                                 .OrderBy(b => b.Id, StringComparer.Ordinal).ToArray();
                             foreach (var victim in victims)
                             {
@@ -482,11 +681,16 @@ public sealed class World
                             }
                             if (victims.Length == 0) Present(CombatPresentationKind.Miss, a, a.Target, d.Id, outcome: "miss");
                         }
-                        else if (Actors.TryGetValue(a.Target, out var t))
+                        else if (Actors.TryGetValue(d.Self ? a.Id : a.Target, out var t))
                         {
                             if (d.ProjectileSpeed > 0)
                             {
-                                Projectiles.Add(ProjectileFlight.Release(a, t, d));
+                                int count = Math.Max(1, d.Projectile?.Count ?? 1);
+                                for (int shot = 0; shot < count; shot++)
+                                {
+                                    float fan = count == 1 ? 0 : (shot / (count - 1f) - .5f) * (d.Projectile?.SpreadDegrees ?? 0) * MathF.PI / 180;
+                                    Projectiles.Add(ProjectileFlight.Release(a, t, d, fan));
+                                }
                                 Present(CombatPresentationKind.ProjectileReleased, a, t.Id, d.Id, a.Position);
                             }
                             else
@@ -514,6 +718,7 @@ public sealed class World
                         a.State = ActionState.Idle;
                         a.FreeSlash = false;
                         a.ActionElapsed = 0;
+                        a.ActionConnected = false;
                         a.RecoveryAbility = "";
                     }
                 }
@@ -530,6 +735,7 @@ public sealed class World
                         Think(a, .2f);
                         if(ProfileCombat) TacticalMilliseconds += Milliseconds(start);
                     }
+                    EnemyMind.Face(this, a, dt);
                     if (a.State is ActionState.Idle or ActionState.Moving)
                     {
                         long start = ProfileCombat ? Stamp() : 0;
@@ -541,6 +747,8 @@ public sealed class World
                             ? separation.Velocity(a, RegionsById[a.Region], desired, Math.Max(0, Stat(a, "speed")), dt)
                             : desired;
                         if(ProfileCombat) AvoidanceMilliseconds += Milliseconds(start);
+                        // A sleeper is not nudged off its spot by whoever creeps past it.
+                        if (EnemyMind.Asleep(a)) velocity = Vector2.Zero;
                         Move(a, velocity * dt);
                     }
                 }
@@ -548,6 +756,8 @@ public sealed class World
                 {
                     a.MotionX = 0;
                     a.MotionY = 0;
+                    // Out of earshot a hunt simply ends; the actor is calm when next met.
+                    if (a.Awareness != Awareness.Unaware && a.State is ActionState.Idle or ActionState.Moving) EnemyMind.Calm(a);
                     if (Tick % 600 == 0)
                         UpdateSchedule(a);
                 }
@@ -575,7 +785,57 @@ public sealed class World
             // Expiration/target loss is diagnostic only, never a fabricated impact.
             Projectiles.RemoveAt(i);
         }
+        AdvanceHazards(dt);
         if(ProfileCombat) ProjectileMilliseconds = Milliseconds(projectileStart);
+    }
+
+    // Lobbed attacks on the ground: in the air until the fuse runs out, then landing on
+    // whoever is still standing there, then (for some) a pool that lingers.
+    void AdvanceHazards(float dt)
+    {
+        for (int i = Hazards.Count - 1; i >= 0; i--)
+        {
+            var h = Hazards[i];
+            var d = FindAbility(h.Ability);
+            if (d?.Blast == null || !RegionsById.ContainsKey(h.Region)) { Hazards.RemoveAt(i); continue; }
+            Actors.TryGetValue(h.Source, out var source);
+            IEnumerable<ActorState> Inside() => source == null ? Array.Empty<ActorState>() : Actors.Values.Where(b => b.Alive && b.Region == h.Region && Hostile(source, b) &&
+                Vector2.Distance(b.Position, h.Position) <= d.Blast.Radius + b.Radius * .5f).OrderBy(b => b.Id, StringComparer.Ordinal).ToArray();
+            if (!h.Landed)
+            {
+                h.Fuse -= dt;
+                if (h.Fuse > 0) continue;
+                h.Fuse = 0;
+                if (source != null)
+                {
+                    Present(CombatPresentationKind.BlastLanded, source, ability: d.Id, position: h.Position);
+                    CombatDiagnostic?.Invoke("blast_landed", h.Position, d.Id);
+                    // The thrower must still be alive and here for the landing itself to hurt.
+                    if (source.Alive && source.Region == h.Region)
+                        foreach (var victim in Inside())
+                        {
+                            var position = victim.Position;
+                            if (!Resolve(source, victim, d, geometryValidated: true))
+                                Present(CombatPresentationKind.Miss, source, victim.Id, d.Id, position, "miss");
+                        }
+                }
+                if (d.Pool == null) { Hazards.RemoveAt(i); continue; }
+                h.Remaining = d.Pool.Duration; h.UntilTick = d.Pool.Interval;
+                continue;
+            }
+            if (d.Pool == null) { Hazards.RemoveAt(i); continue; }
+            h.Remaining -= dt; h.UntilTick -= dt;
+            if (h.UntilTick <= 0)
+            {
+                h.UntilTick += d.Pool.Interval;
+                foreach (var victim in Inside())
+                {
+                    if (d.Pool.Damage > 0) Damage(source!, victim, d.Pool.Damage, d.Type, periodic: true, ability: d.Id);
+                    if (victim.Alive && d.Pool.Status != "") ApplyStatus(victim, d.Pool.Status, source!.Id);
+                }
+            }
+            if (h.Remaining <= 0) Hazards.RemoveAt(i);
+        }
     }
 
     public bool VisibleTo(ActorState actor, Vector2 point, bool allowBlockedTarget = false)
@@ -596,8 +856,11 @@ public sealed class World
     }
 
     public bool LineOfSight(ActorState a, ActorState b) => a.Region == b.Region && VisibleTo(a, b.Position);
-    public bool Move(ActorState a, Vector2 delta)
+    public bool Move(ActorState a, Vector2 delta) => Move(a, delta, slide: true, out _);
+
+    bool Move(ActorState a, Vector2 delta, bool slide, out bool blocked)
     {
+        blocked = false;
         if (!a.Alive || !float.IsFinite(delta.X) || !float.IsFinite(delta.Y))
             return false;
         var r = RegionsById[a.Region];
@@ -613,6 +876,7 @@ public sealed class World
                 moved |= delta.LengthSquared() > 0;
                 continue;
             }
+            blocked = true;
             if (a.Id == "player")
             {
                 CollisionAttempts++;
@@ -626,15 +890,17 @@ public sealed class World
             for(int k=0;k<6;k++) { float mid=(lo+hi)*.5f; if(r.CanStand(a.Position+delta*mid,a))lo=mid;else hi=mid; }
             var accepted=delta*lo;
             a.X+=accepted.X;a.Y+=accepted.Y;moved |= accepted.LengthSquared()>0;
+            // Committed charges stop at the first contact and retain their warned lane.
+            if (!slide) break;
             var remainder=delta*(1-lo);
             // Prefer the larger tangent request rather than always preferring X.
             bool xFirst=Math.Abs(remainder.X)>=Math.Abs(remainder.Y);
             for(int axis=0;axis<2;axis++)
             {
                 bool horizontal=(axis==0)==xFirst;
-                var slide=horizontal ? new Vector2(remainder.X,0) : new Vector2(0,remainder.Y);
-                if(slide.LengthSquared()==0 || !r.CanStand(a.Position+slide,a))continue;
-                a.X+=slide.X;a.Y+=slide.Y;moved=true;
+                var tangent=horizontal ? new Vector2(remainder.X,0) : new Vector2(0,remainder.Y);
+                if(tangent.LengthSquared()==0 || !r.CanStand(a.Position+tangent,a))continue;
+                a.X+=tangent.X;a.Y+=tangent.Y;moved=true;
                 if(a.Id=="player")CollisionSlides++;
             }
         }
@@ -642,11 +908,12 @@ public sealed class World
         return moved;
     }
 
-    public void ClearPlayerMotion() { ActualVelocity=RequestedVelocity=Vector2.Zero; LastInput=Vector2.Zero; LastBlockedReason=""; CollisionAttempts=CollisionSlides=0; }
+    public void ClearPlayerMotion() { PlayerPace=0; ActualVelocity=RequestedVelocity=Vector2.Zero; LastInput=Vector2.Zero; LastBlockedReason=""; CollisionAttempts=CollisionSlides=0; }
 
     public bool PlayerMove(Vector2 direction, float dt, float speedScale=1, bool projected=false)
     {
         var a = Player;
+        PlayerPace=0;
         ActualVelocity=RequestedVelocity=Vector2.Zero;
         CollisionAttempts=CollisionSlides=0;
         LastInput=float.IsFinite(direction.X) && float.IsFinite(direction.Y) ? direction : Vector2.Zero; LastBlockedReason="";
@@ -661,6 +928,7 @@ public sealed class World
         bool moved = Move(a, RequestedVelocity * dt);
         ActualVelocity = dt > 0 ? (a.Position - before) / dt : Vector2.Zero;
         a.State = moved ? ActionState.Moving : ActionState.Idle;
+        PlayerPace = moved ? Math.Min(1, magnitude) : 0;
         return moved;
     }
 
@@ -668,6 +936,9 @@ public sealed class World
     {
         var profile = Content.NpcProfiles.Find(p => p.Id == a.Profile);
         a.Activity = profile?.Schedule.Where(s => s.Hour <= ((Time / 60) % 24)).OrderBy(s => s.Hour).LastOrDefault()?.Activity ?? "patrol";
+        // An undisturbed ambusher lies folded on its spot whatever the hour.
+        if (a.Awareness == Awareness.Unaware && FindProfile(a.CombatProfile)?.Ambusher == true) a.Activity = "ambush";
+        if (EnemyMind.Asleep(a)) a.Activity = "sleep";
     }
 
     public bool Rest(ActorState a, float dt)
@@ -685,37 +956,16 @@ public sealed class World
         UpdateSchedule(a);
         if (Time + .00001 < a.NextTacticalTime) return;
         a.MotionX = a.MotionY = 0;
-        var profile = Content.CombatProfiles.FirstOrDefault(p => p.Id == a.CombatProfile);
-        a.NextTacticalTime = Time + (profile?.DecisionSeconds ?? .2f);
-        var target = Actors.Values.Where(b => b.Alive && b.Region == a.Region && Hostile(a, b) && Vector2.Distance(a.Position, b.Position) < (profile?.PursuitDistance ?? 180) && LineOfSight(a, b))
-            .OrderBy(b => b.Id == a.Target ? 0 : 1).ThenBy(b => Vector2.DistanceSquared(a.Position, b.Position)).ThenBy(b => b.Id, StringComparer.Ordinal).FirstOrDefault();
-        string goal = target != null ? (a.Health < a.MaxHealth * (profile?.RetreatThreshold ?? .2f) ? "safe" : "defeated") : a.Activity;
-        string action = Planner?.Call("choose", goal, target != null).AsString() ?? (target != null ? goal == "safe" ? "retreat" : "attack" : a.Activity);
-        if (target != null)
-        {
-            a.Knowledge[target.Id] = "seen";
-            a.Target = target.Id;
-            var intent = CombatBrain.Select(this, a, target, profile, action == "retreat");
-            a.TacticalIntent = intent.Kind;
-            CombatDiagnostic?.Invoke("ai_intent", a.Position, a.Id + "/" + a.CombatProfile + "/" + intent.Kind + "/" + intent.Ability);
-            if (intent.Kind == "ability") Activate(a.Id, intent.Ability, target.Id);
-            else if (intent.Kind is "approach" or "circle" or "retreat")
-            {
-                Follow(a, intent.Destination, profile?.DecisionSeconds ?? dt);
-                if(intent.Kind=="approach" && a.MotionX==0 && a.MotionY==0)
-                    Follow(a, target.Position, profile?.DecisionSeconds ?? dt);
-            }
-        }
-        else if (action == "patrol")
-        {
-            var dest = new Vector2(a.HomeX + (float)Math.Sin(Time / 9 + StableId(a.Id) % 9) * 64, a.HomeY + (float)Math.Cos(Time / 13) * 40);
-            Follow(a, dest, dt);
-        }
-        else if (action == "rest")
-            Rest(a, dt);
+        var profile = FindProfile(a.CombatProfile);
+        float step = profile?.DecisionSeconds ?? dt;
+        a.NextTacticalTime = Time + step;
+        EnemyMind.Think(this, a, profile, step);
     }
 
-    public void Follow(ActorState a, Vector2 target, float dt)
+    /// <summary>Top-level goal from the planner; perception and tactics choose how to pursue it.</summary>
+    internal string Plan(string goal, bool seesTarget, string fallback) => Planner?.Call("choose", goal, seesTarget).AsString() ?? fallback;
+
+    public void Follow(ActorState a, Vector2 target, float dt, float pace = 1)
     {
         a.MotionX = a.MotionY = 0;
         var r = RegionsById[a.Region];
@@ -732,7 +982,7 @@ public sealed class World
         if (delta.Length() <= .1f) return;
         // Planning happens every .2s. Stop exactly at the waypoint instead of
         // overshooting it and alternating direction on subsequent plans.
-        var velocity = Vector2.Normalize(delta) * Math.Min(Math.Max(0, Stat(a, "speed")), delta.Length() / Math.Max(.001f, dt));
+        var velocity = Vector2.Normalize(delta) * Math.Min(Math.Max(0, Stat(a, "speed")) * Math.Clamp(pace, 0, 1), delta.Length() / Math.Max(.001f, dt));
         a.MotionX = velocity.X; a.MotionY = velocity.Y;
         a.State = ActionState.Moving;
     }
@@ -767,6 +1017,7 @@ public sealed class World
                 var raised = DungeonMechanisms.Pull(r, at);
                 if (raised.Length == 0) continue;
                 InteractionFeedback = "Lever pulled — a portcullis grinds open";
+                EnemyMind.Noise(this, a, r.Center(at), CombatTuning.MechanismNoise);
                 Events.Publish(new("lever_pulled", a.Id, a.Region, at.ToString()));
                 return true;
             }
@@ -787,6 +1038,7 @@ public sealed class World
                 if (!Items.Take(a.Id, "dungeon_key", 1))
                 { keyRequired = true; continue; }
                 InteractionFeedback = "Door unlocked";
+                EnemyMind.Noise(this, a, r.Center(at), CombatTuning.MechanismNoise);
                 foreach (int cell in r.GateAt(at)) r.OpenDoors.Add(cell);
                 Events.Publish(new("door_unlocked", a.Id, a.Region, at.ToString()));
                 return true;
@@ -900,12 +1152,18 @@ public sealed class World
         var def = json.RootElement.GetProperty(region);
         int count = def.GetProperty("count").GetInt32();
         var archetypes = def.GetProperty("archetypes").EnumerateArray().ToArray();
+        // An authored roster fixes the mix; without one the archetypes simply take turns.
+        string[] roster = def.TryGetProperty("roster", out var listed) ? listed.EnumerateArray().Select(x => x.GetString()!).ToArray() : Array.Empty<string>();
+        // Roster slots found dozing at their posts.
+        var asleep = def.TryGetProperty("asleep", out var dozing) ? dozing.EnumerateArray().Select(x => x.GetInt32()).ToHashSet() : new HashSet<int>();
         var r = RegionsById[region];
         r.EncountersInitialized = true;
         for (int i = 0; i < count; i++)
         {
             var pos = r.Center(r.Objective);
-            var archetype = archetypes[(i + 1) % archetypes.Length];
+            var archetype = roster.Length > 0
+                ? archetypes.First(x => x.GetProperty("profile").GetString() == roster[i % roster.Length])
+                : archetypes[(i + 1) % archetypes.Length];
             string combatId = archetype.GetProperty("profile").GetString()!;
             var combat = Content.CombatProfiles.Single(p => p.Id == combatId);
             var actor = new ActorState
@@ -925,8 +1183,11 @@ public sealed class World
                 Y = pos.Y,
                 HomeX = pos.X,
                 HomeY = pos.Y,
-                Abilities = combat.Priorities.Keys.OrderBy(x => x, StringComparer.Ordinal).ToList()
+                Abilities = combat.Loadout(),
+                Sleeper = asleep.Contains(i)
             };
+            var looking = EnemyMind.Hash01(StableId(actor.Id), Seed, 4) * MathF.Tau;
+            actor.FacingX = MathF.Cos(looking); actor.FacingY = MathF.Sin(looking);
             AnatomyAdapter.Apply(actor);
             actor.Speed = archetype.GetProperty("speed").GetSingle();
             actor.Health = actor.MaxHealth = archetype.GetProperty("health").GetSingle();
@@ -1044,11 +1305,20 @@ public sealed class World
                     i < 2 ? "slash" : "bite"
                 }
             };
+            // The Reach's prowlers hunt as a loose pack with the authored senses of their kind.
+            if (i >= 2 && FindProfile("mire") is { } mire) { a.CombatProfile = mire.Id; a.Abilities = mire.Loadout(); }
             a.HomeX = a.X;
             a.HomeY = a.Y;
             AnatomyAdapter.Apply(a);
             var placed = r.FindPlacement(a.Position, a, Actors.Values);
             a.X = a.HomeX = placed.X; a.Y = a.HomeY = placed.Y;
+            // The last of the pack is found dozing in the grass.
+            a.Sleeper = i == 7;
+            if (i >= 2)
+            {
+                float looking = EnemyMind.Hash01(StableId(a.Id), Seed, 4) * MathF.Tau;
+                a.FacingX = MathF.Cos(looking); a.FacingY = MathF.Sin(looking);
+            }
             Actors.Add(a.Id, a);
             if (i < 2)
             {

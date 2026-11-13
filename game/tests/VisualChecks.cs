@@ -379,7 +379,7 @@ public static class VisualChecks
             await Frames(app,12); app.Cast("slash");
             await Until(app,()=>!enemy.Alive,"Fatal visual strike did not resolve");
             await CaptureRollFrame(app,"combat-fatal-impact");
-            await Until(app,()=>app.Views[enemy.Id].Creature.Motor!.RestProgress>.45 && app.Views[enemy.Id].LootMarkerVisible,
+            await Until(app,()=>app.Views[enemy.Id].Creature.Motor!.DeathProgress>.45 && app.Views[enemy.Id].LootMarkerVisible,
                 "Defeat posture or loot marker did not appear");
             await CaptureRollFrame(app,"combat-fatal-corpse");
         }
@@ -452,6 +452,8 @@ public static class VisualChecks
         { app.World.Enter(app.World.Player,"ruin");await MechanismVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--landmarks-only"))
         { await LandmarkVisualChecks.Run(app); GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--enemy-preview"))
+        { await EnemyPreview.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--overworld-preview"))
         { await OverworldPreview.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--overworld-props-only"))

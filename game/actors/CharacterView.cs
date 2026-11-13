@@ -2,6 +2,7 @@ using Godot;
 using PixelCreatures.Runtime;
 using PixelCreatures.Core;
 using PixelCreatures.Core.Anatomy;
+using PixelCreatures.Core.Motion;
 
 namespace Mosslight;
 /// <summary>Presentation consumes actor state; the PPC genome never owns health, quests or inventory.</summary>
@@ -14,6 +15,15 @@ public partial class CharacterView : Node2D
     public bool PreferMeasuredExternalVelocity { get; set; } = true;
     public Func<ActorState, Terrain>? GroundTerrain { get; set; }
     public RollDustOverlay? RollDust { get; private set; }
+    /// <summary>Ground dust for enemy charges, leaps and hops. Presentation only.</summary>
+    public RollDustOverlay? Dust { get; private set; }
+    public ActorOverlay? Overlay { get; private set; }
+    /// <summary>The player's own mark: how much nearby enemies know.</summary>
+    public StealthMark? Stealth { get; private set; }
+    /// <summary>Read-only source of ability and profile definitions for presentation.</summary>
+    public World? World { get; set; }
+    public Func<bool>? ReducedMotion { get; set; }
+    public StanceKind Stance { get; private set; }
     LootMarker? lootMarker;
     public bool LootMarkerVisible => lootMarker?.Visible ?? false;
     Vector2 previous;
@@ -22,7 +32,7 @@ public partial class CharacterView : Node2D
     bool attackArc;
     bool attackTimeSynchronized;
     bool previousWasDodging;
-    float defeatDelay;
+    float presentationTime;
     public void Setup(ActorState actor)
     {
         State = actor;
@@ -43,6 +53,15 @@ public partial class CharacterView : Node2D
         {
             RollDust = new RollDustOverlay();
             AddChild(RollDust);
+            Stealth = new StealthMark { View = this, ZIndex = 1, Visible = false };
+            AddChild(Stealth);
+        }
+        else
+        {
+            Dust = new RollDustOverlay();
+            AddChild(Dust);
+            Overlay = new ActorOverlay { View = this, ZIndex = 1 };
+            AddChild(Overlay);
         }
         var result = actor.Appearance.GenomeJson == "" ? null : CreatureRuntime.Serializer.Deserialize(actor.Appearance.GenomeJson);
         if (result != null && !result.Ok)
@@ -52,16 +71,40 @@ public partial class CharacterView : Node2D
         float body = (float)Creature.Model!.Anatomy.Metrics.BodyLength;
         Creature.Scale = Vector2.One * Math.Clamp(actor.Radius / Math.Max(1, body * .2f), .25f, 1);
         previous = new(actor.X, actor.Y);
-        if (!actor.Alive)
-        {
-            Creature.Resting = true;
-            Creature.Motor?.SnapRest(true);
-            Creature.RequestRender();
-        }
+        // A corpse found on loading lies as it fell, without replaying the collapse.
+        if (!actor.Alive) Creature.SnapDead();
         Sync(1f / 60);
     }
 
-    public void SnapPosition() { previous=new Vector2(State.X,State.Y); Creature.Teleport(previous); Creature.MoveVelocity=Vector2.Zero; RollDust?.Reset(); }
+    public void SnapPosition() { previous=new Vector2(State.X,State.Y); Creature.Teleport(previous); Creature.MoveVelocity=Vector2.Zero; RollDust?.Reset(); Dust?.Reset(); }
+
+    AbilityDef? CurrentAbility => World?.FindAbility(State.State == ActionState.Windup ? State.PendingAbility : State.State == ActionState.Recovery ? State.RecoveryAbility : "");
+
+    /// <summary>Running down a committed charge lane right now.</summary>
+    public bool Charging => !State.ActionConnected && State.State == ActionState.Recovery && CurrentAbility is { Charge: { } charge } ability &&
+        State.ActionElapsed >= ability.Windup && State.ActionElapsed - ability.Windup < charge.Duration;
+
+    /// <summary>A hard front, raised: blows arriving on it are turned. Down while it recovers or reels.</summary>
+    public bool ShieldUp => State.Alive && World?.FindProfile(State.CombatProfile) is { ShieldArc: > 0 } &&
+        State.Awareness is Awareness.Alerted or Awareness.Engaged && State.State is ActionState.Idle or ActionState.Moving or ActionState.Windup;
+
+    // The posture is a pure reading of saved actor state, so a restored view shows the same mood.
+    StanceKind ReadStance()
+    {
+        if (!State.Alive || State.Id == "player") return StanceKind.Relaxed;
+        if (Charging) return StanceKind.Charge;
+        switch (State.Awareness)
+        {
+            case Awareness.Suspicious: return StanceKind.Wary;
+            case Awareness.Searching: return StanceKind.Search;
+            case Awareness.Alerted: return StanceKind.Combat;
+            case Awareness.Engaged:
+                if (State.Statuses.Any(s => s.Id == "rage")) return StanceKind.Enraged;
+                if (ShieldUp && State.State is ActionState.Idle or ActionState.Moving && State.TacticalIntent is not ("retreat" or "cower")) return StanceKind.Guard;
+                return State.TacticalIntent is "retreat" or "cower" && State.State is ActionState.Idle or ActionState.Moving ? StanceKind.Flee : StanceKind.Combat;
+            default: return StanceKind.Relaxed;
+        }
+    }
 
     public void Equipment(string json)
     {
@@ -79,15 +122,29 @@ public partial class CharacterView : Node2D
         // The last dodge increment can arrive on the same frame as the transition
         // to Idle. Do not let that displacement masquerade as walking intent.
         bool dodgeDisplacement = State.State == ActionState.Dodging || previousWasDodging;
-        bool combatDisplacement = dodgeDisplacement || State.FreeSlash;
+        // A leap is carried by its own animation, not by a running cycle in mid-air.
+        bool leaping = State.State == ActionState.Windup && CurrentAbility?.Lunge != null;
+        bool combatDisplacement = dodgeDisplacement || State.FreeSlash || leaping;
+        presentationTime += dt;
+        bool player = State.Id == "player";
+        Stance = ReadStance();
+        Creature.Stance = Stance;
+        // Foes in a fight are sampled a little more often than a calm crowd.
+        if (!player) Creature.AnimationFps = State.Alive && State.Awareness is Awareness.Alerted or Awareness.Engaged ? 15 : 10;
         Creature.UseMeasuredExternalVelocity = combatDisplacement || PreferMeasuredExternalVelocity;
         Creature.MoveVelocity = combatDisplacement || State.State is ActionState.Staggered or ActionState.Dead ? Vector2.Zero : (now - previous) / Math.Max(dt, .001f);
-        if (State.State is ActionState.Idle or ActionState.Moving && Creature.MoveVelocity.LengthSquared() > .25f) Creature.ClearFacingRequest();
+        bool free = State.State is ActionState.Idle or ActionState.Moving;
+        // Non-player actors look where the simulation says they look: at their quarry while
+        // circling or backing off, along their path otherwise. Unset facing keeps the old rule.
+        bool simFacing = !player && State.Alive && (State.FacingX != 0 || State.FacingY != 0);
+        if (free && simFacing) Creature.FaceYaw(PixelCamera.GroundVelocityToYaw(State.FacingX, State.FacingY));
+        else if (free && Creature.MoveVelocity.LengthSquared() > .25f) Creature.ClearFacingRequest();
         if (Creature.Motor != null)
         {
             var motor = Creature.Motor;
-            motor.Options.FaceVelocity = (State.State is ActionState.Idle or ActionState.Moving) && Creature.MoveVelocity.LengthSquared() > .25f;
-            motor.DodgeProgress = State.State == ActionState.Dodging ? State.ActionElapsed / CombatTuning.DodgeDuration :
+            motor.Options.FaceVelocity = free && !simFacing && Creature.MoveVelocity.LengthSquared() > .25f;
+            float dodgeDuration = player ? CombatTuning.DodgeDuration : CombatTuning.EvadeDuration;
+            motor.DodgeProgress = State.State == ActionState.Dodging ? State.ActionElapsed / dodgeDuration :
                 previousWasDodging && State.State == ActionState.Idle ? 1.0 : null;
             motor.DodgeBiped = State.Appearance.Family == "biped";
             if (motor.DodgeProgress.HasValue)
@@ -110,18 +167,35 @@ public partial class CharacterView : Node2D
             State.ActionElapsed / CombatTuning.DodgeDuration, now,
             new Vector2(State.ActionDirectionX, State.ActionDirectionY),
             GroundTerrain?.Invoke(State) ?? Terrain.Grass);
+        if (Dust != null)
+        {
+            // Dust rises where a charge tears along, where a leap takes off and lands, and under a hop.
+            var ability = CurrentAbility;
+            bool kicking = Charging || State.State == ActionState.Dodging ||
+                (leaping && State.ActionElapsed >= ability!.Lunge!.Start && State.ActionElapsed < ability.Lunge.End);
+            float progress = Charging ? (State.ActionElapsed - ability!.Windup) / ability.Charge!.Duration
+                : State.State == ActionState.Dodging ? State.ActionElapsed / CombatTuning.EvadeDuration
+                : kicking ? (State.ActionElapsed - ability!.Lunge!.Start) / (ability.Lunge.End - ability.Lunge.Start) : 0;
+            Dust.Advance(dt, State.Alive && kicking, progress, now, new Vector2(State.ActionDirectionX, State.ActionDirectionY),
+                GroundTerrain?.Invoke(State) ?? Terrain.Floor);
+        }
         Position = GodotConvert.GroundToScreen(State.X, State.Y);
-        if (!Creature.Paused && defeatDelay > 0) defeatDelay = Math.Max(0, defeatDelay - dt);
         // A merchant's "rest" schedule means off-duty, not physically slumped
         // or asleep on the path. Reserve the PPC rest pose for other creatures
-        // and for the death collapse, so starting Reach wardens stand upright.
-        bool visualRest = State.Activity == "rest" && State.Profession != "merchant";
-        Creature.Resting = State.Alive ? visualRest && (State.State is ActionState.Idle or ActionState.Moving) : defeatDelay <= 0;
-        if (State.Alive) { defeatDelay = 0; Creature.Modulate = Colors.White; }
+        // and for an ambusher lying in wait, so starting Reach wardens stand upright.
+        bool visualRest = (State.Activity == "rest" && State.Profession != "merchant") || (State.Activity == "ambush" && State.Awareness == Awareness.Unaware) || EnemyMind.Asleep(State);
+        Creature.Resting = State.Alive && visualRest && (State.State is ActionState.Idle or ActionState.Moving);
+        if (State.Alive)
+        {
+            if (Creature.Dead) Creature.Revive();
+            Creature.Modulate = Colors.White;
+        }
         else
         {
-            float collapse = (float)(Creature.Motor?.RestProgress ?? 1);
-            Creature.Modulate = Colors.White.Lerp(new Color(.45f, .4f, .4f, .72f), collapse);
+            // Killed with no observed blow (a restored or scripted defeat still shown standing).
+            if (!Creature.Dead) Creature.Die(Vector2.Left);
+            float collapse = (float)(Creature.Motor?.DeathProgress ?? 1);
+            Creature.Modulate = Colors.White.Lerp(new Color(.45f, .4f, .4f, .72f), Math.Clamp((collapse - .35f) / .65f, 0, 1));
         }
         if (!State.Alive && HasLoot && lootMarker == null)
         {
@@ -140,7 +214,7 @@ public partial class CharacterView : Node2D
     {
         if (cue is "attack" or "cast")
         {
-            if (State.FreeSlash || ability?.Geometry?.Shape == "cone")
+            if (State.FreeSlash || (ability?.Geometry?.Shape is "cone" or "line"))
             {
                 var ground = new Vector2(State.ActionDirectionX, State.ActionDirectionY);
                 Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(ground.X, ground.Y));
@@ -156,7 +230,8 @@ public partial class CharacterView : Node2D
                 }
             }
             if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
-            if (ability != null) Creature.TriggerGameplayAction(ability.Windup, ability.Recovery, Style(ability), elapsed);
+            // A charge's gesture is only its windup; the run that follows is real locomotion.
+            if (ability != null) Creature.TriggerGameplayAction(ability.Windup, ability.Charge != null ? .15f : ability.Recovery, Style(ability), elapsed);
             else Creature.TriggerAction();
             attackTime = elapsed;
             impactTime = ability?.Windup ?? .14f;
@@ -183,15 +258,44 @@ public partial class CharacterView : Node2D
     }
 
     /// <summary>Use captured pre-knockback positions; never rotate the victim to face the source.</summary>
-    public void ReactToHit(System.Numerics.Vector2 origin, System.Numerics.Vector2 impact, float strength)
+    public void ReactToHit(System.Numerics.Vector2 origin, System.Numerics.Vector2 impact, float strength, bool interruptAction = true)
     {
         if (Creature.Motor != null) Creature.Motor.Options.FaceVelocity = false;
         var from = new Vector2(origin.X - impact.X, origin.Y - impact.Y);
-        Creature.TriggerHit(from.LengthSquared() > .001f ? from.Normalized() : Vector2.Left, strength);
-        attackDuration = 0;
+        Creature.TriggerHit(from.LengthSquared() > .001f ? from.Normalized() : Vector2.Left, strength, interruptAction);
+        if (interruptAction) attackDuration = 0;
     }
 
-    public void BeginDefeat() => defeatDelay = .20f;
+    /// <summary>Collapse away from the blow. Captured positions; the corpse itself is never moved.</summary>
+    public void BeginDefeat(System.Numerics.Vector2 origin, System.Numerics.Vector2 impact)
+    {
+        var from = new Vector2(origin.X - impact.X, origin.Y - impact.Y);
+        Creature.Die(from.LengthSquared() > .001f ? from.Normalized() : Vector2.Left);
+    }
+
+    /// <summary>The moment of noticing: the one who sees barks, the ones called start.</summary>
+    public void Alert(string cause, ActorState? quarry)
+    {
+        Overlay?.Pop();
+        if (!State.Alive || State.State is not (ActionState.Idle or ActionState.Moving)) return;
+        if (quarry != null)
+        {
+            var delta = quarry.Position - State.Position;
+            if (delta.LengthSquared() > .001f) Creature.FaceYaw(PixelCamera.GroundVelocityToYaw(delta.X, delta.Y));
+        }
+        if (cause == "sighted")
+        {
+            float beat = Math.Max(.3f, World?.FindProfile(State.CombatProfile)?.NoticeSeconds ?? .45f);
+            Creature.TriggerGameplayAction(beat * .45f, beat * .55f, ActionStyle.Roar);
+        }
+        else if (cause == "called") React(ReactionKind.Startle);
+    }
+
+    public void React(ReactionKind kind)
+    {
+        if (!State.Alive) return;
+        Creature.TriggerReaction(kind);
+    }
 
     /// <summary>Resume only a live windup, without dispatching another start or sound.</summary>
     public void RestoreWindup(World world)
@@ -205,7 +309,7 @@ public partial class CharacterView : Node2D
     }
 
     // Reconstructed views derive facing from the same state as the warning. A
-    // target-locked strike tracks its target; a cone keeps its committed yaw.
+    // target-locked strike tracks its target; a cone or charge keeps its committed yaw.
     public void SyncCombatFacing(World world)
     {
         if (State.State == ActionState.Recovery && State.RecoveryAbility != "")
@@ -213,6 +317,9 @@ public partial class CharacterView : Node2D
             var recovery = world.FindAbility(State.RecoveryAbility);
             if (recovery != null)
             {
+                if ((recovery.Geometry?.Shape is "cone" or "line") &&
+                    CombatGeometry.TryNormalize(new System.Numerics.Vector2(State.ActionDirectionX, State.ActionDirectionY), out var direction))
+                    Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(direction.X, direction.Y));
                 attackTime = Math.Clamp(recovery.Windup + recovery.Recovery - State.StateRemaining, 0, recovery.Windup + recovery.Recovery);
                 attackTimeSynchronized = true;
                 Creature.Motor?.SynchronizeGameplayAction(attackTime);
@@ -227,7 +334,7 @@ public partial class CharacterView : Node2D
             attackTimeSynchronized = true;
             Creature.Motor?.SynchronizeGameplayAction(attackTime);
         }
-        if (State.FreeSlash || ability?.Geometry?.Shape == "cone")
+        if (State.FreeSlash || (ability?.Geometry?.Shape is "cone" or "line"))
         {
             if (CombatGeometry.TryNormalize(new System.Numerics.Vector2(State.ActionDirectionX, State.ActionDirectionY), out var direction))
                 Creature.LockFacingYaw(PixelCamera.GroundVelocityToYaw(direction.X, direction.Y));
@@ -260,13 +367,74 @@ public partial class CharacterView : Node2D
         {
             return;
         }
+        DrawTemper();
         if (State.Health < State.MaxHealth)
         {
             DrawRect(new Rect2(-14, -50, 28, 3), new Color(.15f, .1f, .12f));
             DrawRect(new Rect2(-14, -50, 28 * State.Health / State.MaxHealth, 3), new Color(.76f, .29f, .22f));
         }
 
-        if (State.Statuses.Count > 0)
-            DrawCircle(new Vector2(0, -54), 2, new Color(1, .6f, .2f));
+        // One pip per status, coloured by what it does.
+        for (int i = 0; i < State.Statuses.Count; i++)
+            DrawCircle(new Vector2((i - (State.Statuses.Count - 1) * .5f) * 6, -54), 2, StatusColor(State.Statuses[i].Id));
+    }
+
+    public static Color StatusColor(string id) => id switch
+    {
+        "venom" => new Color(.5f, .95f, .35f),
+        "ward" => new Color(.55f, .8f, 1f),
+        "rage" => new Color(1f, .3f, .25f),
+        "frenzy" => new Color(1f, .85f, .3f),
+        "snare" => new Color(.72f, .55f, .95f),
+        "regrowth" => new Color(.45f, .95f, .6f),
+        _ => new Color(1, .6f, .2f)
+    };
+
+    // The hard front of a shelled foe, drawn on the ground where it faces: bright while it
+    // turns blows, a faint broken line while it is open. It says which side to get round to.
+    void DrawShield()
+    {
+        if (!State.Alive || State.Id == "player" || World?.FindProfile(State.CombatProfile) is not { ShieldArc: > 0 } profile ||
+            State.Awareness is not (Awareness.Alerted or Awareness.Engaged) || (State.FacingX == 0 && State.FacingY == 0)) return;
+        bool up = ShieldUp;
+        float heading = MathF.Atan2(State.FacingY, State.FacingX), half = profile.ShieldArc * MathF.PI / 180, radius = State.Radius + 9;
+        DrawSetTransform(Vector2.Zero, 0, new Vector2(1, .5f));
+        if (up)
+        {
+            DrawArc(Vector2.Zero, radius, heading - half, heading + half, 20, new Color(.07f, .1f, .14f, .85f), 5.5f, true);
+            DrawArc(Vector2.Zero, radius, heading - half, heading + half, 20, new Color(.74f, .88f, 1f, .95f), 2.6f, true);
+        }
+        else
+            for (int i = 0; i < 5; i++)
+            {
+                float from = heading - half + 2 * half * (i + .15f) / 5, to = heading - half + 2 * half * (i + .7f) / 5;
+                DrawArc(Vector2.Zero, radius, from, to, 4, new Color(.74f, .88f, 1f, .35f), 1.6f, true);
+            }
+        DrawSetTransform(Vector2.Zero);
+    }
+
+    // Ground marks under the body: a red ring for rage, an amber one for a rallied frenzy, green while it mends.
+    void DrawTemper()
+    {
+        DrawShield();
+        bool rage = State.Statuses.Any(s => s.Id == "rage"), frenzy = State.Statuses.Any(s => s.Id == "frenzy"), mending = State.Statuses.Any(s => s.Id == "regrowth");
+        if (!rage && !frenzy && !mending) return;
+        bool still = ReducedMotion?.Invoke() == true;
+        float pulse = still ? .5f : .5f + .5f * MathF.Sin(presentationTime * (rage ? 9f : mending && !frenzy ? 3.5f : 6f));
+        var color = StatusColor(rage ? "rage" : frenzy ? "frenzy" : "regrowth");
+        float radius = State.Radius + 7 + (still ? 0 : pulse * 2);
+        DrawSetTransform(Vector2.Zero, 0, new Vector2(1, .5f));
+        DrawArc(Vector2.Zero, radius, 0, Mathf.Tau, 28, new Color(.12f, .04f, .03f, .7f), 4, true);
+        DrawArc(Vector2.Zero, radius, 0, Mathf.Tau, 28, new Color(color, .55f + .35f * pulse), 2, true);
+        DrawSetTransform(Vector2.Zero);
+        if (still) return;
+        // A few motes rising off the body, phased from the actor's identity.
+        int key = Mosslight.World.StableId(State.Id);
+        for (int i = 0; i < 4; i++)
+        {
+            float phase = (presentationTime * .9f + EnemyMind.Hash01(key, i, 41)) % 1f;
+            float x = (EnemyMind.Hash01(key, i, 42) - .5f) * (State.Radius * 2 + 8);
+            DrawRect(new Rect2(x, -6 - phase * 30, 2, 2), new Color(color, (1 - phase) * .8f));
+        }
     }
 }

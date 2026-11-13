@@ -12,7 +12,7 @@ public sealed class CombatPresentationController : IDisposable
     readonly CameraFeedback camera;
     readonly Node audio;
     (string Actor, string Target, string Ability)? avoided;
-    long avoidanceTick = long.MinValue;
+    long avoidanceTick = long.MinValue, routTick = long.MinValue;
     CombatPresentationEvent? pendingProjectileImpact;
 
     public CombatPresentationController(World world, Dictionary<string, CharacterView> views,
@@ -24,7 +24,7 @@ public sealed class CombatPresentationController : IDisposable
     public void Dispose() => world.Presentation -= Handle;
     public void Reset()
     {
-        avoided = null; avoidanceTick = long.MinValue; pendingProjectileImpact = null; effects.Reset(); camera.Reset();
+        avoided = null; avoidanceTick = routTick = long.MinValue; pendingProjectileImpact = null; effects.Reset(); camera.Reset();
         if (GodotObject.IsInstanceValid(audio)) audio.Call("stop_effects");
     }
     bool Nearby(Ground at, float range) => world.Actors.TryGetValue("player", out var player) &&
@@ -73,7 +73,19 @@ public sealed class CombatPresentationController : IDisposable
     {
         if (pendingProjectileImpact is { } pending && !ImpactFollowup(pending,e)) FlushPending();
         if (avoidanceTick != e.Tick) { avoided = null; avoidanceTick = e.Tick; }
-        string subject = e.Kind is CombatPresentationKind.Hit or CombatPresentationKind.Death ? e.TargetId : e.ActorId;
+        string subject = e.Kind is CombatPresentationKind.Hit or CombatPresentationKind.Death or CombatPresentationKind.GuardBroken ? e.TargetId : e.ActorId;
+        // A glob lands where it was thrown, whether or not its thrower is still about.
+        if (e.Kind == CombatPresentationKind.BlastLanded)
+        {
+            if (world.Actors.TryGetValue("player", out var here) && world.Hazards.Any(h => h.Region == here.Region && h.Ability == e.AbilityId && h.Position == e.Position) ||
+                Visible(e.ActorId))
+            {
+                effects.Emit(CombatEffectKind.Splash, e.Position, Ground.Zero, e.Tick, e.ActorId, e.AbilityId, world.FindAbility(e.AbilityId)?.Blast?.Radius ?? 30);
+                Sound("splash", e.Position);
+                if (Nearby(e.Position, 120)) camera.Impact(1.4f, e.Tick);
+            }
+            return;
+        }
         if (!Visible(subject)) return;
         var ability = world.FindAbility(e.AbilityId);
         var view = View(subject);
@@ -87,7 +99,7 @@ public sealed class CombatPresentationController : IDisposable
                 // Sword windup is silent. The air-only whoosh belongs to the
                 // authoritative strike boundary, whether it hits or misses.
                 if (e.AbilityId != "slash")
-                    Sound(ability.Type == "healing" ? "cast" : ability.ActionStyle == "Bite" ? "bite" : "attack", e.Origin);
+                    Sound(ability.Type == "healing" ? "cast" : ability.ActionStyle == "Roar" ? "roar" : ability.ActionStyle == "Bite" ? "bite" : "attack", e.Origin);
                 break;
             case CombatPresentationKind.AttackCommitted:
                 // Commitment starts no second animation or audio cue.
@@ -148,22 +160,100 @@ public sealed class CombatPresentationController : IDisposable
             case CombatPresentationKind.Hit:
                 bool periodic = e.Outcome == "periodic";
                 bool heavy = Heavy(ability);
-                view?.ReactToHit(e.Origin, e.Position, heavy ? 1.35f : periodic ? .55f : 1f);
+                bool blocked = e.Outcome == "blocked";
+                bool guarded = e.Outcome == "guarded" || blocked;
+                if (e.Outcome == "ambush") heavy = true;
+                // Read the resolved state: ambush/periodic outcomes can also leave a guarded action running.
+                bool actionSurvives = world.Actors.TryGetValue(e.TargetId, out var hitActor) &&
+                    hitActor.State is ActionState.Windup or ActionState.Recovery or ActionState.Dodging;
+                view?.ReactToHit(e.Origin, e.Position, guarded ? .45f : heavy ? 1.35f : periodic ? .55f : 1f, !actionSurvives);
                 if (pendingProjectileImpact is { } hitImpact && SameImpact(hitImpact,e))
                 {
                     pendingProjectileImpact = null;
                     Emit(CombatEffectKind.ProjectileCollision, hitImpact, hitImpact.Position);
                 }
-                else Emit(periodic ? CombatEffectKind.Periodic : heavy ? CombatEffectKind.HeavyHit : CombatEffectKind.Hit, e, Contact(e));
+                else Emit(periodic ? CombatEffectKind.Periodic : blocked ? CombatEffectKind.Blocked : guarded ? CombatEffectKind.Guarded : heavy ? CombatEffectKind.HeavyHit : CombatEffectKind.Hit, e, Contact(e));
+                if (blocked) view?.React(PixelCreatures.Core.Motion.ReactionKind.Block);
+                // Say the things a player needs to learn from: why that hit was big, or why it did nothing.
+                if (e.ActorId == "player" && e.TargetId != "player")
+                {
+                    if (e.Outcome == "ambush") effects.Say("AMBUSH", e.Position, e.Tick, e.TargetId, new Color(1f, .86f, .4f));
+                    else if (blocked) effects.Say("BLOCKED", e.Position, e.Tick, e.TargetId, new Color(.78f, .9f, 1f));
+                }
                 if (!periodic)
                 {
-                    Sound(e.TargetId == "player" ? "player_hit" : ability?.ProjectileSpeed > 0 ? "projectile_impact" : heavy ? "heavy_hit" : "hit", e.Position);
+                    Sound(e.TargetId == "player" ? "player_hit" : blocked ? "block" : guarded ? "guard" : ability?.ProjectileSpeed > 0 ? "projectile_impact" : heavy ? "heavy_hit" : "hit", e.Position);
                     if (Nearby(e.Position, 240)) camera.Impact(e.TargetId == "player" ? 2.2f : heavy ? 1.8f : 1.1f, e.Tick);
                 }
                 break;
             case CombatPresentationKind.Death:
-                view?.BeginDefeat();
+                view?.BeginDefeat(e.Origin, e.Position);
                 Emit(CombatEffectKind.Death, e, e.Position); Sound("death", e.Position);
+                break;
+            case CombatPresentationKind.Alerted:
+                world.Actors.TryGetValue(e.TargetId, out var quarry);
+                view?.Alert(e.Outcome, quarry);
+                // Only the one who actually spots the intruder cries out; the called simply start.
+                if (e.Outcome != "called") { Emit(CombatEffectKind.Alert, e, e.Origin); Sound("alert", e.Origin); }
+                break;
+            case CombatPresentationKind.AwarenessChanged:
+                // The overhead mark reads actor state directly; nothing to trigger here.
+                break;
+            case CombatPresentationKind.GuardBroken:
+            {
+                var broken = View(e.TargetId);
+                broken?.React(PixelCreatures.Core.Motion.ReactionKind.Reel);
+                broken?.Overlay?.GuardBroken();
+                if (Visible(e.TargetId))
+                {
+                    effects.Say("GUARD BROKEN", e.Position, e.Tick, e.TargetId, new Color(.8f, .93f, 1f));
+                    Emit(CombatEffectKind.GuardBreak, e, e.Position); Sound("guard_break", e.Position);
+                    if (Nearby(e.Position, 240)) camera.Impact(2f, e.Tick);
+                }
+                break;
+            }
+            case CombatPresentationKind.ChargeStarted:
+                Sound("charge", e.Origin);
+                break;
+            case CombatPresentationKind.ChargeCrashed:
+                view?.React(PixelCreatures.Core.Motion.ReactionKind.Crash);
+                Emit(CombatEffectKind.Crash, e, e.Origin + Direction(e) * 10); Sound("crash", e.Origin);
+                if (Nearby(e.Origin, 240)) camera.Impact(2.4f, e.Tick);
+                break;
+            case CombatPresentationKind.Rallied:
+            {
+                bool mends = ability != null && world.Content.Statuses.Any(s => s.Id == ability.Status && s.Heal > 0);
+                effects.Emit(CombatEffectKind.Rally, e.Origin, Direction(e), e.Tick, e.ActorId, e.TargetId, ability?.AllyRadius ?? 120);
+                if (!mends) break;
+                // Everyone it reached shows it.
+                foreach (var mended in world.Actors.Values)
+                    if (mended.Alive && Visible(mended.Id) && mended.Statuses.Any(s => s.Id == ability!.Status && s.Source == e.ActorId) && Ground.Distance(mended.Position, e.Origin) <= ability!.AllyRadius)
+                        effects.Emit(CombatEffectKind.Mend, mended.Position, Ground.Zero, e.Tick, e.ActorId, mended.Id);
+                Sound("mend", e.Origin);
+                break;
+            }
+            case CombatPresentationKind.Heard:
+                view?.Overlay?.Heard();
+                effects.Emit(CombatEffectKind.Ripple, e.Position, Ground.Zero, e.Tick, e.ActorId, "heard");
+                Sound("heard", e.Origin);
+                break;
+            case CombatPresentationKind.Disturbed:
+                view?.Overlay?.Heard();
+                if (e.Outcome == "body") { view?.React(PixelCreatures.Core.Motion.ReactionKind.Startle); Sound("heard", e.Origin); }
+                break;
+            case CombatPresentationKind.Woke:
+                view?.React(PixelCreatures.Core.Motion.ReactionKind.Startle);
+                Sound("wake", e.Origin);
+                break;
+            case CombatPresentationKind.Shaken:
+                view?.React(PixelCreatures.Core.Motion.ReactionKind.Cower);
+                Emit(CombatEffectKind.Shaken, e, e.Origin);
+                // One word for the whole pack, over the first of them.
+                if (e.Outcome == "leader" && routTick != e.Tick) { routTick = e.Tick; effects.Say("ROUTED", e.Origin, e.Tick, e.ActorId, new Color(.66f, .85f, 1f)); }
+                Sound("whimper", e.Origin);
+                break;
+            case CombatPresentationKind.BlastLaunched:
+                Emit(CombatEffectKind.ProjectileRelease, e, e.Origin); Sound("lob", e.Origin);
                 break;
         }
     }

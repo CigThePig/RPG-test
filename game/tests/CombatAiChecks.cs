@@ -83,8 +83,8 @@ public static class CombatAiChecks
                 foreach (string id in w.Actors.Keys.Where(x => x.StartsWith("ruin:spawn:")).ToArray()) w.Actors.Remove(id);
                 w.Enter(w.Player, "ruin");
                 var spawned = w.Actors.Values.Where(x => x.Id.StartsWith("ruin:spawn:")).OrderBy(x => x.Id).ToArray();
-                check(spawned.Length == 8 && new[] { "prowler", "brute", "spitter" }.All(id => spawned.Any(a => a.CombatProfile == id)), "seed " + seed + " spawns all archetypes");
-                check(spawned.All(a => w.RegionsById[a.Region].CanStand(a.Position, a) && a.Abilities.SequenceEqual(w.Content.CombatProfiles.Single(x => x.Id == a.CombatProfile).Priorities.Keys.OrderBy(x => x, StringComparer.Ordinal))), "seed " + seed + " preserves spawn terrain and authored abilities");
+                check(spawned.Length == 10 && new[] { "prowler", "brute", "spitter", "stalker", "howler", "alpha", "shellback", "mender", "lasher" }.All(id => spawned.Any(a => a.CombatProfile == id)), "seed " + seed + " spawns all archetypes");
+                check(spawned.All(a => w.RegionsById[a.Region].CanStand(a.Position, a) && a.Abilities.SequenceEqual(w.Content.CombatProfiles.Single(x => x.Id == a.CombatProfile).Loadout())), "seed " + seed + " preserves spawn terrain and authored abilities");
             }
         }
         finally { Persistence.Restore(w, app.Narrative, saved); app.RebuildViews(); }

@@ -75,6 +75,8 @@ public static class CombatPresentationChecks
                 check(motor.ResolveActionStyle(ActionStyle.TailSwipe) == ActionStyle.TailSwipe, "tailed anatomy accepts TailSwipe");
             double facing = motor.Yaw;
             var beforeContact = enemy.Position; var origin = p.Position;
+            // An enemy caught mid-windup is already fighting: no ambush bonus, no alarm.
+            enemy.Awareness = Awareness.Engaged; enemy.Target = p.Id;
             app.CombatEffects.Reset();
             hitBefore = app.Audio.Call("debug_cue_count", "hit").AsInt32();
             check(w.Damage(p, enemy, 5, "physical", ability: "slash"), "real damage interrupts the windup");
@@ -133,12 +135,12 @@ public static class CombatPresentationChecks
             var defeated = app.Views[enemy.Id]; defeated.Creature.Paused = false;
             defeated.HasLoot = w.Items.HasLoot(enemy.Id);
             for (int i = 0; i < 50; i++) { defeated.Sync(Dt); defeated.Creature.Motor!.Step(Dt); }
-            check(defeated.Creature.Motor!.RestProgress > .1 && defeated.LootMarkerVisible, "fatal hit transitions into a loot-marked rig defeat posture");
+            check(defeated.Creature.Motor!.DeathProgress > .1 && defeated.LootMarkerVisible, "fatal hit transitions into a loot-marked rig defeat posture");
             string corpse = Persistence.Capture(w, app.Narrative);
             Persistence.Restore(w, app.Narrative, corpse); p = w.Player; enemy = w.Actors[enemy.Id];
             int savedEffects = app.CombatEffects.EmittedCount; app.RebuildViews();
             app.Views[enemy.Id].HasLoot=w.Items.HasLoot(enemy.Id); app.Views[enemy.Id].Sync(Dt);
-            check(!enemy.Alive && app.Views[enemy.Id].Creature.Motor!.RestProgress >= .999 && app.Views[enemy.Id].LootMarkerVisible && app.CombatEffects.EmittedCount == savedEffects,
+            check(!enemy.Alive && app.Views[enemy.Id].Creature.Motor!.DeathProgress >= .999 && app.Views[enemy.Id].LootMarkerVisible && app.CombatEffects.EmittedCount == savedEffects,
                 "restored corpse is already defeated without replaying fatal feedback");
             // Restore an available actor for the routing and resource checks below.
             enemy.Health = enemy.MaxHealth; enemy.State = ActionState.Idle; enemy.Invulnerable = 0;
@@ -242,7 +244,7 @@ public static class CombatPresentationChecks
                 app._PhysicsProcess(Dt);
                 app.Views[p.Id].Creature._Process(Dt);
             }
-            check(w.Tick == deathTick && !app.Views[p.Id].Creature.Paused && app.Views[p.Id].Creature.Motor!.RestProgress > .1 && app.Views[enemy.Id].Creature.Paused,
+            check(w.Tick == deathTick && !app.Views[p.Id].Creature.Paused && app.Views[p.Id].Creature.Motor!.DeathProgress > .1 && app.Views[enemy.Id].Creature.Paused,
                 "player defeat advances while the world and living creatures remain paused");
             app.Ui.PauseForVerification();
         }

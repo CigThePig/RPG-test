@@ -4,9 +4,14 @@ namespace Mosslight;
 public readonly record struct ProjectileCollision(string Outcome, ActorState? Actor = null);
 public static class ProjectileFlight
 {
-    public static ProjectileState Release(ActorState source, ActorState target, AbilityDef ability)
+    public static ProjectileState Release(ActorState source, ActorState target, AbilityDef ability, float fanRadians = 0)
     {
         var heading = CombatGeometry.TryNormalize(target.Position - source.Position, out var d) ? d : Vector2.UnitX;
+        if (fanRadians != 0)
+        {
+            float c = MathF.Cos(fanRadians), s = MathF.Sin(fanRadians);
+            heading = new(heading.X * c - heading.Y * s, heading.X * s + heading.Y * c);
+        }
         return new() { Source = source.Id, Target = target.Id, Ability = ability.Id, Region = source.Region,
             X = source.X, Y = source.Y, HeadingX = heading.X, HeadingY = heading.Y, Remaining = ability.Projectile?.Lifetime ?? 4 };
     }

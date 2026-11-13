@@ -61,6 +61,9 @@ namespace PixelCreatures.Core.Motion
         private readonly ActionPlayer _action = new ActionPlayer();
         private readonly HitReaction _hit = new HitReaction();
         private readonly RestPlayer _rest = new RestPlayer();
+        private readonly StanceLayer _stance = new StanceLayer();
+        private readonly ReactionPlayer _reaction = new ReactionPlayer();
+        private readonly DeathPlayer _death = new DeathPlayer();
         private readonly CreaturePose _pose;
         private PoseParams _params = PoseParams.Neutral;
         private Smooth1 _moveW, _runW;
@@ -73,6 +76,7 @@ namespace PixelCreatures.Core.Motion
         private bool _wasRolling;
         private double _hitSamplingUntil;
         private double? _gameplayActionTime;
+        private double _deadHold;
 
         public MotorOptions Options { get; }
         public CreatureModel Model { get; }
@@ -103,6 +107,53 @@ namespace PixelCreatures.Core.Motion
         }
         public bool Resting { get => _rest.Requested; set => _rest.Requested = value; }
 
+        /// <summary>Persistent posture; blends in over a fraction of a second.</summary>
+        public StanceKind Stance { get => _stance.Target; set => _stance.Target = value; }
+        public double StanceWeight(StanceKind kind) => _stance.Weight(kind);
+        public void SnapStance(StanceKind kind) => _stance.Snap(kind);
+        public ReactionKind Reaction => _reaction.Kind;
+        public int ReactionTriggerCount => _reaction.TriggerCount;
+        public bool Dead => _death.Active;
+        public double DeathProgress => _death.Progress;
+
+        /// <summary>Plays a short reaction over the current motion without interrupting it.</summary>
+        public void TriggerReaction(ReactionKind kind, double duration = 0)
+        {
+            if (_death.Active) return;
+            if (_rest.Progress > 0.01) _rest.Requested = false;
+            _reaction.Trigger(_ctx, kind, duration);
+        }
+
+        /// <summary>Begins the collapse; the direction points from the creature to what struck it.</summary>
+        public void Die(Vec3 fromDirectionWorld)
+        {
+            if (_death.Active) return;
+            _pendingAction = false;
+            _gameplayActionTime = null;
+            _action.Cancel();
+            _reaction.Cancel();
+            _rest.Snap(false);
+            _death.Begin(_ctx, fromDirectionWorld);
+        }
+
+        /// <summary>Instantly lying dead (corpses restored from a save).</summary>
+        public void SnapDead()
+        {
+            _action.Cancel();
+            _reaction.Cancel();
+            _rest.Snap(false);
+            _death.Snap(_ctx);
+            _ctx.DeathWeight = 1;
+            _deadHold = 0;
+            ComputePose(0, initialize: true);
+        }
+
+        public void Revive()
+        {
+            _death.Revive();
+            ComputePose(0, initialize: true);
+        }
+
         public Vec3 Position => _ctx.Position;
         public double Yaw => _ctx.Yaw;
         public double Speed => _ctx.Speed;
@@ -116,7 +167,7 @@ namespace PixelCreatures.Core.Motion
         public double ActionTime => _action.Time;
         public int ActionTriggerCount => _action.TriggerCount;
         // Do not keep a crowd at the combat rate for the whole spring tail.
-        public bool CombatSampling => _action.Active || _ctx.Time < _hitSamplingUntil;
+        public bool CombatSampling => _action.Active || _reaction.Active || (_death.Active && _death.Progress < 1) || _ctx.Time < _hitSamplingUntil;
 
         public CreatureMotor(CreatureModel model, CreatureRegistry registry, MotorOptions? options = null)
         {
@@ -140,6 +191,7 @@ namespace PixelCreatures.Core.Motion
         /// <summary>Starts immediately on the world's timeline, even when waking from rest.</summary>
         public void TriggerGameplayAction(double windup, double recovery, ActionStyle? style, double elapsed = 0)
         {
+            if (_death.Active) return;
             _rest.Requested = false;
             _pendingAction = false;
             _gameplayActionTime = null;
@@ -182,6 +234,7 @@ namespace PixelCreatures.Core.Motion
 
         public void TriggerAction(ActionStyle style)
         {
+            if (_death.Active) return;
             _gameplayActionTime = null;
             if (_rest.Progress > 0.01)
             {
@@ -195,12 +248,15 @@ namespace PixelCreatures.Core.Motion
         }
 
         /// <summary>Hit from a world direction (vector pointing from the attacker to the creature is derived internally).</summary>
-        public void TriggerHit(Vec3 fromDirectionWorld, double strength = 1.0)
+        public void TriggerHit(Vec3 fromDirectionWorld, double strength = 1.0, bool interruptAction = true)
         {
             if (_rest.Progress > 0.01) _rest.Requested = false;
-            _pendingAction = false;
-            _gameplayActionTime = null;
-            _action.Cancel();
+            if (interruptAction)
+            {
+                _pendingAction = false;
+                _gameplayActionTime = null;
+                _action.Cancel();
+            }
             _hitSamplingUntil = _ctx.Time + .38;
             _hit.Trigger(_ctx, fromDirectionWorld, strength);
             _driver.Tail?.Impulse(new Vec3(-fromDirectionWorld.X, 0.5, -fromDirectionWorld.Z).NormalizedOr(Vec3.UnitY) * 40, FixedClock.DefaultStep);
@@ -241,6 +297,7 @@ namespace PixelCreatures.Core.Motion
         {
             get
             {
+                if (_death.Active) return MotionStateKind.Dead;
                 if (_action.Active) return MotionStateKind.Action;
                 if (_hit.Active && _hit.Flash > 0) return MotionStateKind.Hit;
                 if (_rest.Progress > 0.001) return _rest.Progress >= 0.999 && _rest.Requested ? MotionStateKind.Rest : MotionStateKind.Transition;
@@ -257,6 +314,14 @@ namespace PixelCreatures.Core.Motion
             _steps++;
             var ctx = _ctx;
             ctx.Time += dt;
+            // Once the collapse and its last tremors are over, the corpse is simply held:
+            // no drifting, bobbing or swaying from modules that never stop on their own.
+            if (_death.Active && _death.Progress >= 1)
+            {
+                _deadHold += dt;
+                if (_deadHold > 0.6) return;
+            }
+            else _deadHold = 0;
             var traits = ctx.Traits;
 
             // ---- drive
@@ -299,10 +364,14 @@ namespace PixelCreatures.Core.Motion
             if (_gameplayActionTime.HasValue && _action.Active) _action.Seek(_gameplayActionTime.Value);
             else _action.Step(dt);
             _hit.Step(ctx, dt);
-            _idle.Step(ctx, dt);
+            _stance.Step(dt);
+            _reaction.Step(dt);
+            _death.Step(dt);
+            if (!_death.Active) _idle.Step(ctx, dt);
             ctx.RestWeight = _rest.Progress;
             ctx.RestExiting = _rest.Exiting;
             ctx.ActionWeight = _action.Envelope;
+            ctx.DeathWeight = _death.Active ? DMath.SmoothStep(0.05, 0.6, _death.Progress) : 0;
             if (_pendingAction && _rest.Progress <= 0.001)
             {
                 _pendingAction = false;
@@ -369,6 +438,9 @@ namespace PixelCreatures.Core.Motion
             var ctx = _ctx;
             var p = PoseParams.Neutral;
             double idle = (1 - ctx.MoveWeight) * (1 - ctx.RestWeight) * (1 - ctx.ActionWeight);
+            // A tense body does not yawn or shake itself out, and a dead one does nothing.
+            idle *= 1 - Math.Max(_stance.Weight(StanceKind.Combat), Math.Max(_stance.Weight(StanceKind.Enraged), Math.Max(_stance.Weight(StanceKind.Charge), _stance.Weight(StanceKind.Guard))));
+            if (_death.Active) idle = 0;
             _idle.Evaluate(ctx, ref p, idle);
             _loco.Evaluate(ctx, ref p);
 
@@ -379,8 +451,10 @@ namespace PixelCreatures.Core.Motion
             p.LookX += DMath.Clamp(turn * 1.5, -1, 1);
 
             _rest.Evaluate(ctx, ref p);
+            _stance.Evaluate(ctx, ref p);
             _action.Evaluate(ctx, ref p);
             _hit.Evaluate(ctx, ref p);
+            _reaction.Evaluate(ctx, ref p);
             bool exclusiveRoll = DodgeProgress.HasValue && DodgeBiped && _loco is LeggedLocomotion;
             if (exclusiveRoll)
             {
@@ -389,12 +463,23 @@ namespace PixelCreatures.Core.Motion
             }
             else if (DodgeProgress.HasValue)
             {
-                // Families without biped roll anatomy retain a small non-spinning evasion.
-                double tuck = Math.Sin(Math.PI * DMath.Clamp(DodgeProgress.Value, 0, 1));
-                p.BodyPitch += .45 * tuck;
-                p.Crouch += .35 * tuck;
+                // Bodies that cannot tumble spring clear instead: gather, leave the ground, land.
+                double q = DMath.Clamp(DodgeProgress.Value, 0, 1);
+                double arc = Math.Sin(Math.PI * q);
+                double land = DMath.Pulse(q, .78, .86, .92, 1.0);
+                double leg = Math.Max(3, ctx.Anatomy.Metrics.LegLength);
+                p.Altitude += arc * leg * .5;
+                p.Squash += -.15 * arc + .2 * land;
+                p.LegTuck = Math.Max(p.LegTuck, .55 * arc);
+                p.BodyPitch += -.16 * DodgeForwardComponent * arc;
+                p.BodyRoll += .22 * DodgeSideComponent * arc;
+                p.EarPitch -= .8 * arc;
+                p.TailPitch += .4 * arc;
+                p.WingFold = Math.Min(p.WingFold, 1 - .5 * arc);
+                p.Crouch += .3 * land;
             }
-            p.Altitude += _loco.Altitude(ctx) * (1 - ctx.RestWeight);
+            if (_death.Active) _death.Evaluate(ctx, ref p);
+            p.Altitude += _loco.Altitude(ctx) * (1 - ctx.RestWeight) * (1 - _death.Grounded);
             p.EyeOpen = DMath.Saturate(p.EyeOpen);
             ctx.Altitude = p.Altitude;
             _params = p;

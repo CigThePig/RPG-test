@@ -179,6 +179,8 @@ namespace PixelCreatures.Core.Anatomy
         Spray,
         /// <summary>Threat display: rear up, lift the front legs, bare the fangs, snap down.</summary>
         Rear,
+        /// <summary>Paw the ground and lower the head, then hand over to a flat-out run.</summary>
+        Charge,
     }
 
     public enum RestStyle : byte

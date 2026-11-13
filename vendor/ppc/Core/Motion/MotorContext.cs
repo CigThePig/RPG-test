@@ -24,6 +24,7 @@ namespace PixelCreatures.Core.Motion
         Hit,
         Rest,
         Transition,
+        Dead,
     }
 
     public sealed class MotorContext
@@ -54,6 +55,8 @@ namespace PixelCreatures.Core.Motion
         public bool RestExiting;
         /// <summary>Action envelope 0..1 (locomotion is damped while acting).</summary>
         public double ActionWeight;
+        /// <summary>0..1 how far a dying creature has collapsed; living motion fades out with it.</summary>
+        public double DeathWeight;
         /// <summary>Root altitude (flight, jumps, swimming offset).</summary>
         public double Altitude;
         /// <summary>Surface level for swimming creatures (NaN = land).</summary>
