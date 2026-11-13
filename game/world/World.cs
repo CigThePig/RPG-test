@@ -604,6 +604,8 @@ public sealed class World
                 if (s.UntilTick <= 0 && d.Damage > 0 && Actors.TryGetValue(s.Source, out var source))
                 {
                     Damage(source, a, d.Damage * s.Stacks, d.Type, periodic: true);
+                    // Defeat is final: later statuses must not heal this actor back to life.
+                    if (!a.Alive) break;
                     s.UntilTick += d.Interval;
                 }
                 else if (s.UntilTick <= 0 && d.Heal > 0)

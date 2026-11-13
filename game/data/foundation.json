@@ -384,7 +384,7 @@
       "Id": "fang",
       "Name": "Fang strike",
       "Range": 84,
-      "MinRange": 44,
+      "MinRange": 48,
       "Damage": 7,
       "Cost": 0,
       "Cooldown": 2.8,

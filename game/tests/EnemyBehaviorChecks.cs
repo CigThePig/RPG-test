@@ -86,6 +86,8 @@ public static class EnemyBehaviorChecks
             Mender(check);
             Saving(app, check);
             Authoring(check);
+            FangRange(check);
+            LethalStatus(check);
         }
         finally
         {
@@ -982,6 +984,32 @@ public static class EnemyBehaviorChecks
         p.Statuses.Clear();
     }
 
+    static void FangRange(Action<bool, string> check)
+    {
+        // With coil unavailable, fang must not leap past a stationary quarry.
+        var fang = w.FindAbility("fang")!;
+        foreach (float distance in new[] { 44f, 45f, 46f, 47f, 48f, 52f, 70f, 74f })
+        {
+            Arena();
+            var lasher = Spawn("b:fang-range", "lasher", p.X - distance, p.Y, V.UnitX); Engage(lasher);
+            lasher.Cooldowns["coil"] = 30;
+            var intent = CombatBrain.Select(w, lasher, p, w.FindProfile("lasher"), false);
+            if (distance < 48)
+            {
+                check(intent.Ability != "fang" && !w.CanActivate(lasher, p, fang) && !w.Activate(lasher.Id, "fang", p.Id),
+                    $"fang rejects a target inside its safe landing distance at {distance} pixels");
+                continue;
+            }
+            check(intent.Ability == "fang" && w.Activate(lasher.Id, "fang", p.Id),
+                $"fang accepts a stationary target at {distance} pixels");
+            float health = p.Health;
+            for (int i = 0; i < (int)MathF.Ceiling(fang.Windup * 60) + 2; i++)
+            { lasher.NextTacticalTime = w.Time + 1; w.Step(Dt); }
+            check(p.Health < health && p.Statuses.Any(st => st.Id == "venom") && Saw(CombatPresentationKind.Hit, lasher.Id),
+                $"the selected fang hits and envenoms its stationary target at {distance} pixels");
+        }
+    }
+
     static void Mender(Action<bool, string> check)
     {
         var status = w.Content.Statuses.Single(st => st.Id == "regrowth");
@@ -1014,6 +1042,38 @@ public static class EnemyBehaviorChecks
         Run(240, _ => closest = Math.Min(closest, V.Distance(m.Position, p.Position)));
         check(Blooms() >= 1 && m.Statuses.Any(st => st.Id == "regrowth") || m.Health > m.MaxHealth * .7f, "a wounded mender tends itself");
         check(closest > w.FindProfile("mender")!.MinimumDistance - 12, $"and keeps its distance rather than closing in ({closest:0})");
+    }
+
+    static void LethalStatus(Action<bool, string> check)
+    {
+        // Exercise both insertion orders with damage lethal even after a healing tick.
+        foreach (bool healFirst in new[] { false, true })
+        {
+            Arena();
+            var a = Spawn("b:status-death", "prowler", p.X - 74, p.Y, V.UnitX); Engage(a);
+            check(w.Activate(a.Id, "pounce", p.Id), "lethal status fixture starts an attack");
+            a.Health = 1;
+            foreach (string id in healFirst ? new[] { "regrowth", "burn" } : new[] { "burn", "regrowth" })
+                w.ApplyStatus(a, id, p.Id);
+            foreach (var status in a.Statuses) { status.UntilTick = 0; if (status.Id == "burn") status.Stacks = 3; }
+            int TotalExperience() => p.Experience + 50 * p.Level * (p.Level - 1);
+            int experience = TotalExperience();
+            float health = p.Health;
+            var position = a.Position;
+            w.Events.Recent.Clear();
+            w.Step(Dt);
+            check(!a.Alive && a.Health == 0 && a.State == ActionState.Dead && a.PendingAbility == "" && a.Position == position,
+                $"lethal status damage leaves a dead actor with its attack canceled (heal first: {healFirst})");
+            check(TotalExperience() == experience + 25 && w.Events.Recent.Count(e => e.Kind == "defeated" && e.Target == a.Id) == 1,
+                "a lethal status tick awards defeat and experience exactly once");
+            var loot = w.Content.Loot.Select(l => l.Item).Distinct().ToDictionary(id => id, id => w.Items.Count(a.Id, id));
+            Run(120);
+            check(!a.Alive && a.Health == 0 && a.State == ActionState.Dead && a.Position == position && p.Health == health,
+                "a defeated actor stays dead and cannot resume its attack on later steps");
+            check(TotalExperience() == experience + 25 && w.Events.Recent.Count(e => e.Kind == "defeated" && e.Target == a.Id) == 1 &&
+                loot.All(kv => w.Items.Count(a.Id, kv.Key) == kv.Value) && !w.Damage(p, a, 100, "fire", periodic: true),
+                "later status ticks and damage cannot award defeat rewards or loot again");
+        }
     }
 
     static void Saving(Foundation app, Action<bool, string> check)
