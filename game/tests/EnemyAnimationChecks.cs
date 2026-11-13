@@ -52,7 +52,7 @@ public static class EnemyAnimationChecks
             check(Difference(Bones(steady), twin) == 0, label + ": the same inputs give the same pose on every run");
 
             // Reactions end by themselves and leave no residue.
-            foreach (var reaction in new[] { ReactionKind.Startle, ReactionKind.Reel, ReactionKind.Crash })
+            foreach (var reaction in new[] { ReactionKind.Startle, ReactionKind.Reel, ReactionKind.Crash, ReactionKind.Block, ReactionKind.Cower })
             {
                 var motor = Motor(family, seed); Advance(motor, .5);
                 var before = Bones(motor); int count = motor.ReactionTriggerCount;
@@ -115,6 +115,125 @@ public static class EnemyAnimationChecks
         }
 
         Views(app, check);
+        Senses(app, check);
+    }
+
+    // Sleep, wariness, broken nerve, shells, lobbed attacks and what the player is shown of enemy senses.
+    static void Senses(Foundation app, Action<bool, string> check)
+    {
+        var w = app.World; string saved = Persistence.Capture(w, app.Narrative);
+        try
+        {
+            app.BeginCombatCourse("depths", true);
+            var p = w.Player;
+            ActorState Of(string profile) => w.Actors.Values.First(a => a.Id.StartsWith("lab:") && a.CombatProfile == profile);
+            var alpha = Of("alpha"); var prowler = Of("prowler"); var shell = Of("shellback"); var mender = Of("mender"); var spitter = Of("spitter"); var lasher = Of("lasher");
+            int post = 0;
+            foreach (var a in w.Actors.Values.Where(a => a.Id.StartsWith("lab:")).OrderBy(a => a.Id, StringComparer.Ordinal))
+            { EnemyMind.Resettle(a, new V(p.X + 120 + post % 3 * 40, p.Y - 60 + post / 3 * 90), new V(-1, 0)); a.NextTacticalTime = 1e9; post++; }
+            void Sync() { foreach (var view in app.Views.Values) { view.SyncCombatFacing(w); view.Sync(1f / 60); view.Overlay?._Process(1.0 / 60); view.Stealth?._Process(1.0 / 60); } app.Senses.Survey(); }
+            var eye = app.Views[p.Id].Stealth!;
+            var view = app.Views[prowler.Id];
+
+            // Calm and awake: sight and earshot are shown, the leader wears its crest, the player's eye is shut.
+            Sync();
+            check(app.Views[alpha.Id].Overlay!.LeaderVisible && !view.Overlay!.LeaderVisible, "only the pack's leader wears a crest");
+            check(app.Senses.ConesDrawn == 6 && app.Senses.EarshotDrawn == 6 && app.Senses.TrailsDrawn == 0, $"each calm enemy nearby shows what it can see and hear ({app.Senses.ConesDrawn} cones, {app.Senses.EarshotDrawn} rings)");
+            check(eye.Exposure == Exposure.Unseen && eye.Visible, "near enemies that have noticed nothing, the player's eye is shut");
+
+            // Asleep: lying down under drifting letters, with no sight to show.
+            prowler.Sleeper = true; Sync();
+            check(EnemyMind.Asleep(prowler) && view.Creature.Resting && view.Overlay.Glyph == "sleep" && view.Stance == StanceKind.Relaxed, "a sleeper lies down under its own mark");
+            check(app.Senses.ConesDrawn == 5 && app.Senses.EarshotDrawn == 6 && !SenseView.ShowsSight(w, prowler, w.FindProfile("prowler")!), "a sleeper shows how near it can be approached, and no field of view");
+            float loud = EnemyMind.Earshot(w, alpha, p, w.FindProfile("alpha")!);
+            p.State = ActionState.Dodging;
+            float rolling = EnemyMind.Earshot(w, alpha, p, w.FindProfile("alpha")!);
+            p.State = ActionState.Idle;
+            check(rolling > loud * 1.9f && EnemyMind.Earshot(w, prowler, p, w.FindProfile("prowler")!) < loud, "the earshot shown shrinks for a quiet player and for a sleeping listener");
+            prowler.Cooldowns["wary"] = 5; Sync();
+            check(!view.Creature.Resting && view.Overlay.Glyph == "wary", "on edge after a disturbance it is up, under an open eye");
+            prowler.Sleeper = false; prowler.Cooldowns.Clear();
+
+            // Suspicion and search, as the player's own mark shows them.
+            prowler.Awareness = Awareness.Suspicious; prowler.Alertness = .6f; Sync();
+            check(eye.Exposure == Exposure.Suspected && Math.Abs(eye.Suspicion - .6f) < .001f, "growing suspicion opens the player's eye by as much");
+            prowler.Awareness = Awareness.Searching; prowler.LastKnownX = p.X + 40; prowler.LastKnownY = p.Y; prowler.Alertness = 0; view.Overlay.Heard(); Sync();
+            check(eye.Exposure == Exposure.Sought && view.Overlay.Glyph == "search" && view.Overlay.HeardVisible && app.Senses.TrailsDrawn == 1 && SenseView.ShowsTrail(w, prowler),
+                "a search drawn by a noise shows sound arcs and the spot it is heading for");
+            prowler.Awareness = Awareness.Engaged; prowler.Target = p.Id; Sync();
+            check(eye.Exposure == Exposure.Hunted && app.Senses.ConesDrawn == 5, "recognised, the eye turns to say so and that enemy's sight is no longer drawn");
+            prowler.Cooldowns["rout"] = 3; view.Overlay.Pop(); for (int i = 0; i < 60; i++) Sync();
+            check(view.Overlay.Glyph == "shaken", "a broken nerve shows over the head for as long as it lasts");
+            prowler.TacticalIntent = "cower"; Sync();
+            check(view.Stance == StanceKind.Flee, "an enemy that has run far enough still shows its fear");
+            prowler.Cooldowns.Clear(); EnemyMind.Calm(prowler);
+
+            // The shell: raised while it can turn a blow, lowered while it recovers.
+            var guard = app.Views[shell.Id];
+            shell.Awareness = Awareness.Engaged; shell.Target = p.Id; Sync();
+            check(guard.ShieldUp && guard.Stance == StanceKind.Guard && w.Shielded(shell, p.Position), "a shellback in a fight hunkers behind its raised front");
+            shell.Invulnerable = 0; w.Damage(p, shell, 10, "physical", ability: "slash"); Sync();
+            check(guard.Creature.Motor!.Reaction == ReactionKind.Block && app.CombatEffects.LastWord == "BLOCKED", "a turned blow jolts it and is called out");
+            shell.State = ActionState.Recovery; shell.RecoveryAbility = "pincer"; shell.StateRemaining = .4f; Sync();
+            check(!guard.ShieldUp && guard.Stance != StanceKind.Guard && !w.Shielded(shell, p.Position), "recovering from its own attack, the shell is shown open");
+            w.Cancel(shell); EnemyMind.Calm(shell);
+            prowler.Invulnerable = 0; prowler.Awareness = Awareness.Unaware; w.Damage(p, prowler, 1, "physical", ability: "slash");
+            check(app.CombatEffects.LastWord == "AMBUSH", "an ambush is called out");
+            EnemyMind.Calm(prowler);
+
+            // A lobbed glob: warned from the first moment of the windup until it lands, then a pool.
+            var glob = w.FindAbility("glob")!;
+            spitter.Awareness = Awareness.Engaged; spitter.Target = p.Id; w.Cancel(spitter); spitter.Cooldowns.Clear();
+            p.X = spitter.X - 140; p.Y = spitter.Y;
+            check(w.Activate(spitter.Id, "glob", p.Id) && TelegraphView.IsActive(w, spitter, glob), "a lobbed attack is warned through its windup");
+            float early = TelegraphView.BlastProgress(glob, 0);
+            for (int i = 0; i < (int)(glob.Windup * 60) + 3; i++) w.Step(1f / 60);
+            Sync();
+            check(w.Hazards.Count == 1 && app.Telegraphs.HazardsDrawn == 1 && TelegraphView.BlastProgress(glob, glob.Windup) > early &&
+                TelegraphView.BlastProgress(glob, glob.Windup + glob.Blast!.Delay) == 1, "the warning carries on, still filling, while it is in the air");
+            app.CombatEffects.Reset();
+            for (int i = 0; i < (int)(glob.Blast!.Delay * 60) + 2; i++) w.Step(1f / 60);
+            Sync();
+            check(w.Hazards.Count == 1 && w.Hazards[0].Landed && app.Telegraphs.HazardsDrawn == 1 && app.CombatEffects.EmittedCount > 0, "it bursts where it was warned and the pool is drawn");
+            w.Hazards.Clear(); w.Cancel(spitter); EnemyMind.Calm(spitter);
+
+            // A burst is warned all round the body.
+            var coil = w.FindAbility("coil")!;
+            lasher.Awareness = Awareness.Engaged; lasher.Target = p.Id; lasher.Cooldowns.Clear(); p.X = lasher.X - 34; p.Y = lasher.Y;
+            check(w.Activate(lasher.Id, "coil", p.Id) && TelegraphView.IsActive(w, lasher, coil), "a burst is warned through its windup");
+            w.Cancel(lasher); EnemyMind.Calm(lasher);
+
+            // Mending shows on the mended.
+            mender.Awareness = Awareness.Engaged; mender.Target = p.Id; alpha.Health = alpha.MaxHealth * .4f;
+            alpha.X = mender.X + 20; alpha.Y = mender.Y + 20;
+            app.CombatEffects.Reset(); w.Activate(mender.Id, "bloom", mender.Id);
+            var bloom = w.FindAbility("bloom")!;
+            for (int i = 0; i < (int)(bloom.Windup * 60) + 2; i++) w.Step(1f / 60);
+            Sync();
+            check(alpha.Statuses.Any(s => s.Id == "regrowth") && app.CombatEffects.LastKind == CombatEffectKind.Mend && CharacterView.StatusColor("regrowth") != CharacterView.StatusColor("snare"),
+                "a mended ally shows it, in its own colour");
+
+            app.CombatEffects.Reset();
+            foreach (var kind in new[] { CombatEffectKind.Blocked, CombatEffectKind.Splash, CombatEffectKind.Ripple, CombatEffectKind.Mend, CombatEffectKind.Shaken })
+                check(app.CombatEffects.Emit(kind, p.Position, V.UnitX, w.Tick, "a", "b", 34) && app.CombatEffects.LastKind == kind, "effect layer accepts " + kind);
+            check(app.CombatEffects.Say("ROUTED", p.Position, w.Tick, "a", Colors.White) && app.CombatEffects.LastKind == CombatEffectKind.Word, "effect layer accepts a call-out");
+            for (int i = 0; i < 12; i++) app.CombatEffects.Advance(.09f);
+            check(app.CombatEffects.ActiveCount == 0, "the new effects expire by themselves");
+            foreach (string cue in new[] { "block", "splash", "heard", "wake", "whimper", "mend", "lob" })
+            {
+                // Each on a free mixer: the fight above left voices sounding.
+                app.Audio.Call("stop_effects");
+                int before = app.Audio.Call("debug_cue_count", cue).AsInt32();
+                app.Audio.Call("cue", cue);
+                check(app.Audio.Call("debug_cue_count", cue).AsInt32() == before + 1, "audio service has a voice for " + cue);
+            }
+            app.Audio.Call("stop_effects");
+        }
+        finally
+        {
+            if (app.InFeelCourse) app.LeaveFeelCourse();
+            Persistence.Restore(w, app.Narrative, saved); app.RebuildViews(); app.Ui.PauseForVerification();
+        }
     }
 
     // The production view derives posture, facing and marks from actor state alone.

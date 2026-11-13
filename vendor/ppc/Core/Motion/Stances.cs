@@ -26,6 +26,8 @@ namespace PixelCreatures.Core.Motion
         Enraged,
         /// <summary>Head down for a flat-out run.</summary>
         Charge,
+        /// <summary>Hunkered behind a hard front: low, braced, limbs drawn in, barely moving.</summary>
+        Guard,
     }
 
     public sealed class StanceLayer
@@ -145,6 +147,28 @@ namespace PixelCreatures.Core.Motion
                 if (flee > 0.5 && p.Mood == EyeMood.Neutral) p.Mood = EyeMood.Alert;
             }
 
+            double guard = _w[(int)StanceKind.Guard] * live;
+            if (guard > 1e-3)
+            {
+                // Braced and compact: everything soft is tucked behind the front.
+                p.Crouch += 0.34 * guard;
+                p.Squash += 0.06 * guard;
+                p.BodyPitch += -0.09 * guard;
+                p.BodyOffset = p.BodyOffset + new Vec3(0.02 * L * guard, 0, 0);
+                p.NeckPitch += -0.42 * guard;
+                p.HeadPitch += -0.22 * guard;
+                p.EarPitch += -0.8 * guard;
+                p.TailPitch += -0.3 * guard;
+                p.TailCurl += 0.3 * guard;
+                p.ArmRaise += 0.5 * guard;
+                p.ArmReach += 0.22 * guard;
+                p.FrontReach += 0.07 * guard;
+                p.Grip = Math.Max(p.Grip, 0.6 * guard);
+                p.WingFold = Math.Max(p.WingFold, 0.85 * guard);
+                p.Breath *= 1 - 0.5 * guard;
+                if (guard > 0.5 && p.Mood is EyeMood.Neutral or EyeMood.Alert) p.Mood = EyeMood.Angry;
+            }
+
             double charge = _w[(int)StanceKind.Charge] * (1 - ctx.RestWeight) * (1 - ctx.DeathWeight);
             if (charge > 1e-3)
             {
@@ -169,6 +193,10 @@ namespace PixelCreatures.Core.Motion
         Reel,
         /// <summary>Ran headlong into something solid: flattened, then swaying.</summary>
         Crash,
+        /// <summary>A blow turned on a hard front: a short jolt back, braced and squashed, then set again.</summary>
+        Block,
+        /// <summary>Nerve gone: a flinch that shrinks the whole body away.</summary>
+        Cower,
     }
 
     /// <summary>Short additive one-shots that do not interrupt locomotion or facing.</summary>
@@ -190,6 +218,8 @@ namespace PixelCreatures.Core.Motion
                 ReactionKind.Startle => 0.42,
                 ReactionKind.Reel => 0.7,
                 ReactionKind.Crash => 1.1,
+                ReactionKind.Block => 0.3,
+                ReactionKind.Cower => 0.6,
                 _ => 0,
             };
             if (Duration <= 0) Kind = ReactionKind.None;
@@ -268,6 +298,35 @@ namespace PixelCreatures.Core.Motion
                     // Dizzy: eyes drift half shut and blink out of time.
                     p.EyeOpen *= 1 - sway * (0.45 + 0.4 * (DMath.Sin(DMath.TwoPi * 3.1 * Time) > 0.2 ? 1 : 0));
                     p.Mood = EyeMood.Pain;
+                    break;
+                }
+                case ReactionKind.Block:
+                {
+                    double jolt = DMath.Pulse(u, 0.0, 0.1, 0.25, 0.9);
+                    p.BodyOffset = p.BodyOffset + new Vec3(-0.06 * L * jolt, 0, 0);
+                    p.Squash += 0.12 * jolt;
+                    p.Crouch += 0.18 * jolt;
+                    p.BodyPitch += 0.06 * jolt;
+                    p.HeadRoll += Curves.Shake(u, 0.0, 0.8, 4) * 0.12;
+                    p.ArmRaise += 0.25 * jolt;
+                    p.Grip = Math.Max(p.Grip, jolt);
+                    break;
+                }
+                case ReactionKind.Cower:
+                {
+                    double shrink = DMath.Pulse(u, 0.0, 0.15, 0.6, 1.0);
+                    p.Crouch += 0.4 * shrink;
+                    p.BodyOffset = p.BodyOffset + new Vec3(-0.07 * L * shrink, 0, 0);
+                    p.NeckPitch += -0.35 * shrink;
+                    p.HeadPitch += -0.2 * shrink;
+                    p.EarPitch += -1.0 * shrink;
+                    p.TailPitch += -0.6 * shrink;
+                    p.TailCurl += 0.5 * shrink;
+                    p.HeadRoll += Curves.Shake(u, 0.05, 0.95, 7) * 0.1;
+                    p.BodyRoll += Curves.Shake(u, 0.0, 0.9, 8) * 0.03;
+                    p.WingFold = Math.Max(p.WingFold, 0.9 * shrink);
+                    p.EyeOpen = Math.Max(p.EyeOpen, shrink);
+                    if (u < 0.9) p.Mood = EyeMood.Alert;
                     break;
                 }
             }

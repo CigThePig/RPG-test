@@ -439,7 +439,7 @@ namespace PixelCreatures.Core.Motion
             var p = PoseParams.Neutral;
             double idle = (1 - ctx.MoveWeight) * (1 - ctx.RestWeight) * (1 - ctx.ActionWeight);
             // A tense body does not yawn or shake itself out, and a dead one does nothing.
-            idle *= 1 - Math.Max(_stance.Weight(StanceKind.Combat), Math.Max(_stance.Weight(StanceKind.Enraged), _stance.Weight(StanceKind.Charge)));
+            idle *= 1 - Math.Max(_stance.Weight(StanceKind.Combat), Math.Max(_stance.Weight(StanceKind.Enraged), Math.Max(_stance.Weight(StanceKind.Charge), _stance.Weight(StanceKind.Guard))));
             if (_death.Active) idle = 0;
             _idle.Evaluate(ctx, ref p, idle);
             _loco.Evaluate(ctx, ref p);

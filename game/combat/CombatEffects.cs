@@ -4,7 +4,7 @@ using Ground = System.Numerics.Vector2;
 
 namespace Mosslight;
 
-public enum CombatEffectKind { Hit, HeavyHit, Whiff, Dodge, Interrupt, ProjectileRelease, ProjectileCollision, Death, Periodic, TerrainCollision, Alert, GuardBreak, Crash, Rally, Guarded }
+public enum CombatEffectKind { Hit, HeavyHit, Whiff, Dodge, Interrupt, ProjectileRelease, ProjectileCollision, Death, Periodic, TerrainCollision, Alert, GuardBreak, Crash, Rally, Guarded, Blocked, Splash, Ripple, Mend, Shaken, Word }
 
 /// <summary>One bounded world-space draw layer. Fragments are derived from the event seed, not stored as nodes.</summary>
 public partial class CombatEffects : Node2D
@@ -19,6 +19,8 @@ public partial class CombatEffects : Node2D
         public float Age, Lifetime, Size;
         public uint Seed;
         public int Priority;
+        public string Text;
+        public Color Tint;
     }
     readonly Effect[] effects = new Effect[Capacity];
     public int ActiveCount { get; private set; }
@@ -29,8 +31,9 @@ public partial class CombatEffects : Node2D
 
     static int Priority(CombatEffectKind kind) => kind switch
     {
-        CombatEffectKind.Death or CombatEffectKind.HeavyHit or CombatEffectKind.GuardBreak or CombatEffectKind.Crash => 3,
-        CombatEffectKind.Hit or CombatEffectKind.Dodge or CombatEffectKind.ProjectileCollision or CombatEffectKind.Alert or CombatEffectKind.Rally => 2,
+        CombatEffectKind.Death or CombatEffectKind.HeavyHit or CombatEffectKind.GuardBreak or CombatEffectKind.Crash or CombatEffectKind.Splash => 3,
+        CombatEffectKind.Hit or CombatEffectKind.Dodge or CombatEffectKind.ProjectileCollision or CombatEffectKind.Alert or CombatEffectKind.Rally or
+            CombatEffectKind.Blocked or CombatEffectKind.Word or CombatEffectKind.Mend => 2,
         _ => 1
     };
     static float Duration(CombatEffectKind kind) => kind switch
@@ -43,8 +46,24 @@ public partial class CombatEffects : Node2D
         CombatEffectKind.GuardBreak or CombatEffectKind.Crash => .5f,
         CombatEffectKind.Alert => .4f,
         CombatEffectKind.Guarded => .22f,
+        CombatEffectKind.Blocked => .3f,
+        CombatEffectKind.Splash => .55f,
+        CombatEffectKind.Ripple => .8f,
+        CombatEffectKind.Mend => .9f,
+        CombatEffectKind.Shaken => .5f,
+        CombatEffectKind.Word => .95f,
         _ => .32f
     };
+
+    /// <summary>A short call-out that rises from a point and fades: what just happened, in a word.</summary>
+    public bool Say(string text, Ground position, long tick, string actorId, Color tint)
+    {
+        if (!Emit(CombatEffectKind.Word, position, Ground.Zero, tick, actorId, text)) return false;
+        effects[lastSlot].Text = text; effects[lastSlot].Tint = tint; LastWord = text;
+        return true;
+    }
+    public string LastWord { get; private set; } = "";
+    int lastSlot;
 
     public bool Emit(CombatEffectKind kind, Ground position, Ground direction, long tick, string actorId, string targetId = "", float size = 0)
     {
@@ -64,7 +83,8 @@ public partial class CombatEffects : Node2D
         else d = d.Normalized();
         uint seed = unchecked((uint)World.StableId(actorId) ^ (uint)World.StableId(targetId) * 3266489917u ^ (uint)tick * 2654435761u ^ (uint)kind * 2246822519u);
         effects[slot] = new Effect { Active = true, Kind = kind, Anchor = projected, Direction = d,
-            Lifetime = Duration(kind), Seed = seed, Priority = priority, Size = size };
+            Lifetime = Duration(kind), Seed = seed, Priority = priority, Size = size, Text = "" };
+        lastSlot = slot;
         LastAnchor = projected; LastKind = kind; EmittedCount++;
         QueueRedraw();
         return true;
@@ -165,6 +185,100 @@ public partial class CombatEffects : Node2D
                 DrawSetTransform(Vector2.Zero);
                 break;
             }
+            case CombatEffectKind.Blocked:
+            {
+                // Turned on a hard front: a bright curved flash across the blow and sparks thrown back along it.
+                var at = e.Anchor + new Vector2(0, -12);
+                float facing = e.Direction.Angle();
+                var steel = new Color(.82f, .93f, 1f, fade);
+                DrawArc(at, 10 + t * 5, facing + Mathf.Pi - .9f, facing + Mathf.Pi + .9f, 10, new Color(.07f, .1f, .14f, fade), 5, true);
+                DrawArc(at, 10 + t * 5, facing + Mathf.Pi - .9f, facing + Mathf.Pi + .9f, 10, steel, 2.5f, true);
+                for (int j = 0; j < 5; j++)
+                {
+                    float angle = facing + Mathf.Pi + (Variation(e.Seed, j) - .5f) * 1.8f;
+                    var ray = new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .7f);
+                    DrawLine(at + ray * (9 + t * 16), at + ray * (13 + t * 24), new Color(1f, .96f, .7f, fade), 2);
+                }
+                break;
+            }
+            case CombatEffectKind.Splash:
+            {
+                // A lobbed glob bursting on the ground: a ring to its edge and droplets thrown up.
+                var c = new Color(.72f, .95f, .3f);
+                float radius = Math.Max(16, e.Size);
+                float eased = 1 - (1 - t) * (1 - t);
+                DrawSetTransform(e.Anchor, 0, new Vector2(1, .5f));
+                DrawArc(Vector2.Zero, radius * (.35f + .65f * eased), 0, Mathf.Tau, 32, new Color(c, fade * .9f), 3.5f, true);
+                if (t < .25f) DrawCircle(Vector2.Zero, radius * .6f, new Color(1, 1, .8f, (1 - t / .25f) * .5f));
+                DrawSetTransform(Vector2.Zero);
+                for (int j = 0; j < 7; j++)
+                {
+                    float angle = Variation(e.Seed, j) * Mathf.Tau, throwOut = radius * (.3f + .6f * Variation(e.Seed, j + 9)) * eased;
+                    float rise = (14 + 14 * Variation(e.Seed, j + 17)) * MathF.Sin(t * Mathf.Pi);
+                    DrawCircle(e.Anchor + new Vector2(MathF.Cos(angle) * throwOut, MathF.Sin(angle) * throwOut * .5f - rise), 2.6f * (1 - t) + 1, new Color(c, fade + .15f));
+                }
+                break;
+            }
+            case CombatEffectKind.Ripple:
+            {
+                // A noise that something heard: thin rings spreading over the ground from where it was.
+                var c = new Color(.8f, .9f, 1f);
+                DrawSetTransform(e.Anchor, 0, new Vector2(1, .5f));
+                for (int ring = 0; ring < 3; ring++)
+                {
+                    float u = Math.Clamp(t * 1.3f - ring * .2f, 0, 1);
+                    if (u <= 0) continue;
+                    DrawArc(Vector2.Zero, 6 + u * 26, 0, Mathf.Tau, 24, new Color(c, (1 - u) * .55f), 1.6f, true);
+                }
+                DrawSetTransform(Vector2.Zero);
+                break;
+            }
+            case CombatEffectKind.Mend:
+            {
+                // Green crosses rising off the body.
+                var c = new Color(.5f, 1f, .62f);
+                for (int j = 0; j < 5; j++)
+                {
+                    float u = Math.Clamp(t * 1.4f - Variation(e.Seed, j) * .4f, 0, 1);
+                    if (u <= 0 || u >= 1) continue;
+                    var at = e.Anchor + new Vector2((Variation(e.Seed, j + 5) - .5f) * 26, -8 - u * 34);
+                    float arm = 3.2f * (1 - u * .4f);
+                    DrawLine(at + new Vector2(-arm, 0), at + new Vector2(arm, 0), new Color(.05f, .16f, .08f, (1 - u) * .9f), 3.6f);
+                    DrawLine(at + new Vector2(0, -arm), at + new Vector2(0, arm), new Color(.05f, .16f, .08f, (1 - u) * .9f), 3.6f);
+                    DrawLine(at + new Vector2(-arm, 0), at + new Vector2(arm, 0), new Color(c, 1 - u), 1.8f);
+                    DrawLine(at + new Vector2(0, -arm), at + new Vector2(0, arm), new Color(c, 1 - u), 1.8f);
+                }
+                break;
+            }
+            case CombatEffectKind.Shaken:
+            {
+                // A jagged shiver over the head.
+                var c = new Color(.6f, .82f, 1f, fade);
+                var head = e.Anchor + new Vector2(0, -50);
+                for (int j = 0; j < 3; j++)
+                {
+                    float x = (j - 1) * 9;
+                    DrawPolyline(new[] { head + new Vector2(x - 2, -6 - t * 8), head + new Vector2(x + 2, -2 - t * 8), head + new Vector2(x - 2, 2 - t * 8), head + new Vector2(x + 2, 6 - t * 8) }, c, 1.8f);
+                }
+                break;
+            }
+            case CombatEffectKind.Word:
+            {
+                if (string.IsNullOrEmpty(e.Text)) break;
+                var font = ThemeDB.FallbackFont;
+                const int size = 11;
+                float rise = 1 - (1 - t) * (1 - t);
+                float alpha = t < .7f ? 1 : 1 - (t - .7f) / .3f;
+                // A quick overshoot as it appears, then it drifts up.
+                float scale = t < .14f ? .6f + .6f * (t / .14f) : 1.2f - .2f * Math.Clamp((t - .14f) / .12f, 0, 1);
+                float width = font.GetStringSize(e.Text, HorizontalAlignment.Left, -1, size).X;
+                DrawSetTransform(e.Anchor + new Vector2(0, -62 - rise * 16), 0, new Vector2(scale, scale));
+                var origin = new Vector2(-width / 2, 0);
+                DrawStringOutline(font, origin, e.Text, HorizontalAlignment.Left, -1, size, 4, new Color(.06f, .05f, .05f, alpha * .9f));
+                DrawString(font, origin, e.Text, HorizontalAlignment.Left, -1, size, new Color(e.Tint, alpha));
+                DrawSetTransform(Vector2.Zero);
+                break;
+            }
             case CombatEffectKind.Guarded:
             {
                 var c = new Color(.72f, .82f, .92f, fade);
@@ -189,7 +303,8 @@ public partial class CombatEffects : Node2D
             float t = Math.Clamp(e.Age / e.Lifetime, 0, 1);
             float fade = (1 - t) * (1 - t);
             Vector2 at = e.Anchor + new Vector2(0, e.Kind == CombatEffectKind.Death ? -7 : -12);
-            if (e.Kind is CombatEffectKind.Alert or CombatEffectKind.GuardBreak or CombatEffectKind.Crash or CombatEffectKind.Rally or CombatEffectKind.Guarded)
+            if (e.Kind is CombatEffectKind.Alert or CombatEffectKind.GuardBreak or CombatEffectKind.Crash or CombatEffectKind.Rally or CombatEffectKind.Guarded or
+                CombatEffectKind.Blocked or CombatEffectKind.Splash or CombatEffectKind.Ripple or CombatEffectKind.Mend or CombatEffectKind.Shaken or CombatEffectKind.Word)
             { DrawBehaviour(e, t, fade); continue; }
             Color c = e.Kind switch
             {

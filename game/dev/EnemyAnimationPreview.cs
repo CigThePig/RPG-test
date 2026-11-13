@@ -45,6 +45,9 @@ public static class EnemyAnimationPreview
         new("search", 2.4, m => m.SnapStance(StanceKind.Search)),
         new("flee", 1.0, m => m.SnapStance(StanceKind.Flee), (m, t) => m.SetWorldPosition(new Vec3(80 * t, 0, 0), new Vec3(80, 0, 0))),
         new("enraged", 1.2, m => m.SnapStance(StanceKind.Enraged)),
+        new("guard", 1.2, m => m.SnapStance(StanceKind.Guard)),
+        new("block", .5, m => { m.SnapStance(StanceKind.Guard); m.TriggerReaction(ReactionKind.Block); }, Lead: .1),
+        new("cower", .8, m => { m.SnapStance(StanceKind.Flee); m.TriggerReaction(ReactionKind.Cower); }, Lead: .1),
         new("bite", Total("bite"), Attack("bite"), Lead: .2),
         new("pounce", Total("pounce"), Attack("pounce"), Lead: .2),
         new("slam", Total("slam"), Attack("slam"), Lead: .2),
@@ -61,6 +64,11 @@ public static class EnemyAnimationPreview
         new("gust", Total("gust"), Attack("gust"), Lead: .2),
         new("spit", Total("spit"), Attack("spit"), Lead: .2),
         new("screech", Total("screech"), Attack("screech"), Lead: .2),
+        new("pincer", Total("pincer"), Attack("pincer"), Lead: .2),
+        new("coil", Total("coil"), Attack("coil"), Lead: .2),
+        new("fang", Total("fang"), Attack("fang"), Lead: .2),
+        new("lash", Total("lash"), Attack("lash"), Lead: .2),
+        new("glob", Total("glob"), Attack("glob"), Lead: .2),
         new("hit", .5, m => { m.SnapStance(StanceKind.Combat); m.TriggerHit(new Vec3(1, 0, .3)); }, Lead: .1),
         new("guard break", .8, m => { m.SnapStance(StanceKind.Combat); m.TriggerHit(new Vec3(1, 0, 0), 1.4); m.TriggerReaction(ReactionKind.Reel); }, Lead: .1),
         new("evade", CombatTuning.EvadeDuration + .15, m => m.SnapStance(StanceKind.Combat), (m, t) =>
@@ -78,7 +86,8 @@ public static class EnemyAnimationPreview
     public static readonly (string Label, string Family, ulong Seed)[] Subjects =
     {
         ("prowler", "quadruped", 42), ("brute", "reptile", 43), ("spitter", "amorphous", 44),
-        ("stalker", "arthropod", 46), ("howler", "winged", 47), ("wayfarer", "biped", 42), ("serpent", "serpent", 5), ("swimmer", "aquatic", 9),
+        ("stalker", "arthropod", 46), ("howler", "winged", 47), ("wayfarer", "biped", 42), ("lasher", "serpent", 5), ("swimmer", "aquatic", 9),
+        ("shellback", "arthropod", 49), ("mender", "plantfolk", 50),
     };
 
     /// <summary>Simulate one clip and return the rasterized frames, evenly spaced.</summary>

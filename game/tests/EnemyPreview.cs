@@ -113,6 +113,62 @@ public static class EnemyPreview
             await Wait(app, 22); await Shot(app, "15-death-falling");
             await Wait(app, 80); await Shot(app, "16-death-settled");
 
+            // Senses: a den with two asleep and one on watch; the cone and earshot rings show what each can perceive.
+            cast = Stage(app, "sleepers", (215, -50, -1), (110, 34, 1), (150, 72, 1));
+            foreach (var a in cast.Skip(1)) a.Sleeper = true;
+            cast[0].NextTacticalTime = w.Time + 5;
+            await Wait(app, 70); await Shot(app, "18-sleepers");
+
+            // A roll behind a prowler's back: it heard something and goes to look.
+            cast = Stage(app, "prowler", (66, 0, 1));
+            cast[0].NextTacticalTime = w.Time + .6;
+            await Wait(app, 20);
+            w.Cancel(P()); P().Cooldowns.Clear(); w.TryStartPlayerDodge(new V(0, 1));
+            await Wait(app, 16); await Shot(app, "19-heard");
+
+            // A slain packmate found: the finder searches and warns the others.
+            cast = Stage(app, "pack", (150, 0, -1), (215, 40, 1), (90, 10, -1));
+            cast[0].NextTacticalTime = cast[1].NextTacticalTime = w.Time + 3;
+            cast[2].Invulnerable = 0; P().X -= 400; w.Damage(P(), cast[2], 10000, "physical", ability: "slash");
+            foreach (var a in cast.Take(2)) { EnemyMind.Calm(a); a.Knowledge.Remove(cast[2].Id); a.Cooldowns.Clear(); a.NextTacticalTime = 0; }
+            cast[3].Region = "reach";
+            P().X += 400; P().Y += 150; app.Views["player"].SnapPosition();
+            await Until(app, () => cast[0].Awareness == Awareness.Searching, 300); await Wait(app, 14); await Shot(app, "20-found-body");
+
+            // The shell: turned from the front, open from behind.
+            cast = Stage(app, "shellback", (36, 0, -1));
+            await Until(app, () => cast[0].Awareness == Awareness.Engaged);
+            cast[0].NextTacticalTime = w.Time + 2;
+            w.Damage(P(), cast[0], 22, "physical", ability: "slash"); await Wait(app, 8); await Shot(app, "21-shell-blocked");
+            P().X = cast[0].X + 34; P().Y = cast[0].Y + 6; app.Views["player"].SnapPosition(); cast[0].NextTacticalTime = w.Time + 2;
+            await Wait(app, 14); await Shot(app, "22-shell-flanked");
+
+            // A lobbed glob: warned on the ground while it flies, then a pool.
+            cast = Stage(app, "spitter", (150, 0, -1));
+            await Until(app, () => cast[0].Awareness == Awareness.Engaged);
+            w.Cancel(cast[0]); cast[0].Cooldowns.Clear(); w.Activate(cast[0].Id, "glob", P().Id);
+            await Until(app, () => w.Hazards.Count == 1 && w.Hazards[0].Fuse < .4f); await Shot(app, "23-glob-flight");
+            await Until(app, () => w.Hazards.Count == 1 && w.Hazards[0].Landed); await Wait(app, 5); await Shot(app, "24-glob-splash");
+            await Wait(app, 60); await Shot(app, "25-pool");
+
+            cast = Stage(app, "lasher", (34, 0, -1));
+            await Until(app, () => cast[0].PendingAbility == "coil" && cast[0].StateRemaining < .25f, 900); await Shot(app, "26-coil");
+
+            // A mender tending a wounded ally.
+            cast = Stage(app, "mender", (130, -40, -1), (60, 20, -1), (70, 60, -1));
+            await Until(app, () => cast.All(a => a.Awareness == Awareness.Engaged));
+            foreach (var a in cast.Where(a => a.CombatProfile == "prowler")) a.Health = a.MaxHealth * .35f;
+            rallied = false; w.Presentation += Heard;
+            try { await Until(app, () => rallied, 900); } finally { w.Presentation -= Heard; }
+            await Wait(app, 16); await Shot(app, "27-mender-bloom");
+
+            // The alpha falls and the pack breaks.
+            cast = Stage(app, "alpha", (60, 0, -1), (80, -40, -1), (85, 40, -1), (110, 0, -1));
+            await Until(app, () => cast.All(a => a.Awareness == Awareness.Engaged)); await Wait(app, 30); await Shot(app, "28-alpha-pack");
+            var alpha = cast.First(a => a.CombatProfile == "alpha");
+            alpha.Invulnerable = 0; w.Damage(P(), alpha, 10000, "physical", ability: "slash");
+            await Wait(app, 26); await Shot(app, "29-rout");
+
             // Losing the quarry: the player vanishes beyond the lab's dividing wall.
             cast = Stage(app, "prowler", (90, 0, -1));
             await Until(app, () => cast[0].Awareness == Awareness.Engaged);

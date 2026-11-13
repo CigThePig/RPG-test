@@ -4,23 +4,29 @@ namespace Mosslight;
 
 /// <summary>
 /// Marks above a non-player actor that say what it knows and how it stands: a filling "?"
-/// while suspicious, a "!" as it raises the alarm, a pale "?" while it searches, a guard bar
-/// for foes that shrug off blows, and circling stars while dazed. Reads actor state only.
+/// while suspicious, a "!" as it raises the alarm, a pale "?" while it searches (with sound
+/// arcs when a noise drew it), drifting "z"s while it sleeps, an open eye while it is still on
+/// edge, falling drops while its nerve is broken, a guard bar for foes that shrug off blows,
+/// circling stars while dazed and a small crest over a pack's leader. Reads actor state only.
 /// </summary>
 public partial class ActorOverlay : Node2D
 {
     public CharacterView View { get; set; } = null!;
-    float clock, pop = 10, lost = 10, guardFlash = 10;
+    float clock, pop = 10, lost = 10, guardFlash = 10, heard = 10;
     Awareness shown;
 
     /// <summary>The alarm was just raised: the mark jumps before settling.</summary>
     public void Pop() { pop = 0; QueueRedraw(); }
+    /// <summary>A noise just drew its attention: sound arcs beside the mark for a moment.</summary>
+    public void Heard() { heard = 0; QueueRedraw(); }
     /// <summary>The guard was just broken: the bar flashes empty.</summary>
     public void GuardBroken() { guardFlash = 0; QueueRedraw(); }
 
     public bool Showing { get; private set; }
-    /// <summary>Which mark is up, for verification: "", "?", "!", "search", "home".</summary>
+    /// <summary>Which mark is up, for verification: "", "?", "!", "search", "home", "sleep", "wary", "shaken".</summary>
     public string Glyph { get; private set; } = "";
+    public bool LeaderVisible { get; private set; }
+    public bool HeardVisible => Glyph == "search" && heard < 1.2f;
     public bool GuardVisible { get; private set; }
     public bool DazeVisible { get; private set; }
 
@@ -28,7 +34,7 @@ public partial class ActorOverlay : Node2D
     {
         if (View?.State == null || View.Creature.Paused) return;
         float dt = (float)delta;
-        clock += dt; pop += dt; lost += dt; guardFlash += dt;
+        clock += dt; pop += dt; lost += dt; guardFlash += dt; heard += dt;
         var a = View.State;
         if (a.Awareness != shown)
         {
@@ -39,18 +45,19 @@ public partial class ActorOverlay : Node2D
         {
             Awareness.Suspicious => "?",
             Awareness.Alerted => "!",
-            Awareness.Engaged => pop < .9f ? "!" : "",
+            Awareness.Engaged => pop < .9f ? "!" : a.Cooldowns.GetValueOrDefault("rout") > 0 ? "shaken" : "",
             Awareness.Searching => "search",
             Awareness.Returning => lost < 1.4f ? "home" : "",
-            _ => ""
+            _ => EnemyMind.Asleep(a) ? "sleep" : a.Cooldowns.GetValueOrDefault("wary") > 0 && a.CombatProfile != "" ? "wary" : ""
         };
         var profile = View.World?.FindProfile(a.CombatProfile);
+        bool leader = a.Alive && profile is { Leader: true };
         bool guard = a.Alive && profile is { Poise: > 0 } && a.Awareness is Awareness.Alerted or Awareness.Engaged;
         bool daze = a.Alive && a.State == ActionState.Staggered && a.StateRemaining > .3f;
-        bool showing = glyph != "" || guard || daze;
+        bool showing = glyph != "" || guard || daze || leader;
         // Redraw while anything is up, and once more to clear it.
         if (showing || Showing) QueueRedraw();
-        Showing = showing; Glyph = glyph; GuardVisible = guard; DazeVisible = daze;
+        Showing = showing; Glyph = glyph; GuardVisible = guard; DazeVisible = daze; LeaderVisible = leader;
         Visible = showing;
     }
 
@@ -112,7 +119,61 @@ public partial class ActorOverlay : Node2D
             case "search":
             {
                 float bob = still ? 0 : MathF.Sin(clock * 3.2f) * 1.5f;
-                Question(at + new Vector2(0, bob), new Color(.78f, .86f, .9f, .9f), .9f);
+                var pale = new Color(.78f, .86f, .9f, .9f);
+                Question(at + new Vector2(0, bob), pale, .9f);
+                if (HeardVisible)
+                {
+                    // It heard something: arcs of sound spreading from beside the mark.
+                    float fade = Math.Clamp(1 - heard / 1.2f, 0, 1);
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float reach = 6 + i * 4 + (still ? 0 : Math.Min(1, heard / .4f) * 2);
+                        DrawArc(at + new Vector2(7, -3 + bob), reach, -.75f, .75f, 8, new Color(Ink, fade), 3, true);
+                        DrawArc(at + new Vector2(7, -3 + bob), reach, -.75f, .75f, 8, new Color(pale, fade * (1 - i * .25f)), 1.5f, true);
+                    }
+                }
+                break;
+            }
+            case "sleep":
+            {
+                // Three letters drifting up and away, each smaller than the last.
+                var dusk = new Color(.72f, .8f, 1f);
+                for (int i = 0; i < 3; i++)
+                {
+                    float phase = still ? i / 3f : (clock * .45f + i / 3f) % 1f;
+                    float size = 2.2f + 2.6f * (1 - phase);
+                    var c = at + new Vector2(4 + phase * 12, 4 - phase * 18);
+                    float alpha = MathF.Sin(phase * MathF.PI) * .95f;
+                    var points = new[] { c + new Vector2(-size, -size), c + new Vector2(size, -size), c + new Vector2(-size, size), c + new Vector2(size, size) };
+                    DrawPolyline(points, new Color(Ink, alpha), 3.2f, true);
+                    DrawPolyline(points, new Color(dusk, alpha), 1.5f, true);
+                }
+                break;
+            }
+            case "wary":
+            {
+                // Still on edge: a small open eye.
+                var amber = new Color(1f, .82f, .3f, .85f);
+                var eye = at + new Vector2(0, -1);
+                DrawArc(eye + new Vector2(0, 5), 8, -Mathf.Pi * .78f, -Mathf.Pi * .22f, 8, new Color(Ink, .8f), 3.4f, true);
+                DrawArc(eye + new Vector2(0, -5), 8, Mathf.Pi * .22f, Mathf.Pi * .78f, 8, new Color(Ink, .8f), 3.4f, true);
+                DrawArc(eye + new Vector2(0, 5), 8, -Mathf.Pi * .78f, -Mathf.Pi * .22f, 8, amber, 1.5f, true);
+                DrawArc(eye + new Vector2(0, -5), 8, Mathf.Pi * .22f, Mathf.Pi * .78f, 8, amber, 1.5f, true);
+                float look = still ? 0 : MathF.Sin(clock * 1.7f) * 2;
+                DrawCircle(eye + new Vector2(look, 0), 1.7f, amber);
+                break;
+            }
+            case "shaken":
+            {
+                // Nerve gone: drops flying off the head.
+                var sweat = new Color(.6f, .82f, 1f);
+                for (int i = 0; i < 3; i++)
+                {
+                    float phase = still ? .3f + i * .2f : (clock * 1.6f + i / 3f) % 1f;
+                    var drop = at + new Vector2((i - 1) * 8 + (i - 1) * phase * 5, 2 - MathF.Sin(phase * MathF.PI) * 7 + phase * 6);
+                    DrawCircle(drop, 2.6f, new Color(Ink, 1 - phase));
+                    DrawCircle(drop, 1.6f, new Color(sweat, 1 - phase));
+                }
                 break;
             }
             case "home":
@@ -126,6 +187,15 @@ public partial class ActorOverlay : Node2D
                 }
                 break;
             }
+        }
+        if (LeaderVisible)
+        {
+            // A small three-pointed crest: this one leads.
+            var gold = new Color(1f, .8f, .32f);
+            var c = new Vector2(-15, -head - 8);
+            var crest = new[] { c + new Vector2(-6, 0), c + new Vector2(-6, -5), c + new Vector2(-3, -2), c + new Vector2(0, -6), c + new Vector2(3, -2), c + new Vector2(6, -5), c + new Vector2(6, 0), c + new Vector2(-6, 0) };
+            DrawPolyline(crest, Ink, 3.2f, true);
+            DrawPolyline(crest, gold, 1.4f, true);
         }
         if (GuardVisible)
         {

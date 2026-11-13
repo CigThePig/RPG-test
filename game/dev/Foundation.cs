@@ -57,6 +57,10 @@ public partial class Foundation : Node2D
         var p=World.Player;p.Region=map.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.State=ActionState.Idle;p.StateRemaining=0;p.PendingAbility="";p.Statuses.Clear();p.Cooldowns.Clear();
         TouchMovement=ControllerVelocity=Vector2.Zero; Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/start-or-reset");
     }
+    /// <summary>Keyboard walking pace while the sneak key is held: under the pace at which steps are heard.</summary>
+    public const float SneakScale = .5f;
+    public SenseView Senses { get; private set; } = null!;
+    public TelegraphView Telegraphs => telegraphs!;
     public string CombatCourseId { get; private set; } = "";
     public void BeginCombatCourse() => BeginCombatCourse("mixed", true);
     public void BeginCombatCourse(string encounter, bool protectedPlayer, ulong seed=42)
@@ -197,6 +201,11 @@ public partial class Foundation : Node2D
             Key.Space
         },
         {
+            // Held: walk softly. A touch stick does the same by being pushed only part of the way.
+            "sneak",
+            Key.Shift
+        },
+        {
             "inventory",
             Key.I
         },
@@ -308,6 +317,7 @@ public partial class Foundation : Node2D
             EnemyAnimationPreview.Write("build/enemy-animation", only: sheets.Contains('=') ? sheets.Split('=',2)[1] : null);
             GetTree().Quit();return;
         }
+        if(OS.GetCmdlineUserArgs().Any(x=>x=="--enemy-encounter-report" || x.StartsWith("--enemy-encounter-report="))) CallDeferred(nameof(RunEncounterReport));
         if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
         if (OS.GetCmdlineUserArgs().Contains("--adventure-visual")) CallDeferred(nameof(RunAdventureVisual));
         if (OS.GetCmdlineUserArgs().Contains("--adventure-check")) CallDeferred(nameof(RunAdventure));
@@ -375,10 +385,13 @@ public partial class Foundation : Node2D
         World.NewGame();
         if (telegraphs == null)
         {
-            telegraphs = new TelegraphView { World = World, ZIndex = -1 };
+            // What enemies can perceive lies under the warnings of what they are about to do.
+            Senses = new SenseView { World = World, ZIndex = -1, ReducedMotion = () => ui?.Preferences.ReducedMotion ?? false };
+            AddChild(Senses);
+            telegraphs = new TelegraphView { World = World, ZIndex = -1, ReducedMotion = () => ui?.Preferences.ReducedMotion ?? false };
             AddChild(telegraphs);
         }
-        else telegraphs.World = World;
+        else { telegraphs.World = World; Senses.World = World; }
         RebuildViews();
         drawnRegion = "";
     }
@@ -456,6 +469,7 @@ public partial class Foundation : Node2D
             while (accumulator >= 1.0 / 60)
             {
                 var v = (Input.GetVector("west", "east", "north", "south") + TouchMovement).LimitLength();
+                if (Input.IsActionPressed("sneak")) v *= SneakScale;
                 // Input describes screen direction; PPC projects ground south at half height.
                 ScreenInput=v;
                 if (World.Player.State == ActionState.Dodging) ControllerVelocity=Vector2.Zero;
@@ -861,6 +875,14 @@ public partial class Foundation : Node2D
     {
         var ruin=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--adventure-ruin="))?.Split('=',2)[1];
         try { new AdventureRun(this){RuinSeed=ruin==null?null:int.Parse(ruin)}.Run(); GetTree().Quit(0); }
+        catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
+    }
+
+    // Balance aid: a scripted duelist fights every lab encounter headlessly and the outcomes are tabulated.
+    public void RunEncounterReport()
+    {
+        var chosen=OS.GetCmdlineUserArgs().First(x=>x.StartsWith("--enemy-encounter-report"));
+        try { EnemyEncounterReport.Write(this,"build",chosen.Contains('=') ? chosen.Split('=',2)[1] : null); GetTree().Quit(0); }
         catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 

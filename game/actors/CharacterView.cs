@@ -18,6 +18,8 @@ public partial class CharacterView : Node2D
     /// <summary>Ground dust for enemy charges, leaps and hops. Presentation only.</summary>
     public RollDustOverlay? Dust { get; private set; }
     public ActorOverlay? Overlay { get; private set; }
+    /// <summary>The player's own mark: how much nearby enemies know.</summary>
+    public StealthMark? Stealth { get; private set; }
     /// <summary>Read-only source of ability and profile definitions for presentation.</summary>
     public World? World { get; set; }
     public Func<bool>? ReducedMotion { get; set; }
@@ -51,6 +53,8 @@ public partial class CharacterView : Node2D
         {
             RollDust = new RollDustOverlay();
             AddChild(RollDust);
+            Stealth = new StealthMark { View = this, ZIndex = 1, Visible = false };
+            AddChild(Stealth);
         }
         else
         {
@@ -80,6 +84,10 @@ public partial class CharacterView : Node2D
     public bool Charging => !State.ActionConnected && State.State == ActionState.Recovery && CurrentAbility is { Charge: { } charge } ability &&
         State.ActionElapsed >= ability.Windup && State.ActionElapsed - ability.Windup < charge.Duration;
 
+    /// <summary>A hard front, raised: blows arriving on it are turned. Down while it recovers or reels.</summary>
+    public bool ShieldUp => State.Alive && World?.FindProfile(State.CombatProfile) is { ShieldArc: > 0 } &&
+        State.Awareness is Awareness.Alerted or Awareness.Engaged && State.State is ActionState.Idle or ActionState.Moving or ActionState.Windup;
+
     // The posture is a pure reading of saved actor state, so a restored view shows the same mood.
     StanceKind ReadStance()
     {
@@ -92,6 +100,7 @@ public partial class CharacterView : Node2D
             case Awareness.Alerted: return StanceKind.Combat;
             case Awareness.Engaged:
                 if (State.Statuses.Any(s => s.Id == "rage")) return StanceKind.Enraged;
+                if (ShieldUp && State.State is ActionState.Idle or ActionState.Moving && State.TacticalIntent is not ("retreat" or "cower")) return StanceKind.Guard;
                 return State.TacticalIntent is "retreat" or "cower" && State.State is ActionState.Idle or ActionState.Moving ? StanceKind.Flee : StanceKind.Combat;
             default: return StanceKind.Relaxed;
         }
@@ -174,7 +183,7 @@ public partial class CharacterView : Node2D
         // A merchant's "rest" schedule means off-duty, not physically slumped
         // or asleep on the path. Reserve the PPC rest pose for other creatures
         // and for an ambusher lying in wait, so starting Reach wardens stand upright.
-        bool visualRest = (State.Activity == "rest" && State.Profession != "merchant") || (State.Activity == "ambush" && State.Awareness == Awareness.Unaware);
+        bool visualRest = (State.Activity == "rest" && State.Profession != "merchant") || (State.Activity == "ambush" && State.Awareness == Awareness.Unaware) || EnemyMind.Asleep(State);
         Creature.Resting = State.Alive && visualRest && (State.State is ActionState.Idle or ActionState.Moving);
         if (State.Alive)
         {
@@ -376,17 +385,43 @@ public partial class CharacterView : Node2D
         "ward" => new Color(.55f, .8f, 1f),
         "rage" => new Color(1f, .3f, .25f),
         "frenzy" => new Color(1f, .85f, .3f),
+        "snare" => new Color(.72f, .55f, .95f),
+        "regrowth" => new Color(.45f, .95f, .6f),
         _ => new Color(1, .6f, .2f)
     };
 
-    // Ground marks under the body: a red ring for rage, an amber one for a rallied frenzy.
+    // The hard front of a shelled foe, drawn on the ground where it faces: bright while it
+    // turns blows, a faint broken line while it is open. It says which side to get round to.
+    void DrawShield()
+    {
+        if (!State.Alive || State.Id == "player" || World?.FindProfile(State.CombatProfile) is not { ShieldArc: > 0 } profile ||
+            State.Awareness is not (Awareness.Alerted or Awareness.Engaged) || (State.FacingX == 0 && State.FacingY == 0)) return;
+        bool up = ShieldUp;
+        float heading = MathF.Atan2(State.FacingY, State.FacingX), half = profile.ShieldArc * MathF.PI / 180, radius = State.Radius + 9;
+        DrawSetTransform(Vector2.Zero, 0, new Vector2(1, .5f));
+        if (up)
+        {
+            DrawArc(Vector2.Zero, radius, heading - half, heading + half, 20, new Color(.07f, .1f, .14f, .85f), 5.5f, true);
+            DrawArc(Vector2.Zero, radius, heading - half, heading + half, 20, new Color(.74f, .88f, 1f, .95f), 2.6f, true);
+        }
+        else
+            for (int i = 0; i < 5; i++)
+            {
+                float from = heading - half + 2 * half * (i + .15f) / 5, to = heading - half + 2 * half * (i + .7f) / 5;
+                DrawArc(Vector2.Zero, radius, from, to, 4, new Color(.74f, .88f, 1f, .35f), 1.6f, true);
+            }
+        DrawSetTransform(Vector2.Zero);
+    }
+
+    // Ground marks under the body: a red ring for rage, an amber one for a rallied frenzy, green while it mends.
     void DrawTemper()
     {
-        bool rage = State.Statuses.Any(s => s.Id == "rage"), frenzy = State.Statuses.Any(s => s.Id == "frenzy");
-        if (!rage && !frenzy) return;
+        DrawShield();
+        bool rage = State.Statuses.Any(s => s.Id == "rage"), frenzy = State.Statuses.Any(s => s.Id == "frenzy"), mending = State.Statuses.Any(s => s.Id == "regrowth");
+        if (!rage && !frenzy && !mending) return;
         bool still = ReducedMotion?.Invoke() == true;
-        float pulse = still ? .5f : .5f + .5f * MathF.Sin(presentationTime * (rage ? 9f : 6f));
-        var color = StatusColor(rage ? "rage" : "frenzy");
+        float pulse = still ? .5f : .5f + .5f * MathF.Sin(presentationTime * (rage ? 9f : mending && !frenzy ? 3.5f : 6f));
+        var color = StatusColor(rage ? "rage" : frenzy ? "frenzy" : "regrowth");
         float radius = State.Radius + 7 + (still ? 0 : pulse * 2);
         DrawSetTransform(Vector2.Zero, 0, new Vector2(1, .5f));
         DrawArc(Vector2.Zero, radius, 0, Mathf.Tau, 28, new Color(.12f, .04f, .03f, .7f), 4, true);
