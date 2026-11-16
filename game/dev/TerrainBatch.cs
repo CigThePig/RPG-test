@@ -22,6 +22,14 @@ public sealed class TerrainBatch : IDisposable
         Add(a,u);Add(b,v);Add(new Vector2(a.X,b.Y),new Vector2(u.X,v.Y));
         void Add(Vector2 p,Vector2 uv){vertices.Add(new Vector3(p.X,p.Y,0));colors.Add(tint ?? Colors.White);uvs.Add(uv);}
     }
+    /// <summary>An untextured quad carrying raw coordinates in UV for a shader to read.</summary>
+    public void Quad(Rect2 destination, Rect2 uv, Color color)
+    {
+        var a=destination.Position;var b=destination.End;var u=uv.Position;var v=uv.End;
+        Add(a,u);Add(new Vector2(b.X,a.Y),new Vector2(v.X,u.Y));Add(b,v);
+        Add(a,u);Add(b,v);Add(new Vector2(a.X,b.Y),new Vector2(u.X,v.Y));
+        void Add(Vector2 p,Vector2 t){vertices.Add(new Vector3(p.X,p.Y,0));colors.Add(color);uvs.Add(t);}
+    }
     public int VertexCount => vertices.Count;
     public long VertexBytes => vertices.Count * (Texture==null?28L:36L);
     public void Dispose() { mesh?.Dispose(); mesh=null; }

@@ -144,7 +144,7 @@ public partial class Foundation : Node2D
     readonly List<FeatureView> features = new();
     readonly List<TerrainWallRow> wallRows = new();
     readonly List<DungeonClutter> clutter = new();
-    readonly List<TownView> town = new();
+    readonly List<Node2D> town = new();
     readonly List<EnvironmentDecoration> decorations = new();
     readonly List<OverworldFlora> flora = new();
     public bool CollisionDebug { get; set; }
@@ -772,7 +772,9 @@ public partial class Foundation : Node2D
         {
             // Paving lies on the turf, under everything that stands.
             ground.AddChild(new TownPaving {Region=r,Plan=plan});
+            foreach (var row in wallRows) { row.Town=plan; row.Region=r; }
             town.AddRange(TownView.Create(plan));
+            town.AddRange(TownRoof.Create(plan,()=>new Vector2(World.Player.X,World.Player.Y),()=>Ui.Preferences.ReducedMotion));
             foreach (var piece in town) actors.AddChild(piece);
         }
         foreach(var decoration in decorations) { actors.RemoveChild(decoration); decoration.QueueFree(); }
@@ -957,6 +959,8 @@ public partial class TerrainView : Node2D
                 // The Living Reach surface is opaque over the complete water footprint.
                 // Avoid a redundant water fill underneath its palette shader.
                 if(Region.Rooms.Count==0 && ((tile==Terrain.Water && OverworldWaterRenderer.UseLivingReach) || (OverworldGroundRenderer.Enabled && tile is Terrain.Grass or Terrain.Earth) || (OverworldRockRenderer.Enabled && tile==Terrain.Rock)))continue;
+                // A town's block houses paint their own floors and walls.
+                if(tile is Terrain.Wall or Terrain.Floor && TownStage.For(Region)!=null)continue;
                 var color = tile switch
                 {
                     Terrain.Water => new Color(.19f, .33f, .35f),

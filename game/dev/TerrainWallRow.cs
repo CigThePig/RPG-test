@@ -11,6 +11,9 @@ public partial class TerrainWallRow : Node2D
     public int[] Columns { get; init; } = Array.Empty<int>();
     /// <summary>The region's shared lookups and wall material; rows without one draw nothing.</summary>
     public DungeonSurface? Surface { get; set; }
+    /// <summary>Overworld rows belong to a town's block houses and take their style from its plan.</summary>
+    public TownPlan? Town { get; set; }
+    public RegionState? Region { get; set; }
     public static double BuildMilliseconds { get; private set; }
     TerrainBatch? batch;
 
@@ -39,13 +42,31 @@ public partial class TerrainWallRow : Node2D
     {
         if(fixtures.Length>0)AddChild(new WallFixtures{Fixtures=fixtures,Seed=Seed});
     }
+    void DrawTown(TownPlan town, RegionState r)
+    {
+        TextureFilter=TextureFilterEnum.Nearest;Material=TownBlocks.Wall;
+        bool Wall(int x,int y)=>x>=0&&y>=0&&x<r.Width&&y<r.Height&&r.Tiles[y*r.Width+x]==Terrain.Wall;
+        foreach (int x in Columns)
+        {
+            if(town.HouseAt(x,Row) is not {} house)continue;
+            var p = GodotConvert.GroundToScreen(x * RegionState.Tile, Row * RegionState.Tile) - Position;
+            int mask=(Wall(x,Row-1)?1:0)|(Wall(x+1,Row)?2:0)|(Wall(x,Row+1)?4:0)|(Wall(x-1,Row)?8:0);
+            batch!.Rect(new Rect2(p+new Vector2(0,-Rise),new Vector2(24,12)),new Color(0,mask/15f,0,house.Wall/16f));
+            if(Wall(x,Row+1))continue;
+            float End(int nx)=>!Wall(nx,Row)?.5f:Wall(nx,Row+1)?1:0;
+            // Only the outer south wall has windows; they would look into the room otherwise.
+            var (window,lit)=Row==house.Y+house.Height-1?TownBlocks.Window(house,r.Seed,x):(false,false);
+            batch.Rect(new Rect2(p+new Vector2(0,12-Rise),new Vector2(24,Rise)),new Color(1,End(x-1),End(x+1),(house.Wall+(window?4:0)+(window&&lit?8:0))/16f));
+        }
+        batch!.Draw(this);
+    }
     public override void _ExitTree() => batch?.Dispose();
     public override void _Draw()
     {
         var timer = System.Diagnostics.Stopwatch.StartNew();
         batch?.Dispose();
         batch = new TerrainBatch();
-        if (Surface == null) return;
+        if (Surface == null) { if (Town != null && Region != null) DrawTown(Town, Region); return; }
         TextureFilter=TextureFilterEnum.Nearest;Material=Surface.Wall;
         var r=Surface.Region;
         bool Solid(int x,int y)=>DungeonArt.Solid(Surface.Masonry,r,x,y);
