@@ -5,8 +5,8 @@ of blocks: a ring of ordinary wall tiles round a floor, with a doorway. Its roof
 and fades away while the wayfarer is inside. Street furniture, furnishings and cobbled paving are painted with
 the Reach's own painter and palette.
 
-This is a kit and a way to stage it. Town generation, saved towns and inhabitants do not exist yet, and
-nothing in the shipped game places a town.
+The kit now has a seeded town generator and saved composition, described below. New standard Reach
+worlds contain a furnished roadside town; no new inhabitant or shop systems are added.
 
 Reference captures of a hand-laid market town are in `docs/town-screenshots/`: `square`, `west`, `east`,
 `south`, `overview`, and `inside-inn`, `inside-chapel`, `inside-cottage`, `inside-smithy`, `inside-barn` with
@@ -70,9 +70,8 @@ plan.Carve(region);                                  // houses become wall and f
 TownStage.Stage(region.Id,plan);                     // then rebuild the region's views
 ```
 
-Carving changes the region's tiles, which are saved like any other terrain. The plan itself (styles, roofs,
-furniture, paving) is presentation: it is not saved and is never read by the simulation. `TownStage` is a
-stand-in until regions can carry a town. A staged plan keeps wild trees, shrubs and flora off its paving and
+Carving changes the region's tiles, which are saved like any other terrain. Generated plans (styles, roofs, furniture and paving) are saved through `RegionState.Town`;
+hand-authored previews can still override them through `TownStage`. A staged plan keeps wild trees, shrubs and flora off its paving and
 furniture, with a clear tile round each house and two before its door.
 
 ## Extending it
@@ -98,3 +97,40 @@ visible, and every other roof still shut.
 
 The fade itself was checked only at its two ends; time is frozen in the checks, so the transition has not been
 watched in motion.
+
+## Seeded towns (generator follow-up)
+
+New standard Reach worlds now call `TownGenerator.Install` after placing the road and its interaction
+features. A private, hashed seed stream varies house widths, depths, plot offsets, door positions, side-plot
+styles and furniture variants. Six plots provide a cottage, stone house, inn, smithy, chapel and barn. The
+inn overlooks a small market with stalls, a well, notice board, benches and lamps. Furnishings reflect each
+building's purpose. Three-tile approaches and a southern return lane join every south-facing door to the
+central street. House rows leave at least four clear tiles for the roof overhang. Town furniture retains the
+kit's noncolliding behaviour; these buildings do not add shop or inn gameplay services.
+
+Only house parcels, their verges and streets are cleared. The original spawn, chest, harvest nodes and ruin
+portal stay in place; the original route continues east into wilderness. Wardens begin by the street, while
+prowlers begin beyond the eastern plots. Custom maps smaller than 48 by 44 tiles retain the original
+roadside clearing. Generation declines a layout if a custom feature occupies a house footprint.
+
+`RegionState.Town` holds a `TownState` with the houses, furniture and paved tile indices. `TownStage.For`
+uses a staged reference plan when present, otherwise this saved composition. Saved terrain remains the
+collision and sight authority: loading never re-carves a town. Missing town data is valid, so existing saves
+keep their old geography; start a new game to see a generated town. Invalid town bounds, styles, furniture,
+paving or disagreement with saved house terrain are rejected before live state changes. Installing twice is
+a no-op. Town RNG is independent of simulation RNG.
+
+`TownGenerationChecks` covers repeated seeds, varied layouts, small and larger maps, reachable interiors,
+sealed-door exclusion, feature access, roof-row spacing, idempotent installation, production save/load,
+invalid saves and the legacy no-town case. `--town-only` also walks through every generated door and back
+out on seeds 1, 42 and 1337, checking that exactly the entered roof opens. It writes phone-sized street,
+overview and interior captures to `docs/generated-town-screenshots/`; CI retains those with the town kit
+captures.
+
+Generator verification on Godot 4.6.1 .NET: `dotnet build` succeeded; the full headless suite passed
+16,207 assertions; focused town suites passed 545 assertions with the maximum production radius; the
+rendered town suite passed all 11 reference houses and 18 generated door entries/exits; the normal-health
+adventure replay completed both quests (12,698 ticks, 68 health remaining). Review images:
+[generated town overview](generated-town-screenshots/seed-42-overview.jpg) and
+[inside the inn](generated-town-screenshots/inside-inn.jpg). Full-resolution PNGs are emitted by the rendered
+check and retained in CI's evidence artifact. The new town has not been tested on the physical S25.

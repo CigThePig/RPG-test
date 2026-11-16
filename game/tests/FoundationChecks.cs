@@ -32,6 +32,7 @@ public static class FoundationChecks
         (nameof(LandmarkChecks), LandmarkChecks.Run),
         (nameof(EnvironmentArtChecks), EnvironmentArtChecks.Run),
         (nameof(TownArtChecks), TownArtChecks.Run),
+        (nameof(TownGenerationChecks), TownGenerationChecks.Run),
         (nameof(OverworldWaterChecks), OverworldWaterChecks.Run),
         (nameof(OverworldGroundChecks), (_, check) => OverworldGroundChecks.Run(check)),
         (nameof(OverworldPropChecks), OverworldPropChecks.Run),
@@ -315,6 +316,9 @@ public static class FoundationChecks
                 a.X += 1000;
             beast.X = p.X + 25;
             beast.Y = p.Y;
+            // This combat fixture teleports wilderness actors into town. Move their
+            // homes too, so the production leash does not reset the test combat.
+            beast.HomeX = beast.X; beast.HomeY = beast.Y;
             beast.Health = 25;
             beast.Defence = 0;
             Check(!w.Activate(p.Id, "slash", "npc:0"), "friendly-fire target rejected");
@@ -328,6 +332,7 @@ public static class FoundationChecks
             var b = w.Actors["npc:3"];
             b.X = p.X + 25;
             b.Y = p.Y;
+            b.HomeX = b.X; b.HomeY = b.Y;
             b.Health = 10;
             w.Damage(p, b, 100, "physical");
             Check(app.Narrative.Call("completed", 1).AsBool(), "defeat events complete kill quest");

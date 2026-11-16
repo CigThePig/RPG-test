@@ -36,6 +36,7 @@ public static class Persistence
         foreach (var region in s.Regions.Values)
         {
             Landmarks.ValidateSaved(region);
+            TownState.Validate(region);
             if(region.DiscoveredLandmarks == null || region.ExploredTiles == null || region.ExploredTiles.Any(at=>at<0||at>=region.Tiles.Length) ||
                 region.DiscoveredLandmarks.Any(id=>!region.Landmarks.Any(l=>Exploration.Identity(region,l)==id)))
                 throw new InvalidDataException("Invalid saved exploration state");

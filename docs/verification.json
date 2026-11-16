@@ -1,225 +1,225 @@
 {
   "world32x24": {
-    "generationMs": 0.1501,
-    "navigationMs": 0.3951,
+    "generationMs": 0.1574,
+    "navigationMs": 0.2869,
     "cells": 768
   },
   "world64x48": {
-    "generationMs": 0.4979,
-    "navigationMs": 8.0353,
+    "generationMs": 0.6773,
+    "navigationMs": 1.0727,
     "cells": 3072
   },
   "world128x96": {
-    "generationMs": 1.9004,
-    "navigationMs": 3.9658,
+    "generationMs": 1.9302,
+    "navigationMs": 4.9508,
     "cells": 12288
   },
   "regionGenerationMs": [
-    0.5617,
-    0.5474,
-    0.55,
-    0.5717,
-    0.5484,
-    0.5781,
-    0.5814,
-    0.5523,
-    0.7646,
-    0.7628,
-    0.5416,
-    0.5735,
-    0.5522,
-    0.5654,
-    0.5768,
-    0.5532,
-    0.5703,
-    0.5518,
-    0.5458,
-    0.5656,
-    0.5813,
-    0.5568,
-    0.5775,
-    0.5486,
-    0.5157,
-    0.5125,
-    0.5212,
-    0.6523,
-    0.5021,
-    0.4972
+    0.647,
+    1.4071,
+    0.5465,
+    0.623,
+    0.6157,
+    0.5938,
+    0.5756,
+    0.7079,
+    0.5467,
+    1.0126,
+    0.7223,
+    0.636,
+    1.3069,
+    1.0795,
+    0.6255,
+    0.7672,
+    0.583,
+    0.5969,
+    0.9246,
+    0.5423,
+    1.1052,
+    0.5686,
+    0.9748,
+    0.908,
+    0.7371,
+    0.7633,
+    0.5488,
+    0.7285,
+    0.6361,
+    0.7
   ],
   "dungeons": [
     {
       "seed": 0,
-      "milliseconds": 48.0085,
-      "tiles": 980
+      "milliseconds": 49.3916,
+      "tiles": 5780
     },
     {
       "seed": 1,
-      "milliseconds": 5.2324,
-      "tiles": 784
+      "milliseconds": 8.16,
+      "tiles": 4624
     },
     {
       "seed": 2,
-      "milliseconds": 16.968,
-      "tiles": 588
+      "milliseconds": 12.041,
+      "tiles": 3468
     },
     {
       "seed": 3,
-      "milliseconds": 10.0097,
-      "tiles": 980
+      "milliseconds": 9.0769,
+      "tiles": 5780
     },
     {
       "seed": 4,
-      "milliseconds": 15.789,
-      "tiles": 1176
+      "milliseconds": 15.6536,
+      "tiles": 6936
     },
     {
       "seed": 5,
-      "milliseconds": 48.0191,
-      "tiles": 1470
+      "milliseconds": 31.457,
+      "tiles": 8670
     },
     {
       "seed": 6,
-      "milliseconds": 211.6047,
-      "tiles": 784
+      "milliseconds": 161.8758,
+      "tiles": 4624
     },
     {
       "seed": 7,
-      "milliseconds": 126.6376,
-      "tiles": 784
+      "milliseconds": 113.1899,
+      "tiles": 4624
     },
     {
       "seed": 8,
-      "milliseconds": 176.8351,
-      "tiles": 588
+      "milliseconds": 260.7272,
+      "tiles": 3468
     },
     {
       "seed": 9,
-      "milliseconds": 8.8794,
-      "tiles": 735
+      "milliseconds": 8.5703,
+      "tiles": 4335
     },
     {
       "seed": 10,
-      "milliseconds": 27.0323,
-      "tiles": 784
+      "milliseconds": 20.7984,
+      "tiles": 4624
     },
     {
       "seed": 11,
-      "milliseconds": 162.8195,
-      "tiles": 735
+      "milliseconds": 136.2574,
+      "tiles": 4335
     },
     {
       "seed": 12,
-      "milliseconds": 7.7293,
-      "tiles": 588
+      "milliseconds": 12.6446,
+      "tiles": 3468
     },
     {
       "seed": 13,
-      "milliseconds": 31.2022,
-      "tiles": 980
+      "milliseconds": 21.864,
+      "tiles": 5780
     },
     {
       "seed": 14,
-      "milliseconds": 38.0626,
-      "tiles": 980
+      "milliseconds": 50.7946,
+      "tiles": 5780
     },
     {
       "seed": 15,
-      "milliseconds": 24.5605,
-      "tiles": 1176
+      "milliseconds": 25.8527,
+      "tiles": 6936
     },
     {
       "seed": 16,
-      "milliseconds": 141.159,
-      "tiles": 735
+      "milliseconds": 212.0803,
+      "tiles": 4335
     },
     {
       "seed": 17,
-      "milliseconds": 21.4024,
-      "tiles": 735
+      "milliseconds": 13.8893,
+      "tiles": 4335
     },
     {
       "seed": 18,
-      "milliseconds": 10.6114,
-      "tiles": 735
+      "milliseconds": 15.0867,
+      "tiles": 4335
     },
     {
       "seed": 19,
-      "milliseconds": 181.5545,
-      "tiles": 784
+      "milliseconds": 336.3157,
+      "tiles": 4624
     },
     {
       "seed": 20,
-      "milliseconds": 11.2695,
-      "tiles": 588
+      "milliseconds": 16.8189,
+      "tiles": 3468
     },
     {
       "seed": 21,
-      "milliseconds": 19.6111,
-      "tiles": 784
+      "milliseconds": 24.7722,
+      "tiles": 4624
     },
     {
       "seed": 22,
-      "milliseconds": 50.5329,
-      "tiles": 1176
+      "milliseconds": 79.0678,
+      "tiles": 6936
     },
     {
       "seed": 23,
-      "milliseconds": 35.8408,
-      "tiles": 784
+      "milliseconds": 65.7935,
+      "tiles": 4624
     },
     {
       "seed": 24,
-      "milliseconds": 127.1964,
-      "tiles": 1715
+      "milliseconds": 234.7393,
+      "tiles": 10115
     },
     {
       "seed": 25,
-      "milliseconds": 28.3535,
-      "tiles": 980
+      "milliseconds": 43.579,
+      "tiles": 5780
     },
     {
       "seed": 26,
-      "milliseconds": 98.1625,
-      "tiles": 441
+      "milliseconds": 257.2985,
+      "tiles": 2601
     },
     {
       "seed": 27,
-      "milliseconds": 23.4775,
-      "tiles": 980
+      "milliseconds": 48.1656,
+      "tiles": 5780
     },
     {
       "seed": 28,
-      "milliseconds": 6.3559,
-      "tiles": 588
+      "milliseconds": 9.4267,
+      "tiles": 3468
     },
     {
       "seed": 29,
-      "milliseconds": 5.1112,
-      "tiles": 588
+      "milliseconds": 13.6452,
+      "tiles": 3468
     }
   ],
   "simulation16": {
     "ticks": 600,
-    "milliseconds": 122.0003,
-    "msPerTick": 0.20333383333333332,
-    "managedBytes": 46301104,
-    "saveBytes": 97952
+    "milliseconds": 97.8214,
+    "msPerTick": 0.16303566666666666,
+    "managedBytes": 46996640,
+    "saveBytes": 121799
   },
   "simulation64": {
     "ticks": 600,
-    "milliseconds": 606.7758,
-    "msPerTick": 1.011293,
-    "managedBytes": 38596568,
-    "saveBytes": 162837
+    "milliseconds": 492.6955,
+    "msPerTick": 0.8211591666666667,
+    "managedBytes": 36532712,
+    "saveBytes": 206223
   },
   "simulation128": {
     "ticks": 600,
-    "milliseconds": 1171.5393,
-    "msPerTick": 1.9525655,
-    "managedBytes": 29449888,
-    "saveBytes": 249386
+    "milliseconds": 1161.2569,
+    "msPerTick": 1.9354281666666668,
+    "managedBytes": 39317664,
+    "saveBytes": 318847
   },
-  "assertions": 3739,
-  "elapsedSeconds": 12.0602923,
-  "environment": "Linux AMD EPYC 7763 64-Core Processor \u00B7 Godot 4.6.1-stable (official)"
+  "assertions": 16207,
+  "elapsedSeconds": 78.2099244,
+  "environment": "Linux INTEL(R) XEON(R) PLATINUM 8573C \u00B7 Godot 4.6.1-stable (official)"
 }

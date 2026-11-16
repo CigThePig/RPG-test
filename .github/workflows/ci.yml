@@ -62,6 +62,7 @@ jobs:
             docs/overworld-screenshots/
             docs/dungeon-screenshots/
             docs/town-screenshots/
+            docs/generated-town-screenshots/
             build/overworld/
             docs/audio-samples/
             docs/verification.json
