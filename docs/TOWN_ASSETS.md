@@ -28,8 +28,8 @@ with the doorway in its south wall. `TownPlan.Carve` writes it into the region a
 `Terrain.Floor`, so collision, line of sight and pathing work with no town-specific rules: walls block, the
 doorway is the only way in.
 
-Houses are drawn at the character's scale: walls stand 44 pixels (`TownBlocks.Rise`), a little taller than a
-standing character, and the doorway opening is 34 pixels under a transom.
+Houses are drawn at the character's scale: walls stand 40 pixels (`TownBlocks.Rise`), the height of a
+standing character, and the doorway opening is 32 pixels under a transom.
 
 - **Outside.** `TownRoof` is the shell of the house: a full-height front wall with windows (some lit) and a
   dark doorway with the door standing open, and above it a hipped roof seen from above. It sits in the actor
@@ -44,8 +44,9 @@ standing character, and the doorway opening is 34 pixels under a transom.
   front wall, chimney and doorway shadow fade out over about a fifth of a second, and fade back on leaving.
   Other houses stay shut. Reduced motion switches at once.
 
-A house's shell rises 54 pixels above its back wall. Leave five clear rows between the back of one house and
-the front of the next (or a road), or the nearer roof will stand over them.
+A house's shell rises 48 pixels above its back wall: exactly four tile rows. Leave four clear rows between
+the back of one house and the front of the next (or a road), or the nearer roof will stand over them. The
+generated towns' plots already do.
 
 ## Furniture
 

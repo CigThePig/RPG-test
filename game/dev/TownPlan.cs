@@ -83,12 +83,12 @@ public static class TownBlocks
         new("4a3426"),new("6a4c34"),new("82613f"),new("9a784f"),
         new("5f4f38"),new("786447"),new("c4a455")};
     /// <summary>Height of a house wall on screen: a little taller than a standing character.</summary>
-    public const int Rise=44;
+    public const int Rise=40;
     static ShaderMaterial? wall,floor;
     static Shader? roof;
     static ShaderMaterial Shared(string path)
     {
-        var material=new ShaderMaterial{Shader=GD.Load<Shader>(path)};material.SetShaderParameter("town_palette",Ramp);return material;
+        var material=new ShaderMaterial{Shader=GD.Load<Shader>(path)};material.SetShaderParameter("town_palette",Ramp);material.SetShaderParameter("wall_rise",(float)Rise);return material;
     }
     public static ShaderMaterial Wall=>wall??=Shared("res://game/art/town_wall.gdshader");
     public static ShaderMaterial Floor=>floor??=Shared("res://game/art/town_floor.gdshader");
@@ -138,9 +138,9 @@ public partial class TownRoof : Node2D
 {
     public const float FadeSeconds=.22f;
     /// <summary>How far the roof stands above the wall heads; furniture within stays under it.</summary>
-    public const int Loft=10;
+    public const int Loft=8;
     /// <summary>Height of the doorway opening under its transom.</summary>
-    public const int DoorHeight=34;
+    public const int DoorHeight=32;
     public TownHouse House {get;init;}
     public int Seed {get;init;}
     /// <summary>The wayfarer's ground position.</summary>

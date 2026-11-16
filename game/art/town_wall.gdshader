@@ -7,7 +7,7 @@ render_mode unshaded;
 // 15; on a face, g and b are its left and right ends (0 continues, 0.5 stops, 1 inside
 // corner); a carries the style (0 timber, 1 stone, 2 plank), +4 for a window, +8 if lit, over 16.
 uniform vec4 town_palette[35];
-uniform float wall_rise=44.0;
+uniform float wall_rise=40.0;
 uniform float wall_alpha=1.0;
 varying vec2 place;
 varying vec4 flags;
@@ -38,9 +38,9 @@ void fragment(){
             t=6;if(grit>0.94)t=5;if(h<6.0)t=5;
             if(h<3.0)t=h<1.0?1:h<2.0?3:2;
             if(lx<2.0)t=lx<1.0?3:2;
-            if(h>=20.0&&h<22.0&&!window)t=h<21.0?3:2;
-            if(!window&&h>=3.0&&h<20.0&&lx==floor(4.0+(20.0-h)*0.9))t=2;
-            if(!window&&h>=22.0&&foot>5.0&&lx==12.0)t=2;
+            if(h>=19.0&&h<21.0&&!window)t=h<20.0?3:2;
+            if(!window&&h>=3.0&&h<19.0&&lx==floor(4.0+(19.0-h)*0.9))t=2;
+            if(!window&&h>=21.0&&foot>5.0&&lx==12.0)t=2;
             if(foot<=5.0)t=foot>4.0?11:foot>1.0?(mod(tx*24.0+lx,9.0)<1.0?8:10):8;
         }else if(style==1){
             float course=floor(h/5.0),cy=h-course*5.0;
@@ -56,15 +56,15 @@ void fragment(){
             t=town_hash(vec2(board,3.0))>0.5?3:2;
             if(mod(lx,4.0)>=3.0)t=1;
             if(h<3.0)t=h<1.0?1:2;if(h>=3.0&&h<6.0&&t>1)t-=1;
-            if(h>=22.0&&h<24.0)t=h<23.0?4:1;
+            if(h>=20.0&&h<22.0)t=h<21.0?4:1;
             if(foot<=3.0)t=foot>2.0?9:8;
         }
-        if(window&&lx>=5.0&&lx<19.0&&h>=9.0&&h<27.0){
-            bool frame=lx<6.0||lx>=18.0||h<10.0||h>=26.0||lx==12.0||h==17.0;
-            t=frame?(style==1?8:1):lit?(h<13.0?14:13):15;
-            if(!frame&&!lit&&lx+h==27.0)t=25;
+        if(window&&lx>=5.0&&lx<19.0&&h>=8.0&&h<25.0){
+            bool frame=lx<6.0||lx>=18.0||h<9.0||h>=24.0||lx==12.0||h==16.0;
+            t=frame?(style==1?8:1):lit?(h<12.0?14:13):15;
+            if(!frame&&!lit&&lx+h==26.0)t=25;
             // Sill.
-            if(h>=26.0)t=style==1?12:4;
+            if(h>=24.0)t=style==1?12:4;
         }
         // Ends: a lit corner post or quoin on the left, shade on the right and in inside corners.
         if(flags.g>0.25&&flags.g<0.75&&lx<2.0)t=style==1?12:4;
