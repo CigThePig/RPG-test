@@ -31,7 +31,10 @@ public static class WallDepthChecks
             Engine.TimeScale=0;w.Projectiles.Clear();w.Cancel(w.Player);
             var p=w.Player;
             // A real two-row wall with safe floor on either side, from the first seed that has one.
-            bool Fixture(RegionState region,int at) => at%region.Width is >2 && at%region.Width<region.Width-3 && region.Tiles[at]==Terrain.Wall && region.Tiles[at+region.Width]==Terrain.Wall &&
+            // Built masonry only: a landmark's structural prop blocks like wall but is drawn as the prop.
+            var structural=new Dictionary<RegionState,HashSet<int>>();
+            bool Masonry(RegionState region,int at) => region.Tiles[at]==Terrain.Wall && !(structural.TryGetValue(region,out var props)?props:structural[region]=DungeonArt.PropTiles(region)).Contains(at);
+            bool Fixture(RegionState region,int at) => at%region.Width is >2 && at%region.Width<region.Width-3 && Masonry(region,at) && Masonry(region,at+region.Width) &&
                 region.Tiles[at-region.Width]==Terrain.Floor && region.Tiles[at+2*region.Width]==Terrain.Floor &&
                 region.CanStand(new V(region.Center(at).X,at/region.Width*24-p.Radius-1),p) &&
                 region.CanStand(new V(region.Center(at).X,(at/region.Width+2)*24+p.Radius+1),p);

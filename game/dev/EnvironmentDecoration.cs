@@ -7,7 +7,6 @@ public partial class EnvironmentDecoration : Node2D
     public const int Maximum = 96;
     public Texture2D? Texture { get; init; }
     public Vector2 Pivot { get; init; }
-    public bool Rubble { get; init; }
     public int ReachModule {get;init;}=-1;
     public int PropModule { get; init; } = -1;
     public static List<EnvironmentDecoration> Create(RegionState r, Dictionary<string,Texture2D> art)
@@ -23,7 +22,9 @@ public partial class EnvironmentDecoration : Node2D
             if(asset<0)continue;
             result.Add(new EnvironmentDecoration {
                 Position=GodotConvert.GroundToScreen((room.OriginX+a.X+.5f)*24,(room.OriginY+a.Y+1f)*24),
-                PropModule=(Array.IndexOf(Landmarks.Themes,room.Theme)*5+asset)*3+a.Variant,
+                // Templates author one variant; coordinates pick the wear so rooms do not repeat.
+                PropModule=DungeonPropArt.Structural((DungeonProp)asset,Array.IndexOf(Landmarks.Themes,room.Theme),
+                    a.Variant+(int)(EnvironmentStyle.Hash(r.Seed,room.OriginX+a.X,room.OriginY+a.Y,9730)%3)),
                 TextureFilter=TextureFilterEnum.Nearest });
         }
         if(result.Count>Maximum)throw new InvalidDataException("Saved landmark exceeds architectural node budget");
@@ -32,10 +33,10 @@ public partial class EnvironmentDecoration : Node2D
             {
                 int at=y*r.Width+x;var tile=r.Tiles[at];
                 uint h=EnvironmentStyle.Hash(r.Seed,x,y,99);
-                if(tile is not (Terrain.Grass or Terrain.Floor) || h%29!=0)continue;
+                // Ruins scatter their own clutter; see DungeonDressing.
+                if(tile!=Terrain.Grass || h%29!=0)continue;
                 // Keep all feature stands, doorway lanes and arrival clear of tall silhouettes.
                 if(r.Features.Keys.Any(f=>Math.Abs(f%r.Width-x)<3 && Math.Abs(f/r.Width-y)<3))continue;
-                if(tile==Terrain.Floor && !RubbleAllowed(r,x,y))continue;
                 // The Reach leans on its trees; the frozen pre-Part-3 comparison keeps its old mix.
                 bool reach=tile==Terrain.Grass && r.Rooms.Count==0 && OverworldPropAtlas.Enabled;
                 uint pick=reach?(h>>3)%8:99;
@@ -46,35 +47,17 @@ public partial class EnvironmentDecoration : Node2D
                     Position=GodotConvert.GroundToScreen((x+.5f)*24,(y+.5f)*24),
                     ReachModule=tile==Terrain.Grass && r.Rooms.Count==0 && OverworldPropAtlas.Enabled
                         ?OverworldPropArt.Module(key=="tree1"?ReachProp.Tree:key=="rock1"?ReachProp.Rock:ReachProp.Shrub,h>>8):-1,
-                    Texture=tile==Terrain.Grass && !(r.Rooms.Count==0 && OverworldPropAtlas.Enabled)?texture:null, Rubble=tile==Terrain.Floor,
+                    Texture=tile==Terrain.Grass && !(r.Rooms.Count==0 && OverworldPropAtlas.Enabled)?texture:null,
                     Pivot=key=="tree1"?new Vector2(36,100):key=="rock1"?new Vector2(12,16):new Vector2(17,23),
                     TextureFilter=TextureFilterEnum.Nearest
                 });
             }
         return result;
     }
-    // Rubble stays inside rooms, off the core's protected cross and perimeter lanes and
-    // off room edges, so corridors and their doorways read as clear passages.
-    static bool RubbleAllowed(RegionState r,int x,int y)
-    {
-        var room=r.RoomAt(x,y);
-        if(room==null || room.Kind!="room" || !room.Contains(x,y))return false;
-        if(!room.Contains(x-1,y) || !room.Contains(x+1,y) || !room.Contains(x,y-1) || !room.Contains(x,y+1))return false;
-        int lx=x-room.CoreX+1,ly=y-room.CoreY+1;
-        bool Lane(int n) => n is 0 or 1 or 4 or 5 or 6 or 9 or 10;
-        return !(lx is >=0 and <=10 && Lane(lx) || ly is >=0 and <=10 && Lane(ly));
-    }
     public override void _Draw()
     {
-        if(PropModule>=0)DrawTextureRectRegion(EnvironmentAssetCache.Props,new Rect2(-13,-62,26,64),new Rect2(PropModule*26,0,26,64));
+        if(PropModule>=0)DungeonPropAtlas.Draw(this,PropModule,new Vector2(0,-1));
         if(ReachModule>=0)OverworldPropAtlas.Draw(this,ReachModule,Vector2.Zero);
         if(Texture!=null)DrawTexture(Texture,-Pivot);
-        if(Rubble)
-        {
-            DrawRect(new Rect2(-5,-1,11,3),new Color(0,0,0,.15f));
-            DrawColoredPolygon(new[]{new Vector2(-4,0),new Vector2(-3,-4),new Vector2(0,-5),new Vector2(3,-2),new Vector2(3,1)},EnvironmentStyle.Stone);
-            DrawRect(new Rect2(-3,-4,3,1),EnvironmentStyle.Cap);
-            DrawRect(new Rect2(4,-1,3,2),EnvironmentStyle.Shade);
-        }
     }
 }

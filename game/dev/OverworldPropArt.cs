@@ -24,7 +24,19 @@ public static class OverworldPropArt
         new("b9822f"),new("f0c659"),new("fff0b0"),
         new("f3ecd2"),new("d98bb6"),new("c9483e"),new("7d7fd6"),
         new Color(.04f,.08f,.16f,.30f),new Color(.04f,.08f,.16f,.15f),new("172428"),
-        new("c9eedd"),new("86d2c6"),new Color(.07f,.20f,.33f,.55f)};
+        new("c9eedd"),new("86d2c6"),new Color(.07f,.20f,.33f,.55f),
+        // The ruins share this palette: 41-43 iron, 44-47 flame, 48-53 sandstone, 54-56 ward
+        // light, 57-59 bone, 60-62 cloth, 63-64 bindings, 65 parchment, 66-68 clay, 69 ash,
+        // 70-71 daylight.
+        new("23272f"),new("444c56"),new("78828c"),
+        new("c2491d"),new("f08a2c"),new("ffd35a"),new("fff6c8"),
+        new("33282d"),new("54443f"),new("6f5a48"),new("8a7355"),new("a58f66"),new("c9b684"),
+        new("3fb6c4"),new("9fe9ea"),new("e6fffa"),
+        new("8f8873"),new("cfc8ae"),new("efe9d2"),
+        new("5e1f33"),new("9c3443"),new("cf5a55"),
+        new("3d5c8a"),new("3f7f78"),new("d9c9a0"),
+        new("6b3b2c"),new("a05f3c"),new("cf8f58"),
+        new("6d6863"),new("e9f4ff"),new("a9c9e6")};
     const byte Ink=37,Shadow=35,Penumbra=36,Foam=38,Ripple=39,Submerged=40;
     static readonly byte[] Leaf={1,2,2,3,3,4,5,6},Needle={7,7,8,8,9,9,10,4},Airy={2,3,4,4,5,5,6,11},
         Stone={19,20,20,21,21,22,23,24},Bark={12,13,14,14,15,16};
@@ -263,7 +275,7 @@ public static class OverworldPropArt
         }
         p.Tuft(30,100,2);p.Tuft(42,100,2);
     }
-    sealed class Pixels
+    internal sealed class Pixels
     {
         public readonly byte[] Data=new byte[Width*Height];
         public byte At(int x,int y)=>x>=0&&x<Width&&y>=0&&y<Height?Data[y*Width+x]:(byte)0;

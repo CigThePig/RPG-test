@@ -58,6 +58,7 @@ jobs:
             docs/native-screenshots/
             docs/landmark-screenshots/
             docs/overworld-screenshots/
+            docs/dungeon-screenshots/
             build/overworld/
             docs/audio-samples/
             docs/verification.json
