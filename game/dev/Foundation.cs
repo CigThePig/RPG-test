@@ -774,7 +774,7 @@ public partial class Foundation : Node2D
             ground.AddChild(new TownPaving {Region=r,Plan=plan});
             foreach (var row in wallRows) { row.Town=plan; row.Region=r; }
             town.AddRange(TownView.Create(plan));
-            town.AddRange(TownRoof.Create(plan,()=>new Vector2(World.Player.X,World.Player.Y),()=>Ui.Preferences.ReducedMotion));
+            town.AddRange(TownRoof.Create(plan,r.Seed,()=>new Vector2(World.Player.X,World.Player.Y),()=>Ui.Preferences.ReducedMotion));
             foreach (var piece in town) actors.AddChild(piece);
         }
         foreach(var decoration in decorations) { actors.RemoveChild(decoration); decoration.QueueFree(); }

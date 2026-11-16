@@ -83,6 +83,8 @@ public static class TownBlocks
         new("26344f"),new("3b5274"),new("5b7a9e"),new("8fabc4"),
         new("4a3426"),new("6a4c34"),new("82613f"),new("9a784f"),
         new("5f4f38"),new("786447"),new("c4a455")};
+    /// <summary>Height of a house wall on screen: a little taller than a standing character.</summary>
+    public const int Rise=44;
     static ShaderMaterial? wall,floor;
     static Shader? roof;
     static ShaderMaterial Shared(string path)
@@ -91,6 +93,8 @@ public static class TownBlocks
     }
     public static ShaderMaterial Wall=>wall??=Shared("res://game/art/town_wall.gdshader");
     public static ShaderMaterial Floor=>floor??=Shared("res://game/art/town_floor.gdshader");
+    /// <summary>A wall material of its own, for a facade that fades.</summary>
+    public static ShaderMaterial Facade()=>Shared("res://game/art/town_wall.gdshader");
     public static ShaderMaterial Roof()
     {
         roof??=GD.Load<Shader>("res://game/art/town_roof.gdshader");
@@ -129,32 +133,49 @@ public partial class TownView : Node2D
 
 /// <summary>A house's roof, in the actor layer at the house's front edge: characters in
 /// front stand before it, everything within is under it. It fades out while the wayfarer
-/// is inside the house and returns when they leave.</summary>
+/// is inside the house and returns when they leave. The full-height front wall goes with
+/// it, leaving the low inner wall, so the room is seen as a cutaway.</summary>
 public partial class TownRoof : Node2D
 {
     public const float FadeSeconds=.22f;
     /// <summary>How far the roof stands above the wall heads; furniture within stays under it.</summary>
-    public const int Loft=20;
+    public const int Loft=10;
+    /// <summary>Height of the doorway opening under its transom.</summary>
+    public const int DoorHeight=34;
     public TownHouse House {get;init;}
+    public int Seed {get;init;}
     /// <summary>The wayfarer's ground position.</summary>
     public Func<Vector2> Wayfarer {get;init;}=()=>new Vector2(-1,-1);
     public Func<bool> ReducedMotion {get;init;}=()=>false;
     public float Opacity {get;private set;}=1;
     public bool Occupied {get;private set;}
-    readonly TerrainBatch batch=new();
-    ShaderMaterial? material;
+    readonly TerrainBatch batch=new(),front=new();
+    ShaderMaterial? material,facade;
     Rect2 area;
-    public static List<TownRoof> Create(TownPlan plan,Func<Vector2> wayfarer,Func<bool> reducedMotion)
-        =>plan.Houses.Select(house=>new TownRoof{House=house,Wayfarer=wayfarer,ReducedMotion=reducedMotion,
+    public static List<TownRoof> Create(TownPlan plan,int seed,Func<Vector2> wayfarer,Func<bool> reducedMotion)
+        =>plan.Houses.Select(house=>new TownRoof{House=house,Seed=seed,Wayfarer=wayfarer,ReducedMotion=reducedMotion,
             // A hair past the south wall's own row, so the roof always draws over it.
             Position=new Vector2(0,(house.Y+house.Height)*12+.5f),TextureFilter=TextureFilterEnum.Nearest}).ToList();
     public override void _Ready()
     {
         // The roof oversails the walls and stops just over the top of the south face.
-        float left=House.X*24-4,right=(House.X+House.Width)*24+4,top=House.Y*12-TerrainWallRow.Rise-Loft,bottom=(House.Y+House.Height)*12-TerrainWallRow.Rise+4;
+        float left=House.X*24-4,right=(House.X+House.Width)*24+4,top=House.Y*12-TownBlocks.Rise-Loft,bottom=(House.Y+House.Height)*12-TownBlocks.Rise+4;
         area=new Rect2(left,top-Position.Y,right-left,bottom-top);
         batch.Quad(area,new Rect2(0,0,area.Size.X,area.Size.Y),Colors.White);
         material=TownBlocks.Roof();material.SetShaderParameter("roof_size",area.Size);material.SetShaderParameter("roof_style",House.Roof);
+        // The front of the house: a full-height facade over the low inner wall, with a
+        // transom over each doorway. It goes with the roof.
+        float sill=(House.Y+House.Height)*12-Position.Y;int south=House.Y+House.Height-1;
+        for(int x=House.X;x<House.X+House.Width;x++)
+        {
+            bool door=House.Doorway(x,south);
+            float End(int nx)=>nx<House.X||nx>=House.X+House.Width||House.Doorway(nx,south)?.5f:0;
+            var (window,lit)=TownBlocks.Window(House,Seed,x);
+            int rise=door?TownBlocks.Rise-DoorHeight:TownBlocks.Rise;
+            front.Quad(new Rect2(x*24,sill-TownBlocks.Rise,24,rise),new Rect2(0,0,24,rise),new Color(1,door?0:End(x-1),door?0:End(x+1),(House.Wall+(window&&!door?4:0)+(window&&lit&&!door?8:0))/16f));
+        }
+        facade=TownBlocks.Facade();
+        AddChild(new Cover{Batch=front,Material=facade,TextureFilter=TextureFilterEnum.Nearest,ShowBehindParent=true});
         AddChild(new Cover{Batch=batch,Material=material,TextureFilter=TextureFilterEnum.Nearest,ShowBehindParent=true});
         Step(0,true);
     }
@@ -166,14 +187,14 @@ public partial class TownRoof : Node2D
         // Frozen time and reduced motion both get the end state at once.
         Opacity=snap||delta<=0||ReducedMotion()?target:Mathf.MoveToward(Opacity,target,(float)delta/FadeSeconds);
         if(Opacity==before&&!snap)return;
-        material!.SetShaderParameter("roof_alpha",Opacity);QueueRedraw();
+        material!.SetShaderParameter("roof_alpha",Opacity);facade!.SetShaderParameter("wall_alpha",Opacity);QueueRedraw();
     }
     public override void _Process(double delta)=>Step(delta,false);
     public override void _Draw()
     {
         // From outside the doorway is a dark opening under an oak lintel, with the door
         // standing open against the wall. It clears with the roof.
-        float sill=(House.Y+House.Height)*12-Position.Y,head=sill-TerrainWallRow.Rise+4;
+        float sill=(House.Y+House.Height)*12-Position.Y,head=sill-DoorHeight;
         for(int i=0;i<House.DoorWidth;i++)
         {
             float x=(House.X+House.Door+i)*24;
@@ -187,7 +208,7 @@ public partial class TownRoof : Node2D
         var foot=new Vector2(area.Position.X+area.Size.X*(House.X%2==0?.74f:.26f),area.Position.Y+area.Size.Y*.5f+2).Floor();
         DrawTextureRectRegion(TownAtlas.Props,new Rect2(foot-TownArt.Pivot,new Vector2(TownArt.Width,TownArt.Height)),TownArt.PropSource(TownArt.Module(TownProp.Chimney)),new Color(1,1,1,Opacity));
     }
-    public override void _ExitTree(){batch.Dispose();material?.Dispose();}
+    public override void _ExitTree(){batch.Dispose();front.Dispose();material?.Dispose();facade?.Dispose();}
     partial class Cover : Node2D
     {
         public TerrainBatch Batch {get;init;}=null!;

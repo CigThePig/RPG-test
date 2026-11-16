@@ -85,7 +85,7 @@ public static class TownArtChecks
             foreach(var view in views)view.Free();
             // Roofs: one per house, and each knows when the wayfarer is under it.
             var where=new Vector2(-1,-1);
-            var roofs=TownRoof.Create(plan,()=>where,()=>false);
+            var roofs=TownRoof.Create(plan,r.Seed,()=>where,()=>false);
             check(roofs.Count==plan.Houses.Count && roofs.Zip(plan.Houses).All(pair=>pair.First.Position.Y>(pair.Second.Y+pair.Second.Height)*12 && pair.First.Position.Y<(pair.Second.Y+pair.Second.Height)*12+1),"a roof per house, sorted at its front edge");
             foreach(var roof in roofs)roof.Free();
             foreach(var row in TerrainWallRow.Create(r))row.Free();

@@ -28,19 +28,24 @@ with the doorway in its south wall. `TownPlan.Carve` writes it into the region a
 `Terrain.Floor`, so collision, line of sight and pathing work with no town-specific rules: walls block, the
 doorway is the only way in.
 
-- **Walls** reuse `TerrainWallRow` (the dungeon's Y-sorted wall rows): a wall head and, where open ground lies
-  to the south, a 16-pixel face. South faces of the outer wall carry windows, some lit.
+Houses are drawn at the character's scale: walls stand 44 pixels (`TownBlocks.Rise`), a little taller than a
+standing character, and the doorway opening is 34 pixels under a transom.
+
+- **Outside.** `TownRoof` is the shell of the house: a full-height front wall with windows (some lit) and a
+  dark doorway with the door standing open, and above it a hipped roof seen from above. It sits in the actor
+  layer at the house's front edge: characters in front of the house stand before it, and everything inside is
+  under it.
+- **Inside.** The room is a cutaway. The back wall stands full height; the side and front walls are cut low
+  (16 pixels, the dungeon's wall height) so the floor and furniture show. These are `TerrainWallRow` rows, the
+  same Y-sorted wall rows the dungeons use.
 - **Floors** are drawn per tile in the ground layer, shaded under the north and west walls, with a stone
   threshold in the doorway.
-- **Roof.** `TownRoof` is a hipped roof seen from above, standing `Loft` (20) pixels over the wall heads. It
-  sits in the actor layer at the house's front edge: characters in front of the house stand before it, and
-  everything inside is under it. From outside the doorway shows as a dark opening with the door standing open.
 - **Entering.** When the wayfarer's tile is inside the house rectangle (doorway included) that house's roof,
-  chimney and doorway shadow fade out over about a fifth of a second, and fade back on leaving. Other roofs
-  stay shut. Reduced motion switches at once.
+  front wall, chimney and doorway shadow fade out over about a fifth of a second, and fade back on leaving.
+  Other houses stay shut. Reduced motion switches at once.
 
-Leave four clear rows between the back of one house and the front of the next, or the nearer roof will stand
-over the further house's front wall.
+A house's shell rises 54 pixels above its back wall. Leave five clear rows between the back of one house and
+the front of the next (or a road), or the nearer roof will stand over them.
 
 ## Furniture
 

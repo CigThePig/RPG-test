@@ -51,12 +51,13 @@ public partial class TerrainWallRow : Node2D
             if(town.HouseAt(x,Row) is not {} house)continue;
             var p = GodotConvert.GroundToScreen(x * RegionState.Tile, Row * RegionState.Tile) - Position;
             int mask=(Wall(x,Row-1)?1:0)|(Wall(x+1,Row)?2:0)|(Wall(x,Row+1)?4:0)|(Wall(x-1,Row)?8:0);
-            batch!.Rect(new Rect2(p+new Vector2(0,-Rise),new Vector2(24,12)),new Color(0,mask/15f,0,house.Wall/16f));
+            // The back wall stands full height; side and front walls inside are cut low so the
+            // room shows. From outside TownRoof covers the front with a full-height facade.
+            int rise=Row==house.Y?TownBlocks.Rise:(int)Rise;
+            batch!.Quad(new Rect2(p+new Vector2(0,-rise),new Vector2(24,12)),new Rect2(0,0,24,12),new Color(0,mask/15f,0,house.Wall/16f));
             if(Wall(x,Row+1))continue;
             float End(int nx)=>!Wall(nx,Row)?.5f:Wall(nx,Row+1)?1:0;
-            // Only the outer south wall has windows; they would look into the room otherwise.
-            var (window,lit)=Row==house.Y+house.Height-1?TownBlocks.Window(house,r.Seed,x):(false,false);
-            batch.Rect(new Rect2(p+new Vector2(0,12-Rise),new Vector2(24,Rise)),new Color(1,End(x-1),End(x+1),(house.Wall+(window?4:0)+(window&&lit?8:0))/16f));
+            batch.Quad(new Rect2(p+new Vector2(0,12-rise),new Vector2(24,rise)),new Rect2(0,TownBlocks.Rise-rise,24,rise),new Color(1,End(x-1),End(x+1),house.Wall/16f));
         }
         batch!.Draw(this);
     }
