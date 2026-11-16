@@ -134,6 +134,9 @@ public static class PlayabilityChecks
             string migrated=Persistence.Capture(w,app.Narrative);
             var invalid=System.Text.Json.Nodes.JsonNode.Parse(saved)!;
             invalid["Regions"]!["reach"]!.AsObject().Remove("PlacementRevision");
+            // This deliberately replaces all geography to exercise legacy actor placement,
+            // so discard the unrelated saved town composition with that geography.
+            invalid["Regions"]!["reach"]!["Town"]=null;
             var tiles=invalid["Regions"]!["reach"]!["Tiles"]!.AsArray();
             for(int i=0;i<tiles.Count;i++)tiles[i]=(int)Terrain.Wall;
             bool rejected=false;try { Persistence.Restore(w,app.Narrative,invalid.ToJsonString()); }catch(InvalidOperationException){rejected=true;}

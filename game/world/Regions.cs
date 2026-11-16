@@ -17,6 +17,7 @@ public enum Terrain
 public sealed class RegionState
 {
     public string Id { get; set; } = "reach";
+    public TownState? Town { get; set; }
     public int Seed { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
@@ -246,6 +247,7 @@ public static class Regions
                 for(int x=fx-1;x<=fx+1;x++)
                     if(x>0&&x<width-1&&y>0&&y<height-1) r.Tiles[y*width+x]=Terrain.Earth;
         }
+        TownGenerator.Install(r);
         return r;
     }
 

@@ -25,7 +25,7 @@ public readonly record struct TownPiece(int Kind,int Variant,int X,int Y);
 
 /// <summary>A town: block houses, placed furniture and paved tiles. Carve writes the houses
 /// into a region's terrain as ordinary wall and floor, so collision, sight and pathing need
-/// no town rules of their own. Everything else here is presentation and is not saved.</summary>
+/// no town rules of their own. Generated composition is saved by TownState.</summary>
 public sealed class TownPlan
 {
     public List<TownHouse> Houses {get;}=new();
@@ -57,15 +57,14 @@ public sealed class TownPlan
     }
 }
 
-/// <summary>Town plans staged for a region's presentation, keyed by region id. Town
-/// generation does not exist yet; fixtures and previews stage plans here.</summary>
+/// <summary>Reference-scene overrides, falling back to the region's saved town composition.</summary>
 public static class TownStage
 {
     static readonly Dictionary<string,TownPlan> plans=new(StringComparer.Ordinal);
     public static void Stage(string regionId,TownPlan plan)=>plans[regionId]=plan;
     public static void Clear(string regionId)=>plans.Remove(regionId);
-    public static TownPlan? For(RegionState r)=>plans.GetValueOrDefault(r.Id);
-    public static bool Occupied(RegionState r,int x,int y)=>plans.TryGetValue(r.Id,out var plan)&&plan.Occupied(x,y);
+    public static TownPlan? For(RegionState r)=>plans.GetValueOrDefault(r.Id) ?? r.Town?.Plan(r.Width);
+    public static bool Occupied(RegionState r,int x,int y)=>For(r)?.Occupied(x,y) ?? false;
 }
 
 /// <summary>Shared ramp and materials for block houses.</summary>

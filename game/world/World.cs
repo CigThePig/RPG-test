@@ -1293,7 +1293,9 @@ public sealed class World
                 Profile = p.Id,
                 Profession = p.Profession,
                 Faction = p.Faction,
-                X = pos.X + 100 + i * 68,
+                // The town's wardens remain by the street; prowlers start beyond
+                // its eastern plots rather than spawning among the houses.
+                X = r.Town != null && i >= 2 ? (r.Town.Houses.Max(h => h.X + h.Width) + 4) * 24 + (i - 2) * 54 : pos.X + 100 + i * 68,
                 Y = pos.Y + (i % 2) * 48,
                 Appearance = new()
                 {
