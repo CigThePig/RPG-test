@@ -55,9 +55,16 @@ public partial class TerrainWallRow : Node2D
             // room shows. From outside TownRoof covers the front with a full-height facade.
             int rise=Row==house.Y?TownBlocks.Rise:(int)Rise;
             batch!.Quad(new Rect2(p+new Vector2(0,-rise),new Vector2(24,12)),new Rect2(0,0,24,12),new Color(0,mask/15f,0,house.Wall/16f));
-            if(Wall(x,Row+1))continue;
+            // A same-height wall to the south hides the face, but the tall back
+            // corners must show the step down to the low side walls. Otherwise
+            // skipping the whole face leaves two holes in the room's silhouette.
+            bool continues=Wall(x,Row+1);
+            int faceHeight=continues
+                ? Row==house.Y && (x==house.X || x==house.X+house.Width-1) ? rise-(int)Rise : 0
+                : rise;
+            if(faceHeight<=0)continue;
             float End(int nx)=>!Wall(nx,Row)?.5f:Wall(nx,Row+1)?1:0;
-            batch.Quad(new Rect2(p+new Vector2(0,12-rise),new Vector2(24,rise)),new Rect2(0,TownBlocks.Rise-rise,24,rise),new Color(1,End(x-1),End(x+1),house.Wall/16f));
+            batch.Quad(new Rect2(p+new Vector2(0,12-rise),new Vector2(24,faceHeight)),new Rect2(0,TownBlocks.Rise-rise,24,faceHeight),new Color(1,End(x-1),End(x+1),house.Wall/16f));
         }
         batch!.Draw(this);
     }
