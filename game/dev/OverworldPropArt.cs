@@ -36,7 +36,16 @@ public static class OverworldPropArt
         new("5e1f33"),new("9c3443"),new("cf5a55"),
         new("3d5c8a"),new("3f7f78"),new("d9c9a0"),
         new("6b3b2c"),new("a05f3c"),new("cf8f58"),
-        new("6d6863"),new("e9f4ff"),new("a9c9e6")};
+        new("6d6863"),new("e9f4ff"),new("a9c9e6"),
+        // Towns: 72-75 clay roof tile, 76-79 slate, 80-83 thatch, 84-86 limewash,
+        // 87-89 awning blue, 90-92 awning green, 93 lamplit glass, 94 night glass.
+        new("5c2428"),new("8f3a34"),new("bd5a42"),new("e08a5e"),
+        new("26344f"),new("3b5274"),new("5b7a9e"),new("8fabc4"),
+        new("6e5328"),new("9a7a3a"),new("c4a455"),new("e6d188"),
+        new("b9ae92"),new("ddd3b8"),new("f6efd9"),
+        new("2f4f86"),new("4f7fc0"),new("9cc3ea"),
+        new("2d6144"),new("4c9360"),new("9fd28f"),
+        new("ffcf6b"),new("1f2a44")};
     const byte Ink=37,Shadow=35,Penumbra=36,Foam=38,Ripple=39,Submerged=40;
     static readonly byte[] Leaf={1,2,2,3,3,4,5,6},Needle={7,7,8,8,9,9,10,4},Airy={2,3,4,4,5,5,6,11},
         Stone={19,20,20,21,21,22,23,24},Bark={12,13,14,14,15,16};
@@ -277,10 +286,13 @@ public static class OverworldPropArt
     }
     internal sealed class Pixels
     {
-        public readonly byte[] Data=new byte[Width*Height];
-        public byte At(int x,int y)=>x>=0&&x<Width&&y>=0&&y<Height?Data[y*Width+x]:(byte)0;
+        // The Reach and the ruins use the standard cell; town buildings ask for a larger one.
+        public readonly int W,H;
+        public readonly byte[] Data;
+        public Pixels(int width=OverworldPropArt.Width,int height=OverworldPropArt.Height){W=width;H=height;Data=new byte[W*H];}
+        public byte At(int x,int y)=>x>=0&&x<W&&y>=0&&y<H?Data[y*W+x]:(byte)0;
         // The outermost ring stays transparent so neighbouring atlas cells never bleed.
-        public void Set(int x,int y,byte c){if(x>0&&x<Width-1&&y>0&&y<Height-1)Data[y*Width+x]=c;}
+        public void Set(int x,int y,byte c){if(x>0&&x<W-1&&y>0&&y<H-1)Data[y*W+x]=c;}
         public void Rect(int x,int y,int w,int h,byte c){for(int yy=y;yy<y+h;yy++)for(int xx=x;xx<x+w;xx++)Set(xx,yy,c);}
         /// <summary>Recolour only pixels that already hold one of the listed materials.</summary>
         public void Over(int x,int y,int w,int h,byte c,params byte[] onto){for(int yy=y;yy<y+h;yy++)for(int xx=x;xx<x+w;xx++)if(Array.IndexOf(onto,At(xx,yy))>=0)Set(xx,yy,c);}
@@ -288,7 +300,7 @@ public static class OverworldPropArt
         public void Line(int x,int y,int ex,int ey,int width,byte c){int dx=Math.Abs(ex-x),sx=x<ex?1:-1,dy=-Math.Abs(ey-y),sy=y<ey?1:-1,err=dx+dy;while(true){Rect(x,y,width,width,c);if(x==ex&&y==ey)break;int e=err*2;if(e>=dy){err+=dy;x+=sx;}if(e<=dx){err+=dx;y+=sy;}}}
         public void Poly(byte c,params int[] xy)
         {
-            int minX=Width,maxX=0,minY=Height,maxY=0;
+            int minX=W,maxX=0,minY=H,maxY=0;
             for(int i=0;i<xy.Length;i+=2){minX=Math.Min(minX,xy[i]);maxX=Math.Max(maxX,xy[i]);minY=Math.Min(minY,xy[i+1]);maxY=Math.Max(maxY,xy[i+1]);}
             for(int y=minY;y<=maxY;y++)for(int x=minX;x<=maxX;x++)
             {
@@ -367,10 +379,10 @@ public static class OverworldPropArt
         public void Waterline(int surface)
         {
             var stems=new List<int>();
-            for(int x=1;x<Width-1;x++)if(At(x,surface)!=0&&At(x,surface)!=Ink)stems.Add(x);
+            for(int x=1;x<W-1;x++)if(At(x,surface)!=0&&At(x,surface)!=Ink)stems.Add(x);
             if(stems.Count==0)return;
             int left=stems.Min(),right=stems.Max();
-            Rect(1,surface+1,Width-2,Height-surface-2,0);
+            Rect(1,surface+1,W-2,H-surface-2,0);
             // The ink under the last row of stems would read as a hard floor: clear it.
             for(int x=left-1;x<=right+1;x++)if(At(x,surface)==Ink && !stems.Contains(x))Set(x,surface,0);
             foreach(int x in stems){Set(x,surface+1,Submerged);if(x%2==0)Set(x,surface+2,Submerged);}
@@ -389,8 +401,8 @@ public static class OverworldPropArt
             if(flat)return;
             bool Solid(int x,int y){byte c=At(x,y);return c!=0&&c!=Shadow&&c!=Penumbra&&c!=Ink;}
             var edge=new List<int>();
-            for(int y=1;y<Height-1;y++)for(int x=1;x<Width-1;x++)
-                if(!Solid(x,y)&&At(x,y)!=Ink&&(Solid(x-1,y)||Solid(x+1,y)||Solid(x,y-1)||Solid(x,y+1)))edge.Add(y*Width+x);
+            for(int y=1;y<H-1;y++)for(int x=1;x<W-1;x++)
+                if(!Solid(x,y)&&At(x,y)!=Ink&&(Solid(x-1,y)||Solid(x+1,y)||Solid(x,y-1)||Solid(x,y+1)))edge.Add(y*W+x);
             foreach(int at in edge)Data[at]=Ink;
         }
     }

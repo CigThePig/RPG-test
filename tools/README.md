@@ -17,6 +17,8 @@ For enemy work, `godot --headless --path . -- --enemy-animation-sheets[=prowler,
 
 For dungeon art review, `godot --path . -- --visual-check --mobile-ui --dungeon-preview` writes production captures of three ruins (every theme, hall, gate and mechanism) and the ruin atlas to `build/dungeon-preview/`; add `--preview-clean` to hide the interface. It asserts nothing. `--dungeon-art-only` runs the rendered ruin art checks and rewrites `docs/dungeon-screenshots/`. See [dungeon art direction](../docs/DUNGEON_ART_DIRECTION.md).
 
+For town assets, `--town-preview` writes captures of a hand-laid reference town and both town atlases to `build/town-preview/`, and `--town-only` runs the rendered town check. See [town asset kit](../docs/TOWN_ASSETS.md).
+
 For overworld art review, `godot --path . -- --visual-check --mobile-ui --overworld-preview` writes five production captures and the prop atlas to `build/preview/` in about twenty seconds; add `--preview-clean` to hide the interface. It asserts nothing.
 
 `tools/build-host.py` is a compiler fallback for Linux hosts where process inspection prevents normal MSBuild. It needs `DOTNET_ROOT`, `GODOT_MONO_ROOT`, and restored Godot source-generator packages; standard builds do not need it.

@@ -144,6 +144,7 @@ public partial class Foundation : Node2D
     readonly List<FeatureView> features = new();
     readonly List<TerrainWallRow> wallRows = new();
     readonly List<DungeonClutter> clutter = new();
+    readonly List<TownView> town = new();
     readonly List<EnvironmentDecoration> decorations = new();
     readonly List<OverworldFlora> flora = new();
     public bool CollisionDebug { get; set; }
@@ -765,6 +766,15 @@ public partial class Foundation : Node2D
         }
         foreach (var row in wallRows) actors.AddChild(row);
         foreach (var row in clutter) actors.AddChild(row);
+        foreach (var piece in town) { actors.RemoveChild(piece); piece.QueueFree(); }
+        town.Clear();
+        if(TownStage.For(r) is {} plan)
+        {
+            // Paving lies on the turf, under everything that stands.
+            ground.AddChild(new TownPaving {Region=r,Plan=plan});
+            town.AddRange(TownView.Create(plan));
+            foreach (var piece in town) actors.AddChild(piece);
+        }
         foreach(var decoration in decorations) { actors.RemoveChild(decoration); decoration.QueueFree(); }
         decorations.Clear();
         decorations.AddRange(EnvironmentDecoration.Create(r,art));
