@@ -11,9 +11,13 @@ public static class DungeonEncounters
         var sanctuary = r.RoomAt(r.Objective % r.Width, r.Objective / r.Width);
         var rooms = r.Rooms.Where(room => room.Kind == "room" && room != entrance)
             .Select(room => new { Room = room, Area = room.Tiles().Count(), Local = others.Count(a => room.Contains((int)(a.X/24),(int)(a.Y/24))) })
-            .Where(a => a.Local < (a.Area >= 100 ? 2 : 1))
-            .OrderBy(a => slot == 0 && a.Room == sanctuary ? -1 : a.Local)
-            .ThenBy(a => actor.CombatProfile == "brute" ? -a.Area : 0)
+            // A pack gathers round its leader: prowlers join an alpha's hall when there is room for them.
+            .Select(a => new { a.Room, a.Area, a.Local, Pack = actor.CombatProfile == "prowler" && a.Area >= 100 &&
+                others.Any(o => o.CombatProfile == "alpha" && a.Room.Contains((int)(o.X/24),(int)(o.Y/24))) })
+            // Rooms fill evenly (emptiest first): a second inhabitant only once every room has one.
+            .Where(a => a.Local < (a.Pack ? 3 : a.Area >= 64 ? 2 : 1))
+            .OrderBy(a => slot == 0 && a.Room == sanctuary ? -2 : a.Pack ? -1 : a.Local)
+            .ThenBy(a => actor.CombatProfile is "brute" or "alpha" ? -a.Area : 0)
             .ThenBy(a => DungeonLayout.Hash(r.Seed, a.Room.X, a.Room.Y, 773 + slot)).ThenBy(a => a.Room.Y).ThenBy(a => a.Room.X);
         foreach (var candidate in rooms)
         {

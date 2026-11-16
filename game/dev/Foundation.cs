@@ -38,8 +38,7 @@ public partial class Foundation : Node2D
         view.PreferMeasuredExternalVelocity=Feel.Id!="baseline";
         view.Creature.UseMeasuredExternalVelocity=view.PreferMeasuredExternalVelocity;
         view.Creature.AnimationFps=view.State.Id=="player" && Feel.Id!="baseline" ? 20 : 10;
-        if (view.State.Id == "player")
-            view.GroundTerrain = actor =>
+        view.GroundTerrain = actor =>
             {
                 if (!World.RegionsById.TryGetValue(actor.Region, out var region)) return Terrain.Grass;
                 int index = region.Index(actor.Position);
@@ -58,6 +57,10 @@ public partial class Foundation : Node2D
         var p=World.Player;p.Region=map.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.State=ActionState.Idle;p.StateRemaining=0;p.PendingAbility="";p.Statuses.Clear();p.Cooldowns.Clear();
         TouchMovement=ControllerVelocity=Vector2.Zero; Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/start-or-reset");
     }
+    /// <summary>Keyboard walking pace while the sneak key is held: under the pace at which steps are heard.</summary>
+    public const float SneakScale = .5f;
+    public SenseView Senses { get; private set; } = null!;
+    public TelegraphView Telegraphs => telegraphs!;
     public string CombatCourseId { get; private set; } = "";
     public void BeginCombatCourse() => BeginCombatCourse("mixed", true);
     public void BeginCombatCourse(string encounter, bool protectedPlayer, ulong seed=42)
@@ -73,9 +76,18 @@ public partial class Foundation : Node2D
         string[] profiles=encounter switch {
             "prowler" => new[]{"prowler"}, "brute" => new[]{"brute"},
             "spitter" or "projectiles" => new[]{"spitter"},
+            "stalker" => new[]{"stalker"}, "howler" => new[]{"howler","prowler"},
+            "pack" => new[]{"prowler","prowler","prowler","prowler"},
+            "ruin" => new[]{"brute","prowler","prowler","spitter","stalker","howler"},
             "two melee" => new[]{"prowler","brute"},
             "four mixed" => new[]{"prowler","brute","spitter","prowler"},
             "crowd" => Enumerable.Range(0,8).Select(i=>new[]{"prowler","brute","spitter"}[i%3]).ToArray(),
+            "alpha" => new[]{"alpha","prowler","prowler","prowler"},
+            "shellback" => new[]{"shellback"}, "lasher" => new[]{"lasher"},
+            "mender" => new[]{"mender","prowler","prowler"},
+            // A den at rest: two asleep, one keeping watch.
+            "sleepers" => new[]{"prowler","prowler","prowler"},
+            "depths" => new[]{"alpha","prowler","shellback","mender","lasher","spitter"},
             _ => new[]{"prowler","brute","spitter"}
         };
         for(int i=0;i<profiles.Length;i++)
@@ -83,11 +95,16 @@ public partial class Foundation : Node2D
             string id=profiles[i];
             float x=380+(i/3)*42,y=275+(i%3)*30;
             if(id=="spitter")x+=65;
-            var a=new ActorState{Id="lab:"+id+(i<3 ? "" : ":"+i),Name=id,Region=p.Region,Faction="beasts",Profile="beast",CombatProfile=id,
-                Appearance=new(){Family=id=="prowler" ? "quadruped" : id=="brute" ? "reptile" : "amorphous",Seed=seed+(ulong)i},
-                X=x,Y=y,HomeX=x,HomeY=y,Health=id=="prowler"?65:id=="brute"?120:55,MaxHealth=id=="prowler"?65:id=="brute"?120:55,
-                Abilities=World.Content.CombatProfiles.Single(c=>c.Id==id).Priorities.Keys.ToList()};
-            AnatomyAdapter.Apply(a);a.Speed=id=="prowler"?88:id=="brute"?46:62;World.Actors[a.Id]=a;
+            // Lab inhabitants start facing the player, so the fight begins with a sighting.
+            var a=EnemyRoster.Create(World,"lab:"+id+(i<3 && !World.Actors.ContainsKey("lab:"+id) ? "" : ":"+i),id,p.Region,new(x,y),new(-1,0),seed+(ulong)i);
+            a.Name=id;
+            if(encounter=="sleepers")
+            {
+                // The watcher looks away from the door; the sleepers lie beyond it.
+                a.Sleeper=i>0;
+                EnemyMind.Resettle(a,new(430+i*34,270+i*38),new(1,0));
+            }
+            World.Actors[a.Id]=a;
         }
         Trace.Marker($"combat-course/{encounter}/seed-{seed}/{(protectedPlayer ? "protected" : "normal")}");
         Ui.Notify($"Combat lab: {encounter} · {(protectedPlayer ? "protected observation" : "normal health")} · reset / return through Feel lab");
@@ -182,6 +199,11 @@ public partial class Foundation : Node2D
         {
             "dodge",
             Key.Space
+        },
+        {
+            // Held: walk softly. A touch stick does the same by being pushed only part of the way.
+            "sneak",
+            Key.Shift
         },
         {
             "inventory",
@@ -288,6 +310,14 @@ public partial class Foundation : Node2D
         var dump=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--dump-dungeons="))?.Split('=',2)[1];
         if(dump!=null)
         { foreach(int seed in dump.Split(',').Select(int.Parse))GD.Print(DungeonLayout.Ascii(Regions.Dungeon(seed)));GetTree().Quit();return; }
+        var sheets=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x=="--enemy-animation-sheets" || x.StartsWith("--enemy-animation-sheets="));
+        if(sheets!=null)
+        {
+            // Authoring aid: contact sheets of every enemy animation, no display needed.
+            EnemyAnimationPreview.Write("build/enemy-animation", only: sheets.Contains('=') ? sheets.Split('=',2)[1] : null);
+            GetTree().Quit();return;
+        }
+        if(OS.GetCmdlineUserArgs().Any(x=>x=="--enemy-encounter-report" || x.StartsWith("--enemy-encounter-report="))) CallDeferred(nameof(RunEncounterReport));
         if(OS.GetCmdlineUserArgs().Contains("--gameplay-check")) replay=new GameplayReplay(this);
         if (OS.GetCmdlineUserArgs().Contains("--adventure-visual")) CallDeferred(nameof(RunAdventureVisual));
         if (OS.GetCmdlineUserArgs().Contains("--adventure-check")) CallDeferred(nameof(RunAdventure));
@@ -325,6 +355,10 @@ public partial class Foundation : Node2D
                 GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0}");
             if(Trace.Active && e.Kind is "region_entered" or "resource_depleted" or "ability_started" or "defeated")Trace.Marker(e.Kind+"/"+e.Value);
             Narrative.Call("receive", e.Kind, e.Actor, e.Target, e.Value, e.Count);
+            if (e.Kind == "afflicted" && e.Target == "player")
+                ui?.Notify(e.Value == "venom" ? $"Envenomed · it wears off in {e.Count}s" : $"Afflicted: {e.Value} · {e.Count}s", minor: true);
+            if (e.Kind == "ambush" && e.Actor == "player")
+                ui?.Notify("Ambush · struck before it noticed you", minor: true);
             if (e.Kind == "level_gained" && e.Actor == "player")
                 ui?.Notify($"Level up · now level {e.Value} · a skill point is ready in Character");
             if (e.Kind == "region_entered")
@@ -351,10 +385,13 @@ public partial class Foundation : Node2D
         World.NewGame();
         if (telegraphs == null)
         {
-            telegraphs = new TelegraphView { World = World, ZIndex = -1 };
+            // What enemies can perceive lies under the warnings of what they are about to do.
+            Senses = new SenseView { World = World, ZIndex = -1, ReducedMotion = () => ui?.Preferences.ReducedMotion ?? false };
+            AddChild(Senses);
+            telegraphs = new TelegraphView { World = World, ZIndex = -1, ReducedMotion = () => ui?.Preferences.ReducedMotion ?? false };
             AddChild(telegraphs);
         }
-        else telegraphs.World = World;
+        else { telegraphs.World = World; Senses.World = World; }
         RebuildViews();
         drawnRegion = "";
     }
@@ -374,6 +411,8 @@ public partial class Foundation : Node2D
         {
             var view = new CharacterView();
             actors.AddChild(view);
+            view.World = World;
+            view.ReducedMotion = () => ui?.Preferences.ReducedMotion ?? false;
             view.Setup(a);
             ConfigureView(view);
             Views[a.Id] = view;
@@ -430,6 +469,7 @@ public partial class Foundation : Node2D
             while (accumulator >= 1.0 / 60)
             {
                 var v = (Input.GetVector("west", "east", "north", "south") + TouchMovement).LimitLength();
+                if (Input.IsActionPressed("sneak")) v *= SneakScale;
                 // Input describes screen direction; PPC projects ground south at half height.
                 ScreenInput=v;
                 if (World.Player.State == ActionState.Dodging) ControllerVelocity=Vector2.Zero;
@@ -835,6 +875,14 @@ public partial class Foundation : Node2D
     {
         var ruin=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--adventure-ruin="))?.Split('=',2)[1];
         try { new AdventureRun(this){RuinSeed=ruin==null?null:int.Parse(ruin)}.Run(); GetTree().Quit(0); }
+        catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
+    }
+
+    // Balance aid: a scripted duelist fights every lab encounter headlessly and the outcomes are tabulated.
+    public void RunEncounterReport()
+    {
+        var chosen=OS.GetCmdlineUserArgs().First(x=>x.StartsWith("--enemy-encounter-report"));
+        try { EnemyEncounterReport.Write(this,"build",chosen.Contains('=') ? chosen.Split('=',2)[1] : null); GetTree().Quit(0); }
         catch(Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 

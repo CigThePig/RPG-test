@@ -1,6 +1,6 @@
 {
   "ruin": {
-    "count": 8,
+    "count": 10,
     "faction": "beasts",
     "archetypes": [
       {
@@ -23,7 +23,65 @@
         "family": "amorphous",
         "speed": 62,
         "health": 55
+      },
+      {
+        "profile": "stalker",
+        "name": "Ruin stalker",
+        "family": "arthropod",
+        "speed": 96,
+        "health": 45
+      },
+      {
+        "profile": "howler",
+        "name": "Ruin howler",
+        "family": "winged",
+        "speed": 70,
+        "health": 50
+      },
+      {
+        "profile": "alpha",
+        "name": "Ruin alpha",
+        "family": "quadruped",
+        "speed": 92,
+        "health": 110
+      },
+      {
+        "profile": "shellback",
+        "name": "Ruin shellback",
+        "family": "arthropod",
+        "speed": 52,
+        "health": 95
+      },
+      {
+        "profile": "mender",
+        "name": "Ruin mender",
+        "family": "plantfolk",
+        "speed": 58,
+        "health": 48
+      },
+      {
+        "profile": "lasher",
+        "name": "Ruin lasher",
+        "family": "serpent",
+        "speed": 80,
+        "health": 60
       }
+    ],
+    "roster": [
+      "brute",
+      "alpha",
+      "prowler",
+      "prowler",
+      "spitter",
+      "stalker",
+      "howler",
+      "shellback",
+      "mender",
+      "lasher"
+    ],
+    "asleep": [
+      3,
+      7
     ]
   }
 }

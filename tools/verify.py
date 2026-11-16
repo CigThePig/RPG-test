@@ -9,6 +9,10 @@ if not visual:
 command += ["--", "--visual-check" if visual else "--test"]
 if "--mobile" in sys.argv: command.append("--mobile-ui")
 if "--overworld-props-only" in sys.argv: command.append("--overworld-props-only")
+# Quick iteration: `verify.py --headless --test-only=CombatAiChecks,EnemyBehaviorChecks`.
+only = [x for x in sys.argv if x.startswith("--test-only=")]
+command += only
+if "--test-keep-going" in sys.argv: command.append("--test-keep-going")
 try:
     # Budget for hosted runners' software (llvmpipe) rendering: the painted UI adds
     # draw calls per frame there and the Living Reach shades every terrain pixel, while a
@@ -20,8 +24,8 @@ except subprocess.TimeoutExpired as timeout:
     def decode(stream): return stream.decode(errors="replace") if isinstance(stream, bytes) else stream or ""
     text, returncode = decode(timeout.stdout) + decode(timeout.stderr) + "\nVERIFY TIMEOUT after 480 s\n", 1
 (root / "build").mkdir(exist_ok=True)
-(root / "build" / ("verification-overworld-props.log" if "--overworld-props-only" in sys.argv else "verification-mobile.log" if "--mobile" in sys.argv else "verification-visual.log" if visual else "verification-integration.log")).write_text(text)
+(root / "build" / ("verification-selected.log" if only else "verification-overworld-props.log" if "--overworld-props-only" in sys.argv else "verification-mobile.log" if "--mobile" in sys.argv else "verification-visual.log" if visual else "verification-integration.log")).write_text(text)
 print(text)
-marker = "VISUAL CHECKS PASSED" if visual else "FOUNDATION CHECKS PASSED"
+marker = "VISUAL CHECKS PASSED" if visual else "SELECTED CHECKS PASSED" if only else "FOUNDATION CHECKS PASSED"
 if returncode or marker not in text or "SCRIPT ERROR:" in text or "ERROR:" in text:
     raise SystemExit(1)

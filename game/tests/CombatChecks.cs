@@ -35,6 +35,8 @@ public static class CombatChecks
             var enemy = w.Actors.Values.First(a => a.Profile == "beast");
             enemy.Region = r.Id; enemy.X = 540; enemy.Y = 500; enemy.Health = enemy.MaxHealth = 1000;
             enemy.State = ActionState.Recovery; enemy.StateRemaining = 100; enemy.MotionX = enemy.MotionY = 0;
+            // Already fighting: the plain calculation, without the bonus for striking an unaware foe.
+            enemy.Awareness = Awareness.Engaged; enemy.Target = p.Id;
             p.X = 500; p.Y = 500; p.Cooldowns.Clear();
             float health = enemy.Health;
             check(w.TryStartPlayerSlash(V.UnitX), "directional slash starts with enemy ahead");

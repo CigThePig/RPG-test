@@ -189,7 +189,7 @@ namespace PixelCreatures.Core.Motion
             TurnInPlace(ctx, speed, dt);
             SettleIdle(ctx, speed, dt);
             // rearing species stand upright while idle and lower the body to crawl
-            _rear.Step(ctx.RestWeight > 0.01 || ctx.MoveWeight > 0.3 ? 0 : 1, ctx.MoveWeight > 0.3 ? 0.12 : 0.35, dt);
+            _rear.Step(ctx.RestWeight > 0.01 || ctx.DeathWeight > 0.01 || ctx.MoveWeight > 0.3 ? 0 : 1, ctx.MoveWeight > 0.3 ? 0.12 : 0.35, dt);
 
             Vec3 fwd = new Vec3(ctx.Velocity.X, 0, ctx.Velocity.Z).NormalizedOr(ctx.Forward);
             Vec3 side = new Vec3(-fwd.Z, 0, fwd.X);
@@ -275,7 +275,7 @@ namespace PixelCreatures.Core.Motion
             {
                 double tt = ctx.Time - _tongueStart;
                 double flick = DMath.Pulse(tt, 0, 0.05, 0.12, 0.17) + DMath.Pulse(tt, 0.25, 0.3, 0.37, 0.43);
-                p.Tongue = Math.Max(p.Tongue, flick * (1 - ctx.RestWeight));
+                p.Tongue = Math.Max(p.Tongue, flick * (1 - ctx.RestWeight) * (1 - ctx.DeathWeight));
             }
             // the head leads with a slight counter-sway and looks around while idle
             p.HeadYaw += -DMath.Sin(DMath.TwoPi * _travel / Math.Max(1, _lambda)) * 0.18 * _wave.X;

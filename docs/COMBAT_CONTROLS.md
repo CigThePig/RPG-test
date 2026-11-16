@@ -10,7 +10,7 @@ Enemy bite windups show rings around the attacker and its designated target, con
 
 The verification-only `fixture_sweep` demonstrates a different rule: its outlined ground sector is a directional cone committed when the attack starts. Moving outside that sector before impact avoids it; moving the target does not rotate it. Both shapes are projected from ground space onto the same camera plane as the creatures. Neither warning controls damage or adds windup time.
 
-Dodge has its own action state and 0.70-second initiation cooldown. It covers up to 90 ground units over 0.40 seconds with ease-out, subject to collision. The direction is the current unsmoothed movement intent, or visual facing if neutral, and is locked for the roll. Direct hits are rejected from 0.10 seconds through just before 0.30 seconds; existing periodic damage retains its normal rules. An early or late hit interrupts the roll. Opening a modal, backgrounding, or loading a saved roll clears its transient motion but retains a valid cooldown. Space dodges on desktop; the separate mobile button is beside Attack. Release inside the original button to activate it.
+Dodge has its own action state and 0.70-second initiation cooldown. It covers up to 90 ground units over 0.40 seconds with ease-out, subject to collision. The direction is the current unsmoothed movement intent, or visual facing if neutral, and is locked for the roll. Direct hits are rejected from 0.10 seconds through just before 0.30 seconds; periodic damage (burning, venom) still hurts but never interrupts the player. An early or late direct hit interrupts the roll. Opening a modal, backgrounding, or loading a saved roll clears its transient motion but retains a valid cooldown. Space dodges on desktop; the separate mobile button is beside Attack. Release inside the original button to activate it.
 
 `game/combat/CombatTuning.cs` contains the new arc, lunge, and dodge constants; existing slash timing, base range, cost, cooldown, and damage remain in `game/data/foundation.json`. Dodge presentation uses the authoritative action progress, with a biped tuck and rotation and a limited fallback for other families. It does not drive world position or damage.
 
@@ -22,7 +22,15 @@ Biped rolling is now a full-body PPC action, not an additive 360-degree torso sp
 
 ## Combat feedback
 
-Bites and the verification cone use their authored PPC action styles. Successful damage produces a directional recoil and contact flash; a miss produces a lighter whiff, and a successful dodge has a separate cool-colored ring. Defeat transitions into the creature rig's rest posture while the loot marker remains available. Projectile launch and actual collision have separate visual cues. These are observers of world decisions and do not grant movement, damage, immunity or extra stun. Camera feedback is a small bounded presentation offset, configurable through `CameraFeedback.Strength`; setting it to zero disables the nudge.
+Bites and the verification cone use their authored PPC action styles. Successful damage produces a directional recoil and contact flash; a miss produces a lighter whiff, and a successful dodge has a separate cool-colored ring. Defeat plays a staged collapse suited to the body plan and holds it, while the loot marker remains available. Projectile launch and actual collision have separate visual cues. These are observers of world decisions and do not grant movement, damage, immunity or extra stun. Camera feedback is a small bounded presentation offset, configurable through `CameraFeedback.Strength`; setting it to zero disables the nudge.
+
+## Enemy awareness, tactics and animation
+
+Enemies now notice, call packmates, search for a lost quarry and return home; packs take turns and flank; and the ruin has pouncing prowlers, guarded charging brutes, volleying spitters, ambushing stalkers and rallying howlers. Striking a foe that has not noticed you deals bonus damage, double on one that is asleep.
+
+**Sneaking.** Hold Shift (keyboard) or push the touch stick only about halfway to walk softly: enemies hear a creeping step from less than half as far. Rolls, swings and fights make noise that draws calm enemies to look. While enemies nearby have not recognised you, their view cones and the distance at which they would hear you are drawn faintly on the ground, and an eye over your head says how much they know.
+
+The ruin also holds alphas whose fall routs their pack, shelled shellbacks to get round, lashers, menders that heal their allies, and spitters that lob acid which pools on the ground. See [enemy behaviour and animation](ENEMY_BEHAVIOR.md). The sections below describe the earlier foundation, which still holds unless that document says otherwise.
 
 ## Tactical enemies (Part 3)
 

@@ -64,7 +64,8 @@ public static class DodgeChecks
             p.State = ActionState.Idle; p.Cooldowns.Clear(); p.Health = p.MaxHealth; p.Invulnerable = 0; p.X = 500; p.Y = 500;
             check(w.TryStartPlayerDodge(V.UnitX), "dodge starts before periodic damage test");
             for (int i = 0; i < 6; i++) w.Step(Dt);
-            check(w.Damage(enemy, p, 5, "fire", periodic: true) && p.State == ActionState.Staggered && !World.DodgeImmune(p), "periodic damage retains existing effect and interrupts dodge");
+            check(w.Damage(enemy, p, 5, "fire", periodic: true) && p.Health == p.MaxHealth - 5 && p.State == ActionState.Dodging, "periodic damage hurts through a roll without taking control from the player");
+            w.CancelPlayerDodge();
             check(p.Invulnerable == 0, "periodic damage grants no post-hit immunity against the next direct hit");
             check(p.Cooldowns["dodge"] > 0, "interrupted dodge keeps cooldown");
             p.State = ActionState.Idle; p.StateRemaining = 0; p.Invulnerable = 0; p.Cooldowns.Clear(); p.X = 520; p.Y = 500;

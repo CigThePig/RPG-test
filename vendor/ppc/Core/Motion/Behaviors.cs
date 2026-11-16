@@ -262,6 +262,7 @@ namespace PixelCreatures.Core.Motion
                 ActionStyle.TailSwipe => 1.0,
                 ActionStyle.Spray => 1.3,
                 ActionStyle.Rear => 1.25,
+                ActionStyle.Charge => 1.2,
                 _ => 0.9,
             } * ts;
         }
@@ -397,18 +398,45 @@ namespace PixelCreatures.Core.Motion
                 }
                 case ActionStyle.Pounce:
                 {
-                    double crouch = Curves.Window(u, 0.0, 0.3, 0.36, 0.42);
-                    double air = Curves.Window(u, 0.4, 0.45, 0.62, 0.7);
-                    double hop = u > 0.4 && u < 0.7 ? DMath.Sin(DMath.Pi * (u - 0.4) / 0.3) : 0;
-                    p.Crouch += 0.45 * crouch + 0.25 * Curves.Window(u, 0.68, 0.72, 0.76, 0.95);
-                    p.Altitude += hop * leg * 0.55;
-                    p.BodyOffset = p.BodyOffset + new Vec3(hop * 0.12 * L, 0, 0);
-                    p.BodyPitch += 0.1 * air - 0.08 * Curves.Window(u, 0.6, 0.66, 0.7, 0.8);
-                    p.Squash += 0.22 * crouch - 0.2 * air + 0.25 * Curves.Window(u, 0.68, 0.71, 0.74, 0.86);
-                    p.FrontReach += 0.25 * air;
+                    // Gather low, leave the ground just before the strike and come down on it.
+                    double crouch = Curves.Window(u, 0.0, 0.2, 0.27, 0.33);
+                    double air = Curves.Window(u, 0.28, 0.32, 0.45, 0.52);
+                    double hop = u > 0.28 && u < 0.52 ? DMath.Sin(DMath.Pi * (u - 0.28) / 0.24) : 0;
+                    double land = Curves.Window(u, 0.5, 0.53, 0.58, 0.8);
+                    p.Crouch += 0.5 * crouch + 0.28 * land;
+                    p.Altitude += hop * leg * 0.6;
+                    p.BodyOffset = p.BodyOffset + new Vec3((hop * 0.12 - crouch * 0.05) * L, 0, 0);
+                    p.BodyPitch += 0.12 * air - 0.1 * land;
+                    p.Squash += 0.22 * crouch - 0.2 * air + 0.25 * land;
+                    p.FrontReach += 0.28 * air;
+                    p.LegTuck = Math.Max(p.LegTuck, 0.25 * air);
+                    p.EarPitch -= 0.9 * Curves.Window(u, 0.02, 0.2, 0.6, 0.9);
+                    p.TailPitch += 0.35 * air;
                     p.TailYaw += DMath.Sin(u * 40) * 0.35 * crouch;
-                    p.Jaw = Math.Max(p.Jaw, 0.6 * air);
+                    p.Jaw = Math.Max(p.Jaw, 0.75 * Curves.Window(u, 0.3, 0.4, 0.47, 0.56));
+                    p.HeadRoll += Curves.Shake(u, 0.5, 0.7, 9) * 0.12;
                     if (u > 0.05 && u < 0.85) p.Mood = EyeMood.Angry;
+                    break;
+                }
+                case ActionStyle.Charge:
+                {
+                    // Scrape the ground and sink back on the haunches, then drop the head and go.
+                    double paw = Curves.Window(u, 0.04, 0.14, 0.34, 0.44);
+                    double go = Curves.Window(u, 0.36, 0.45, 1.0, 1.01);
+                    p.Crouch += 0.3 * paw;
+                    p.Squash += 0.1 * paw;
+                    p.BodyOffset = p.BodyOffset + new Vec3((-0.06 * paw + 0.07 * go) * L, 0, 0);
+                    p.BodyPitch += 0.08 * Curves.Window(u, 0.0, 0.1, 0.2, 0.32) - 0.14 * go;
+                    p.NeckPitch += -0.5 * Curves.Window(u, 0.1, 0.34, 1.0, 1.01);
+                    p.HeadPitch += -0.34 * Curves.Window(u, 0.12, 0.36, 1.0, 1.01);
+                    p.FrontLift += Math.Abs(DMath.Sin(u * DMath.TwoPi * 3.6)) * 0.38 * paw;
+                    p.HeadRoll += Curves.Shake(u, 0.08, 0.42, 6) * 0.1;
+                    p.EarPitch -= Curves.Window(u, 0.05, 0.2, 1.0, 1.01);
+                    p.TailPitch += 0.5 * Curves.Window(u, 0.05, 0.25, 1.0, 1.01);
+                    p.TailYaw += DMath.Sin(u * 36) * 0.4 * paw;
+                    p.Jaw = Math.Max(p.Jaw, 0.3 * paw);
+                    p.WingFold = Math.Max(p.WingFold, go);
+                    if (u > 0.04) p.Mood = EyeMood.Angry;
                     break;
                 }
                 case ActionStyle.PincerSnap:

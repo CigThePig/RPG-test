@@ -19,12 +19,12 @@ public static class AdventureChecks
                 var watch=System.Diagnostics.Stopwatch.StartNew();var r=Regions.Dungeon(seed);double generation=watch.Elapsed.TotalMilliseconds;
                 w.RegionsById["ruin"]=r;watch.Restart();w.Enter(w.Player,"ruin");double population=watch.Elapsed.TotalMilliseconds;
                 var enemies=w.Actors.Values.Where(a=>a.Region=="ruin"&&a.Id!="player").OrderBy(a=>a.Id,StringComparer.Ordinal).ToArray();
-                check(enemies.Length==8,"adventure bounded eight-actor population "+seed);
+                check(enemies.Length==10,"adventure bounded ten-actor population "+seed);
                 var entrance=r.RoomAt(r.Entrance%r.Width,r.Entrance/r.Width);
                 check(enemies.All(a=>r.CanStand(a.Position,a)&&r.RoomAt((int)(a.X/24),(int)(a.Y/24)) is { Kind:"room" } room&&room.Contains((int)(a.X/24),(int)(a.Y/24))&&room!=entrance),"adventure actual-room spawns and safe entrance "+seed);
                 check(enemies.All(a=>r.Features.Keys.All(at=>V.Distance(a.Position,r.Center(at))>=48)),"adventure features clear "+seed);
                 foreach(var room in r.Rooms)
-                    check(enemies.Count(a=>room.Contains((int)(a.X/24),(int)(a.Y/24)))<=(room.Tiles().Count()>=100?2:1),"adventure room density "+seed+"/"+room.X+","+room.Y);
+                    check(enemies.Count(a=>room.Contains((int)(a.X/24),(int)(a.Y/24)))<=(room.Tiles().Count()>=100&&enemies.Any(a=>a.CombatProfile=="alpha"&&room.Contains((int)(a.X/24),(int)(a.Y/24)))?3:room.Tiles().Count()>=64?2:1),"adventure room density "+seed+"/"+room.X+","+room.Y);
                 string positions=JsonSerializer.Serialize(enemies.Select(a=>new{a.Id,a.CombatProfile,a.X,a.Y}));
                 var planned=new List<ActorState>();
                 foreach(var actor in enemies)
@@ -38,7 +38,7 @@ public static class AdventureChecks
                 check(positions==JsonSerializer.Serialize(w.Actors.Values.Where(a=>a.Id.StartsWith("ruin:spawn:")).OrderBy(a=>a.Id,StringComparer.Ordinal).Select(a=>new{a.Id,a.CombatProfile,a.X,a.Y})),"adventure revisit preserves actors "+seed);
                 var killed=w.Actors[enemies[0].Id];w.Damage(w.Player,killed,10000,"magic"); // Explicit persistence fixture, not combat proof.
                 string corpse=Persistence.Capture(w,n);Persistence.Restore(w,n,corpse);w.Enter(w.Player,"reach");w.Enter(w.Player,"ruin");
-                check(!w.Actors[killed.Id].Alive&&w.Actors.Count(a=>a.Key.StartsWith("ruin:spawn:"))==8,"defeated actor survives save and revisit without duplication "+seed);
+                check(!w.Actors[killed.Id].Alive&&w.Actors.Count(a=>a.Key.StartsWith("ruin:spawn:"))==10,"defeated actor survives save and revisit without duplication "+seed);
                 foreach(var a in enemies)w.Actors.Remove(a.Id); // Explicit no-actors persistence fixture, not combat proof.
                 w.Enter(w.Player,"reach");w.Enter(w.Player,"ruin");
                 check(!w.Actors.Keys.Any(id=>id.StartsWith("ruin:spawn:")),"adventure empty population never respawns "+seed);

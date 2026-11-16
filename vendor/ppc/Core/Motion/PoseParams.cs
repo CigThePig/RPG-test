@@ -51,6 +51,8 @@ namespace PixelCreatures.Core.Motion
         public double ArmSide;
         /// <summary>0..1 legs fold into the resting pose.</summary>
         public double LegTuck;
+        /// <summary>0..1 limbs stop standing and hang from the body wherever it has fallen.</summary>
+        public double LegLimp;
         /// <summary>Front legs reach forward (pounces, bracing) in body lengths.</summary>
         public double FrontReach;
         /// <summary>Front leg pair lifts off the ground (threat displays, rearing) 0..1.</summary>
@@ -107,6 +109,7 @@ namespace PixelCreatures.Core.Motion
                 ArmReach = DMath.Lerp(a.ArmReach, b.ArmReach, t),
                 ArmSide = DMath.Lerp(a.ArmSide, b.ArmSide, t),
                 LegTuck = DMath.Lerp(a.LegTuck, b.LegTuck, t),
+                LegLimp = DMath.Lerp(a.LegLimp, b.LegLimp, t),
                 FrontReach = DMath.Lerp(a.FrontReach, b.FrontReach, t),
                 FrontLift = DMath.Lerp(a.FrontLift, b.FrontLift, t),
                 EyeOpen = DMath.Lerp(a.EyeOpen, b.EyeOpen, t),

@@ -21,6 +21,11 @@ public sealed class GameplayReplay
     readonly List<string> tacticalActors = new();
     int tacticalStarts, tacticalReleases, tacticalCollisions, tacticalAvoidances, tacticalCancels, tacticalTerrainCollisions, tacticalDodgeAvoidances;
     int presentationReleases, presentationCollisions, presentationDeaths;
+    // Enemy behaviour scenes: what the cast noticed and did, counted from world observations.
+    readonly Dictionary<string,int> behaviour = new();
+    void Count(string key) => behaviour[key]=behaviour.GetValueOrDefault(key)+1;
+    int Seen(string key) => behaviour.GetValueOrDefault(key);
+    int evadeAt=-1;
     readonly HashSet<string> presentationVictims = new();
     readonly Dictionary<string, string> fixtureFactions = new();
     int turnSign, turnChanges;
@@ -77,6 +82,19 @@ public sealed class GameplayReplay
         new("tactics-wall",180,new(660,300),Vector2.Zero),
         new("tactics-dodge",180,new(300,300),Vector2.Zero),
         new("tactics-interrupt",120,new(300,300),Vector2.Zero),
+        new("behaviour-notice",200,new(300,300),Vector2.Zero),
+        new("behaviour-pack",420,new(300,300),Vector2.Zero),
+        new("behaviour-pounce",170,new(300,300),Vector2.Zero),
+        new("behaviour-charge",230,new(300,300),Vector2.Zero),
+        new("behaviour-guard",190,new(300,300),Vector2.Zero),
+        new("behaviour-ambush",260,new(300,300),Vector2.Zero),
+        new("behaviour-rally",300,new(300,300),Vector2.Zero),
+        new("behaviour-sneak",300,new(300,300),Vector2.Zero),
+        new("behaviour-noise",200,new(300,300),Vector2.Zero),
+        new("behaviour-shell",200,new(300,300),Vector2.Zero),
+        new("behaviour-glob",330,new(300,300),Vector2.Zero),
+        new("behaviour-rout",240,new(300,300),Vector2.Zero),
+        new("behaviour-mend",300,new(300,300),Vector2.Zero),
         new("turn-south-north",100,new(300,300),Vector2.Up)
     };
     public GameplayReplay(Foundation owner)
@@ -106,6 +124,24 @@ public sealed class GameplayReplay
                 if(e.Kind==CombatPresentationKind.DefensiveAvoidance){tacticalAvoidances++;if(e.Outcome=="dodge")tacticalDodgeAvoidances++;}
                 if(e.Kind==CombatPresentationKind.AttackCanceled)tacticalCancels++;
                 app.Trace.Write(new { kind="tactical-event", scenario=app.Trace.Scenario, tick=e.Tick, frame=Engine.GetFramesDrawn(), actor=e.ActorId, ability=e.AbilityId, outcome=e.Outcome, observation=e.Kind.ToString() });
+            }
+            if (app.Trace.Scenario.StartsWith("behaviour-"))
+            {
+                bool cast=tacticalActors.Contains(e.ActorId);
+                if(cast && e.Kind==CombatPresentationKind.Alerted)Count("alerted/"+e.Outcome);
+                if(cast && e.Kind==CombatPresentationKind.AttackStarted)Count("start/"+e.AbilityId);
+                if(cast && e.Kind==CombatPresentationKind.ChargeStarted)Count("charge");
+                if(cast && e.Kind==CombatPresentationKind.ChargeCrashed)Count("crash");
+                if(cast && e.Kind==CombatPresentationKind.Rallied)Count("rally");
+                if(cast && e.Kind==CombatPresentationKind.Hit)Count("hit/"+e.AbilityId);
+                if(cast && e.Kind==CombatPresentationKind.Miss)Count("miss/"+e.AbilityId);
+                if(tacticalActors.Contains(e.TargetId) && e.Kind==CombatPresentationKind.GuardBroken)Count("guard-broken");
+                if(tacticalActors.Contains(e.TargetId) && e.Kind==CombatPresentationKind.Hit && e.Outcome=="guarded")Count("guarded");
+                if(tacticalActors.Contains(e.TargetId) && e.Kind==CombatPresentationKind.Hit && e.Outcome is "ambush" or "blocked")Count(e.Outcome);
+                if(cast && e.Kind is CombatPresentationKind.Heard or CombatPresentationKind.Woke or CombatPresentationKind.Disturbed or CombatPresentationKind.BlastLaunched or CombatPresentationKind.BlastLanded)Count(e.Kind.ToString().ToLowerInvariant());
+                if(cast && e.Kind==CombatPresentationKind.Shaken)Count("shaken/"+e.Outcome);
+                if(cast || tacticalActors.Contains(e.TargetId))
+                    app.Trace.Write(new { kind="behaviour-event", scenario=app.Trace.Scenario, tick=e.Tick, frame=Engine.GetFramesDrawn(), actor=e.ActorId, target=e.TargetId, ability=e.AbilityId, outcome=e.Outcome, observation=e.Kind.ToString() });
             }
             if (app.Trace.Scenario.StartsWith("presentation-") && (e.ActorId == "player" || e.ActorId == presentationEnemy))
             {
@@ -288,12 +324,16 @@ public sealed class GameplayReplay
                     string id=s.Id=="tactics-brute" || s.Id=="tactics-interrupt" ? "brute" : s.Id=="tactics-prowler" || s.Id=="tactics-spacing" ? "prowler" : s.Id=="tactics-mixed" ? new[]{"prowler","brute","spitter"}[i] : "spitter";
                     w.SetAppearance(a,new Appearance { Family=id=="brute" ? "reptile" : id=="spitter" ? "amorphous" : "quadruped", Seed=(ulong)(42+i) });
                     a.Region=p.Region; a.CombatProfile=id;
-                    a.Abilities=w.Content.CombatProfiles.Single(c=>c.Id==id).Priorities.Keys.ToList();
+                    a.Abilities=w.Content.CombatProfiles.Single(c=>c.Id==id).Loadout();
                     a.X=s.Id=="tactics-wall" ? 520 : s.Id=="tactics-interrupt" ? 328 : id=="brute" ? 380 : 440+i*4;
                     a.Y=300+(s.Id=="tactics-mixed" ? (i-1)*45 : s.Id=="tactics-spacing" ? i*3 : 0);
                     a.HomeX=a.X;a.HomeY=a.Y;a.Speed=id=="prowler" ? 88 : id=="brute" ? 46 : 62;
                     a.Health=a.MaxHealth=1000;a.Mana=a.MaxMana=60;a.Invulnerable=0;
-                    a.Statuses.Clear();a.Cooldowns.Clear();a.Target="";a.NextTacticalTime=0;a.TacticalIntent="";
+                    a.Statuses.Clear();a.Target="";a.TacticalIntent="";
+                    // Posted facing the player: each fight opens with a production sighting.
+                    EnemyMind.Resettle(a,a.Position,p.Position-a.Position);
+                    // A guard already worn down by an earlier exchange, so one clean blow breaks it.
+                    if(s.Id=="tactics-interrupt"){a.Poise=4;a.PoiseDelay=CombatTuning.PoiseRecoverySeconds;}
                     if(s.Id is "tactics-straight" or "tactics-homing" or "tactics-wall" or "tactics-dodge")
                     {
                         a.Speed=0; a.Abilities=new(){s.Id=="tactics-homing" ? "fixture_homing" : "spit"};
@@ -302,6 +342,54 @@ public sealed class GameplayReplay
                     tacticalActors.Add(a.Id);
                 }
                 presentationEnemy=enemies[0].Id;
+                app.RebuildViews();app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
+            }
+            if(s.Id.StartsWith("behaviour-"))
+            {
+                var w=app.World;
+                map.Features.Clear();
+                tacticalActors.Clear(); behaviour.Clear(); evadeAt=-1;
+                foreach(var a in w.Actors.Values.Where(a=>a.Id!="player"))a.Region="reach";
+                w.Projectiles.Clear(); w.Cancel(p); p.X=s.Start.X; p.Y=s.Start.Y;
+                p.Health=p.MaxHealth=10000; p.Invulnerable=0; p.Cooldowns.Clear(); p.Statuses.Clear();
+                // Kind, offset from the player, and whether it is posted looking at the player.
+                (string Kind,float X,float Y,bool Watching)[] cast=s.Id switch
+                {
+                    "behaviour-notice" => new[]{("prowler",150f,0f,true),("prowler",215f,45f,false),("prowler",220f,-50f,false)},
+                    "behaviour-pack" => new[]{("prowler",120f,-30f,true),("prowler",140f,20f,true),("prowler",150f,60f,true),("prowler",170f,-60f,true),("prowler",185f,5f,true)},
+                    "behaviour-pounce" => new[]{("prowler",100f,0f,true)},
+                    "behaviour-charge" => new[]{("brute",140f,0f,true)},
+                    "behaviour-guard" => new[]{("brute",34f,0f,true)},
+                    "behaviour-ambush" => new[]{("stalker",150f,10f,false)},
+                    "behaviour-sneak" => new[]{("prowler",76f,0f,false)},
+                    "behaviour-noise" => new[]{("prowler",62f,0f,false)},
+                    "behaviour-shell" => new[]{("shellback",36f,0f,true)},
+                    "behaviour-glob" => new[]{("spitter",150f,0f,true)},
+                    "behaviour-rout" => new[]{("alpha",38f,0f,true),("prowler",80f,-45f,true),("prowler",85f,45f,true)},
+                    "behaviour-mend" => new[]{("mender",130f,-40f,true),("prowler",70f,30f,true)},
+                    _ => new[]{("howler",120f,-45f,true),("prowler",95f,40f,true)}
+                };
+                var bodies=w.Actors.Values.Where(a=>a.Profile=="beast").OrderBy(a=>a.Id,StringComparer.Ordinal).Take(cast.Length).ToArray();
+                for(int i=0;i<bodies.Length;i++)
+                {
+                    var a=bodies[i]; w.Cancel(a);
+                    string id=cast[i].Kind;
+                    w.SetAppearance(a,new Appearance { Family=EnemyRoster.Archetypes[id].Family, Seed=(ulong)(42+i) });
+                    a.Region=p.Region; a.CombatProfile=id; a.Abilities=w.Content.CombatProfiles.Single(c=>c.Id==id).Loadout();
+                    a.Speed=EnemyRoster.Archetypes[id].Speed;
+                    a.Health=a.MaxHealth=1000;a.Mana=a.MaxMana=60;a.Invulnerable=0;a.Statuses.Clear();a.Target="";a.TacticalIntent="";
+                    var at=new V(p.X+cast[i].X,p.Y+cast[i].Y);
+                    EnemyMind.Resettle(a,at,cast[i].Watching ? p.Position-at : at-p.Position);
+                    // Scene dressing: a sleeper to creep up on, a leader one blow from falling, a patient for the mender.
+                    a.Sleeper=s.Id=="behaviour-sneak";
+                    // Facing away when the roll comes: the first idle glance waits until just after it.
+                    if(s.Id=="behaviour-noise")a.NextTacticalTime=w.Time+.6;
+                    if(s.Id=="behaviour-rout" && id=="alpha")a.Health=1;
+                    if(s.Id=="behaviour-mend" && id=="prowler")a.Health=300;
+                    tacticalActors.Add(a.Id);
+                }
+                w.Hazards.Clear();
+                presentationEnemy=bodies[0].Id;
                 app.RebuildViews();app.Views[p.Id].Creature.Motor!.Teleport(new PixelCreatures.Core.Vec3(p.X,0,p.Y),0);
             }
             origin=p.Position;
@@ -328,11 +416,40 @@ public sealed class GameplayReplay
             }
             if(test.Id=="tactics-spitter" && local>=120 && local<165)direction=Vector2.Right;
             if(test.Id=="tactics-brute" && local>=95 && local<120)direction=Vector2.Left;
-            if(test.Id=="tactics-interrupt" && local==20)TapAction("attack");
+            // Strike once the brute has noticed, barked and begun its sweep.
+            if(test.Id=="tactics-interrupt" && local==72)TapAction("attack");
             if(local%6==0)
                 app.Trace.Write(new { kind="tactical-state", scenario=test.Id, tick=w.Tick, frame=Engine.GetFramesDrawn(),
                     actors=tacticalActors.Select(id=>new { id, profile=w.Actors[id].CombatProfile, intent=w.Actors[id].TacticalIntent, x=w.Actors[id].X, y=w.Actors[id].Y, action=w.Actors[id].State.ToString() }).ToArray(),
                     projectiles=w.Projectiles.Select(p=>new { p.Ability, mode=w.FindAbility(p.Ability)?.Projectile?.Mode ?? "legacy", p.X,p.Y,p.HeadingX,p.HeadingY }).ToArray() });
+        }
+        if(test.Id.StartsWith("behaviour-"))
+        {
+            var w=app.World;
+            // Roll out of the committed line once the leap or charge is under way. A roll clears
+            // it under every movement preset; walking alone does not under the slower ones.
+            if(test.Id is "behaviour-pounce" or "behaviour-charge" && tacticalActors.Any(id=>w.Actors[id].PendingAbility is "pounce" or "charge" || app.Views[id].Charging))
+            {
+                direction=Vector2.Down;
+                if(evadeAt<0)evadeAt=local+(test.Id=="behaviour-charge" ? 30 : 2);
+                if(local==evadeAt)TapAction("dodge");
+            }
+            if(test.Id=="behaviour-guard" && local is 40 or 82 or 124)TapAction("attack");
+            // Walk toward the dormant stalker until it stirs, however fast this preset walks.
+            if(test.Id=="behaviour-ambush" && local>=40 && tacticalActors.All(id=>w.Actors[id].Awareness==Awareness.Unaware))direction=Vector2.Right;
+            // Creep up on the sleeper at half a stick, however fast this preset walks, and strike once in reach.
+            if(test.Id=="behaviour-sneak" && local>=30 && evadeAt<0)
+            {
+                if(V.Distance(w.Player.Position,w.Actors[tacticalActors[0]].Position)>38)direction=Vector2.Right*.5f;
+                else { evadeAt=local; TapAction("attack"); }
+            }
+            // A roll behind a prowler's back; blows on a shellback's front; one blow for a wounded alpha.
+            if(test.Id=="behaviour-noise" && local==20)TapAction("dodge");
+            if(test.Id=="behaviour-shell" && local is 60 or 110 or 160)TapAction("attack");
+            if(test.Id=="behaviour-rout" && local is 70 or 115 or 160)TapAction("attack");
+            if(local%6==0)
+                app.Trace.Write(new { kind="behaviour-state", scenario=test.Id, tick=w.Tick, frame=Engine.GetFramesDrawn(),
+                    actors=tacticalActors.Select(id=>new { id, profile=w.Actors[id].CombatProfile, awareness=w.Actors[id].Awareness.ToString(), intent=w.Actors[id].TacticalIntent, x=w.Actors[id].X, y=w.Actors[id].Y, action=w.Actors[id].State.ToString(), stance=app.Views[id].Stance.ToString() }).ToArray() });
         }
         if(test.Id.EndsWith("-route"))
         {
@@ -524,7 +641,7 @@ public sealed class GameplayReplay
             if(s.Id=="telegraph-dodge" && (warningImpacts!=1 || warningAvoidances!=1 || p.Health!=p.MaxHealth)) throw new InvalidOperationException("Dodge did not avoid incoming bite");
         }
         if(s.Id=="presentation-fatal" && (presentationDeaths!=1 || app.World.Actors[presentationEnemy].Alive ||
-            !app.World.Items.HasLoot(presentationEnemy) || app.Views[presentationEnemy].Creature.Motor!.RestProgress<.2))
+            !app.World.Items.HasLoot(presentationEnemy) || app.Views[presentationEnemy].Creature.Motor!.DeathProgress<.2))
             throw new InvalidOperationException("Fatal hit did not leave a recognizable lootable defeated actor");
         if(s.Id=="presentation-crowd" && (presentationVictims.Count<3 || !presentationVictims.Contains("player")))
             throw new InvalidOperationException("Cone did not produce separate real hit events for all three victims");
@@ -547,8 +664,30 @@ public sealed class GameplayReplay
                 if(minimum<6)throw new InvalidOperationException("Crowd did not separate near-identical positions");
             }
             app.Trace.Write(new {kind="tactical-result", scenario=s.Id, tacticalStarts,tacticalReleases,tacticalCollisions,tacticalAvoidances,tacticalCancels,tacticalTerrainCollisions,tacticalDodgeAvoidances});
-            foreach(string id in tacticalActors){var a=app.World.Actors[id];app.World.Cancel(a);a.Region="reach";a.Abilities.Clear();a.CombatProfile="";}
+            foreach(string id in tacticalActors){var a=app.World.Actors[id];app.World.Cancel(a);a.Region="reach";a.Abilities.Clear();a.CombatProfile="";a.Statuses.Clear();EnemyMind.Calm(a);}
             tacticalActors.Clear();app.World.Projectiles.Clear();p.Invulnerable=0;
+        }
+        if(s.Id.StartsWith("behaviour-"))
+        {
+            void Expect(bool held,string what){ if(!held)throw new InvalidOperationException($"Behaviour scene {s.Id}: {what} ({string.Join(", ",behaviour.Select(x=>x.Key+"="+x.Value))})"); }
+            if(s.Id=="behaviour-notice")Expect(Seen("alerted/sighted")==1 && Seen("alerted/called")==2,"one sighting should call both packmates");
+            if(s.Id=="behaviour-pack")Expect(behaviour.Keys.Count(k=>k.StartsWith("start/"))>0 && tacticalActors.Count(id=>app.World.Actors[id].Awareness==Awareness.Engaged)==5,"the whole pack should engage and attack");
+            if(s.Id=="behaviour-pounce")Expect(Seen("start/pounce")>=1 && Seen("miss/pounce")>=1,"a sidestepped pounce should miss");
+            if(s.Id=="behaviour-charge")Expect(Seen("charge")>=1 && Seen("hit/charge")==0,"a sidestepped charge should not connect");
+            if(s.Id=="behaviour-guard")Expect(Seen("guarded")>=1 && Seen("guard-broken")>=1,"blows should glance off, then break the guard");
+            if(s.Id=="behaviour-ambush")Expect(Seen("alerted/sighted")==1 && Seen("start/sting")>=1,"the stalker should wake and sting");
+            if(s.Id=="behaviour-rally")Expect(Seen("rally")>=1,"the howler should rally its ally");
+            if(s.Id=="behaviour-sneak")Expect(Seen("ambush")==1 && Seen("alerted/sighted")==0 && Seen("alerted/hurt")==1,"a sleeper crept up on should be struck before it notices");
+            if(s.Id=="behaviour-noise")Expect(Seen("heard")==1 && behaviour.Keys.First(k=>k is "heard" or "alerted/sighted")=="heard","a roll behind a prowler's back should be heard before it is seen");
+            if(s.Id=="behaviour-shell")Expect(Seen("blocked")>=1,"blows on a shellback's front should be turned");
+            if(s.Id=="behaviour-glob")Expect(Seen("blastlaunched")>=1 && Seen("blastlanded")>=1,"the spitter should lob a glob that lands");
+            if(s.Id=="behaviour-rout")Expect(Seen("shaken/leader")==2,"both followers should break when the alpha falls");
+            if(s.Id=="behaviour-mend")Expect(Seen("rally")>=1,"the mender should tend its wounded ally");
+            app.Trace.Write(new {kind="behaviour-result", scenario=s.Id, observed=behaviour});
+            // Put the borrowed bodies back as they were lent: alive, awake and unprofiled.
+            foreach(string id in tacticalActors){var a=app.World.Actors[id];a.Health=a.MaxHealth;app.World.Cancel(a);a.Region="reach";a.Abilities.Clear();a.CombatProfile="";a.Statuses.Clear();a.Sleeper=false;EnemyMind.Calm(a);}
+            app.World.Hazards.Clear();
+            tacticalActors.Clear();app.World.Projectiles.Clear();p.Invulnerable=0;p.Statuses.Clear();
         }
         foreach(var pair in fixtureFactions)
         {
@@ -557,7 +696,7 @@ public sealed class GameplayReplay
         fixtureFactions.Clear();
         if (s.Id=="turn-south-north" && (turnChanges!=0 || Math.Abs(PixelCreatures.Core.DMath.WrapAngle(app.Views["player"].Creature.Motor!.Yaw-Math.PI/2))>.12)) throw new InvalidOperationException("South-to-north facing oscillated or did not complete");
         if(s.Id=="chest" && !app.World.RegionsById[p.Region].Depleted.Contains(12*64+18))throw new InvalidOperationException("Chest input interaction failed");
-        if(!valid||(!moved && !s.Id.StartsWith("telegraph-") && !s.Id.StartsWith("presentation-") && !s.Id.StartsWith("tactics-")))throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
+        if(!valid||(!moved && !s.Id.StartsWith("telegraph-") && !s.Id.StartsWith("presentation-") && !s.Id.StartsWith("tactics-") && !s.Id.StartsWith("behaviour-")))throw new InvalidOperationException($"Replay failed: {s.Id} at {p.Position}, blocked={app.World.LastBlockedReason}");
     }
     void Finish()
     {
