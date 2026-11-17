@@ -495,7 +495,9 @@ try:
                 capture(f'ruin-combat-{cycle+1}.png',wait=20)
             marks=re.findall(r'MOSSLIGHT_ENVIRONMENT_READY region=(\w+) walls=(\d+) decorations=(\d+) atlases=(\d+)',logs)
             state=marks[-1]
-            assert int(state[3])==3, 'Unbounded or missing environment atlas cache'
+            # The dungeon art pass replaced floor/wall atlases with shaders;
+            # this diagnostic now counts only the shared DungeonPropAtlas.
+            assert int(state[3])==1, 'Unbounded or missing shared dungeon prop atlas'
             assert int(state[2])<=96, 'Unbounded Android decoration count'
             previous=[r for r in regions if r['region']==region]
             if previous: assert previous[-1]['counts']==list(state[1:]), 'Android region views accumulate'
