@@ -61,7 +61,13 @@ public static class LandmarkChecks
         check(library.All(t=>encountered.Contains(t.Id)),"all five landmarks occur naturally across seed sample");
         check(Landmarks.Themes.All(themeSet.Contains),"all three themes occur in production");
         foreach(int theme in Enumerable.Range(0,3))foreach(int asset in Enumerable.Range(0,5))foreach(int variant in Enumerable.Range(0,3))
-            check(EnvironmentArtGenerator.PropModule(asset,variant,Landmarks.Themes[theme]).All(m=>m.Rect.Position.X>=1 && m.Rect.End.X<=25 && m.Rect.Position.Y>=0 && m.Rect.End.Y<=63),"bounded prop atlas recipe");
+        {
+            // Structural props stand on one tile: their solid foot stays within it.
+            var art=DungeonPropArt.Generate((DungeonProp)asset,theme*3+variant);
+            bool Solid(int x,int y){byte c=art[y*DungeonPropArt.Width+x];return c!=0 && c!=35 && c!=36 && c!=37;}
+            var foot=Enumerable.Range(0,DungeonPropArt.Width).Where(x=>Enumerable.Range(96,5).Any(y=>Solid(x,y))).ToArray();
+            check(foot.Length>=8 && foot.Min()>=17 && foot.Max()<=59 && art.All(n=>n<OverworldPropArt.Palette.Length),"bounded structural prop recipe "+theme+":"+asset+":"+variant);
+        }
         var invalidSaved=Regions.Dungeon(1);
         invalidSaved.Landmarks.SelectMany(l=>l.Anchors).First(a=>a.Collision=="terrain").Asset="records";
         try{Landmarks.ValidateSaved(invalidSaved);throw new Exception("Accepted invisible saved structure");}

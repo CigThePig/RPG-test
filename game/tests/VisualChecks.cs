@@ -454,6 +454,12 @@ public static class VisualChecks
         { await LandmarkVisualChecks.Run(app); GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--enemy-preview"))
         { await EnemyPreview.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--town-only"))
+        { await TownArtChecks.Rendered(app);await TownGenerationChecks.Rendered(app);GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--town-preview"))
+        { await TownPreview.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--dungeon-preview"))
+        { await DungeonPreview.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--overworld-preview"))
         { await OverworldPreview.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--overworld-props-only"))
@@ -464,8 +470,10 @@ public static class VisualChecks
         {
             app.World.Enter(app.World.Player,"ruin");
             await DungeonVisualChecks.Run(app); await WallDepthChecks.Run(app);
-            await EnvironmentVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return;
+            await EnvironmentVisualChecks.Run(app); await DungeonArtVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return;
         }
+        if(OS.GetCmdlineUserArgs().Contains("--dungeon-art-only"))
+        { await DungeonArtVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--wall-depth-only"))
         {
             await WallDepthChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return;
@@ -706,6 +714,7 @@ public static class VisualChecks
         await WallDepthChecks.Run(app);
         await EnvironmentVisualChecks.Run(app);
         await LandmarkVisualChecks.Run(app);
+        await DungeonArtVisualChecks.Run(app);
         await AdventurePanels(app);
         app.World.Enter(app.World.Player, "reach");
         if (app.Ui.MobileLayout) await Capture(app, "controls");

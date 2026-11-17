@@ -143,6 +143,8 @@ public partial class Foundation : Node2D
     string drawnRegion = "";
     readonly List<FeatureView> features = new();
     readonly List<TerrainWallRow> wallRows = new();
+    readonly List<DungeonClutter> clutter = new();
+    readonly List<Node2D> town = new();
     readonly List<EnvironmentDecoration> decorations = new();
     readonly List<OverworldFlora> flora = new();
     public bool CollisionDebug { get; set; }
@@ -307,6 +309,8 @@ public partial class Foundation : Node2D
         SelectFeel(MovementFeel.Presets.FirstOrDefault(x=>x.Id==preset) ?? MovementFeel.Presets[1]);
         if(OS.GetCmdlineUserArgs().Contains("--validate-landmarks"))
         { GD.Print($"LANDMARK VALIDATION PASSED: {Landmarks.Library.Count} templates");GetTree().Quit();return; }
+        if(OS.GetCmdlineUserArgs().Contains("--export-assets"))
+        { GD.Print($"ASSET LIBRARY EXPORTED: {AssetLibrary.Export("docs/asset-library")} modules in {AssetLibrary.Sheets.Count} sheets");GetTree().Quit();return; }
         var dump=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--dump-dungeons="))?.Split('=',2)[1];
         if(dump!=null)
         { foreach(int seed in dump.Split(',').Select(int.Parse))GD.Print(DungeonLayout.Ascii(Regions.Dungeon(seed)));GetTree().Quit();return; }
@@ -569,10 +573,10 @@ public partial class Foundation : Node2D
             World.Enter(World.Player,World.Player.Region=="ruin"?"reach":"ruin");
             TouchMovement=ControllerVelocity=Vector2.Zero;Ui.Stick.Cancel();RebuildViews();
             BuildTerrain();drawnRegion=World.Player.Region;
-            _=EnvironmentAssetCache.Floors;_=EnvironmentAssetCache.Walls;_=EnvironmentAssetCache.Props;ResumeGame();
+            _=DungeonPropAtlas.Texture;ResumeGame();
             var activeRegion=World.RegionsById[World.Player.Region];
             GD.Print($"MOSSLIGHT_LANDMARK_READY region={activeRegion.Id} rooms={activeRegion.Landmarks.Count} structures={activeRegion.Landmarks.Sum(l=>l.Anchors.Count(a=>a.Collision=="terrain"))} templates={string.Join(",",activeRegion.Landmarks.Select(l=>l.Template).Distinct())}");
-            GD.Print($"MOSSLIGHT_ENVIRONMENT_READY region={World.Player.Region} walls={wallRows.Count} decorations={decorations.Count} atlases={EnvironmentAssetCache.TextureCount}");
+            GD.Print($"MOSSLIGHT_ENVIRONMENT_READY region={World.Player.Region} walls={wallRows.Count} decorations={decorations.Count} atlases={DungeonPropAtlas.BuildCount}");
             GetViewport().SetInputAsHandled();return;
         }
         if (e.IsActionPressed("menu"))
@@ -749,8 +753,32 @@ public partial class Foundation : Node2D
         if(r.Rooms.Count==0 && OverworldAtmosphere.Enabled)ground.AddChild(new OverworldAtmosphere {Region=r,ZIndex=30});
         foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
         wallRows.Clear();
+        foreach (var row in clutter) { actors.RemoveChild(row); row.QueueFree(); }
+        clutter.Clear();
         wallRows.AddRange(TerrainWallRow.Create(r));
+        if(DungeonArt.Is(r))
+        {
+            var surface=new DungeonSurface(r);
+            ground.AddChild(new DungeonGroundRenderer {Surface=surface,ZIndex=-1});
+            ground.AddChild(new ReachAmbienceDriver {ReducedMotion=()=>Ui.Preferences.ReducedMotion});
+            ground.AddChild(new DungeonLight {Surface=surface,ZIndex=30,Lantern=()=>Views.TryGetValue("player",out var view)?view.Position:GodotConvert.GroundToScreen(World.Player.X,World.Player.Y)});
+            var fixtures=DungeonDressing.Fixtures(r,surface.Masonry).ToLookup(f=>f.Y);
+            foreach(var row in wallRows){row.Surface=surface;row.Dress(fixtures[row.Row].ToArray());}
+            clutter.AddRange(DungeonClutter.Create(r,surface.Masonry));
+        }
         foreach (var row in wallRows) actors.AddChild(row);
+        foreach (var row in clutter) actors.AddChild(row);
+        foreach (var piece in town) { actors.RemoveChild(piece); piece.QueueFree(); }
+        town.Clear();
+        if(TownStage.For(r) is {} plan)
+        {
+            // Paving lies on the turf, under everything that stands.
+            ground.AddChild(new TownPaving {Region=r,Plan=plan});
+            foreach (var row in wallRows) { row.Town=plan; row.Region=r; }
+            town.AddRange(TownView.Create(plan));
+            town.AddRange(TownRoof.Create(plan,r.Seed,()=>new Vector2(World.Player.X,World.Player.Y),()=>Ui.Preferences.ReducedMotion));
+            foreach (var piece in town) actors.AddChild(piece);
+        }
         foreach(var decoration in decorations) { actors.RemoveChild(decoration); decoration.QueueFree(); }
         decorations.Clear();
         decorations.AddRange(EnvironmentDecoration.Create(r,art));
@@ -922,6 +950,8 @@ public partial class TerrainView : Node2D
         var buildTimer = System.Diagnostics.Stopwatch.StartNew();
         foreach(var oldBatch in batches)oldBatch.Dispose();
         batches.Clear();
+        // Ruins are painted by DungeonGroundRenderer and TerrainWallRow.
+        if(DungeonArt.Is(Region)){LastVertexBytes=0;LastBuildMilliseconds=buildTimer.Elapsed.TotalMilliseconds;if(BuildCount==1)FirstBuildMilliseconds=LastBuildMilliseconds;return;}
         var batch=new TerrainBatch();batches.Add(batch);
         // Ground layers do not overlap: group by texture so the engine can batch them.
         for (int y = 0; y < Region.Height; y++)
@@ -931,6 +961,8 @@ public partial class TerrainView : Node2D
                 // The Living Reach surface is opaque over the complete water footprint.
                 // Avoid a redundant water fill underneath its palette shader.
                 if(Region.Rooms.Count==0 && ((tile==Terrain.Water && OverworldWaterRenderer.UseLivingReach) || (OverworldGroundRenderer.Enabled && tile is Terrain.Grass or Terrain.Earth) || (OverworldRockRenderer.Enabled && tile==Terrain.Rock)))continue;
+                // A town's block houses paint their own floors and walls.
+                if(tile is Terrain.Wall or Terrain.Floor && TownStage.For(Region)!=null)continue;
                 var color = tile switch
                 {
                     Terrain.Water => new Color(.19f, .33f, .35f),
@@ -944,19 +976,6 @@ public partial class TerrainView : Node2D
             }
 
         batch.Draw(this);
-        var floorBatch=new TerrainBatch { Texture=EnvironmentAssetCache.Floors };batches.Add(floorBatch);
-        for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
-            if(Region.Tiles[y*Region.Width+x]==Terrain.Floor)
-            {
-                int variant=(int)(EnvironmentStyle.Hash(Region.Seed,x,y)&15);
-                floorBatch.Sprite(new Rect2(GodotConvert.GroundToScreen(x*24,y*24),new Vector2(24,12)),new Rect2(variant*24,0,24,12),EnvironmentThemes.Tint(EnvironmentThemes.At(Region,x,y)));
-            }
-        floorBatch.Draw(this);
-        var landmarkGround = new TerrainBatch(); batches.Add(landmarkGround);
-        foreach(var room in Region.Landmarks)
-            foreach(var anchor in room.Anchors.Where(a=>a.Collision=="cosmetic"))
-                EnvironmentArtGenerator.GroundDetail(landmarkGround,GodotConvert.GroundToScreen((room.OriginX+anchor.X+.5f)*24,(room.OriginY+anchor.Y+.5f)*24),anchor,room.Theme);
-        landmarkGround.Draw(this);
         batch=new TerrainBatch();batches.Add(batch);
         foreach (var(terrain, key)in new[]
         {

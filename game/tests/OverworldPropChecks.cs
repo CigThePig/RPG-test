@@ -67,7 +67,7 @@ public static class OverworldPropChecks
         }
         finally{ReachAmbience.PreviewTime=held;}
         var dungeon=EnvironmentDecoration.Create(Regions.Dungeon(42),art);
-        check(dungeon.All(d=>d.ReachModule<0),"dungeon keeps its existing prop renderer");foreach(var d in dungeon)d.Free();
+        check(dungeon.All(d=>d.ReachModule<0),"ruin props never use Reach modules");foreach(var d in dungeon)d.Free();
         var w=app.World;string snapshot=Persistence.Capture(w,app.Narrative);
         try
         {

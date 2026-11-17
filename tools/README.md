@@ -15,6 +15,12 @@ For interface design review, `godot --path . -- --visual-check --mobile-ui --ui-
 
 For enemy work, `godot --headless --path . -- --enemy-animation-sheets[=prowler,brute]` writes contact sheets of every posture, reaction, attack and death to `build/enemy-animation/` without a display, and `godot --path . -- --visual-check --enemy-preview` stages each behaviour beat in the combat lab and captures it to `build/enemy-preview/`, and `godot --headless --path . -- --enemy-encounter-report[=alpha,depths]` has a scripted duelist fight every lab encounter at normal health and tabulates the outcomes in `build/enemy-encounters.json`. None of them asserts anything. `python3 tools/verify.py --headless --test-only=EnemyBehaviorChecks,EnemyAnimationChecks` runs only the named suites; add `--test-keep-going` to list every failure instead of stopping at the first. See [enemy behaviour and animation](../docs/ENEMY_BEHAVIOR.md).
 
+For dungeon art review, `godot --path . -- --visual-check --mobile-ui --dungeon-preview` writes production captures of three ruins (every theme, hall, gate and mechanism) and the ruin atlas to `build/dungeon-preview/`; add `--preview-clean` to hide the interface. It asserts nothing. `--dungeon-art-only` runs the rendered ruin art checks and rewrites `docs/dungeon-screenshots/`. See [dungeon art direction](../docs/DUNGEON_ART_DIRECTION.md).
+
+For towns, `--town-preview` writes captures of a hand-laid reference town of block houses, inside and out, and the furniture atlas to `build/town-preview/`, and `--town-only` runs the rendered town check. See [town kit](../docs/TOWN_ASSETS.md).
+
+`godot --headless --path . -- --export-assets` renders the [asset library](../docs/ASSET_LIBRARY.md) to `docs/asset-library/` (sheets, previews, manifest and palette).
+
 For overworld art review, `godot --path . -- --visual-check --mobile-ui --overworld-preview` writes five production captures and the prop atlas to `build/preview/` in about twenty seconds; add `--preview-clean` to hide the interface. It asserts nothing.
 
 `tools/build-host.py` is a compiler fallback for Linux hosts where process inspection prevents normal MSBuild. It needs `DOTNET_ROOT`, `GODOT_MONO_ROOT`, and restored Godot source-generator packages; standard builds do not need it.

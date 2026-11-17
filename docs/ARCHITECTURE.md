@@ -74,7 +74,7 @@ This is presentation only: no terrain, footprint, actor position, movement, gate
 
 ## PR5 Part 2 environment presentation
 
-See [PR5_PART2_HANDOFF.md](PR5_PART2_HANDOFF.md) for the shared floor/wall atlases, cosmetic hashing, PPC natural-art pivots, bounded nonblocking decoration, production reference scenes and exact-source verification. Region/gameplay authority and Part 1 front-edge wall Y sorting remain unchanged. `--visual-check --environment-only` runs focused real-renderer references and repeated region rebuild measurements; add `--mobile-ui` for the phone layout.
+The ruin renderer is now described in [DUNGEON_ART_DIRECTION.md](DUNGEON_ART_DIRECTION.md); the PR5 floor, wall and prop atlases it replaced are recorded in [PR5_PART2_HANDOFF.md](PR5_PART2_HANDOFF.md), which still covers cosmetic hashing, PPC natural-art pivots, bounded nonblocking decoration, production reference scenes and exact-source verification. Region/gameplay authority and Part 1 front-edge wall Y sorting remain unchanged. `--visual-check --environment-only` runs focused real-renderer references and repeated region rebuild measurements; add `--mobile-ui` for the phone layout.
 
 ## PR5 Part 3 room composition
 

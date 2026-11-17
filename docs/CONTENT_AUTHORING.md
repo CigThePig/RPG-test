@@ -65,7 +65,7 @@ Mission features sit on room core centers. Eight seeded inhabitants retain the p
 
 ## Environment art and future landmarks
 
-Use `EnvironmentStyle` for the shared palette and cosmetic revision/hash, and `EnvironmentArtGenerator` for bounded integer-pixel floor/wall recipes. Atlases are generated once by `EnvironmentAssetCache`; do not make per-tile textures. Interactive objects remain existing `RegionState.Features` consumed by `FeatureView`. Nonblocking visual slots belong in `EnvironmentDecoration`, with stable ground-contact pivots and the actor Y-sort parent. Preserve saved terrain and gameplay RNG when extending themes. See `PR5_PART2_HANDOFF.md`; full landmark authoring remains Part 3.
+Ruin surfaces, props, dressing and light follow [DUNGEON_ART_DIRECTION.md](DUNGEON_ART_DIRECTION.md). Use `EnvironmentStyle.Hash` for cosmetic variation, `DungeonArt.Ramp` and the floor/wall shaders for surfaces, and `DungeonPropArt` for props; its one atlas is built once per process, so do not make per-tile or per-room textures. Interactive objects remain existing `RegionState.Features` consumed by `FeatureView`. Nonblocking visual slots belong in `EnvironmentDecoration`, with stable ground-contact pivots and the actor Y-sort parent. Preserve saved terrain and gameplay RNG when extending themes. See `PR5_PART2_HANDOFF.md`; full landmark authoring remains Part 3.
 
 ## PR5 authored landmarks
 

@@ -1,5 +1,7 @@
 # PR5 Part 2 — Procedural environmental art
 
+> **Superseded art.** The floor, wall and prop atlases described here were replaced by the shader-painted ruin renderer in [DUNGEON_ART_DIRECTION.md](DUNGEON_ART_DIRECTION.md). Wall-row depth sorting and the authority rules below still hold.
+>
 > **Superseded geometry and saves.** Part 2's renderer still applies; its room screenshots show the earlier fixed 11×11 grid, and its legacy-save notes no longer apply. The current room/corridor layout, saved fields and checks are in [DUNGEON_LAYOUT.md](DUNGEON_LAYOUT.md). Earlier saves are no longer loaded.
 
 ## Implementation and approach

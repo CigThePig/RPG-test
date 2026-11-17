@@ -355,18 +355,26 @@ try:
     # Approach the live enemy group and observe real damage events. This also
     # exercises repeated confirmed-hit effects on the Android renderer.
     previous_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))
-    deadline=time.monotonic()+45
+    # Hosted devices advanced only 12-25 ground units per 600 ms swipe in the
+    # captured failure, so use sustained gestures and allow the full town route.
+    deadline=time.monotonic()+150
     approaches=0
     while time.monotonic()<deadline:
         logs=adb('logcat','-d')
         observed_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))-previous_hits
         if len(observed_hits)>=2: break
         if not adb('shell','pidof',package): raise RuntimeError('Android process exited during real combat damage')
-        if approaches<2:
-            joystick(280,'600')
+        positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
+        current_x=float(positions[-1][0]) if positions else 0
+        # Seeded towns put prowlers beyond the eastern plots (around x=1000).
+        # Continue down the central street until the wilderness, then let them
+        # engage; retain the requirement for two authoritative damage events.
+        if current_x<1050 and approaches<40:
+            joystick(280,'2000')
             approaches+=1
         else: time.sleep(.5)
-    else: raise RuntimeError('Android combat did not produce two real player damage events')
+    else: raise RuntimeError(f'Android combat did not produce two real player damage events: x={current_x}, approaches={approaches}, hits={len(observed_hits)}')
+    capture('combat-hits.png')
     tap_action('inventory')
     time.sleep(1)
     capture('inventory.png')
@@ -487,7 +495,9 @@ try:
                 capture(f'ruin-combat-{cycle+1}.png',wait=20)
             marks=re.findall(r'MOSSLIGHT_ENVIRONMENT_READY region=(\w+) walls=(\d+) decorations=(\d+) atlases=(\d+)',logs)
             state=marks[-1]
-            assert int(state[3])==3, 'Unbounded or missing environment atlas cache'
+            # The dungeon art pass replaced floor/wall atlases with shaders;
+            # this diagnostic now counts only the shared DungeonPropAtlas.
+            assert int(state[3])==1, 'Unbounded or missing shared dungeon prop atlas'
             assert int(state[2])<=96, 'Unbounded Android decoration count'
             previous=[r for r in regions if r['region']==region]
             if previous: assert previous[-1]['counts']==list(state[1:]), 'Android region views accumulate'

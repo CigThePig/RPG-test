@@ -24,7 +24,54 @@ public static class OverworldPropArt
         new("b9822f"),new("f0c659"),new("fff0b0"),
         new("f3ecd2"),new("d98bb6"),new("c9483e"),new("7d7fd6"),
         new Color(.04f,.08f,.16f,.30f),new Color(.04f,.08f,.16f,.15f),new("172428"),
-        new("c9eedd"),new("86d2c6"),new Color(.07f,.20f,.33f,.55f)};
+        new("c9eedd"),new("86d2c6"),new Color(.07f,.20f,.33f,.55f),
+        // The ruins share this palette: 41-43 iron, 44-47 flame, 48-53 sandstone, 54-56 ward
+        // light, 57-59 bone, 60-62 cloth, 63-64 bindings, 65 parchment, 66-68 clay, 69 ash,
+        // 70-71 daylight.
+        new("23272f"),new("444c56"),new("78828c"),
+        new("c2491d"),new("f08a2c"),new("ffd35a"),new("fff6c8"),
+        new("33282d"),new("54443f"),new("6f5a48"),new("8a7355"),new("a58f66"),new("c9b684"),
+        new("3fb6c4"),new("9fe9ea"),new("e6fffa"),
+        new("8f8873"),new("cfc8ae"),new("efe9d2"),
+        new("5e1f33"),new("9c3443"),new("cf5a55"),
+        new("3d5c8a"),new("3f7f78"),new("d9c9a0"),
+        new("6b3b2c"),new("a05f3c"),new("cf8f58"),
+        new("6d6863"),new("e9f4ff"),new("a9c9e6"),
+        // Towns: 72-75 clay roof tile, 76-79 slate, 80-83 thatch, 84-86 limewash,
+        // 87-89 awning blue, 90-92 awning green, 93 lamplit glass, 94 night glass.
+        new("5c2428"),new("8f3a34"),new("bd5a42"),new("e08a5e"),
+        new("26344f"),new("3b5274"),new("5b7a9e"),new("8fabc4"),
+        new("6e5328"),new("9a7a3a"),new("c4a455"),new("e6d188"),
+        new("b9ae92"),new("ddd3b8"),new("f6efd9"),
+        new("2f4f86"),new("4f7fc0"),new("9cc3ea"),
+        new("2d6144"),new("4c9360"),new("9fd28f"),
+        new("ffcf6b"),new("1f2a44"),
+        // The asset library (see AssetPalette for names): 95-98 snow, 99-101 ice, 102-104 sand,
+        // 105-107 cactus, 108-112 autumn, 113-116 swamp, 117-120 violet, 121-123 blossom,
+        // 124-126 bronze, 127-130 steel, 131-133 mythril, 134-136 leather, 137-140 red,
+        // 141-144 blue, 145-148 green, 149-152 yellow, 153-155 orange, 156-158 dark,
+        // 159-161 pale, 162-163 skin, 164-166 bread.
+        new("7f9ec4"),new("b9d0e8"),new("e4eef8"),new("ffffff"),
+        new("4f8fc8"),new("8cc4ea"),new("d3f0ff"),
+        new("c9a865"),new("e3c987"),new("f3e2ad"),
+        new("2f6b3f"),new("4a9150"),new("7dbb62"),
+        new("7a2a1c"),new("b8482a"),new("e0752e"),new("f2a93b"),new("f8d264"),
+        new("2b3a2a"),new("44553a"),new("667a45"),new("93a65a"),
+        new("3b2360"),new("6a3fa0"),new("a06ad8"),new("d6b0f5"),
+        new("b5507a"),new("e889a9"),new("f9c8d4"),
+        new("6b4424"),new("a8713a"),new("d9a25c"),
+        new("3e4a5c"),new("6d7f96"),new("a9bccf"),new("e3edf5"),
+        new("1f6f73"),new("3fb3a8"),new("9ff0dc"),
+        new("4a2f22"),new("7a4e33"),new("a8734a"),
+        new("7d1626"),new("c22b3a"),new("f0616a"),new("ffb3b0"),
+        new("1d3f8f"),new("3b6fd6"),new("7fb0f5"),new("cfe4ff"),
+        new("1c6b34"),new("35a34c"),new("7fd978"),new("d0f7c0"),
+        new("9a6b10"),new("e0a81e"),new("ffd84a"),new("fff3b0"),
+        new("9a4310"),new("e07a1e"),new("ffab4a"),
+        new("15151c"),new("2c2c38"),new("4a4a5a"),
+        new("8c8c98"),new("c4c4cc"),new("f2f2f4"),
+        new("c98a64"),new("e8b48c"),
+        new("b87a3a"),new("e0a85c"),new("f5d49a")};
     const byte Ink=37,Shadow=35,Penumbra=36,Foam=38,Ripple=39,Submerged=40;
     static readonly byte[] Leaf={1,2,2,3,3,4,5,6},Needle={7,7,8,8,9,9,10,4},Airy={2,3,4,4,5,5,6,11},
         Stone={19,20,20,21,21,22,23,24},Bark={12,13,14,14,15,16};
@@ -263,12 +310,15 @@ public static class OverworldPropArt
         }
         p.Tuft(30,100,2);p.Tuft(42,100,2);
     }
-    sealed class Pixels
+    public sealed class Pixels
     {
-        public readonly byte[] Data=new byte[Width*Height];
-        public byte At(int x,int y)=>x>=0&&x<Width&&y>=0&&y<Height?Data[y*Width+x]:(byte)0;
+        // The Reach and the ruins use the standard cell; town buildings ask for a larger one.
+        public readonly int W,H;
+        public readonly byte[] Data;
+        public Pixels(int width=OverworldPropArt.Width,int height=OverworldPropArt.Height){W=width;H=height;Data=new byte[W*H];}
+        public byte At(int x,int y)=>x>=0&&x<W&&y>=0&&y<H?Data[y*W+x]:(byte)0;
         // The outermost ring stays transparent so neighbouring atlas cells never bleed.
-        public void Set(int x,int y,byte c){if(x>0&&x<Width-1&&y>0&&y<Height-1)Data[y*Width+x]=c;}
+        public void Set(int x,int y,byte c){if(x>0&&x<W-1&&y>0&&y<H-1)Data[y*W+x]=c;}
         public void Rect(int x,int y,int w,int h,byte c){for(int yy=y;yy<y+h;yy++)for(int xx=x;xx<x+w;xx++)Set(xx,yy,c);}
         /// <summary>Recolour only pixels that already hold one of the listed materials.</summary>
         public void Over(int x,int y,int w,int h,byte c,params byte[] onto){for(int yy=y;yy<y+h;yy++)for(int xx=x;xx<x+w;xx++)if(Array.IndexOf(onto,At(xx,yy))>=0)Set(xx,yy,c);}
@@ -276,7 +326,7 @@ public static class OverworldPropArt
         public void Line(int x,int y,int ex,int ey,int width,byte c){int dx=Math.Abs(ex-x),sx=x<ex?1:-1,dy=-Math.Abs(ey-y),sy=y<ey?1:-1,err=dx+dy;while(true){Rect(x,y,width,width,c);if(x==ex&&y==ey)break;int e=err*2;if(e>=dy){err+=dy;x+=sx;}if(e<=dx){err+=dx;y+=sy;}}}
         public void Poly(byte c,params int[] xy)
         {
-            int minX=Width,maxX=0,minY=Height,maxY=0;
+            int minX=W,maxX=0,minY=H,maxY=0;
             for(int i=0;i<xy.Length;i+=2){minX=Math.Min(minX,xy[i]);maxX=Math.Max(maxX,xy[i]);minY=Math.Min(minY,xy[i+1]);maxY=Math.Max(maxY,xy[i+1]);}
             for(int y=minY;y<=maxY;y++)for(int x=minX;x<=maxX;x++)
             {
@@ -355,10 +405,10 @@ public static class OverworldPropArt
         public void Waterline(int surface)
         {
             var stems=new List<int>();
-            for(int x=1;x<Width-1;x++)if(At(x,surface)!=0&&At(x,surface)!=Ink)stems.Add(x);
+            for(int x=1;x<W-1;x++)if(At(x,surface)!=0&&At(x,surface)!=Ink)stems.Add(x);
             if(stems.Count==0)return;
             int left=stems.Min(),right=stems.Max();
-            Rect(1,surface+1,Width-2,Height-surface-2,0);
+            Rect(1,surface+1,W-2,H-surface-2,0);
             // The ink under the last row of stems would read as a hard floor: clear it.
             for(int x=left-1;x<=right+1;x++)if(At(x,surface)==Ink && !stems.Contains(x))Set(x,surface,0);
             foreach(int x in stems){Set(x,surface+1,Submerged);if(x%2==0)Set(x,surface+2,Submerged);}
@@ -377,8 +427,8 @@ public static class OverworldPropArt
             if(flat)return;
             bool Solid(int x,int y){byte c=At(x,y);return c!=0&&c!=Shadow&&c!=Penumbra&&c!=Ink;}
             var edge=new List<int>();
-            for(int y=1;y<Height-1;y++)for(int x=1;x<Width-1;x++)
-                if(!Solid(x,y)&&At(x,y)!=Ink&&(Solid(x-1,y)||Solid(x+1,y)||Solid(x,y-1)||Solid(x,y+1)))edge.Add(y*Width+x);
+            for(int y=1;y<H-1;y++)for(int x=1;x<W-1;x++)
+                if(!Solid(x,y)&&At(x,y)!=Ink&&(Solid(x-1,y)||Solid(x+1,y)||Solid(x,y-1)||Solid(x,y+1)))edge.Add(y*W+x);
             foreach(int at in edge)Data[at]=Ink;
         }
     }

@@ -36,7 +36,7 @@ Corridors and wings make the ruin larger than the old fixed grid. Every floor ti
 
 ## Landmarks and decoration
 
-Landmark templates stay 9 × 9 and are stamped onto a room's core. `LandmarkRoom.OriginX/OriginY` is the absolute tile of the template frame (core minus one), and anchors are local to that frame. `Landmarks.RoomSafe` floods the whole room shape, wings included, with the radius-11 footprint. Halls never receive templates. Ambient rubble only appears inside rooms, away from the core's protected cross and perimeter lanes and away from room edges, so corridors and doorways stay visually clear. A corridor takes its block's room theme; halls follow the surrounding zone theme.
+Landmark templates stay 9 × 9 and are stamped onto a room's core. `LandmarkRoom.OriginX/OriginY` is the absolute tile of the template frame (core minus one), and anchors are local to that frame. `Landmarks.RoomSafe` floods the whole room shape, wings included, with the radius-11 footprint. Halls never receive templates. Loose clutter (bones, pots, rubble, growth, candles) only appears inside rooms, mostly at the foot of the walls and well clear of every corridor mouth, so corridors and doorways stay visually clear; it never collides. See [DUNGEON_ART_DIRECTION.md](DUNGEON_ART_DIRECTION.md). A corridor takes its block's room theme; halls follow the surrounding zone theme.
 
 ## Preview and verification
 

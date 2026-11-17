@@ -42,6 +42,7 @@ public partial class OverworldFlora : Node2D
                 continue;
             }
             if(r.Tiles[at]!=Terrain.Grass||h%17!=0||at==r.Entrance)continue;
+            if(TownStage.Occupied(r,x,y))continue;
             // Leave interactables, their approaches and the taller decoration slots clear.
             if(EnvironmentStyle.Hash(r.Seed,x,y,99)%29==0)continue;
             if(r.Features.Keys.Any(f=>Math.Abs(f%r.Width-x)<2&&Math.Abs(f/r.Width-y)<2))continue;

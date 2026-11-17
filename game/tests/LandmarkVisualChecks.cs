@@ -120,7 +120,7 @@ public static class LandmarkVisualChecks
                 for(int f=0;f<90;f++){await Frames(app,1);double now=timer.Elapsed.TotalMilliseconds;intervals.Add(now-last);last=now;}
                 intervals.Sort();parent=app.Views["player"].GetParent();
                 observations.Add(new{iteration,region=p.Region,rebuildMs=rebuild,p50ms=intervals[45],p95ms=intervals[85],terrainMs=TerrainView.LastBuildMilliseconds,wallMs=TerrainWallRow.BuildMilliseconds,
-                    atlasBuildMs=EnvironmentAssetCache.TotalBuildMilliseconds,atlasCount=EnvironmentAssetCache.TextureCount,atlasBytes=EnvironmentAssetCache.PixelBytes,nodes=parent.GetChildCount(),decorationNodes=parent.GetChildren().OfType<EnvironmentDecoration>().Count(),
+                    ruinAtlasBuilds=DungeonPropAtlas.BuildCount,nodes=parent.GetChildCount(),decorationNodes=parent.GetChildren().OfType<EnvironmentDecoration>().Count(),
                     textureBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TextureMemUsed),bufferBytes=RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.BufferMemUsed),managedBytes=GC.GetTotalMemory(true),renderer=RenderingServer.GetVideoAdapterName()});
             }
             Directory.CreateDirectory("build/dungeon");File.WriteAllText("build/dungeon/landmarks-"+(app.Ui.MobileLayout?"mobile":"desktop")+".json",JsonSerializer.Serialize(observations,Content.Json));
