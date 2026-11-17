@@ -309,6 +309,8 @@ public partial class Foundation : Node2D
         SelectFeel(MovementFeel.Presets.FirstOrDefault(x=>x.Id==preset) ?? MovementFeel.Presets[1]);
         if(OS.GetCmdlineUserArgs().Contains("--validate-landmarks"))
         { GD.Print($"LANDMARK VALIDATION PASSED: {Landmarks.Library.Count} templates");GetTree().Quit();return; }
+        if(OS.GetCmdlineUserArgs().Contains("--export-assets"))
+        { GD.Print($"ASSET LIBRARY EXPORTED: {AssetLibrary.Export("docs/asset-library")} modules in {AssetLibrary.Sheets.Count} sheets");GetTree().Quit();return; }
         var dump=OS.GetCmdlineUserArgs().FirstOrDefault(x=>x.StartsWith("--dump-dungeons="))?.Split('=',2)[1];
         if(dump!=null)
         { foreach(int seed in dump.Split(',').Select(int.Parse))GD.Print(DungeonLayout.Ascii(Regions.Dungeon(seed)));GetTree().Quit();return; }

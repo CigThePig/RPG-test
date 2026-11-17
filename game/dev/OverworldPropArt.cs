@@ -45,7 +45,33 @@ public static class OverworldPropArt
         new("b9ae92"),new("ddd3b8"),new("f6efd9"),
         new("2f4f86"),new("4f7fc0"),new("9cc3ea"),
         new("2d6144"),new("4c9360"),new("9fd28f"),
-        new("ffcf6b"),new("1f2a44")};
+        new("ffcf6b"),new("1f2a44"),
+        // The asset library (see AssetPalette for names): 95-98 snow, 99-101 ice, 102-104 sand,
+        // 105-107 cactus, 108-112 autumn, 113-116 swamp, 117-120 violet, 121-123 blossom,
+        // 124-126 bronze, 127-130 steel, 131-133 mythril, 134-136 leather, 137-140 red,
+        // 141-144 blue, 145-148 green, 149-152 yellow, 153-155 orange, 156-158 dark,
+        // 159-161 pale, 162-163 skin, 164-166 bread.
+        new("7f9ec4"),new("b9d0e8"),new("e4eef8"),new("ffffff"),
+        new("4f8fc8"),new("8cc4ea"),new("d3f0ff"),
+        new("c9a865"),new("e3c987"),new("f3e2ad"),
+        new("2f6b3f"),new("4a9150"),new("7dbb62"),
+        new("7a2a1c"),new("b8482a"),new("e0752e"),new("f2a93b"),new("f8d264"),
+        new("2b3a2a"),new("44553a"),new("667a45"),new("93a65a"),
+        new("3b2360"),new("6a3fa0"),new("a06ad8"),new("d6b0f5"),
+        new("b5507a"),new("e889a9"),new("f9c8d4"),
+        new("6b4424"),new("a8713a"),new("d9a25c"),
+        new("3e4a5c"),new("6d7f96"),new("a9bccf"),new("e3edf5"),
+        new("1f6f73"),new("3fb3a8"),new("9ff0dc"),
+        new("4a2f22"),new("7a4e33"),new("a8734a"),
+        new("7d1626"),new("c22b3a"),new("f0616a"),new("ffb3b0"),
+        new("1d3f8f"),new("3b6fd6"),new("7fb0f5"),new("cfe4ff"),
+        new("1c6b34"),new("35a34c"),new("7fd978"),new("d0f7c0"),
+        new("9a6b10"),new("e0a81e"),new("ffd84a"),new("fff3b0"),
+        new("9a4310"),new("e07a1e"),new("ffab4a"),
+        new("15151c"),new("2c2c38"),new("4a4a5a"),
+        new("8c8c98"),new("c4c4cc"),new("f2f2f4"),
+        new("c98a64"),new("e8b48c"),
+        new("b87a3a"),new("e0a85c"),new("f5d49a")};
     const byte Ink=37,Shadow=35,Penumbra=36,Foam=38,Ripple=39,Submerged=40;
     static readonly byte[] Leaf={1,2,2,3,3,4,5,6},Needle={7,7,8,8,9,9,10,4},Airy={2,3,4,4,5,5,6,11},
         Stone={19,20,20,21,21,22,23,24},Bark={12,13,14,14,15,16};
@@ -284,7 +310,7 @@ public static class OverworldPropArt
         }
         p.Tuft(30,100,2);p.Tuft(42,100,2);
     }
-    internal sealed class Pixels
+    public sealed class Pixels
     {
         // The Reach and the ruins use the standard cell; town buildings ask for a larger one.
         public readonly int W,H;
