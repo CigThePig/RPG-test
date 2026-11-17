@@ -49,7 +49,10 @@ public static class TownGenerationChecks
         var world=app.World; string saved=Persistence.Capture(world,app.Narrative);
         try
         {
-            world.RegionsById["reach"]=Regions.Overworld(world.Seed);
+            // Preserve the live production dimensions: actors from a 25x world may be
+            // outside the old 64x48 reference map during this save/load test.
+            var reach=world.RegionsById["reach"];
+            world.RegionsById["reach"]=Regions.Overworld(world.Seed,reach.Width,reach.Height);
             var r=world.RegionsById["reach"];string townJson=Json(r);
             string capture=Persistence.Capture(world,app.Narrative);
             Persistence.Restore(world,app.Narrative,capture);
