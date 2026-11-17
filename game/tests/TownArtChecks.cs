@@ -126,6 +126,30 @@ public static class TownArtChecks
                 p.X=room.X;p.Y=room.Y;app.Views["player"].SnapPosition();
                 using var inside=await Frame();
                 if(!roof.Occupied || roof.Opacity!=0)throw new InvalidOperationException($"Roof of {house.Style} did not open for the wayfarer");
+                // The taller back wall must join both low side walls without showing
+                // the grass/water behind the house through the height transition.
+                // Sample the actual pixels in the formerly missing vertical strips;
+                // use hue ratios because Reach cloud shadows darken the wall.
+                int drop=TownBlocks.Rise-(int)TerrainWallRow.Rise;
+                var wallColors=house.Wall==1
+                    ? Enumerable.Range(8,5).Select(i=>TownBlocks.Ramp[i]).ToArray()
+                    : Enumerable.Range(1,house.Wall==0?7:4).Select(i=>TownBlocks.Ramp[i]).ToArray();
+                var cornerTransform=app.GetViewport().GetCanvasTransform();
+                foreach(int x in new[]{house.X,house.X+house.Width-1})
+                {
+                    int samples=0,wallPixels=0;
+                    for(int dy=2;dy<drop-2;dy++)
+                    {
+                        var point=cornerTransform*new Vector2(x*24+12,house.Y*12+12-TownBlocks.Rise+dy);
+                        int sx=(int)MathF.Floor(point.X),sy=(int)MathF.Floor(point.Y);
+                        if(sx<0||sy<0||sx>=inside.GetWidth()||sy>=inside.GetHeight())continue;
+                        var c=inside.GetPixel(sx,sy);samples++;
+                        if(wallColors.Any(b=>MathF.Abs(c.R/MathF.Max(c.G,.01f)-b.R/b.G)<.12f &&
+                            MathF.Abs(c.B/MathF.Max(c.G,.01f)-b.B/b.G)<.14f))wallPixels++;
+                    }
+                    if(drop>4 && (samples<drop-4 || wallPixels<samples*3/4))
+                        throw new InvalidOperationException($"Open back corner of {house.Style} at {x},{house.Y}: {wallPixels}/{samples} wall pixels");
+                }
                 // With the roof open the room shows: compare the roof's own area in both frames,
                 // moving the outside frame by the camera's shift between them.
                 var others=parent.GetChildren().OfType<TownRoof>().Where(n=>n!=roof);
