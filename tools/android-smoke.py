@@ -355,7 +355,9 @@ try:
     # Approach the live enemy group and observe real damage events. This also
     # exercises repeated confirmed-hit effects on the Android renderer.
     previous_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))
-    deadline=time.monotonic()+45
+    # Hosted devices advanced only 12-25 ground units per 600 ms swipe in the
+    # captured failure, so use sustained gestures and allow the full town route.
+    deadline=time.monotonic()+150
     approaches=0
     while time.monotonic()<deadline:
         logs=adb('logcat','-d')
@@ -367,11 +369,12 @@ try:
         # Seeded towns put prowlers beyond the eastern plots (around x=1000).
         # Continue down the central street until the wilderness, then let them
         # engage; retain the requirement for two authoritative damage events.
-        if current_x<1050 and approaches<20:
-            joystick(280,'600')
+        if current_x<1050 and approaches<40:
+            joystick(280,'2000')
             approaches+=1
         else: time.sleep(.5)
-    else: raise RuntimeError('Android combat did not produce two real player damage events')
+    else: raise RuntimeError(f'Android combat did not produce two real player damage events: x={current_x}, approaches={approaches}, hits={len(observed_hits)}')
+    capture('combat-hits.png')
     tap_action('inventory')
     time.sleep(1)
     capture('inventory.png')
