@@ -1,4 +1,5 @@
 using Godot;
+using PixelCreatures.Runtime;
 namespace Mosslight;
 
 /// <summary>
@@ -91,7 +92,7 @@ public partial class OverworldChunkStreamer : Node2D
     void Load(Vector2I id)
     {
         Rect2I cells=Cells(Region,id);
-        var ground=new List<Node>(),actors=new List<Node>();
+        var ground=new List<Node>();var actors=new List<Node>();
         void Ground(Node node){AddChild(node);ground.Add(node);}
         void Actor(Node2D node){ActorLayer.AddChild(node);actors.Add(node);}
         Ground(new TerrainView {Region=Region,Art=Art,Cells=cells});

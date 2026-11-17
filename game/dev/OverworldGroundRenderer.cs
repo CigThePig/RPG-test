@@ -53,7 +53,7 @@ public partial class OverworldGroundRenderer : Node2D
     public void Configure(ShaderMaterial target)
     {
         target.SetShaderParameter("ground_map",lookup!);
-        target.SetShaderParameter("ground_lookup_size",lookup!.GetSize());
+        target.SetShaderParameter("ground_lookup_size",new Vector2(lookup!.GetWidth(),lookup.GetHeight()));
         target.SetShaderParameter("ground_lookup_origin",lookupOrigin);
         target.SetShaderParameter("ground_palette",OverworldGroundArt.Ramp);
         target.SetShaderParameter("ground_seed",(int)(OverworldWaterArt.Hash(Region.Seed,0,0,OverworldGroundArt.Revision)%4096));
