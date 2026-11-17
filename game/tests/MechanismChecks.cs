@@ -177,6 +177,9 @@ public static class MechanismChecks
     {
         var w = app.World; var n = app.Narrative; var p = w.Player;
         var r = Regions.Dungeon(7); w.RegionsById["ruin"] = r; p.Region = "ruin";
+        // A newly enlarged overworld spawn may be outside the dungeon bounds.
+        // Position this save fixture at an authoritative dungeon tile.
+        var entry = r.Center(r.Entrance); p.X = entry.X; p.Y = entry.Y;
         var ring = DungeonMechanisms.Controls(r).First(c => c.Kind == "puzzle");
         DungeonMechanisms.Kindle(r, DungeonMechanisms.Solution(r, ring.Controllers)[0], out _);
         var lit = r.Lit.Order().ToArray();
