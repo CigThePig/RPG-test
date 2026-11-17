@@ -39,10 +39,15 @@ public partial class OverworldWaterRenderer : Node2D
         }
         if(OS.GetCmdlineUserArgs().Contains("--water-static-fallback"))
         {
-            foreach(var mark in OverworldWaterArt.Build(Region))
+            if(Cells==null)
             {
-                var rect=mark.Rect.Intersection(regionBounds);
-                if(rect.HasArea())surface.Rect(rect,OverworldWaterArt.Ramp[mark.Shade]);
+                foreach(var mark in OverworldWaterArt.Build(Region))surface.Rect(mark.Rect,OverworldWaterArt.Ramp[mark.Shade]);
+            }
+            else // A frozen baseline should never generate an entire 25x world per chunk.
+            {
+                for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;x++)
+                    if(OverworldWaterArt.Water(Region,x,y))
+                        surface.Rect(new Rect2(x*24,y*12,24,12),OverworldWaterArt.Ramp[OverworldWaterArt.Shade(Region,x,y,12,6)]);
             }
             LastVertexBytes=surface.VertexBytes;LastLookupBytes=0;LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;BuildCount++;SetProcess(false);return;
         }

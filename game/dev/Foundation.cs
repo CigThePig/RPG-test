@@ -736,21 +736,35 @@ public partial class Foundation : Node2D
         }
 
         var r = World.RegionsById[World.Player.Region];
-        var tilemap = new TerrainView
+        bool streamed = r.Id=="reach" && r.Width>=128 && r.Height>=128 && r.Rooms.Count==0;
+        if(streamed)
         {
-            Region = r,
-            Art = art
-        };
-        ground.AddChild(tilemap);
-        OverworldGroundRenderer? groundMaterial=null;
-        if(r.Rooms.Count==0 && OverworldGroundRenderer.Enabled)
-        {groundMaterial=new OverworldGroundRenderer {Region=r,ZIndex=-1};ground.AddChild(groundMaterial);}
-        if(r.Rooms.Count==0)ground.AddChild(new ReachAmbienceDriver {ReducedMotion=()=>Ui.Preferences.ReducedMotion});
-        // Outcrops precede water among siblings: their raised tops must stay above the surface.
-        if(r.Rooms.Count==0 && OverworldRockRenderer.Enabled && r.Tiles.Contains(Terrain.Rock))ground.AddChild(new OverworldRockRenderer {Region=r});
-        if(r.Rooms.Count==0 && r.Tiles.Contains(Terrain.Water) && OverworldWaterRenderer.UseLivingReach)
-            ground.AddChild(new OverworldWaterRenderer {Region=r,Ground=groundMaterial,ReducedMotion=()=>Ui.Preferences.ReducedMotion,ZIndex=-1});
-        if(r.Rooms.Count==0 && OverworldAtmosphere.Enabled)ground.AddChild(new OverworldAtmosphere {Region=r,ZIndex=30});
+            ground.AddChild(new ReachAmbienceDriver {ReducedMotion=()=>Ui.Preferences.ReducedMotion});
+            // Clouds span the whole region using one shared tiny texture; terrain and
+            // foliage are created and released around the player in fixed-size chunks.
+            if(OverworldAtmosphere.Enabled)ground.AddChild(new OverworldAtmosphere {Region=r,ZIndex=30});
+            ground.AddChild(new OverworldChunkStreamer {
+                Region=r,Art=art,ActorLayer=actors,
+                PlayerPosition=()=>new Vector2(World.Player.X,World.Player.Y),
+                ViewportPixels=()=>GetViewportRect().Size,Zoom=()=>camera.Zoom,
+                ReducedMotion=()=>Ui.Preferences.ReducedMotion,
+                ShowCharacters=()=>showCharacters
+            });
+        }
+        else
+        {
+            var tilemap = new TerrainView {Region=r,Art=art};
+            ground.AddChild(tilemap);
+            OverworldGroundRenderer? groundMaterial=null;
+            if(r.Rooms.Count==0 && OverworldGroundRenderer.Enabled)
+            {groundMaterial=new OverworldGroundRenderer {Region=r,ZIndex=-1};ground.AddChild(groundMaterial);}
+            if(r.Rooms.Count==0)ground.AddChild(new ReachAmbienceDriver {ReducedMotion=()=>Ui.Preferences.ReducedMotion});
+            // Outcrops precede water among siblings: their raised tops must stay above the surface.
+            if(r.Rooms.Count==0 && OverworldRockRenderer.Enabled && r.Tiles.Contains(Terrain.Rock))ground.AddChild(new OverworldRockRenderer {Region=r});
+            if(r.Rooms.Count==0 && r.Tiles.Contains(Terrain.Water) && OverworldWaterRenderer.UseLivingReach)
+                ground.AddChild(new OverworldWaterRenderer {Region=r,Ground=groundMaterial,ReducedMotion=()=>Ui.Preferences.ReducedMotion,ZIndex=-1});
+            if(r.Rooms.Count==0 && OverworldAtmosphere.Enabled)ground.AddChild(new OverworldAtmosphere {Region=r,ZIndex=30});
+        }
         foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
         wallRows.Clear();
         foreach (var row in clutter) { actors.RemoveChild(row); row.QueueFree(); }
@@ -781,11 +795,11 @@ public partial class Foundation : Node2D
         }
         foreach(var decoration in decorations) { actors.RemoveChild(decoration); decoration.QueueFree(); }
         decorations.Clear();
-        decorations.AddRange(EnvironmentDecoration.Create(r,art));
+        if(!streamed)decorations.AddRange(EnvironmentDecoration.Create(r,art));
         foreach(var decoration in decorations)actors.AddChild(decoration);
         foreach(var row in flora){actors.RemoveChild(row);row.QueueFree();}
         flora.Clear();
-        if(r.Rooms.Count==0 && OverworldFlora.Enabled)
+        if(!streamed && r.Rooms.Count==0 && OverworldFlora.Enabled)
         {
             var growth=OverworldFlora.Create(r);flora.AddRange(growth.Standing);
             foreach(var row in flora)actors.AddChild(row);

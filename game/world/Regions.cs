@@ -193,7 +193,7 @@ public static class Regions
     public const string Version = "rpg-regions-2";
     public static RegionState Overworld(int seed, int width = 64, int height = 48)
     {
-        if (width < 16 || height < 16 || width > 256 || height > 256)
+        if (width < 16 || height < 16 || width > 512 || height > 512)
             throw new ArgumentOutOfRangeException(nameof(width));
         var r = new RegionState
         {
@@ -231,7 +231,9 @@ public static class Regions
                     r.Tiles[y*width+x]=Terrain.Earth;
             }
         r.Entrance = (height / 2) * width + 8;
-        r.Objective = (height / 2) * width + width - 8;
+        // Keep the original ruin portal near the town even when wilderness expands.
+        // Long-running quest and adventure routes must not turn into a cross-continent walk.
+        r.Objective = (height / 2) * width + (width>=128 ? 56 : width-8);
         r.Features[r.Objective] = "portal";
         r.Features[r.Entrance + 4] = "chest";
         r.Features[r.Entrance + width * 2] = "herb";

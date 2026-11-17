@@ -1263,7 +1263,9 @@ public sealed class World
 
     public void NewGame()
     {
-        RegionsById["reach"] = Mosslight.Regions.Overworld(Seed);
+        // New worlds have 25 times the former 64x48 overworld area.
+        // Presentation is streamed in 32x32-tile chunks; authoritative tiles remain available for simulation and saves.
+        RegionsById["reach"] = Mosslight.Regions.Overworld(Seed, 320, 240);
         var r = RegionsById["reach"];
         var pos = r.Center(r.Entrance);
         var player = new ActorState
