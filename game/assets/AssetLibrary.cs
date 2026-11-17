@@ -53,7 +53,7 @@ public static class AssetLibrary
     static List<AssetSheet>? sheets;
     static Dictionary<string,(AssetSheet Sheet,int Index)>? index;
     static readonly Dictionary<string,ImageTexture> textures=new();
-    public static IReadOnlyList<AssetSheet> Sheets=>sheets??=new(){ItemIconArt.Sheet(),BiomeArt.Sheet(),StructureArt.Sheet(),StructureArt.Large(),FurnishingArt.Sheet(),DelveArt.Sheet(),EffectArt.Sheet(),MaterialArt.Sheet()};
+    public static IReadOnlyList<AssetSheet> Sheets=>sheets??=new(){ItemIconArt.Sheet(),BiomeArt.Sheet(),StructureArt.Sheet(),StructureArt.Large(),FurnishingArt.Sheet(),DelveArt.Sheet(),EffectArt.Sheet(),MaterialArt.Sheet(),AbilityArt.Sheet(),InterfaceArt.Sheet()};
     public static bool TryFind(string name,out AssetSheet sheet,out int at)
     {
         index??=Sheets.SelectMany(s=>s.Modules.Select((m,i)=>(m.Name,s,i))).ToDictionary(e=>e.Name,e=>(e.s,e.i),StringComparer.Ordinal);
@@ -94,7 +94,7 @@ public static class AssetLibrary
         {
             using var image=Render(sheet);image.SavePng(Path.Combine(directory,sheet.Name+".png"));
             using var preview=Image.CreateEmpty(image.GetWidth(),image.GetHeight(),false,Image.Format.Rgba8);
-            preview.Fill(sheet.Name is "effects"?new Color("1c2030"):sheet.Name is "delve"?new Color("3a4254"):sheet.Name is "items"?new Color("2b3140"):new Color("55994a"));
+            preview.Fill(sheet.Name is "effects" or "interface" or "abilities"?new Color("1c2030"):sheet.Name is "delve"?new Color("3a4254"):sheet.Name is "items"?new Color("2b3140"):new Color("55994a"));
             preview.BlendRect(image,new Rect2I(0,0,image.GetWidth(),image.GetHeight()),Vector2I.Zero);
             preview.Resize(image.GetWidth()*2,image.GetHeight()*2,Image.Interpolation.Nearest);
             preview.SavePng(Path.Combine(directory,sheet.Name+"-preview.png"));

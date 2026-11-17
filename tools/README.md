@@ -19,6 +19,8 @@ For dungeon art review, `godot --path . -- --visual-check --mobile-ui --dungeon-
 
 For towns, `--town-preview` writes captures of a hand-laid reference town of block houses, inside and out, and the furniture atlas to `build/town-preview/`, and `--town-only` runs the rendered town check. See [town kit](../docs/TOWN_ASSETS.md).
 
+`godot --headless --path . -- --export-assets` renders the [asset library](../docs/ASSET_LIBRARY.md) to `docs/asset-library/` (sheets, previews, manifest and palette).
+
 For overworld art review, `godot --path . -- --visual-check --mobile-ui --overworld-preview` writes five production captures and the prop atlas to `build/preview/` in about twenty seconds; add `--preview-clean` to hide the interface. It asserts nothing.
 
 `tools/build-host.py` is a compiler fallback for Linux hosts where process inspection prevents normal MSBuild. It needs `DOTNET_ROOT`, `GODOT_MONO_ROOT`, and restored Godot source-generator packages; standard builds do not need it.

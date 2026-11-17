@@ -32,6 +32,7 @@ public static class FoundationChecks
         (nameof(LandmarkChecks), LandmarkChecks.Run),
         (nameof(EnvironmentArtChecks), EnvironmentArtChecks.Run),
         (nameof(TownArtChecks), TownArtChecks.Run),
+        (nameof(AssetLibraryChecks), AssetLibraryChecks.Run),
         (nameof(TownGenerationChecks), TownGenerationChecks.Run),
         (nameof(OverworldWaterChecks), OverworldWaterChecks.Run),
         (nameof(OverworldGroundChecks), (_, check) => OverworldGroundChecks.Run(check)),

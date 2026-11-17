@@ -18,7 +18,7 @@ public static class MaterialArt
         Add("lava",Lava);Add("basalt",Basalt);Add("ash",(x,y)=>Blend(x,y,4,new byte[]{157,158,158,159},.7f,6));Add("obsidian",Obsidian);
         Add("cobble",(x,y)=>Setts(x,y,new byte[]{20,21,22,23},8,5));Add("stone-flags",(x,y)=>Setts(x,y,new byte[]{20,21,22,23},16,8));Add("sandstone-tiles",(x,y)=>Setts(x,y,new byte[]{49,51,52,53},12,6));Add("brick",(x,y)=>Setts(x,y,new byte[]{72,73,74,75},12,4));
         Add("planks",(x,y)=>Boards(x,y,false));Add("parquet",(x,y)=>Boards(x,y,true));Add("marble",Marble);Add("marble-checker",Checker);
-        Add("carpet-red",(x,y)=>Carpet(x,y,A.Red));Add("carpet-blue",(x,y)=>Carpet(x,y,A.Blue));Add("straw",Straw);Add("tilled-soil",Tilled);
+        Add("floor-carpet-red",(x,y)=>Carpet(x,y,A.Red));Add("floor-carpet-blue",(x,y)=>Carpet(x,y,A.Blue));Add("straw",Straw);Add("tilled-soil",Tilled);
         Add("grass-dark",(x,y)=>Turf(x,y,new byte[]{1,2,3,4}));Add("grass-dry",(x,y)=>Turf(x,y,new byte[]{114,115,116,104}));Add("autumn-leaves",LeafLitter);Add("gravel",Gravel);
         Add("moss-stone",MossStone);Add("crystal-floor",CrystalFloor);Add("metal-grate",Grate);Add("bone-floor",BoneFloor);
         return s;
