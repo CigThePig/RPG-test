@@ -2,6 +2,7 @@
 // region lookup and a cosmetic seed: stable under camera motion and zoom.
 uniform sampler2D ground_map : filter_linear, repeat_disable;
 uniform vec2 ground_lookup_size;
+uniform vec2 ground_lookup_origin;
 uniform vec4 ground_palette[20];
 uniform uint ground_seed;
 uniform float reach_time;
@@ -13,7 +14,7 @@ float ground_hash(vec2 p){
 // 6x4 pixel motifs, one bit per pixel, row-major from the upper-left corner.
 bool ground_bit(int mask,vec2 l){return ((mask>>(int(l.y)*6+int(l.x)))&1)==1;}
 vec4 reach_ground(vec2 p){
-    vec4 data=texture(ground_map,(p/3.0+vec2(0.5))/ground_lookup_size);
+    vec4 data=texture(ground_map,(p/3.0-ground_lookup_origin+vec2(0.5))/ground_lookup_size);
     float soil=data.r*96.0-48.0,wet=data.g*48.0;
     float broad=data.b,clump=data.a;
     vec2 cell=floor(p/vec2(6.0,4.0)),l=floor(p-cell*vec2(6.0,4.0));

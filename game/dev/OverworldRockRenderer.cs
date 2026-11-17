@@ -9,6 +9,7 @@ public partial class OverworldRockRenderer : Node2D
 {
     public const int Lift=10;
     public RegionState Region {get;init;}=null!;
+    public Rect2I? Cells {get;init;}
     public static bool Enabled=>OverworldGroundRenderer.Enabled && OverworldPropAtlas.Enabled;
     public static long LastLookupBytes {get;private set;}
     public static long LastVertexBytes {get;private set;}
@@ -31,12 +32,16 @@ public partial class OverworldRockRenderer : Node2D
     {
         var timer=System.Diagnostics.Stopwatch.StartNew();
         AddToGroup("overworld-rock");SetProcess(false);TextureFilter=TextureFilterEnum.Nearest;
-        int width=Region.Width*8+1,height=Region.Height*4+1;
+        var cells=Cells??new Rect2I(0,0,Region.Width,Region.Height);
+        int sx=Math.Max(0,cells.Position.X-3),sy=Math.Max(0,cells.Position.Y-3);
+        int ex=Math.Min(Region.Width,cells.End.X+3),ey=Math.Min(Region.Height,cells.End.Y+3);
+        int width=(ex-sx)*8+1,height=(ey-sy)*4+1;
         using(var image=Image.CreateEmpty(width,height,false,Image.Format.Rgb8))
         {
             for(int y=0;y<height;y++)for(int x=0;x<width;x++)
             {
-                int tx=Math.Min(x/8,Region.Width-1),ty=Math.Min(y/4,Region.Height-1);float px=x*3,py=y*6;
+                int gx=x+sx*8,gy=y+sy*4;
+                int tx=Math.Min(gx/8,Region.Width-1),ty=Math.Min(gy/4,Region.Height-1);float px=gx*3,py=gy*6;
                 float d=Rock(Region,tx,ty)?Distance(Region,tx,ty,px,py):-2;
                 image.SetPixel(x,y,new Color(Math.Clamp((d+8)/68,0,1),OverworldGroundArt.Noise(Region.Seed,px/46f,py/46f,22),Inset(Region,px,py)/8));
             }
@@ -50,13 +55,13 @@ public partial class OverworldRockRenderer : Node2D
             {int nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<Region.Width&&ny<Region.Height&&Rock(Region,nx,ny))return true;}
             return false;
         }
-        for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;)
+        for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;)
         {
             if(!Near(x,y)){x++;continue;}
-            int start=x;while(x<Region.Width&&Near(x,y))x++;
+            int start=x;while(x<cells.End.X&&Near(x,y))x++;
             batch.Rect(new Rect2(start*24,y*12,(x-start)*24,12),Colors.White);
         }
-        for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+        for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;x++)
             if(Lone(Region,x,y))
                 boulders.Sprite(new Rect2(new Vector2(x*24+12,y*12+11)-OverworldPropArt.Pivot,new Vector2(OverworldPropArt.Width,OverworldPropArt.Height)),
                     OverworldPropArt.Source(OverworldPropArt.Module(ReachProp.Rock,EnvironmentStyle.Hash(Region.Seed,x,y))));
@@ -64,6 +69,7 @@ public partial class OverworldRockRenderer : Node2D
         shader??=GD.Load<Shader>("res://game/art/overworld_rock.gdshader");
         material=new ShaderMaterial{Shader=shader};
         material.SetShaderParameter("rock_map",lookup);material.SetShaderParameter("rock_lookup_size",new Vector2(width,height));
+        material.SetShaderParameter("rock_lookup_origin",new Vector2(sx*8,sy*4));
         material.SetShaderParameter("rock_palette",Ramp);material.SetShaderParameter("rock_seed",(float)(EnvironmentStyle.Hash(Region.Seed,0,0,9300)%97));
         Material=material;LastLookupBytes=(long)width*height*3;LastVertexBytes=batch.VertexBytes+boulders.VertexBytes;LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;
     }

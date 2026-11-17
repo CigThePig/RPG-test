@@ -942,6 +942,7 @@ public partial class TerrainView : Node2D
     public override void _ExitTree() { foreach(var batch in batches)batch.Dispose(); }
     readonly List<TerrainBatch> batches=new();
     public RegionState Region { get; set; } = null !;
+    public Rect2I? Cells {get;set;}
     public Dictionary<string, Texture2D> Art { get; set; } = null !;
 
     public override void _Draw()
@@ -953,9 +954,10 @@ public partial class TerrainView : Node2D
         // Ruins are painted by DungeonGroundRenderer and TerrainWallRow.
         if(DungeonArt.Is(Region)){LastVertexBytes=0;LastBuildMilliseconds=buildTimer.Elapsed.TotalMilliseconds;if(BuildCount==1)FirstBuildMilliseconds=LastBuildMilliseconds;return;}
         var batch=new TerrainBatch();batches.Add(batch);
+        var cells=Cells??new Rect2I(0,0,Region.Width,Region.Height);
         // Ground layers do not overlap: group by texture so the engine can batch them.
-        for (int y = 0; y < Region.Height; y++)
-            for (int x = 0; x < Region.Width; x++)
+        for (int y = cells.Position.Y; y < cells.End.Y; y++)
+            for (int x = cells.Position.X; x < cells.End.X; x++)
             {
                 var tile = Region.Tiles[y * Region.Width + x];
                 // The Living Reach surface is opaque over the complete water footprint.
@@ -989,8 +991,8 @@ public partial class TerrainView : Node2D
             if(Region.Rooms.Count==0 && ((terrain==Terrain.Water && OverworldWaterRenderer.UseLivingReach) || (OverworldGroundRenderer.Enabled && terrain is Terrain.Grass or Terrain.Earth)))continue;
             if (!Art.TryGetValue(key, out var texture))
                 continue;
-            for (int y = 0; y < Region.Height; y++)
-                for (int x = 0; x < Region.Width; x++)
+            for (int y = cells.Position.Y; y < cells.End.Y; y++)
+                for (int x = cells.Position.X; x < cells.End.X; x++)
                     if (Region.Tiles[y * Region.Width + x] == terrain)
                         DrawTextureRect(texture, new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), false, new Color(1, 1, 1, .32f));
         }
@@ -1000,7 +1002,7 @@ public partial class TerrainView : Node2D
         if(!outcrops && Region.Rooms.Count==0 && OverworldPropAtlas.Enabled)
         {
             var rocks=new TerrainBatch {Texture=OverworldPropAtlas.Texture};batches.Add(rocks);
-            for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+            for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;x++)
                 if(Region.Tiles[y*Region.Width+x]==Terrain.Rock)
                 {
                     var foot=GodotConvert.GroundToScreen(x*24+12,y*24+24);
@@ -1012,13 +1014,13 @@ public partial class TerrainView : Node2D
         else if(!outcrops && Art.TryGetValue("rock1",out var rock))
         {
             var rockBatch=new TerrainBatch { Texture=rock };batches.Add(rockBatch);
-            for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+            for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;x++)
                 if(Region.Tiles[y*Region.Width+x]==Terrain.Rock)
                     rockBatch.Sprite(new Rect2(GodotConvert.GroundToScreen(x*24,y*24)+new Vector2(0,-7),new Vector2(24,19)),new Rect2(Vector2.Zero,rock.GetSize()));
             rockBatch.Draw(this);
         }
-        for (int y = 0; y < Region.Height; y++)
-            for (int x = 0; x < Region.Width; x++)
+        for (int y = cells.Position.Y; y < cells.End.Y; y++)
+            for (int x = cells.Position.X; x < cells.End.X; x++)
             {
                 int at=y*Region.Width+x;
                 var tile=Region.Tiles[at];

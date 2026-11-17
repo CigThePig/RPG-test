@@ -17,11 +17,13 @@ public partial class OverworldFlora : Node2D
     /// <summary>Screen pixels between a standing character's ground point and its lowest drawn
     /// pixel (feet and contact shadow), measured on the production player view.</summary>
     public const int ActorFootDrop=6;
-    public static List<Placement> Plan(RegionState r)
+    public static List<Placement> Plan(RegionState r,Rect2I? area=null)
     {
         var result=new List<Placement>();
         bool Is(int x,int y,Terrain t)=>x>=0&&y>=0&&x<r.Width&&y<r.Height&&r.Tiles[y*r.Width+x]==t;
-        for(int y=1;y<r.Height-1;y++)for(int x=1;x<r.Width-1;x++)
+        var cells=area??new Rect2I(0,0,r.Width,r.Height);
+        for(int y=Math.Max(1,cells.Position.Y);y<Math.Min(r.Height-1,cells.End.Y);y++)
+            for(int x=Math.Max(1,cells.Position.X);x<Math.Min(r.Width-1,cells.End.X);x++)
         {
             int at=y*r.Width+x;uint h=EnvironmentStyle.Hash(r.Seed,x,y,9500);
             float jitter=((h>>20)%9)-4f;
@@ -69,9 +71,9 @@ public partial class OverworldFlora : Node2D
         return null;
     }
     /// <summary>Row nodes for the Y-sorted actor layer plus one flat node for the ground layer.</summary>
-    public static (List<OverworldFlora> Standing,OverworldFlora? Flat) Create(RegionState r)
+    public static (List<OverworldFlora> Standing,OverworldFlora? Flat) Create(RegionState r,Rect2I? area=null)
     {
-        var plan=Plan(r);LastCount=plan.Count;
+        var plan=Plan(r,area);LastCount=plan.Count;
         var rows=new SortedDictionary<int,OverworldFlora>();OverworldFlora? flat=null;
         foreach(var item in plan)
         {

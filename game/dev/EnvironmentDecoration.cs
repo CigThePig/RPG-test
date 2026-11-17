@@ -9,7 +9,7 @@ public partial class EnvironmentDecoration : Node2D
     public Vector2 Pivot { get; init; }
     public int ReachModule {get;init;}=-1;
     public int PropModule { get; init; } = -1;
-    public static List<EnvironmentDecoration> Create(RegionState r, Dictionary<string,Texture2D> art)
+    public static List<EnvironmentDecoration> Create(RegionState r, Dictionary<string,Texture2D> art,Rect2I? area=null)
     {
         var result=new List<EnvironmentDecoration>();
         // Every structural anchor is required and admitted by generation's budget.
@@ -28,8 +28,9 @@ public partial class EnvironmentDecoration : Node2D
                 TextureFilter=TextureFilterEnum.Nearest });
         }
         if(result.Count>Maximum)throw new InvalidDataException("Saved landmark exceeds architectural node budget");
-        for(int y=1;y<r.Height-1 && result.Count<Maximum;y++)
-            for(int x=1;x<r.Width-1 && result.Count<Maximum;x++)
+        var cells=area??new Rect2I(0,0,r.Width,r.Height);
+        for(int y=Math.Max(1,cells.Position.Y);y<Math.Min(r.Height-1,cells.End.Y) && result.Count<Maximum;y++)
+            for(int x=Math.Max(1,cells.Position.X);x<Math.Min(r.Width-1,cells.End.X) && result.Count<Maximum;x++)
             {
                 int at=y*r.Width+x;var tile=r.Tiles[at];
                 uint h=EnvironmentStyle.Hash(r.Seed,x,y,99);

@@ -5,6 +5,7 @@ render_mode unshaded;
 #include "res://game/art/overworld_ground_common.gdshaderinc"
 uniform sampler2D depth_map : filter_linear, repeat_disable;
 uniform vec2 lookup_size;
+uniform vec2 lookup_origin;
 uniform float cosmetic_seed;
 uniform vec4 palette[12];
 varying vec2 place;
@@ -15,7 +16,7 @@ float bayer(vec2 p){
     return (m+0.5)/16.0;
 }
 vec3 field(vec2 p){
-    vec3 s=texture(depth_map,(p/3.0+vec2(0.5))/lookup_size).rgb;
+    vec3 s=texture(depth_map,(p/3.0-lookup_origin+vec2(0.5))/lookup_size).rgb;
     return vec3(s.r*68.0-8.0-s.b*8.0,s.g,s.b);
 }
 vec4 reach_water(vec2 p){
