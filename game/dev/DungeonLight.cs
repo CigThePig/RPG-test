@@ -18,7 +18,8 @@ public partial class DungeonLight : Node2D
     public Func<Vector2> Lantern {get;init;}=()=>Vector2.Zero;
     static Shader? shader;
     ShaderMaterial? material;
-    ImageTexture? map;
+    ImageTexture? map,lanternMap;
+    Vector2I lanternTile=new(int.MinValue,int.MinValue);
     int signature=-1;
     float drawn=float.NaN;
     Vector2 centre;
@@ -69,6 +70,25 @@ public partial class DungeonLight : Node2D
         for(int y=0;y<height;y++)for(int x=0;x<width;x++){int at=(y*width+x)*3;image.SetPixel(x,y,new Color(light[at],light[at+1],light[at+2]));}
         return image;
     }
+    /// <summary>The lantern shares the lamps' masonry visibility and wall penetration.
+    /// Its falloff still follows the player's exact position in the shader.</summary>
+    public static Image LanternVisibility(RegionState r,bool[] masonry,Vector2I source)
+    {
+        int width=r.Width*8+1,height=r.Height*4+1;
+        var image=Image.CreateEmpty(width,height,false,Image.Format.L8);
+        // Cover the radius from every possible position within the source tile.
+        int reachX=(int)MathF.Ceiling(LanternRadius/3)+8,reachY=(int)MathF.Ceiling(LanternRadius/4.8f)+4;
+        for(int y=Math.Max(0,source.Y*4-reachY);y<=Math.Min(height-1,source.Y*4+reachY);y++)
+            for(int x=Math.Max(0,source.X*8-reachX);x<=Math.Min(width-1,source.X*8+reachX);x++)
+        {
+            int tx=Math.Min(x*3/24,r.Width-1),ty=Math.Min(y*3/12,r.Height-1);
+            if(!Sees(r,masonry,source.X,source.Y,tx,ty))continue;
+            float visibility=DungeonArt.Solid(masonry,r,tx,ty)
+                ? Math.Clamp(1+DungeonArt.Distance(masonry,r,x*3,y*6)/20,0,1) : 1;
+            image.SetPixel(x,y,new Color(visibility,visibility,visibility));
+        }
+        return image;
+    }
     // Tile walk from the lamp to the target: every tile before the last must be open.
     static bool Sees(RegionState r,bool[] masonry,int x,int y,int ex,int ey)
     {
@@ -104,9 +124,18 @@ public partial class DungeonLight : Node2D
             if(map==null){map=ImageTexture.CreateFromImage(image);material!.SetShaderParameter("light_map",map);}
             else map.Update(image);
         }
-        material!.SetShaderParameter("lantern",Lantern());
+        var position=Lantern();
+        var tile=new Vector2I((int)MathF.Floor(position.X/24),(int)MathF.Floor(position.Y/12));
+        if(tile!=lanternTile)
+        {
+            using var visibility=LanternVisibility(r,Surface.Masonry,tile);
+            if(lanternMap==null){lanternMap=ImageTexture.CreateFromImage(visibility);material!.SetShaderParameter("lantern_visibility",lanternMap);}
+            else lanternMap.Update(visibility);
+            lanternTile=tile;
+        }
+        material!.SetShaderParameter("lantern",position);
     }
-    public override void _ExitTree(){ReachAmbience.Unregister(material);material?.Dispose();map?.Dispose();}
+    public override void _ExitTree(){ReachAmbience.Unregister(material);material?.Dispose();map?.Dispose();lanternMap?.Dispose();}
     partial class Darkness : Node2D
     {
         public Rect2 Area {get;init;}

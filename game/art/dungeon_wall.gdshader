@@ -52,9 +52,10 @@ vec4 wall_top(vec2 p){
     if(theme==2&&e>3.6&&e<5.4&&seam>=1.0&&mod(floor(level?p.x:p.y),3.0)<2.0)c=dungeon_palette[lit>0.0||south?26:25];
     return c;
 }
-vec4 wall_face(vec2 p,float left,float right){
-    float ty=floor((p.y+4.0)/12.0);
-    float h=p.y-0.5-(ty*12.0-4.0);
+vec4 wall_face(vec2 p,float left,float right,float face_height){
+    // UV.y is measured from this face's head, even where faces overlap rows.
+    float h=floor(face_height);
+    float ty=floor((p.y-h-0.5+RISE-12.0)/12.0+0.01);
     float tx=floor(p.x/24.0),lx=p.x-0.5-tx*24.0;
     vec2 foot=vec2(p.x,ty*12.0+6.0);
     vec4 data=dungeon_data(foot);
@@ -110,5 +111,5 @@ vec4 wall_face(vec2 p,float left,float right){
 }
 void fragment(){
     vec2 p=floor(place)+vec2(0.5);
-    COLOR=flags.r<0.5?wall_top(p):wall_face(p,flags.g,flags.b);
+    COLOR=flags.r<0.5?wall_top(p):wall_face(p,flags.g,flags.b,UV.y);
 }

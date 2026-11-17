@@ -28,6 +28,21 @@ public static class EnvironmentArtChecks
             check(data.SequenceEqual(DungeonPropArt.Generate(prop,v)),"repeatable ruin art "+prop+v);
         }
         check(DungeonArt.Ramp.Length==36 && DungeonArt.Ramp.All(c=>c.A==1),"opaque ruin surface ramp");
+        // A dividing wall blocks the carried lantern on either side, including after
+        // moving its source; an open doorway restores visibility. No geography changes.
+        var lightRoom=new RegionState{Id="lantern-check",Width=9,Height=9,
+            Tiles=Enumerable.Repeat(Terrain.Floor,81).ToArray()};
+        for(int y=0;y<9;y++)lightRoom.Tiles[y*9+4]=Terrain.Wall;
+        var lightWalls=DungeonArt.Masonry(lightRoom);
+        using(var west=DungeonLight.LanternVisibility(lightRoom,lightWalls,new Vector2I(2,4)))
+        using(var east=DungeonLight.LanternVisibility(lightRoom,lightWalls,new Vector2I(6,4)))
+        {
+            check(west.GetPixel(2*8+4,4*4+2).R==1 && west.GetPixel(6*8+4,4*4+2).R==0,"lantern lights its room but stops at masonry");
+            check(east.GetPixel(6*8+4,4*4+2).R==1 && east.GetPixel(2*8+4,4*4+2).R==0,"moving lantern updates the visible side of masonry");
+        }
+        lightRoom.Tiles[4*9+4]=Terrain.Floor;
+        using(var doorway=DungeonLight.LanternVisibility(lightRoom,DungeonArt.Masonry(lightRoom),new Vector2I(2,4)))
+            check(doorway.GetPixel(6*8+4,4*4+2).R==1,"lantern travels through an open doorway");
         var digest=new List<uint>();
         foreach(int seed in new[]{1,42,1337})
         {

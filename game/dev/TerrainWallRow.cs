@@ -83,12 +83,12 @@ public partial class TerrainWallRow : Node2D
             // A landmark's structural prop stands on open floor, not on a block of wall.
             if(!Solid(x,Row))continue;
             var p = GodotConvert.GroundToScreen(x * RegionState.Tile, Row * RegionState.Tile) - Position;
-            batch.Rect(new Rect2(p+new Vector2(0,-Rise),new Vector2(24,12)),new Color(0,0,0));
+            batch.Quad(new Rect2(p+new Vector2(0,-Rise),new Vector2(24,12)),new Rect2(0,0,24,12),new Color(0,0,0));
             if(Solid(x,Row+1))continue;
             // The face shows only where floor lies to the south. Its ends tell the shader
             // whether the wall stops there (0.5), turns south (1) or simply continues (0).
             float End(int nx)=>!Solid(nx,Row)?.5f:Solid(nx,Row+1)?1:0;
-            batch.Rect(new Rect2(p+new Vector2(0,12-Rise),new Vector2(24,Rise)),new Color(1,End(x-1),End(x+1)));
+            batch.Quad(new Rect2(p+new Vector2(0,12-Rise),new Vector2(24,Rise)),new Rect2(0,0,24,Rise),new Color(1,End(x-1),End(x+1)));
         }
         batch.Draw(this);
         BuildMilliseconds += timer.Elapsed.TotalMilliseconds;

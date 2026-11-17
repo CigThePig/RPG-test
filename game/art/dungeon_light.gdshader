@@ -5,6 +5,7 @@ render_mode unshaded, blend_mul;
 // map; the wayfarer's own lantern is added here. Light steps down in dithered bands.
 uniform sampler2D light_map : filter_linear, repeat_disable;
 uniform vec2 light_map_size;
+uniform sampler2D lantern_visibility : filter_nearest, repeat_disable;
 uniform vec2 lantern;
 uniform float lantern_radius;
 uniform vec3 ambient;
@@ -18,7 +19,8 @@ void fragment(){
     light*=1.0-0.045*(0.5+0.5*sin(reach_time*5.1))*(0.5+0.5*sin(reach_time*2.3+1.7));
     vec2 v=(p-lantern)*vec2(1.0,1.6);
     float k=clamp(1.0-length(v)/lantern_radius,0.0,1.0);
-    light=max(light,vec3(1.0,0.93,0.80)*k*(2.0-k));
+    float visibility=texture(lantern_visibility,(p/3.0+vec2(0.5))/light_map_size).r;
+    light=max(light,vec3(1.0,0.93,0.80)*k*(2.0-k)*visibility);
     float level=max(light.r,max(light.g,light.b));
     vec3 hue=level>0.004?light/level:vec3(1.0);
     float bayer=mod(floor(p.x),2.0)<1.0?(mod(floor(p.y),2.0)<1.0?0.0:0.75):(mod(floor(p.y),2.0)<1.0?0.5:0.25);

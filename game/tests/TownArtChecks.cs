@@ -129,7 +129,11 @@ public static class TownArtChecks
                 // The taller back wall must join both low side walls without showing
                 // the grass/water behind the house through the height transition.
                 // Sample the actual pixels in the formerly missing vertical strips;
-                // use hue ratios because Reach cloud shadows darken the wall.
+                // Isolate masonry from the coloured cloud multiplication for palette matching.
+                var atmosphere=app.FindChildren("*","",true,false).OfType<OverworldAtmosphere>().ToArray();
+                foreach(var air in atmosphere)air.Visible=false;
+                using var corners=await Frame();
+                foreach(var air in atmosphere)air.Visible=true;
                 int drop=TownBlocks.Rise-(int)TerrainWallRow.Rise;
                 var wallColors=house.Wall==1
                     ? Enumerable.Range(8,5).Select(i=>TownBlocks.Ramp[i]).ToArray()
@@ -143,7 +147,7 @@ public static class TownArtChecks
                         var point=cornerTransform*new Vector2(x*24+12,house.Y*12+12-TownBlocks.Rise+dy);
                         int sx=(int)MathF.Floor(point.X),sy=(int)MathF.Floor(point.Y);
                         if(sx<0||sy<0||sx>=inside.GetWidth()||sy>=inside.GetHeight())continue;
-                        var c=inside.GetPixel(sx,sy);samples++;
+                        var c=corners.GetPixel(sx,sy);samples++;
                         if(wallColors.Any(b=>MathF.Abs(c.R/MathF.Max(c.G,.01f)-b.R/b.G)<.12f &&
                             MathF.Abs(c.B/MathF.Max(c.G,.01f)-b.B/b.G)<.14f))wallPixels++;
                     }
