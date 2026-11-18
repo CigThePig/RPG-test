@@ -38,6 +38,8 @@ public static class LivingReachChecks
             check(main.Count>2000 && main.Count<r.Tiles.Length*.18,"controlled substantial watershed extent "+seed);
             var actor=new ActorState{Radius=11};var spawn=r.Center(r.Entrance);
             check(r.Crossings.Count>0&&r.Crossings.All(i=>r.Passable(i,actor))&&r.Path(spawn,r.Center(r.Objective),actor).Count>0&&r.Features.Keys.All(i=>r.CanStand(r.Center(i),actor)),"quest and resources accessible "+seed);
+            check(r.Path(spawn,r.Center(40*r.Width+230),actor).Count>0,"bridge reaches northeastern woodland "+seed);
+            check(r.Path(spawn,r.Center(200*r.Width+230),actor).Count>0,"bridge reaches southeastern woodland "+seed);
             TownState.Validate(r);var town=r.Town!;
             check(town.Revision==2&&town.Houses.Select(h=>h.Style).Distinct().Count()==6,"six generous building styles "+seed);
             foreach(var h in town.Houses)

@@ -52,7 +52,8 @@ public static class LivingReachVisualChecks
                 app.Ui.Visible=false;await Shot("seed-"+seed+"-world");app.Ui.Visible=true;
                 if(seed!=42)continue;
                 app.Camera.Zoom=zoom;
-                foreach(var (name,x,y) in new[]{("river-bend",LivingReachGeography.RiverX(seed,110,320,240),110f),("lake",LivingReachGeography.RiverX(seed,70,320,240),70f),("pond",80f,53f),("confluence",LivingReachGeography.RiverX(seed,132,320,240),132f),("town",39f,122f)})
+                float join=LivingReachGeography.RiverX(seed,132,320,240),branchT=(243-join)/(320-join);
+                foreach(var (name,x,y) in new[]{("river-bend",LivingReachGeography.RiverX(seed,110,320,240),110f),("lake",LivingReachGeography.RiverX(seed,70,320,240),70f),("pond",80f,53f),("confluence",LivingReachGeography.RiverX(seed,132,320,240),132f),("river-crossing",LivingReachGeography.RiverX(seed,141,320,240),141f),("tributary-crossing",243f,132-64.8f*branchT+3*MathF.Sin(branchT*MathF.Tau)),("town",39f,122f)})
                 {Position(x,y);await Settle();await Shot(name);}
                 app.Camera.Zoom=Vector2.One*.65f;Position(39,123);await Settle();await Shot("town-overview");app.Camera.Zoom=zoom;
                 foreach(var h in r.Town!.Houses)

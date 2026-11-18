@@ -4,8 +4,8 @@ New 320×240 worlds use geography revision 1, without changing `rpg-regions-2` o
 save schema 1. A north–south valley channel has broad seeded bends, slowly varying
 width, two irregular basins, an eastern tributary and a separate small pond.
 Rock ridges frame the valley. Smooth canopy fields compose clearings and forest
-cover, and a short local road branches into woodland trails. A saved three-tile
-bridge deck allows walkers across the river while retaining water below it.
+cover, and a short local road branches into woodland trails. Saved three-tile
+bridge decks allow walkers across the river and tributary while retaining water below it.
 
 Large new towns use composition revision 2: cottages start at 10×9, stone houses
 11×10, inns 17×12, smithies 13×10, chapels 15×14 and barns 16×13, with seeded
@@ -49,8 +49,8 @@ includes software rasterization; it does not establish Galaxy S25 performance.
 ## Device check
 
 Install the ARM64 development APK. In Menu → Developer, enable the performance
-overlay. Start a new seed-42 world, explore east from town, cross and recross the
-river bridge, move diagonally, return to town, enter/exit the dungeon, save/load
+overlay. Start a new seed-42 world, explore east from town, cross and recross both
+waterway bridges, move diagonally, return to town, enter/exit the dungeon, save/load
 away from town, and repeat with Reduced motion. Record the overlay while moving;
 report p50/p95/p99, worst streaming time and whether any freezes or low-detail
 catch-up are visible. The engineering target is 60+ FPS and no ordinary transition

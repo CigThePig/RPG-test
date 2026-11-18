@@ -70,7 +70,7 @@ public static class LivingReachGeography
         Road(r,70,r.Height/2,105,r.Height*.65f,1.1f);
         // One modest timber crossing opens the eastern bank without interrupting
         // the water geometry. Collision reads the saved deck cells above water.
-        int bridgeY=r.Height/2+7;
+        int bridgeY=(int)(r.Height*.59f);
         int bank=(int)RiverX(r.Seed,bridgeY,r.Width,r.Height);
         for(int y=bridgeY-1;y<=bridgeY+1;y++)for(int x=bank-12;x<=bank+12;x++)
         {
@@ -79,6 +79,18 @@ public static class LivingReachGeography
             else r.Tiles[at]=Terrain.Earth;
         }
         Road(r,76,r.Height/2,bank-12,bridgeY,1);
+        // The tributary divides the eastern bank again: a second crossing keeps
+        // both woodlands reachable without flattening either watercourse.
+        int branchX=(int)(r.Width*.76f);
+        float branchT=(branchX-joinX)/(r.Width-joinX);
+        int branchBridgeY=(int)MathF.Round(joinY-r.Height*.27f*branchT+3*MathF.Sin(branchT*MathF.Tau));
+        for(int y=branchBridgeY-10;y<=branchBridgeY+10;y++)for(int x=branchX-1;x<=branchX+1;x++)
+        {
+            int at=y*r.Width+x;
+            if(r.Tiles[at]==Terrain.Water)r.Crossings.Add(at);
+            else r.Tiles[at]=Terrain.Earth;
+        }
+        Road(r,bank+12,bridgeY,branchX,branchBridgeY+10,1);
         r.GeographyRevision=Revision;
     }
     static void Road(RegionState r,float ax,float ay,float bx,float by,float bend)

@@ -18,6 +18,8 @@ public partial class ReachBridge : Node2D
                 batch.Rect(new Rect2(x+dx,y,1,11),new Color("b38a58"));
             }
             if(!Region.Crossings.Contains(i-Region.Width))batch.Rect(new Rect2(x,y-2,24,2),new Color("b38a58"));
+            if(!Region.Crossings.Contains(i-1))batch.Rect(new Rect2(x-1,y,2,12),new Color("b38a58"));
+            if(!Region.Crossings.Contains(i+1))batch.Rect(new Rect2(x+23,y,2,12),new Color("4d3528"));
             if(!Region.Crossings.Contains(i+Region.Width))batch.Rect(new Rect2(x,y+11,24,2),new Color("4d3528"));
         }
         batch.Upload();SetProcess(false);
