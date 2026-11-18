@@ -17,6 +17,8 @@ public enum Terrain
 public sealed class RegionState
 {
     public string Id { get; set; } = "reach";
+    public int ReachRevision { get; set; } // Zero in old saves: no retroactive hostiles.
+    public List<ReachSite> ReachSites { get; set; } = new();
     public TownState? Town { get; set; }
     public int Seed { get; set; }
     public int Width { get; set; }
@@ -33,6 +35,8 @@ public sealed class RegionState
     public bool ExplorationInitialized { get; set; } = true;
     public HashSet<int> ExploredTiles { get; set; } = new();
     public HashSet<string> DiscoveredLandmarks { get; set; } = new(StringComparer.Ordinal);
+    public HashSet<int> Crossings {get;set;}=new(); // Optional saved bridge deck cells over water.
+    public int GeographyRevision { get; set; } // Missing in old saves: retain stored terrain verbatim.
     public int PlacementRevision { get; set; }
     public int Entrance { get; set; }
     public int Objective { get; set; }
@@ -59,7 +63,7 @@ public sealed class RegionState
         {
             Terrain.Wall => false,
             Terrain.Rock => false,
-            Terrain.Water => a.Flies || a.Swims,
+            Terrain.Water => a.Flies || a.Swims || Crossings.Contains(index),
             _ => true
         };
     }
@@ -193,7 +197,7 @@ public static class Regions
     public const string Version = "rpg-regions-2";
     public static RegionState Overworld(int seed, int width = 64, int height = 48)
     {
-        if (width < 16 || height < 16 || width > 256 || height > 256)
+        if (width < 16 || height < 16 || width > 512 || height > 512)
             throw new ArgumentOutOfRangeException(nameof(width));
         var r = new RegionState
         {
@@ -220,6 +224,9 @@ public static class Regions
                     r.Tiles[n] = Terrain.Rock;
             }
 
+        bool large=width>=128 && height>=128;
+        if(large)LivingReachGeography.Generate(r);
+
         // A compact settlement and a winding, three-cell road preserve landscape
         // barriers without flattening a nine-cell strip across the entire region.
         for (int y = 1; y < height-1; y++)
@@ -227,11 +234,13 @@ public static class Regions
             {
                 float sx=(x-10)/7f, sy=(y-height/2)/4f;
                 int roadY = height/2 + (int)MathF.Round(MathF.Sin((x-8)*.14f)*2);
-                if(sx*sx+sy*sy < 1 || (x>=8 && x<=width-8 && Math.Abs(y-roadY)<=1))
+                if(sx*sx+sy*sy < 1 || (!large && x>=8 && x<=width-8 && Math.Abs(y-roadY)<=1))
                     r.Tiles[y*width+x]=Terrain.Earth;
             }
         r.Entrance = (height / 2) * width + 8;
-        r.Objective = (height / 2) * width + width - 8;
+        // Keep the original ruin portal near the town even when wilderness expands.
+        // Long-running quest and adventure routes must not turn into a cross-continent walk.
+        r.Objective = (height / 2) * width + (width>=128 ? 56 : width-8);
         r.Features[r.Objective] = "portal";
         r.Features[r.Entrance + 4] = "chest";
         r.Features[r.Entrance + width * 2] = "herb";

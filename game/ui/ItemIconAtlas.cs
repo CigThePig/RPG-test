@@ -22,8 +22,29 @@ public static class ItemIconAtlas
             _ => "unknown"
         };
         if (Cache.TryGetValue(key, out var existing)) return existing;
+        string module = key switch
+        {
+            "iron_sword" => "sword-iron",
+            "ore" => "ore-iron",
+            "wood" => "log",
+            "coin" => "coin",
+            "dungeon_key" => "key-iron",
+            _ => ""
+        };
         using var image = Image.CreateEmpty(32, 32, false, Image.Format.Rgba8);
-        Paint(image, key);
+        if (module != "" && AssetLibrary.TryFind(module, out var sheet, out int cell))
+        {
+            var asset = sheet.Modules[cell];
+            var pixels = asset.Paint();
+            int margin = (32 - asset.Width) / 2;
+            for (int y = 0; y < asset.Height; y++)
+                for (int x = 0; x < asset.Width; x++)
+                    image.SetPixel(x + margin, y + margin, OverworldPropArt.Palette[pixels[y * asset.Width + x]]);
+        }
+        else
+        {
+            Paint(image, key);
+        }
         var texture = ImageTexture.CreateFromImage(image);
         Cache[key] = texture;
         return texture;

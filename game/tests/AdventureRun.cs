@@ -33,15 +33,25 @@ public sealed class AdventureRun(Foundation app)
     IEnumerable<int> Fight(ActorState enemy)
     {
         Mark("encounter-"+enemy.Id);
-        int timeout=0;
+        int timeout=0;var detour=new Queue<int>();
         while(enemy.Alive)
         {
-            if(++timeout>12000)throw new InvalidOperationException("Adventure fight stuck "+enemy.Id);
+            if(++timeout>12000)throw new InvalidOperationException($"Adventure fight stuck {enemy.Id}: p={W.Player.Position} enemy={enemy.Position} hp={enemy.Health} state={enemy.State} blocked={W.LastBlockedReason} los={W.LineOfSight(W.Player,enemy)}");
             var p=W.Player;V offset=enemy.Position-p.Position;float distance=offset.Length();V direction=distance>1?V.Normalize(offset):V.UnitX;
             if(W.Activate(p.Id,"ember",enemy.Id))spells++;
             if(distance<65&&W.TryStartPlayerSlash(direction))attacks++;
             if(enemy.State==ActionState.Windup && distance<85 && W.TryStartPlayerDodge(new V(-direction.Y,direction.X)))dodges++;
-            Tick(distance>38?direction:V.Zero);yield return ticks;
+            // A foe can retreat around masonry after initially being visible. Direct
+            // pursuit sticks on the corner even when the production route is valid.
+            var region=W.RegionsById[p.Region];V chase=direction;
+            if(!region.CanTravel(p.Position,enemy.Position,p))
+            {
+                if(detour.Count==0||timeout%30==0)detour=new(region.Path(p.Position,enemy.Position,p));
+                while(detour.Count>0&&V.Distance(p.Position,region.Center(detour.Peek()))<3)detour.Dequeue();
+                if(detour.Count>0)chase=V.Normalize(region.Center(detour.Peek())-p.Position);
+            }
+            else detour.Clear();
+            Tick(distance>38||detour.Count>0?chase:V.Zero);yield return ticks;
         }
         Mark("defeated-"+enemy.Id);
         // Loot stays with its production corpse, claimed via normal interaction when in range.
@@ -122,9 +132,24 @@ public sealed class AdventureRun(Foundation app)
         {
             if(UseDialogue) { foreach(int step in Choose("I can help"))yield return step; }
             else if(!N.Call("accept_quest",1).AsBool())throw new InvalidOperationException("Intro acceptance failed");
-            foreach(var enemy in W.Actors.Values.Where(a=>a.Profile=="beast").Take(2).ToArray())
+            var wilderness=W.RegionsById["reach"];
+            if(wilderness.ReachRevision>0)
             {
-                var r=W.RegionsById["reach"];foreach(int step in Travel(r.Index(enemy.Position)))yield return step;if(enemy.Alive)foreach(int step in Fight(enemy))yield return step;
+                // Discover real planned starter territories through ordinary travel. Their
+                // inhabitants need not exist in World.Actors while still distant from town.
+                foreach(var site in wilderness.ReachSites.Where(s=>s.Template=="lone-hunter")
+                    .OrderBy(s=>V.DistanceSquared(wilderness.Center(s.Tile),W.Player.Position)).Take(2).ToArray())
+                {
+                    foreach(int step in Travel(site.Tile))yield return step;
+                    foreach(var member in site.Members)
+                        if(W.Actors.TryGetValue(member.Id,out var enemy)&&enemy.Alive)
+                            foreach(int step in Fight(enemy))yield return step;
+                }
+            }
+            else foreach(var enemy in W.Actors.Values.Where(a=>a.Profile=="beast").Take(2).ToArray())
+            {
+                foreach(int step in Travel(wilderness.Index(enemy.Position)))yield return step;
+                if(enemy.Alive)foreach(int step in Fight(enemy))yield return step;
             }
             if(!N.Call("completed",1).AsBool())throw new InvalidOperationException("Adventure prerequisite failed");
             if(UseDialogue)

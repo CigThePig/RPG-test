@@ -669,6 +669,11 @@ public partial class RpgUi : CanvasLayer
             var interaction=App.World.InteractionTargets(App.World.Player).FirstOrDefault();
             string nearby=interaction.Value==null ? "none" : interaction.Value+" "+System.Numerics.Vector2.Distance(App.World.Player.Position,App.World.RegionsById[App.World.Player.Region].Center(interaction.Key)).ToString("0.0");
             metrics.Text = $"Target {nearby}\nXY {App.World.Player.X:0},{App.World.Player.Y:0} · tile {App.World.RegionsById[App.World.Player.Region].Index(App.World.Player.Position)} · stand {App.World.RegionsById[App.World.Player.Region].CanStand(App.World.Player.Position,App.World.Player)}\nInput {App.World.LastInput.Length():0.00} · velocity {App.World.ActualVelocity.Length():0.0} · sim {App.SimulationMs:0.00}ms\nBlocked {App.World.LastBlockedReason}\nFPS {Engine.GetFramesPerSecond()} · p50/p95/p99 {sorted[(int)((sorted.Length - 1) * .5)]:0.0}/{sorted[(int)((sorted.Length - 1) * .95)]:0.0}/{sorted[(int)((sorted.Length - 1) * .99)]:0.0} ms\nActors {App.Views.Values.Count(v => v.Visible)}/{App.World.Actors.Count} · managed {GC.GetTotalMemory(false)/1048576.0:0} MB\nRaster {PixelCreatures.Runtime.CreatureRenderQueue.LastRasterMs:0.0} ms · upload {PixelCreatures.Runtime.CreatureRenderQueue.LastUploadMs:0.0} ms · save {Persistence.LastSaveMilliseconds:0.0} ms";
+            var stream=GetTree().GetNodesInGroup("overworld-chunks").OfType<OverworldChunkStreamer>().FirstOrDefault();
+            if(stream!=null)
+            {
+                metrics.Text+=$"\nStream {stream.LastMainThreadMs:0.00} ms · max {stream.WorstMainThreadMs:0.00} ms · active/cache {stream.LoadedChunks}/{stream.CachedChunks}\nPrepared {stream.PreparedChunks} · lookups {stream.LookupBytes/1048576.0:0.0} MB · reuse {stream.CacheHits}";
+            }
         }
         var a = App.World.Player;
         hud.Refresh(a, a.Region, App.World.Time);
@@ -1187,6 +1192,7 @@ public partial class RpgUi : CanvasLayer
             App.World.Enter(App.World.Player, "reach");
             ClosePanels();
         });
+        Button(body, "Visit nearby hunter territory (F8)", App.VisitHunterTerritory);
         Button(body, "Combat archetypes test encounter (F9)", App.BeginCombatCourse);
         foreach(var encounter in new[]{"prowler","brute","spitter","two melee","mixed","four mixed","projectiles","crowd"})
         {

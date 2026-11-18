@@ -94,6 +94,11 @@ public static class WallDepthChecks
             int frontPixels=0;Pixels((px,py)=>{if(Different(front.GetPixel(px,py),incorrectlyAbove.GetPixel(px,py)))frontPixels++;});
             if(frontPixels<20)throw new InvalidOperationException("Actor in front was incorrectly hidden by the wall");
             foreach(var row in rows)row.ZIndex=0;
+            // Comparing the entire image with a forced wall Z change also
+            // changes wall overlap with decorative clutter elsewhere in view.
+            // Isolate that comparison from the cosmetic props, as above.
+            var clutter = parent.GetChildren().OfType<DungeonClutter>().ToArray();
+            foreach (var decoration in clutter) decoration.Hide();
             // A north/south corridor crossing's three-tile opening stays visibly open.
             var southward=r.Passages.First(q=>q.Dy==1);
             float doorX=(southward.X+.5f)*24;y=(southward.Y+1)*24-24;
@@ -108,6 +113,7 @@ public static class WallDepthChecks
                 if(Different(doorwayFixed.GetPixel(px,py),doorwayLegacy.GetPixel(px,py)))doorwayChanges++;
             if(doorwayChanges!=0)throw new InvalidOperationException("Wall row paints over clear doorway: "+doorwayChanges);
             foreach(var row in rows)row.ZIndex=0;
+            foreach (var decoration in clutter) decoration.Show();
             // Actual collision-safe movement through the opening and back.
             Place(new V(doorX,y-48));
             var start=p.Position;w.Move(p,new V(0,144));w.Move(p,new V(0,-144));

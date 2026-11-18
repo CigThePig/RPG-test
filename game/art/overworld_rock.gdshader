@@ -4,6 +4,7 @@ render_mode unshaded;
 // ground, a stratified south face and a soft cast shadow. Static; no clock.
 uniform sampler2D rock_map : filter_linear, repeat_disable;
 uniform vec2 rock_lookup_size;
+uniform vec2 rock_lookup_origin;
 uniform vec4 rock_palette[12];
 uniform float rock_seed;
 const float LIFT=10.0;
@@ -11,7 +12,7 @@ varying vec2 place;
 void vertex(){place=VERTEX;}
 float rock_hash(vec2 p){return fract(sin(dot(floor(p)+vec2(rock_seed,rock_seed*0.37),vec2(127.1,311.7)))*43758.5453);}
 vec2 rock(vec2 p){
-    vec3 s=texture(rock_map,(p/3.0+vec2(0.5))/rock_lookup_size).rgb;
+    vec3 s=texture(rock_map,(p/3.0-rock_lookup_origin+vec2(0.5))/rock_lookup_size).rgb;
     return vec2(s.r*68.0-8.0-s.b*8.0,s.g);
 }
 void fragment(){

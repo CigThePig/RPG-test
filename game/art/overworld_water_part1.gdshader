@@ -3,13 +3,14 @@ render_mode unshaded;
 // Frozen Part 1 water, kept only for the reversible before/after verification captures.
 uniform sampler2D depth_map : filter_linear, repeat_disable;
 uniform vec2 lookup_size;
+uniform vec2 lookup_origin;
 uniform float cosmetic_seed;
 uniform vec4 palette[12];
 varying vec2 place;
 void vertex() { place = VERTEX; }
 void fragment() {
     vec2 p = floor(place) + vec2(0.5);
-    vec3 sample_data = texture(depth_map, (p / 3.0 + vec2(0.5)) / lookup_size).rgb;
+    vec3 sample_data = texture(depth_map, (p / 3.0 - lookup_origin + vec2(0.5)) / lookup_size).rgb;
     float d = sample_data.r * 68.0 - 8.0;
     float v = sample_data.g;
     float edge = d - (0.2 + v * 2.6);

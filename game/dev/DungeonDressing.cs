@@ -11,7 +11,7 @@ public static class DungeonDressing
     /// <summary>A wall tile whose south face carries a torch (Banner &lt; 0) or a banner.</summary>
     public readonly record struct Fixture(int X,int Y,int Banner);
     /// <summary>One loose item: its atlas module, ground point and any light it gives.</summary>
-    public readonly record struct Item(int Module,V Ground,float Glow,bool Warm);
+    public readonly record struct Item(int Module,V Ground,float Glow,bool Warm,string LibraryModule);
     static bool Face(RegionState r,bool[] masonry,int x,int y)=>y+1<r.Height&&DungeonArt.Solid(masonry,r,x,y)&&!DungeonArt.Solid(masonry,r,x,y+1);
     public static List<Fixture> Fixtures(RegionState r,bool[] masonry)
     {
@@ -33,6 +33,12 @@ public static class DungeonDressing
         return result;
     }
     public static IEnumerable<Fixture> Torches(RegionState r,bool[] masonry)=>Fixtures(r,masonry).Where(f=>f.Banner<0);
+    static readonly string[] Bones = { "skeleton-sitting", "skull-pile", "bone-heap", "ribcage-large" };
+    static readonly string[] Growth = { "cave-moss", "root-tangle", "stalagmite-1", "stalagmite-2", "stalagmite-3" };
+    static readonly string[] Debris = { "web-corner", "web-large", "egg-sac", "nest", "rubble-large", "pillar-broken-1", "pillar-broken-2" };
+    static readonly string[] Sacred = { "statue-knight", "statue-broken", "candle-stand" };
+    static readonly string[] Storage = { "bottle-rack", "bookshelf-ruined" };
+
     public static List<Item> Plan(RegionState r,bool[] masonry)
     {
         var result=new List<Item>();
@@ -75,7 +81,18 @@ public static class DungeonDressing
             // wall row, which sorts at its front edge, would draw over it.
             var ground=new V((x+.5f)*24+jitter,(y+(north?.62f:.5f))*24);
             bool glowcap=kind==DungeonProp.Growth&&variant==3,candles=kind==DungeonProp.Sacred&&variant==0;
-            result.Add(new(DungeonPropArt.Module(kind,(int)variant),ground,glowcap?46:candles?64:0,candles));
+            string library = "";
+            if ((north || side) && !glowcap && !candles && (h >> 24) % 2 == 0)
+            {
+                var choices = theme switch
+                {
+                    1 => kind == DungeonProp.Bones ? Bones : Growth,
+                    2 => kind == DungeonProp.Pots ? Storage : Sacred,
+                    _ => kind == DungeonProp.Bones ? Bones : kind == DungeonProp.Pots ? Storage : Debris
+                };
+                library = choices[EnvironmentStyle.Hash(r.Seed, x, y, 9721) % choices.Length];
+            }
+            result.Add(new(DungeonPropArt.Module(kind,(int)variant),ground,glowcap?46:candles?64:0,candles,library));
         }
         return result;
     }
@@ -86,6 +103,7 @@ public static class DungeonDressing
 public partial class DungeonClutter : Node2D
 {
     readonly List<(Rect2 Destination,Rect2 Source)> sprites=new();
+    readonly List<(string Asset, Vector2 Foot)> library = new();
     public static int LastCount {get;private set;}
     public static List<DungeonClutter> Create(RegionState r,bool[] masonry)
     {
@@ -97,12 +115,21 @@ public partial class DungeonClutter : Node2D
             // Sort by the same visible footing as a standing character; see OverworldFlora.
             int row=(int)MathF.Round(foot.Y)-OverworldFlora.ActorFootDrop;
             if(!rows.TryGetValue(row,out var node))rows[row]=node=new DungeonClutter{Position=new Vector2(0,row),TextureFilter=TextureFilterEnum.Nearest};
+            if (item.LibraryModule != "")
+            {
+                node.library.Add((item.LibraryModule, foot - node.Position));
+                continue;
+            }
             node.sprites.Add((new Rect2(foot-node.Position-DungeonPropArt.Pivot,new Vector2(DungeonPropArt.Width,DungeonPropArt.Height)),DungeonPropArt.Source(item.Module)));
         }
         return rows.Values.ToList();
     }
     public override void _Ready()=>SetProcess(false);
-    public override void _Draw(){foreach(var sprite in sprites)DrawTextureRectRegion(DungeonPropAtlas.Texture,sprite.Destination,sprite.Source);}
+    public override void _Draw()
+    {
+        foreach(var sprite in sprites) DrawTextureRectRegion(DungeonPropAtlas.Texture,sprite.Destination,sprite.Source);
+        foreach(var (asset, foot) in library) AssetLibrary.Draw(this, asset, foot, .68f);
+    }
 }
 
 /// <summary>Torches and banners hung on one wall row's faces. A child of that row, so it
@@ -125,7 +152,8 @@ public partial class WallFixtures : Node2D
             var foot=new Vector2(fixture.X*24+12,0);
             if(fixture.Banner>=0){DungeonPropAtlas.Draw(this,DungeonPropArt.Module(DungeonProp.Banner,fixture.Banner),foot);continue;}
             DungeonPropAtlas.Draw(this,DungeonPropArt.Module(DungeonProp.Sconce),foot);
-            DungeonPropAtlas.Draw(this,DungeonPropArt.Module(DungeonProp.TorchFlame,frame+(int)(EnvironmentStyle.Hash(Seed,fixture.X,fixture.Y,9720)%4)),foot);
+            int phase = (frame + (int)(EnvironmentStyle.Hash(Seed,fixture.X,fixture.Y,9720) % 8)) % 8;
+            AssetLibrary.Draw(this, "torch-flame-" + (phase + 1), foot + new Vector2(0, -19), .55f);
         }
     }
 }

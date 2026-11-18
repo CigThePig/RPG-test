@@ -6,6 +6,8 @@ namespace Mosslight;
 public partial class OverworldWaterRenderer : Node2D
 {
     public RegionState Region { get; init; } = null!;
+    public Rect2I? Cells {get;init;}
+    public ChunkLookup? Prepared {get;set;}
     public OverworldGroundRenderer? Ground {get;init;}
     public Func<bool> ReducedMotion { get; init; } = () => true;
     static readonly bool visualVerification=OS.GetCmdlineUserArgs().Contains("--visual-check");
@@ -27,7 +29,10 @@ public partial class OverworldWaterRenderer : Node2D
         AddToGroup("overworld-water");
         TextureFilter=TextureFilterEnum.Nearest;
         var timer=System.Diagnostics.Stopwatch.StartNew();
-        var regionBounds=new Rect2(0,0,Region.Width*24,Region.Height*12);
+        var cells=Cells??new Rect2I(0,0,Region.Width,Region.Height);
+        int sx=Math.Max(0,cells.Position.X-3),sy=Math.Max(0,cells.Position.Y-3);
+        int ex=Math.Min(Region.Width,cells.End.X+3),ey=Math.Min(Region.Height,cells.End.Y+3);
+        var regionBounds=new Rect2(cells.Position.X*24,cells.Position.Y*12,cells.Size.X*24,cells.Size.Y*12);
         void Bank(Rect2 rectangle,Color color)
         {
             var clipped=rectangle.Intersection(regionBounds);
@@ -35,17 +40,29 @@ public partial class OverworldWaterRenderer : Node2D
         }
         if(OS.GetCmdlineUserArgs().Contains("--water-static-fallback"))
         {
-            foreach(var mark in OverworldWaterArt.Build(Region))surface.Rect(mark.Rect,OverworldWaterArt.Ramp[mark.Shade]);
+            if(Cells==null)
+            {
+                foreach(var mark in OverworldWaterArt.Build(Region))surface.Rect(mark.Rect,OverworldWaterArt.Ramp[mark.Shade]);
+            }
+            else // A frozen baseline should never generate an entire 25x world per chunk.
+            {
+                for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;x++)
+                    if(OverworldWaterArt.Water(Region,x,y))
+                        surface.Rect(new Rect2(x*24,y*12,24,12),OverworldWaterArt.Ramp[OverworldWaterArt.Shade(Region,x,y,12,6)]);
+            }
             LastVertexBytes=surface.VertexBytes;LastLookupBytes=0;LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;BuildCount++;SetProcess(false);return;
         }
         // Three canvas pixels per distance sample. GPU interpolates the scalar field,
         // then quantizes material at integer canvas pixels: crisp art, not a blurred image.
-        int width=Region.Width*8+1,height=Region.Height*4+1;
+        int width=(ex-sx)*8+1,height=(ey-sy)*4+1;
+        if(Prepared!=null)field=Prepared.Upload(Prepared.Water!,Image.Format.Rgb8);
+        else
         using(var image=Image.CreateEmpty(width,height,false,OverworldWaterArt.Part1?Image.Format.Rg8:Image.Format.Rgb8))
         {
             for(int y=0;y<height;y++)for(int x=0;x<width;x++)
             {
-                int tx=x/8,ty=y/4;float px=x*3,py=y*6;
+                int gx=x+sx*8,gy=y+sy*4;
+                int tx=gx/8,ty=gy/4;float px=gx*3,py=gy*6;
                 float d=OverworldWaterArt.Water(Region,tx,ty)?OverworldWaterArt.Distance(Region,tx,ty,px,py):-2;
                 float v=OverworldWaterArt.Variation(Region.Seed,px,py);
                 float inset=OverworldWaterArt.BankInset(Region,tx,ty,px,py);
@@ -54,25 +71,28 @@ public partial class OverworldWaterRenderer : Node2D
             field=ImageTexture.CreateFromImage(image);
         }
         LastLookupBytes=(long)width*height*(OverworldWaterArt.Part1?2:3);
+        Prepared=null;
         // Exactly the authoritative water footprint. Adjacent water rows share one quad.
-        for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;)
+        for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;)
         {
             if(!OverworldWaterArt.Water(Region,x,y)){x++;continue;}
-            int start=x;while(x<Region.Width && OverworldWaterArt.Water(Region,x,y))x++;
+            int start=x;while(x<cells.End.X && OverworldWaterArt.Water(Region,x,y))x++;
             surface.Rect(new Rect2(start*24,y*12,(x-start)*24,12),Colors.White);
         }
+        surface.Upload();
         bool legacy=OverworldWaterArt.Part1;
         if(legacy)legacyShader ??= GD.Load<Shader>("res://game/art/overworld_water_part1.gdshader");
         else waterShader ??= GD.Load<Shader>("res://game/art/overworld_water.gdshader");
         surfaceMaterial=new ShaderMaterial {Shader=legacy?legacyShader:waterShader};surfaceMaterial.SetShaderParameter("depth_map",field);
         surfaceMaterial.SetShaderParameter("palette",legacy?OverworldWaterArt.Ramp:OverworldWaterArt.Living);
-        surfaceMaterial.SetShaderParameter("lookup_size",new Vector2(width,height));surfaceMaterial.SetShaderParameter("cosmetic_seed",(float)(OverworldWaterArt.Hash(Region.Seed,0,0)%65536));
+        surfaceMaterial.SetShaderParameter("lookup_size",new Vector2(width,height));
+        surfaceMaterial.SetShaderParameter("lookup_origin",new Vector2(sx*8,sy*4));surfaceMaterial.SetShaderParameter("cosmetic_seed",(float)(OverworldWaterArt.Hash(Region.Seed,0,0)%65536));
         if(!legacy){Ground?.Configure(surfaceMaterial);ReachAmbience.Register(surfaceMaterial);}
         Material=surfaceMaterial;
         // Swell, foam and sparkle now live in the surface shader. The separate bank
         // marks and glint batch remain only for the frozen Part 1 comparison.
         if(!legacy){LastVertexBytes=surface.VertexBytes;LastBuildMilliseconds=timer.Elapsed.TotalMilliseconds;BuildCount++;SetProcess(false);return;}
-        for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+        for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;x++)
         {
             if(!OverworldWaterArt.Water(Region,x,y))continue;
             uint bank=OverworldWaterArt.Hash(Region.Seed,x,y,9);

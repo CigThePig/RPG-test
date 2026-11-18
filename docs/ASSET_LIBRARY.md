@@ -2,7 +2,38 @@
 
 Nearly a thousand procedurally painted modules for future content, in the Living Reach's manner: the same indexed palette, upper-left light, one dark contour and a cast shadow. Every module is a recipe in `game/assets/`; nothing is a hand-edited file, so the whole library re-renders identically from source.
 
-None of it is placed in the game yet. It is a library to draw from.
+The 248 **Keep** modules now have placements in the game across the generated Reach and its ruins. The catalog retains the other designs for future review.
+
+## Mosslight fit review
+
+The [curated catalog](asset-library/curation.csv) gives all 996 modules a decision and reason. It covers the library introduced in PR #10 and carried into PR #11. The review compares the sheets with the Living Reach, its modest town interiors and ruins, and the current mobile HUD. It rates whether an asset belongs on the shortlist. The table describes the review decisions. Animated families count once per frame.
+
+| Decision | Modules | Use |
+| --- | ---: | --- |
+| Keep | 248 | Shortlist for the current setting. Start with mossy stone, cairns, hollow logs, weathered shrines, simple work furniture, cave rubble and nests. |
+| Reserve | 333 | Save for a specific region, room, item or mechanic. Frost trees, palms, cacti, coral, docks, mine gear and traps belong here. |
+| Rework | 392 | Adapt to Mosslight before use. Tone down jewel-bright magic props, give recoloured items distinct silhouettes, and match combat cues and interface art to the live game. |
+| Exclude | 23 | Leave these versions out of content briefs and placement shortlists. |
+
+### Exclude from the shortlist
+
+| Sheet | Module IDs | Reason |
+| --- | --- | --- |
+| Biomes | `snowman` | Seasonal novelty prop. |
+| Structures | `sandbags` | The stacked military barrier feels out of place alongside the Reach's timber and fieldstone defenses. |
+| Landmarks | `lighthouse` | The striped tower and hard beacon cone read as a modern coastal beacon. A stone signal tower could serve a future coast. |
+| Furnishings | `piano`, `floor-lamp` | These upright piano and shaded standing-lamp designs look out of period in the current interiors. The harp and candelabra suit specialist rooms. |
+| Delve | `iron-maiden` | A torture-device prop pushes the ruins toward a different tone. |
+| Materials | `bone-floor` | Repeating skulls overwhelm the floor pattern. Use sparse bone props on stone. |
+| Effects | `coin-spin-1` through `coin-spin-8` | The arcade reward animation competes with the game's quieter looting feedback. |
+| Items | `heart`, `star` | Generic pickup symbols carry little meaning as inventory items. |
+| Interface | `cursor-hand`, `cursor-sword`, `cursor-target`, `cursor-grab`, `speech-bubble`, `thought-bubble` | Desktop pointers and comic bubbles clash with the established touch controls and dialogue presentation. |
+
+The streamed Reach uses contextual pines, flowers, shore props and small landmarks. Camps, memorials and stone markers use material accents and the existing reduced-motion clock. The generated town uses the furniture in its six house styles, with the item art arranged as local goods on display. Existing inventory items use five of those icons directly. The dungeon keeps its original layout and uses the reviewed clutter along room edges and the torch frames on its wall sconces. The mine and cave artwork depict blocked openings. Purchases, equipment, dungeon entrances and collision continue to use the existing rules.
+
+`AssetLibraryChecks` checks the live placement rules across eight seed worlds against every Keep ID, including the animation frames.
+
+Keep a full animation together when applying a decision. The catalog deliberately lists every frame so it can be joined directly to `manifest.json` by sheet and module name. When adding or renaming a recipe, review its catalog row alongside the next asset export.
 
 ## Using it
 
@@ -78,4 +109,4 @@ Add a recipe to the sheet's class with `sheet.Add(name, p => ...)`, painting wit
 
 `AssetLibraryChecks` (headless) requires every module to be painted, to use only the shared palette, to repeat exactly, to have a unique name and a pivot inside its cell, to keep a transparent gutter unless it lies flat, materials to be opaque, and every effect to have eight frames. Effects may hold a blank frame for a flicker or the end of a fade.
 
-The previews were reviewed by eye at 2x. None of these modules has been seen in a live scene or on the phone.
+The catalog previews show the original sheets at 2x.

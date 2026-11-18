@@ -21,12 +21,43 @@ for preset in ([] if a.dungeon_only else a.presets.split(',')):
     if not a.realtime: command+=['--write-movie',str(folder/'gameplay.avi'),'--fixed-fps','60']
     command+=['--','--gameplay-check','--mobile-ui',f'--preset={preset}',f'--evidence={folder}']
     recorder=None
+    game=None
+    capture_first=None
     capture_utc=time.time()
-    if a.realtime:
-        recorder=subprocess.Popen(['ffmpeg','-v','error','-y','-f','x11grab','-video_size','1280x800','-framerate','30','-i',os.environ['DISPLAY'],'-c:v','libx264','-preset','ultrafast','-crf','24','-pix_fmt','yuv420p',str(folder/'gameplay.mp4')],stdin=subprocess.PIPE)
     try:
-        result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=900)
+        if a.realtime:
+            # Recording the X11 root before Godot launches records a blank desktop.
+            # Wait for completed drawn frames AND an uploaded player bitmap. Keep
+            # the complete trace; record the first visible-state offset explicitly.
+            launch_log=folder/'capture-launch.log'
+            trace=folder/'trace.jsonl'
+            trace.unlink(missing_ok=True) # Never accept readiness from an earlier invocation.
+            with launch_log.open('w') as output:
+                game=subprocess.Popen(command,cwd=root,stdout=output,stderr=subprocess.STDOUT)
+                deadline=time.monotonic()+60
+                while game.poll() is None and capture_first is None:
+                    if trace.exists():
+                        for line in trace.read_text(encoding='utf-8-sig').splitlines():
+                            try: row=json.loads(line)
+                            except json.JSONDecodeError: continue # Writer may be midway through a row.
+                            if row.get('kind')=='sample' and row.get('frame',0)>=2 and row.get('renderCount',0)>0:
+                                capture_first={k:row[k] for k in ('frame','tick','wallMs')}
+                                break
+                    if capture_first is not None: break
+                    if time.monotonic()>deadline:
+                        raise RuntimeError('Replay did not draw a player before capture; see capture-launch.log')
+                    time.sleep(.05)
+                if capture_first is None:
+                    raise RuntimeError('Replay exited before visible capture: '+launch_log.read_text()[-6000:])
+                capture_utc=time.time()
+                recorder=subprocess.Popen(['ffmpeg','-v','error','-y','-f','x11grab','-video_size','1280x800','-framerate','30','-i',os.environ['DISPLAY'],'-c:v','libx264','-preset','ultrafast','-crf','24','-pix_fmt','yuv420p',str(folder/'gameplay.mp4')],stdin=subprocess.PIPE)
+                code=game.wait(timeout=900)
+            result=subprocess.CompletedProcess(command,code,launch_log.read_text(),'')
+        else:
+            result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=900)
     finally:
+        if game is not None and game.poll() is None:
+            game.kill();game.wait()
         if recorder is not None:
             recorder.communicate(b'q',timeout=30)
             if recorder.returncode:raise RuntimeError('Real-time FFmpeg capture failed')
@@ -97,7 +128,8 @@ for preset in ([] if a.dungeon_only else a.presets.split(',')):
         changed+=sum(ImageStat.Stat(ImageChops.difference(old,new)).mean)>1
     assert changed>8,'Frozen gameplay recording'
     for f in images[::5]:
-        im=Image.open(f).convert('RGB');assert len(im.getcolors(im.width*im.height))>100,'Blank rendering'
+        im=Image.open(f).convert('RGB');colors=len(im.getcolors(im.width*im.height))
+        assert colors>100,f'Blank rendering: {f.name}, {colors} colors'
     # Frame/time labels make every thumbnail locatable in the full clip and trace.
     chosen=[images[round(i*(len(images)-1)/19)] for i in range(20)]
     sheet=Image.new('RGB',(4*320,5*220));draw=ImageDraw.Draw(sheet)
@@ -200,7 +232,7 @@ for preset in ([] if a.dungeon_only else a.presets.split(',')):
     if (folder/'gameplay.avi').exists(): (folder/'gameplay.avi').unlink()
     for f in images:f.unlink()
     status=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],cwd=root,text=True).splitlines()
-    report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(status),'statusEntries':status,'preset':preset,'stateDigest':digest,'deterministicRepeat':True,'movieMode':not a.realtime,'captureStartUnix':capture_utc,'environment':session,'renderWallPacing':pacing,'distinctIndexedCreatureFrames':pose_evidence,'simulationSeconds':(samples[-1]['tick']-samples[0]['tick'])/60,'wallSeconds':(samples[-1]['wallMs']-samples[0]['wallMs'])/1000,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}
+    report={'source':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(status),'statusEntries':status,'preset':preset,'stateDigest':digest,'deterministicRepeat':True,'movieMode':not a.realtime,'captureStartUnix':capture_utc,'captureFirstRenderedState':capture_first,'environment':session,'renderWallPacing':pacing,'distinctIndexedCreatureFrames':pose_evidence,'simulationSeconds':(samples[-1]['tick']-samples[0]['tick'])/60,'wallSeconds':(samples[-1]['wallMs']-samples[0]['wallMs'])/1000,'metrics':metrics,'problemPeriods':problems,'visualReview':'Automated sanity/temporal checks only. Human or vision inspection must be reported separately.'}
     (folder/'report.json').write_text(json.dumps(report,indent=2));summary[preset]=metrics
 (out/'comparison.json').write_text(json.dumps(summary,indent=2));print(json.dumps(summary,indent=2))
 

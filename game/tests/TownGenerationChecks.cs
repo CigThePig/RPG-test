@@ -49,7 +49,10 @@ public static class TownGenerationChecks
         var world=app.World; string saved=Persistence.Capture(world,app.Narrative);
         try
         {
-            world.RegionsById["reach"]=Regions.Overworld(world.Seed);
+            // Preserve the live production dimensions: actors from a 25x world may be
+            // outside the old 64x48 reference map during this save/load test.
+            var reach=world.RegionsById["reach"];
+            world.RegionsById["reach"]=Regions.Overworld(world.Seed,reach.Width,reach.Height);
             var r=world.RegionsById["reach"];string townJson=Json(r);
             string capture=Persistence.Capture(world,app.Narrative);
             Persistence.Restore(world,app.Narrative,capture);
@@ -87,7 +90,7 @@ public static class TownGenerationChecks
             }
             foreach(int seed in new[]{1,42,1337})
             {
-                var r=Regions.Overworld(seed); w.RegionsById["reach"]=r; player.Region="reach";
+                var r=Regions.Overworld(seed,320,240); w.RegionsById["reach"]=r; player.Region="reach";
                 var plan=TownStage.For(r)!;
                 foreach(var h in plan.Houses)
                 {
@@ -108,7 +111,7 @@ public static class TownGenerationChecks
                 }
                 var spawn=r.Center(r.Entrance);player.X=spawn.X;player.Y=spawn.Y;app.RebuildViews();app.ResumeGame();
                 await Frame("seed-"+seed+"-street");
-                player.X=20.5f*24;player.Y=(r.Height/2+3)*24;app.RebuildViews();app.ResumeGame();app.Camera.Zoom=zoom*.5f;
+                player.X=39.5f*24;player.Y=(r.Height/2+3)*24;app.RebuildViews();app.ResumeGame();app.Camera.Zoom=zoom*.5f;
                 await Frame("seed-"+seed+"-overview");app.Camera.Zoom=zoom;
             }
             GD.Print("GENERATED TOWN RENDERED CHECKS PASSED: 18 actual door entries and exits across seeds 1, 42, 1337");

@@ -30,6 +30,8 @@ jobs:
       - run: python3 tools/pack-dungeon-rules.py
       - run: git diff --exit-code -- game/data/dungeon_rules.json
       - run: dotnet build
+      - name: Validate bounded import recovery and plugin restoration
+        run: python3 tools/test_import_project.py
       - name: Import assets before enabling editor plugins
         run: python3 tools/import-project.py
       - name: Engine integration and population benchmarks
@@ -52,6 +54,8 @@ jobs:
         run: xvfb-run -a -s '-screen 0 2560x1440x24' python3 tools/verify.py --visual --mobile --overworld-props-only
       - name: Town block houses and roofs in the Living Reach
         run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --town-only
+      - name: Interaction keeps streamed terrain visible and resource visuals current
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --interaction-terrain-only
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -69,9 +73,68 @@ jobs:
             docs/render-verification*.json
             build/dungeon/
             build/adventure/
+            build/ecology/
             build/encounter-measurements.json
             build/verification-*.log
             build/widescreen/
+            build/interactions/
+  living-reach:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: |
+            8.0.408
+            9.0.203
+      - uses: chickensoft-games/setup-godot@ac93246ea68518a384c1c280a496e5989341f2f6
+        with:
+          version: 4.6.1
+          use-dotnet: true
+          include-templates: false
+      - run: dotnet build
+      - run: python3 tools/import-project.py
+      - run: python3 tools/setup-video.py --require-display
+      - name: Production geography, interiors, streaming A/B and real-time movie
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' python3 tools/living-reach-verify.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: living-reach-evidence
+          path: build/living-reach/
+          retention-days: 30
+  encounter-ecology:
+    runs-on: ubuntu-24.04
+    # Independent of the three lengthy scenery A/B/movie passes above.
+    # Keep every encounter assertion and capture within its own recording budget.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: |
+            8.0.408
+            9.0.203
+      - uses: chickensoft-games/setup-godot@ac93246ea68518a384c1c280a496e5989341f2f6
+        with:
+          version: 4.6.1
+          use-dotnet: true
+          include-templates: false
+      - run: git rev-parse HEAD > game/data/build-source.txt
+      - run: dotnet build
+      - run: python3 tools/import-project.py
+      - run: python3 tools/setup-video.py --require-display
+      - name: Seeded encounter planning, real AI and lifecycle verification
+        run: python3 tools/verify.py --headless --test-only=ReachEncounterChecks
+      - name: Planned encounter gameplay and 2340x1080 recording
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' python3 tools/ecology-verify.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: encounter-ecology-evidence
+          path: build/ecology/
+          retention-days: 30
   preserved-reference:
     runs-on: ubuntu-24.04
     defaults:

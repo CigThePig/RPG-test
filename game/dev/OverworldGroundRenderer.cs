@@ -6,6 +6,9 @@ namespace Mosslight;
 public partial class OverworldGroundRenderer : Node2D
 {
     public RegionState Region {get;init;}=null!;
+    public Rect2I? Cells {get;init;}
+    public ChunkLookup? Prepared {get;set;}
+    Vector2 lookupOrigin;
     static readonly bool visualVerification=OS.GetCmdlineUserArgs().Contains("--visual-check");
     static readonly bool previousCommand=OS.GetCmdlineUserArgs().Contains("--part1-ground");
     public static bool VerificationPrevious {get;set;}
@@ -22,22 +25,31 @@ public partial class OverworldGroundRenderer : Node2D
     {
         var timer=System.Diagnostics.Stopwatch.StartNew();
         AddToGroup("overworld-ground");SetProcess(false);TextureFilter=TextureFilterEnum.Nearest;
-        int width=Region.Width*8+1,height=Region.Height*4+1;
+        var cells=Cells??new Rect2I(0,0,Region.Width,Region.Height);
+        int sx=Math.Max(0,cells.Position.X-3),sy=Math.Max(0,cells.Position.Y-3);
+        int ex=Math.Min(Region.Width,cells.End.X+3),ey=Math.Min(Region.Height,cells.End.Y+3);
+        int width=(ex-sx)*8+1,height=(ey-sy)*4+1;
+        lookupOrigin=new Vector2(sx*8,sy*4);
+        if(Prepared!=null)lookup=Prepared.Upload(Prepared.Ground,Image.Format.Rgba8);
+        else
         using(var image=Image.CreateEmpty(width,height,false,Image.Format.Rgba8))
         {
             for(int y=0;y<height;y++)for(int x=0;x<width;x++)
             {
-                var s=OverworldGroundArt.Sample(Region,x*3,y*6);
-                image.SetPixel(x,y,new Color((s.Soil+48)/96,s.Wet/48,OverworldGroundArt.Noise(Region.Seed,x*3/110f,y*6/110f,0),OverworldGroundArt.Noise(Region.Seed,x*3/22f,y*6/22f,1)));
+                int gx=x+sx*8,gy=y+sy*4;
+                var s=OverworldGroundArt.Sample(Region,gx*3,gy*6);
+                image.SetPixel(x,y,new Color((s.Soil+48)/96,s.Wet/48,OverworldGroundArt.Noise(Region.Seed,gx*3/110f,gy*6/110f,0),OverworldGroundArt.Noise(Region.Seed,gx*3/22f,gy*6/22f,1)));
             }
             lookup=ImageTexture.CreateFromImage(image);
         }
-        for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;)
+        Prepared=null;
+        for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;)
         {
             if(!OverworldGroundArt.Covered(Region,x,y)){x++;continue;}
-            int start=x;while(x<Region.Width&&OverworldGroundArt.Covered(Region,x,y))x++;
+            int start=x;while(x<cells.End.X&&OverworldGroundArt.Covered(Region,x,y))x++;
             batch.Rect(new Rect2(start*24,y*12,(x-start)*24,12),Colors.White);
         }
+        batch.Upload();
         shader??=GD.Load<Shader>("res://game/art/overworld_ground.gdshader");
         material=new ShaderMaterial{Shader=shader};Configure(material);ReachAmbience.Register(material);
         Material=material;LastLookupBytes=(long)width*height*4;LastVertexBytes=batch.VertexBytes;
@@ -46,7 +58,8 @@ public partial class OverworldGroundRenderer : Node2D
     public void Configure(ShaderMaterial target)
     {
         target.SetShaderParameter("ground_map",lookup!);
-        target.SetShaderParameter("ground_lookup_size",new Vector2(Region.Width*8+1,Region.Height*4+1));
+        target.SetShaderParameter("ground_lookup_size",new Vector2(lookup!.GetWidth(),lookup.GetHeight()));
+        target.SetShaderParameter("ground_lookup_origin",lookupOrigin);
         target.SetShaderParameter("ground_palette",OverworldGroundArt.Ramp);
         target.SetShaderParameter("ground_seed",(int)(OverworldWaterArt.Hash(Region.Seed,0,0,OverworldGroundArt.Revision)%4096));
     }

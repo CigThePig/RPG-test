@@ -22,11 +22,12 @@ jobs:
   gameplay:
     runs-on: ubuntu-24.04
     # The expanded 45-scene suite records and deterministically repeats each preset.
-    # Separate runners bound wall time without dropping any scenario or assertion.
+    # Adventure and real-time recordings also use independent runners so movie
+    # generation cannot consume another suite's time budget or drop assertions.
     strategy:
       fail-fast: false
       matrix:
-        preset: ${{ fromJSON(inputs.extended && '["baseline","precise","soft","explore"]' || '["baseline","precise"]') }}
+        preset: ${{ fromJSON(inputs.extended && '["baseline","precise","soft","explore","adventure","realtime"]' || '["baseline","precise","adventure","realtime"]') }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -49,12 +50,13 @@ jobs:
       - run: dotnet build
       - run: python3 tools/import-project.py
       - name: Deterministic production touch replay and actual rendered movies
+        if: matrix.preset != 'adventure' && matrix.preset != 'realtime'
         run: xvfb-run -a python3 tools/gameplay-verify.py --presets "${{ matrix.preset }}"
       - name: Complete rendered normal-health adventure and contextual dialogue
-        if: matrix.preset == 'precise'
+        if: matrix.preset == 'adventure'
         run: xvfb-run -a python3 tools/adventure-verify.py
       - name: Real-time frame pacing and desktop capture
-        if: inputs.extended && matrix.preset == 'precise'
+        if: matrix.preset == 'realtime'
         run: xvfb-run -a python3 tools/gameplay-verify.py --presets precise --realtime --output build/gameplay-realtime
       - name: Evidence index
         if: always()

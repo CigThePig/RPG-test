@@ -57,6 +57,33 @@ public partial class Foundation : Node2D
         var p=World.Player;p.Region=map.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.State=ActionState.Idle;p.StateRemaining=0;p.PendingAbility="";p.Statuses.Clear();p.Cooldowns.Clear();
         TouchMovement=ControllerVelocity=Vector2.Zero; Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/start-or-reset");
     }
+    /// <summary>Developer inspection of a real planned site; no spawned fixture, healing or forced alarm.</summary>
+    public void VisitHunterTerritory()
+    {
+        if(InFeelCourse) LeaveFeelCourse();
+        if(!World.Player.Alive)return;
+        if(World.Player.Region!="reach")World.Enter(World.Player,"reach");
+        var region=World.RegionsById["reach"];var player=World.Player;
+        foreach(var site in region.ReachSites.Where(s=>s.Template=="lone-hunter")
+            .OrderBy(s=>NVector.DistanceSquared(region.Center(s.Tile),player.Position)).ThenBy(s=>s.Id,StringComparer.Ordinal))
+        {
+            var member=site.Members[0];
+            if(World.Actors.TryGetValue(member.Id,out var active)&&!active.Alive || World.Population.Dormant.TryGetValue(member.Id,out var dormant)&&!dormant.Alive)continue;
+            var home=region.Center(member.Tile);
+            foreach(float side in new[]{1f,-1f})
+            {
+                var approach=home+new NVector(side*180,0);
+                if(!region.CanTravel(home,approach,player))continue;
+                World.Cancel(player);World.ClearPlayerMotion();player.X=approach.X;player.Y=approach.Y;
+                TouchMovement=ControllerVelocity=Vector2.Zero;Ui.Stick.Cancel();Ui.ClosePanels();RebuildViews();
+                Views["player"].SnapPosition();Camera.ResetSmoothing();ResumeGame();
+                GD.Print(FormattableString.Invariant($"MOSSLIGHT_ENCOUNTER_READY site={site.Id} actor={member.Id} template={site.Template} homeX={home.X:0.0} homeY={home.Y:0.0} approachX={approach.X:0.0}"));
+                Ui.Notify("Hunter territory · approach quietly or draw it out");return;
+            }
+        }
+        Ui.Notify("No surviving planned hunter territory is available in this world");
+    }
+
     /// <summary>Keyboard walking pace while the sneak key is held: under the pace at which steps are heard.</summary>
     public const float SneakScale = .5f;
     public SenseView Senses { get; private set; } = null!;
@@ -356,7 +383,7 @@ public partial class Foundation : Node2D
             if(OS.HasFeature("android") && e.Kind=="ability_started" && e.Actor=="player")
                 GD.Print($"MOSSLIGHT_PLAYER_ABILITY id={e.Value} tick={World.Tick}");
             if (OS.HasFeature("android") && e.Kind == "damage" && e.Target == "player")
-                GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0}");
+                GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0} source={e.Actor}");
             if(Trace.Active && e.Kind is "region_entered" or "resource_depleted" or "ability_started" or "defeated")Trace.Marker(e.Kind+"/"+e.Value);
             Narrative.Call("receive", e.Kind, e.Actor, e.Target, e.Value, e.Count);
             if (e.Kind == "afflicted" && e.Target == "player")
@@ -411,7 +438,7 @@ public partial class Foundation : Node2D
         }
 
         Views.Clear();
-        foreach (var a in World.Actors.Values)
+        foreach (var a in World.Actors.Values.Where(a=>a.EncounterSite=="" || EcologyVisible(a)))
         {
             var view = new CharacterView();
             actors.AddChild(view);
@@ -425,6 +452,21 @@ public partial class Foundation : Node2D
         foreach (var view in Views.Values) view.RestoreWindup(World);
 
         drawnRegion = "";
+    }
+
+    bool EcologyVisible(ActorState a) => a.Region==World.Player.Region && NVector.DistanceSquared(a.Position,World.Player.Position)<1050*1050;
+    void SyncEcologyViews()
+    {
+        foreach(var pair in Views.Where(v=>v.Value.State.EncounterSite!="" && (!World.Actors.TryGetValue(v.Key,out var live)||!ReferenceEquals(live,v.Value.State)||!EcologyVisible(v.Value.State))).ToArray())
+        {
+            Views.Remove(pair.Key); actors.RemoveChild(pair.Value); pair.Value.QueueFree();
+        }
+        // Leave the scenery queue its frame budget; no full view rebuild on territory crossings.
+        var a=World.Actors.Values.FirstOrDefault(a=>a.EncounterSite!=""&&EcologyVisible(a)&&!Views.ContainsKey(a.Id));
+        if(a==null)return;
+        var view=new CharacterView();actors.AddChild(view);view.World=World;
+        view.ReducedMotion=()=>ui?.Preferences.ReducedMotion??false;view.Setup(a);ConfigureView(view);
+        Views[a.Id]=view;view.Equipment(items.Call("equipment_appearance",a.Id).AsString());view.RestoreWindup(World);
     }
 
     public void ChangeAppearance(string family, ulong seed)
@@ -453,7 +495,10 @@ public partial class Foundation : Node2D
     bool adventureVisual;
     public void RebuildViewsIfNeededForAdventure()
     {
-        if(Views.Count!=World.Actors.Count || Views.Any(v=>!World.Actors.TryGetValue(v.Key,out var state) || !ReferenceEquals(state,v.Value.State))) RebuildViews();
+        bool changedLegacy=World.Actors.Values.Any(a=>a.EncounterSite==""&&(!Views.TryGetValue(a.Id,out var v)||!ReferenceEquals(a,v.State))) ||
+            Views.Any(v=>v.Value.State.EncounterSite==""&&(!World.Actors.TryGetValue(v.Key,out var state)||!ReferenceEquals(state,v.Value.State)));
+        if(changedLegacy) RebuildViews();
+        else SyncEcologyViews();
     }
     public async void RunAdventureVisual()
     {
@@ -489,6 +534,7 @@ public partial class Foundation : Node2D
         }
         else
         { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; if(!adventureVisual)World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
+        SyncEcologyViews();
         presentation?.FlushPending();
         var player = World.Player;
         if (PresentationBlocked) CombatCamera.Reset();
@@ -561,6 +607,9 @@ public partial class Foundation : Node2D
 
     public override void _UnhandledInput(InputEvent e)
     {
+        if(e is InputEventKey ecologyKey && ecologyKey.Pressed && !ecologyKey.Echo &&
+            (ecologyKey.PhysicalKeycode==Key.F8 || ecologyKey.Keycode==Key.F8) && !Narrative.Get("speaking").AsBool())
+        { VisitHunterTerritory();GetViewport().SetInputAsHandled();return; }
         if(e is InputEventKey developerKey && developerKey.Pressed && !developerKey.Echo && (developerKey.PhysicalKeycode==Key.F9 || developerKey.Keycode==Key.F9) && !Narrative.Get("speaking").AsBool())
         { BeginCombatCourse(); GetViewport().SetInputAsHandled(); return; }
         // Development shortcut for the existing Diagnostics entry/return actions.
@@ -688,10 +737,16 @@ public partial class Foundation : Node2D
             return;
         }
 
-        World.Interact(a);
+        string previousRegion = a.Region;
+        bool changed = World.Interact(a);
         ui.Notify(World.InteractionFeedback);
         if (OS.HasFeature("android")) GD.Print($"MOSSLIGHT_INTERACT feedback={World.InteractionFeedback}");
-        drawnRegion = "";
+        // Resource/chest visuals already observe Spent/Lit in _PhysicsProcess.
+        // Replacing the streamed ground here, even for an unavailable interaction,
+        // discards its visible chunks and leaves a black frame while it restarts.
+        // Dungeon mechanisms still need their wall/surface geometry refreshed.
+        if (a.Region != previousRegion || (changed && World.RegionsById[a.Region].Rooms.Count > 0))
+            drawnRegion = "";
     }
 
     public override void _Notification(int what)
@@ -736,21 +791,36 @@ public partial class Foundation : Node2D
         }
 
         var r = World.RegionsById[World.Player.Region];
-        var tilemap = new TerrainView
+        bool streamed = r.Id=="reach" && r.Width>=128 && r.Height>=128 && r.Rooms.Count==0;
+        if(streamed)
         {
-            Region = r,
-            Art = art
-        };
-        ground.AddChild(tilemap);
-        OverworldGroundRenderer? groundMaterial=null;
-        if(r.Rooms.Count==0 && OverworldGroundRenderer.Enabled)
-        {groundMaterial=new OverworldGroundRenderer {Region=r,ZIndex=-1};ground.AddChild(groundMaterial);}
-        if(r.Rooms.Count==0)ground.AddChild(new ReachAmbienceDriver {ReducedMotion=()=>Ui.Preferences.ReducedMotion});
-        // Outcrops precede water among siblings: their raised tops must stay above the surface.
-        if(r.Rooms.Count==0 && OverworldRockRenderer.Enabled && r.Tiles.Contains(Terrain.Rock))ground.AddChild(new OverworldRockRenderer {Region=r});
-        if(r.Rooms.Count==0 && r.Tiles.Contains(Terrain.Water) && OverworldWaterRenderer.UseLivingReach)
-            ground.AddChild(new OverworldWaterRenderer {Region=r,Ground=groundMaterial,ReducedMotion=()=>Ui.Preferences.ReducedMotion,ZIndex=-1});
-        if(r.Rooms.Count==0 && OverworldAtmosphere.Enabled)ground.AddChild(new OverworldAtmosphere {Region=r,ZIndex=30});
+            ground.AddChild(new ReachHabitatEvidence {World=World,ZIndex=1});
+            ground.AddChild(new ReachAmbienceDriver {ReducedMotion=()=>Ui.Preferences.ReducedMotion});
+            // Clouds span the whole region using one shared tiny texture; terrain and
+            // foliage are created and released around the player in fixed-size chunks.
+            if(OverworldAtmosphere.Enabled)ground.AddChild(new OverworldAtmosphere {Region=r,ZIndex=30});
+            ground.AddChild(new OverworldChunkStreamer {
+                Region=r,Art=art,ActorLayer=actors,
+                PlayerPosition=()=>new Vector2(World.Player.X,World.Player.Y),
+                ViewportPixels=()=>GetViewportRect().Size,Zoom=()=>camera.Zoom,
+                ReducedMotion=()=>Ui.Preferences.ReducedMotion,
+                ShowCharacters=()=>showCharacters
+            });
+        }
+        else
+        {
+            var tilemap = new TerrainView {Region=r,Art=art};
+            ground.AddChild(tilemap);
+            OverworldGroundRenderer? groundMaterial=null;
+            if(r.Rooms.Count==0 && OverworldGroundRenderer.Enabled)
+            {groundMaterial=new OverworldGroundRenderer {Region=r,ZIndex=-1};ground.AddChild(groundMaterial);}
+            if(r.Rooms.Count==0)ground.AddChild(new ReachAmbienceDriver {ReducedMotion=()=>Ui.Preferences.ReducedMotion});
+            // Outcrops precede water among siblings: their raised tops must stay above the surface.
+            if(r.Rooms.Count==0 && OverworldRockRenderer.Enabled && r.Tiles.Contains(Terrain.Rock))ground.AddChild(new OverworldRockRenderer {Region=r});
+            if(r.Rooms.Count==0 && r.Tiles.Contains(Terrain.Water) && OverworldWaterRenderer.UseLivingReach)
+                ground.AddChild(new OverworldWaterRenderer {Region=r,Ground=groundMaterial,ReducedMotion=()=>Ui.Preferences.ReducedMotion,ZIndex=-1});
+            if(r.Rooms.Count==0 && OverworldAtmosphere.Enabled)ground.AddChild(new OverworldAtmosphere {Region=r,ZIndex=30});
+        }
         foreach (var row in wallRows) { actors.RemoveChild(row); row.QueueFree(); }
         wallRows.Clear();
         foreach (var row in clutter) { actors.RemoveChild(row); row.QueueFree(); }
@@ -776,16 +846,17 @@ public partial class Foundation : Node2D
             ground.AddChild(new TownPaving {Region=r,Plan=plan});
             foreach (var row in wallRows) { row.Town=plan; row.Region=r; }
             town.AddRange(TownView.Create(plan));
+            if(r.Width>=128 && r.Height>=128)town.AddRange(CuratedTown.Dress(plan));
             town.AddRange(TownRoof.Create(plan,r.Seed,()=>new Vector2(World.Player.X,World.Player.Y),()=>Ui.Preferences.ReducedMotion));
             foreach (var piece in town) actors.AddChild(piece);
         }
         foreach(var decoration in decorations) { actors.RemoveChild(decoration); decoration.QueueFree(); }
         decorations.Clear();
-        decorations.AddRange(EnvironmentDecoration.Create(r,art));
+        if(!streamed)decorations.AddRange(EnvironmentDecoration.Create(r,art));
         foreach(var decoration in decorations)actors.AddChild(decoration);
         foreach(var row in flora){actors.RemoveChild(row);row.QueueFree();}
         flora.Clear();
-        if(r.Rooms.Count==0 && OverworldFlora.Enabled)
+        if(!streamed && r.Rooms.Count==0 && OverworldFlora.Enabled)
         {
             var growth=OverworldFlora.Create(r);flora.AddRange(growth.Standing);
             foreach(var row in flora)actors.AddChild(row);
@@ -942,6 +1013,7 @@ public partial class TerrainView : Node2D
     public override void _ExitTree() { foreach(var batch in batches)batch.Dispose(); }
     readonly List<TerrainBatch> batches=new();
     public RegionState Region { get; set; } = null !;
+    public Rect2I? Cells {get;set;}
     public Dictionary<string, Texture2D> Art { get; set; } = null !;
 
     public override void _Draw()
@@ -953,9 +1025,10 @@ public partial class TerrainView : Node2D
         // Ruins are painted by DungeonGroundRenderer and TerrainWallRow.
         if(DungeonArt.Is(Region)){LastVertexBytes=0;LastBuildMilliseconds=buildTimer.Elapsed.TotalMilliseconds;if(BuildCount==1)FirstBuildMilliseconds=LastBuildMilliseconds;return;}
         var batch=new TerrainBatch();batches.Add(batch);
+        var cells=Cells??new Rect2I(0,0,Region.Width,Region.Height);
         // Ground layers do not overlap: group by texture so the engine can batch them.
-        for (int y = 0; y < Region.Height; y++)
-            for (int x = 0; x < Region.Width; x++)
+        for (int y = cells.Position.Y; y < cells.End.Y; y++)
+            for (int x = cells.Position.X; x < cells.End.X; x++)
             {
                 var tile = Region.Tiles[y * Region.Width + x];
                 // The Living Reach surface is opaque over the complete water footprint.
@@ -989,8 +1062,8 @@ public partial class TerrainView : Node2D
             if(Region.Rooms.Count==0 && ((terrain==Terrain.Water && OverworldWaterRenderer.UseLivingReach) || (OverworldGroundRenderer.Enabled && terrain is Terrain.Grass or Terrain.Earth)))continue;
             if (!Art.TryGetValue(key, out var texture))
                 continue;
-            for (int y = 0; y < Region.Height; y++)
-                for (int x = 0; x < Region.Width; x++)
+            for (int y = cells.Position.Y; y < cells.End.Y; y++)
+                for (int x = cells.Position.X; x < cells.End.X; x++)
                     if (Region.Tiles[y * Region.Width + x] == terrain)
                         DrawTextureRect(texture, new Rect2(GodotConvert.GroundToScreen(x * 24, y * 24), new Vector2(24, 12)), false, new Color(1, 1, 1, .32f));
         }
@@ -1000,7 +1073,7 @@ public partial class TerrainView : Node2D
         if(!outcrops && Region.Rooms.Count==0 && OverworldPropAtlas.Enabled)
         {
             var rocks=new TerrainBatch {Texture=OverworldPropAtlas.Texture};batches.Add(rocks);
-            for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+            for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;x++)
                 if(Region.Tiles[y*Region.Width+x]==Terrain.Rock)
                 {
                     var foot=GodotConvert.GroundToScreen(x*24+12,y*24+24);
@@ -1012,13 +1085,13 @@ public partial class TerrainView : Node2D
         else if(!outcrops && Art.TryGetValue("rock1",out var rock))
         {
             var rockBatch=new TerrainBatch { Texture=rock };batches.Add(rockBatch);
-            for(int y=0;y<Region.Height;y++)for(int x=0;x<Region.Width;x++)
+            for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;x++)
                 if(Region.Tiles[y*Region.Width+x]==Terrain.Rock)
                     rockBatch.Sprite(new Rect2(GodotConvert.GroundToScreen(x*24,y*24)+new Vector2(0,-7),new Vector2(24,19)),new Rect2(Vector2.Zero,rock.GetSize()));
             rockBatch.Draw(this);
         }
-        for (int y = 0; y < Region.Height; y++)
-            for (int x = 0; x < Region.Width; x++)
+        for (int y = cells.Position.Y; y < cells.End.Y; y++)
+            for (int x = cells.Position.X; x < cells.End.X; x++)
             {
                 int at=y*Region.Width+x;
                 var tile=Region.Tiles[at];

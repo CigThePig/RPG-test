@@ -100,6 +100,19 @@ public sealed class GameplayReplay
     public GameplayReplay(Foundation owner)
     {
         app=owner;
+        // This is an isolated controller/animation course with an authored cast.
+        // World ecology has its own production-terrain replay; a distant streamed
+        // actor is not a stable laboratory dummy or guaranteed to own a view.
+        var reach=app.World.RegionsById["reach"];
+        reach.ReachSites.Clear();reach.ReachRevision=0;
+        app.World.Population.Dormant.Clear();app.World.Population.ResetIndex();
+        foreach(string id in app.World.Actors.Values.Where(a=>a.EncounterSite!="").Select(a=>a.Id).ToArray())app.World.Actors.Remove(id);
+        for(int i=2;i<8;i++)
+        {
+            var fixture=EnemyRoster.Create(app.World,"npc:"+i,"mire","reach",app.World.Player.Position+new V(1800+(i-2)*80,300),-V.UnitX,(ulong)(app.World.Seed+i*17));
+            var point=reach.FindPlacement(fixture.Position,fixture,app.World.Actors.Values);
+            EnemyMind.Resettle(fixture,point,-V.UnitX);app.World.Actors[fixture.Id]=fixture;
+        }
         var args=OS.GetCmdlineUserArgs();
         var only=args.FirstOrDefault(x=>x.StartsWith("--replay-only="))?.Split('=',2)[1];
         scenarios=scenarios.Where(s=>only!=null ? s.Id==only : s.Id!="dungeon-expedition").ToArray();

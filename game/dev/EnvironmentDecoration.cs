@@ -7,9 +7,10 @@ public partial class EnvironmentDecoration : Node2D
     public const int Maximum = 96;
     public Texture2D? Texture { get; init; }
     public Vector2 Pivot { get; init; }
+    public string LibraryModule { get; init; } = "";
     public int ReachModule {get;init;}=-1;
     public int PropModule { get; init; } = -1;
-    public static List<EnvironmentDecoration> Create(RegionState r, Dictionary<string,Texture2D> art)
+    public static List<EnvironmentDecoration> Create(RegionState r, Dictionary<string,Texture2D> art,Rect2I? area=null, IReadOnlyList<CuratedScenery>? stops=null)
     {
         var result=new List<EnvironmentDecoration>();
         // Every structural anchor is required and admitted by generation's budget.
@@ -28,26 +29,35 @@ public partial class EnvironmentDecoration : Node2D
                 TextureFilter=TextureFilterEnum.Nearest });
         }
         if(result.Count>Maximum)throw new InvalidDataException("Saved landmark exceeds architectural node budget");
-        for(int y=1;y<r.Height-1 && result.Count<Maximum;y++)
-            for(int x=1;x<r.Width-1 && result.Count<Maximum;x++)
+        var cells=area??new Rect2I(0,0,r.Width,r.Height);
+        for(int y=Math.Max(1,cells.Position.Y);y<Math.Min(r.Height-1,cells.End.Y) && result.Count<Maximum;y++)
+            for(int x=Math.Max(1,cells.Position.X);x<Math.Min(r.Width-1,cells.End.X) && result.Count<Maximum;x++)
             {
                 int at=y*r.Width+x;var tile=r.Tiles[at];
                 uint h=EnvironmentStyle.Hash(r.Seed,x,y,99);
                 // Ruins scatter their own clutter; see DungeonDressing.
-                if(tile!=Terrain.Grass || h%29!=0)continue;
+                if(tile!=Terrain.Grass)continue;
+                float forest=r.GeographyRevision>0?LivingReachGeography.Forest(r.Seed,x,y):.5f;
+                uint spacing=forest>.56f?13u:forest<.35f?79u:29u;
+                if(h%spacing!=0)continue;
                 if(TownStage.Occupied(r,x,y))continue;
+                var foot = GodotConvert.GroundToScreen((x + .5f) * 24, (y + .5f) * 24);
+                if (stops != null && stops.Any(stop => MathF.Abs(foot.X - stop.Position.X) < 45 &&
+                    MathF.Abs(foot.Y - stop.Position.Y) < 24)) continue;
                 // Keep all feature stands, doorway lanes and arrival clear of tall silhouettes.
                 if(r.Features.Keys.Any(f=>Math.Abs(f%r.Width-x)<3 && Math.Abs(f/r.Width-y)<3))continue;
                 // The Reach leans on its trees; the frozen pre-Part-3 comparison keeps its old mix.
                 bool reach=tile==Terrain.Grass && r.Rooms.Count==0 && OverworldPropAtlas.Enabled;
                 uint pick=reach?(h>>3)%8:99;
                 string key=reach?(pick<3?"tree1":pick==3?"rock1":"bush1"):h%4==0?"tree1":h%4==1?"rock1":"bush1";
+                if(reach && ReachEncounters.ObscuresCombat(r,x,y,key))continue;
                 art.TryGetValue(key,out var texture);
                 result.Add(new EnvironmentDecoration
                 {
-                    Position=GodotConvert.GroundToScreen((x+.5f)*24,(y+.5f)*24),
+                    Position=foot,
                     ReachModule=tile==Terrain.Grass && r.Rooms.Count==0 && OverworldPropAtlas.Enabled
                         ?OverworldPropArt.Module(key=="tree1"?ReachProp.Tree:key=="rock1"?ReachProp.Rock:ReachProp.Shrub,h>>8):-1,
+                    LibraryModule=reach && area.HasValue ? CuratedScenery.WildProp(r,x,y,h>>8,key) : "",
                     Texture=tile==Terrain.Grass && !(r.Rooms.Count==0 && OverworldPropAtlas.Enabled)?texture:null,
                     Pivot=key=="tree1"?new Vector2(36,100):key=="rock1"?new Vector2(12,16):new Vector2(17,23),
                     TextureFilter=TextureFilterEnum.Nearest
@@ -58,7 +68,8 @@ public partial class EnvironmentDecoration : Node2D
     public override void _Draw()
     {
         if(PropModule>=0)DungeonPropAtlas.Draw(this,PropModule,new Vector2(0,-1));
-        if(ReachModule>=0)OverworldPropAtlas.Draw(this,ReachModule,Vector2.Zero);
+        if(LibraryModule!="")AssetLibrary.Draw(this,LibraryModule,Vector2.Zero,.8f);
+        else if(ReachModule>=0)OverworldPropAtlas.Draw(this,ReachModule,Vector2.Zero);
         if(Texture!=null)DrawTexture(Texture,-Pivot);
     }
 }

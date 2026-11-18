@@ -352,28 +352,38 @@ try:
     assert choices,'Missing actual Continue control'
     tap(float(choices[-1][0]),float(choices[-1][1]))
     time.sleep(.5)
-    # Approach the live enemy group and observe real damage events. This also
-    # exercises repeated confirmed-hit effects on the Android renderer.
+    # Inspect a real planned territory through the developer action. The old
+    # fixed eastbound route no longer identifies an enemy in an ecological world.
+    # F8 only relocates the player to a reachable approach: ordinary streaming,
+    # OS joystick input, perception and production attacks must produce the hits.
     previous_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))
-    # Hosted devices advanced only 12-25 ground units per 600 ms swipe in the
-    # captured failure, so use sustained gestures and allow the full town route.
-    deadline=time.monotonic()+150
-    approaches=0
+    adb('shell','input','keyevent','138') # Android KEYCODE_F8
+    deadline=time.monotonic()+30
     while time.monotonic()<deadline:
         logs=adb('logcat','-d')
-        observed_hits=set(re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+)',logs))-previous_hits
-        if len(observed_hits)>=2: break
-        if not adb('shell','pidof',package): raise RuntimeError('Android process exited during real combat damage')
+        territory=re.findall(r'MOSSLIGHT_ENCOUNTER_READY site=(\S+) actor=(\S+) template=(\S+) homeX=([0-9.]+) homeY=([0-9.]+) approachX=([0-9.]+)',logs)
+        if territory:break
+        time.sleep(.25)
+    else:raise RuntimeError('Installed Android did not inspect a real planned hunter site')
+    site_id,member_id,template,home_x,home_y,approach_x=territory[-1]
+    assert template=='lone-hunter' and member_id.startswith(site_id+':'),'Invalid planned encounter identity'
+    current_x=float(approach_x);home_x=float(home_x)
+    capture('planned-hunter-approach.png',wait=20)
+    deadline=time.monotonic()+100;approaches=0
+    release_count=len(re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs))
+    while time.monotonic()<deadline:
+        logs=adb('logcat','-d')
+        damage_rows=re.findall(r'MOSSLIGHT_PLAYER_DAMAGE tick=(\d+) health=([0-9.]+) source=(\S+)',logs)
+        observed_hits={(tick,hp) for tick,hp,source in damage_rows if source==member_id and (tick,hp) not in previous_hits}
+        if len(observed_hits)>=2:break
+        if not adb('shell','pidof',package):raise RuntimeError('Android process exited during real encounter combat')
         positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
-        current_x=float(positions[-1][0]) if positions else 0
-        # Seeded towns put prowlers beyond the eastern plots (around x=1000).
-        # Continue down the central street until the wilderness, then let them
-        # engage; retain the requirement for two authoritative damage events.
-        if current_x<1050 and approaches<40:
-            joystick(280,'2000')
-            approaches+=1
-        else: time.sleep(.5)
-    else: raise RuntimeError(f'Android combat did not produce two real player damage events: x={current_x}, approaches={approaches}, hits={len(observed_hits)}')
+        if len(positions)>release_count:current_x=float(positions[-1][0])
+        if abs(current_x-home_x)>12 and approaches<35:
+            joystick(50 if current_x>home_x else 280,'1000');approaches+=1
+        else:time.sleep(.5)
+    else:raise RuntimeError(f'Planned Android hunter did not produce two real damage events: site={site_id}, x={current_x}, approaches={approaches}, hits={len(observed_hits)}')
+    (out/'encounter.json').write_text(json.dumps({'site':site_id,'actor':member_id,'template':template,'home':[home_x,float(home_y)],'approachX':float(approach_x),'damageEvents':sorted(observed_hits),'input':'F8 selects a real site; OS joystick approaches; production AI deals damage'},indent=2))
     capture('combat-hits.png')
     tap_action('inventory')
     time.sleep(1)
