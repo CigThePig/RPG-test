@@ -77,11 +77,11 @@ public static class AssetLibrary
         using var image=Render(sheet);return textures[sheet.Name]=ImageTexture.CreateFromImage(image);
     }
     /// <summary>Draw a named module with its ground contact at <paramref name="foot"/>.</summary>
-    public static bool Draw(CanvasItem canvas,string name,Vector2 foot)
+    public static bool Draw(CanvasItem canvas,string name,Vector2 foot,float scale=1)
     {
         if(!TryFind(name,out var sheet,out int at))return false;
         var module=sheet.Modules[at];
-        canvas.DrawTextureRectRegion(Texture(sheet),new Rect2(foot-module.Pivot,new Vector2(module.Width,module.Height)),sheet.Source(at));
+        canvas.DrawTextureRectRegion(Texture(sheet),new Rect2(foot-module.Pivot*scale,new Vector2(module.Width,module.Height)*scale),sheet.Source(at));
         return true;
     }
     /// <summary>Write every sheet as a PNG, a labelled contact sheet on a neutral ground, and

@@ -62,6 +62,27 @@ public static class LivingReachVisualChecks
                     w.Move(w.Player,new System.Numerics.Vector2(0,-3*24));app.Views["player"].SnapPosition();await Frame(20);app.Ui.Visible=false;await Shot("inside-"+h.Style);app.Ui.Visible=true;
                     w.Move(w.Player,new System.Numerics.Vector2(0,3*24));app.Views["player"].SnapPosition();await Frame(20);
                 }
+                foreach (string asset in new[] { "campfire", "shrine", "ruined-temple" })
+                {
+                    Vector2? foot = null;
+                    for (int row = 0; row * OverworldChunkStreamer.ChunkTiles < r.Height && foot == null; row++)
+                        for (int col = 0; col * OverworldChunkStreamer.ChunkTiles < r.Width && foot == null; col++)
+                        {
+                            var cells = OverworldChunkStreamer.Cells(r, new Vector2I(col, row));
+                            foreach (var stop in CuratedScenery.TrailStops(r, cells))
+                            {
+                                if (stop.Sprites.Any(sprite => sprite.Asset == asset)) foot = stop.Position;
+                                stop.Free();
+                            }
+                        }
+                    if (foot is not Vector2 position) continue;
+                    var oldZoom = app.Camera.Zoom;
+                    app.Camera.Zoom = Vector2.One * 2.4f;
+                    Position(position.X / 24, position.Y / 12 + 2);
+                    await Settle();
+                    await Shot("curated-" + asset);
+                    app.Camera.Zoom = oldZoom;
+                }
                 Position(85,120);await Settle();
                 var timer=Stopwatch.StartNew();double previous=timer.Elapsed.TotalMilliseconds;
                 // Sustained horizontal, diagonal, reverse and repeated boundary travel.

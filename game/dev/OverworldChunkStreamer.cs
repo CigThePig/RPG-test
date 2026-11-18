@@ -214,7 +214,11 @@ public partial class OverworldChunkStreamer : Node2D
                 if(c.Lookup!.Rock!=null&&OverworldRockRenderer.Enabled)Ground(new OverworldRockRenderer {Region=Region,Cells=cells,Prepared=baseline?null:c.Lookup});return "rock-upload-mesh";
             case 3:
                 if(c.Lookup!.Water!=null&&OverworldWaterRenderer.UseLivingReach)Ground(new OverworldWaterRenderer {Region=Region,Cells=cells,Prepared=baseline?null:c.Lookup,Ground=c.Soil,ZIndex=-1,ReducedMotion=ReducedMotion});return "water-upload-mesh";
-            case 4:foreach(var n in EnvironmentDecoration.Create(Region,Art,cells))Actor(n);return "decoration-nodes";
+            case 4:
+                var stops = CuratedScenery.TrailStops(Region,cells);
+                foreach(var n in EnvironmentDecoration.Create(Region,Art,cells,stops))Actor(n);
+                foreach(var n in stops)Actor(n);
+                return "decoration-nodes";
             default:
                 if(OverworldFlora.Enabled)
                 {var flora=OverworldFlora.Create(Region,cells);foreach(var n in flora.Standing)Actor(n);if(flora.Flat!=null)Ground(flora.Flat);}

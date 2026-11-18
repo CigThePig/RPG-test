@@ -41,7 +41,60 @@ public static class AssetLibraryChecks
         // Every animated effect has exactly eight frames.
         var effects=AssetLibrary.Sheets.Single(x=>x.Name=="effects").Modules.Select(m=>m.Name[..m.Name.LastIndexOf('-')]).GroupBy(n=>n);
         check(effects.All(g=>g.Count()==EffectArt.Frames),"effects have eight frames each");
+        CheckCuratedPlacements(check);
         var texture=AssetLibrary.Texture(s);
         check(ReferenceEquals(texture,AssetLibrary.Texture(s)) && texture.GetWidth()==s.Columns*s.CellWidth,"sheet textures are built once");
+    }
+    static void CheckCuratedPlacements(Action<bool,string> check)
+    {
+        const string catalog = "docs/asset-library/curation.csv";
+        if (!File.Exists(catalog)) return; // The catalog is not shipped in the game package.
+        var keep = File.ReadLines(catalog).Skip(1).Select(line => line.Split(',', 4))
+            .Where(row => row[2] == "Keep").Select(row => row[1]).ToHashSet(StringComparer.Ordinal);
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        void Record(IEnumerable<CuratedScenery> views)
+        {
+            foreach (var view in views)
+            {
+                if (view.Surface != "") used.Add(view.Surface);
+                foreach (var sprite in view.Sprites)
+                {
+                    if (!sprite.Animate) used.Add(sprite.Asset);
+                    else
+                        for (int i = 1; AssetLibrary.TryFind(sprite.Asset + "-" + i, out _, out _); i++)
+                            used.Add(sprite.Asset + "-" + i);
+                }
+                view.Free();
+            }
+        }
+
+        foreach (int seed in new[] { 1, 42, 1337, 33, 76, 208, 1547, 2816 })
+        {
+            var reach = Regions.Overworld(seed, 320, 240);
+            reach.ReachSites = ReachEncounters.Plan(reach, out _);
+            Record(CuratedTown.Dress(TownStage.For(reach)!));
+            for (int row = 0; row * OverworldChunkStreamer.ChunkTiles < reach.Height; row++)
+                for (int col = 0; col * OverworldChunkStreamer.ChunkTiles < reach.Width; col++)
+                {
+                    var cells = OverworldChunkStreamer.Cells(reach, new Vector2I(col, row));
+                    var stops = CuratedScenery.TrailStops(reach, cells);
+                    foreach (var view in EnvironmentDecoration.Create(reach, new(), cells, stops))
+                    {
+                        if (view.LibraryModule != "") used.Add(view.LibraryModule);
+                        view.Free();
+                    }
+                    Record(stops);
+                }
+            var ruin = Regions.Dungeon(seed);
+            var masonry = DungeonArt.Masonry(ruin);
+            foreach (var item in DungeonDressing.Plan(ruin, masonry))
+                if (item.LibraryModule != "") used.Add(item.LibraryModule);
+            if (DungeonDressing.Torches(ruin, masonry).Any())
+                for (int i = 1; i <= 8; i++) used.Add("torch-flame-" + i);
+        }
+        var missing = keep.Except(used).Order().ToArray();
+        var outside = used.Except(keep).Order().ToArray();
+        check(missing.Length == 0, "Keep modules placed across reference worlds: " + string.Join(", ", missing));
+        check(outside.Length == 0, "curated placements only use Keep modules: " + string.Join(", ", outside));
     }
 }
