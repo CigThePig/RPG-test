@@ -11,6 +11,7 @@ public sealed class SaveData
     public long Tick { get; set; }
     public double Time { get; set; }
     public Dictionary<string, ActorState> Actors { get; set; } = new();
+    public List<string> DormantActors { get; set; } = new();
     public Dictionary<string, RegionState> Regions { get; set; } = new();
     public List<ProjectileState> Projectiles { get; set; } = new();
     // Optional schema-1 field: older saves simply have nothing lying on the ground.
@@ -22,7 +23,7 @@ public sealed class SaveData
 
 public static class Persistence
 {
-    public static string Capture(World w, Node narrative) => JsonSerializer.Serialize(new SaveData { Seed = w.Seed, Tick = w.Tick, Time = w.Time, Actors = w.Actors, Regions = w.RegionsById, Projectiles = w.Projectiles, Hazards = w.Hazards, Events = w.Events.Recent, Items = w.Items.Service.Call("export_state").AsString(), Narrative = narrative.Call("export_state").AsString() }, Content.Json);
+    public static string Capture(World w, Node narrative) => JsonSerializer.Serialize(new SaveData { Seed = w.Seed, Tick = w.Tick, Time = w.Time, Actors = w.Actors.Concat(w.Population.Dormant).ToDictionary(x => x.Key,x => x.Value), DormantActors = w.Population.Dormant.Keys.Order(StringComparer.Ordinal).ToList(), Regions = w.RegionsById, Projectiles = w.Projectiles, Hazards = w.Hazards, Events = w.Events.Recent, Items = w.Items.Service.Call("export_state").AsString(), Narrative = narrative.Call("export_state").AsString() }, Content.Json);
     public static SaveData Parse(string json, Content content)
     {
         var s = JsonSerializer.Deserialize<SaveData>(json, Content.Json) ?? throw new InvalidDataException("Empty save");
@@ -44,6 +45,9 @@ public static class Persistence
                 region.DiscoveredLandmarks.Any(id=>!region.Landmarks.Any(l=>Exploration.Identity(region,l)==id)))
                 throw new InvalidDataException("Invalid saved exploration state");
         }
+        if(s.DormantActors == null || s.DormantActors.Distinct().Count()!=s.DormantActors.Count || s.DormantActors.Any(id=>!s.Actors.TryGetValue(id,out var a)||a.EncounterSite==""))
+            throw new InvalidDataException("Invalid dormant encounter population");
+        ReachEncounters.ValidateSaved(s);
         foreach (var(id, a)in s.Actors)
         {
             if (a.Id != id || !s.Regions.TryGetValue(a.Region, out var r) || !float.IsFinite(a.X) || !float.IsFinite(a.Y) || a.X < 0 || a.Y < 0 || a.X >= r.Width * 24 || a.Y >= r.Height * 24 || a.Health < 0 || a.Health > a.MaxHealth || !float.IsFinite(a.Health) || !float.IsFinite(a.Mana) || !float.IsFinite(a.MaxMana) || !float.IsFinite(a.MaxHealth) || !float.IsFinite(a.Strength) || !float.IsFinite(a.Defence) || !float.IsFinite(a.Speed) || !float.IsFinite(a.Radius) || !float.IsFinite(a.MotionX) || !float.IsFinite(a.MotionY) || !float.IsFinite(a.StateRemaining) || a.MaxHealth <= 0 || a.Radius <= 0 || a.Speed < 0 || !Enum.IsDefined(a.State) || a.Mana < 0 || a.Mana > a.MaxMana || a.Level < 1 || a.Experience < 0 || a.SkillPoints < 0 || a.SkillRanks.Any(x => !content.Skills.Any(d => d.Id == x.Key) || x.Value < 0) || a.Abilities.Any(k => !content.Abilities.Any(d => d.Id == k)) || a.Statuses.Any(x => !content.Statuses.Any(d => d.Id == x.Id) || x.Stacks < 1 || !float.IsFinite(x.Remaining)) || a.Cooldowns.Any(x => !float.IsFinite(x.Value) || x.Value < 0))
@@ -161,7 +165,9 @@ public static class Persistence
         w.Seed = s.Seed;
         w.Tick = s.Tick;
         w.Time = s.Time;
-        w.Actors = s.Actors;
+        w.Population.Dormant = s.DormantActors.ToDictionary(id=>id,id=>s.Actors[id]);
+        w.Actors = s.Actors.Where(x=>!w.Population.Dormant.ContainsKey(x.Key)).ToDictionary(x=>x.Key,x=>x.Value);
+        w.Population.ResetIndex();
         w.RegionsById = s.Regions;
         w.Projectiles = s.Projectiles;
         w.Hazards = s.Hazards;

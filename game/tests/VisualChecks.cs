@@ -439,6 +439,9 @@ public static class VisualChecks
 
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
+        var fixture=EnemyRoster.Create(app.World,"visual:legacy","mire","reach",app.World.Player.Position+new System.Numerics.Vector2(1800,300),-System.Numerics.Vector2.UnitX);
+        var stand=app.World.RegionsById["reach"].FindPlacement(fixture.Position,fixture,app.World.Actors.Values);
+        EnemyMind.Resettle(fixture,stand,-System.Numerics.Vector2.UnitX);app.World.Actors[fixture.Id]=fixture;
         await Frames(app, 30);
         if(OS.GetCmdlineUserArgs().Contains("--ui-gallery"))
         { await UiGallery.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
@@ -454,6 +457,8 @@ public static class VisualChecks
         { await LandmarkVisualChecks.Run(app); GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--enemy-preview"))
         { await EnemyPreview.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--ecology-only"))
+        { await ReachEncounterVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--living-reach-only"))
         { await LivingReachVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--town-only"))

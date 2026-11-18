@@ -28,6 +28,7 @@ public static class FoundationChecks
     /// <summary>Self-contained suites, in run order. Each restores the world it found.</summary>
     static readonly (string Name, Action<Foundation, Action<bool, string>> Run)[] Suites =
     {
+        (nameof(ReachEncounterChecks), ReachEncounterChecks.Run),
         (nameof(AdventureChecks), AdventureChecks.Run),
         (nameof(LandmarkChecks), LandmarkChecks.Run),
         (nameof(EnvironmentArtChecks), EnvironmentArtChecks.Run),
@@ -80,10 +81,20 @@ public static class FoundationChecks
             "compiled environment textures resolve through resource importer");
         var measurements = new Dictionary<string, object>();
         var w = app.World;
-        string original = Persistence.Capture(w, app.Narrative);
+        string pristine = Persistence.Capture(w, app.Narrative);
+        string original = pristine;
         var watch = Stopwatch.StartNew();
         try
         {
+            // Generic combat suites use isolated legacy fixtures instead of depending on the
+            // ecology's current activation radius or a particular world seed's population.
+            for(int i=0;i<2;i++)
+            {
+                var fixture=EnemyRoster.Create(w,"npc:"+(i+2),"mire","reach",w.Player.Position+new V(1800+i*80,300),-V.UnitX);
+                var point=w.RegionsById["reach"].FindPlacement(fixture.Position,fixture,w.Actors.Values);
+                EnemyMind.Resettle(fixture,point,-V.UnitX);w.Actors[fixture.Id]=fixture;
+            }
+            original=Persistence.Capture(w,app.Narrative);
             // `--test-only=CombatAiChecks,EnemyBehaviorChecks` runs just the named suites, for quick iteration.
             var only = OS.GetCmdlineUserArgs().FirstOrDefault(x => x.StartsWith("--test-only="))?.Split('=', 2)[1].Split(',');
             if (only != null && only.Except(Suites.Select(x => x.Name)).Any())
@@ -345,7 +356,7 @@ public static class FoundationChecks
             Check(w.Interact(p) && w.Items.Count(b.Id, "coin") == 0 && w.Items.Count(p.Id, "coin") == playerCoinsBeforeSecond + secondCorpseLoot, "empty overlapping corpse does not hide another corpse's loot");
             string relicQuestAvailable = app.Narrative.Call("export_state").AsString();
             Check(app.Narrative.Call("accept_quest", 2).AsBool(), "quest unlocked after prerequisite");
-            b.Health = 100;
+            b.Health = b.MaxHealth;
             b.Invulnerable = 0;
             b.State = ActionState.Idle;
             b.Statuses.Clear();
@@ -367,7 +378,7 @@ public static class FoundationChecks
             p.State = ActionState.Idle;
             p.Cooldowns.Clear();
             b.Statuses.Clear();
-            b.Health = 100;
+            b.Health = b.MaxHealth;
             b.Invulnerable = 0;
             Check(w.Activate(p.Id, "slash", b.Id), "cancellable ability starts");
             w.Step(1f / 60);
@@ -562,7 +573,7 @@ public static class FoundationChecks
         }
         finally
         {
-            Persistence.Restore(w, app.Narrative, original);
+            Persistence.Restore(w, app.Narrative, pristine);
             app.RebuildViews();
         }
     }

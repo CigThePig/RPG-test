@@ -80,6 +80,7 @@ public static class EnemyMind
     public static bool Notices(World w, ActorState a, ActorState b, CombatProfileDef p)
     {
         if (!b.Alive || b.Region != a.Region || !w.Hostile(a, b)) return false;
+        if(a.EncounterSite!="" && ReachEncounters.Protected(w.RegionsById[a.Region],b.Position,96)) return false;
         float distance = Vector2.Distance(a.Position, b.Position);
         if (distance > p.Sight) return false;
         float earshot = Earshot(w, a, b, p);
@@ -141,7 +142,7 @@ public static class EnemyMind
         int answered = 0;
         foreach (var c in w.Actors.Values.OrderBy(c => c.Id, StringComparer.Ordinal))
         {
-            if (c.Id == a.Id || c.Id == "player" || !c.Alive || c.Region != a.Region || c.Faction != a.Faction || w.Hostile(a, c) ||
+            if (c.Id == a.Id || c.Id == "player" || !c.Alive || c.Region != a.Region || c.Faction != a.Faction || !World.SameTerritory(a,c) || w.Hostile(a, c) ||
                 c.Awareness is Awareness.Alerted or Awareness.Engaged || !w.Hostile(c, quarry)) continue;
             float distance = Vector2.Distance(a.Position, c.Position);
             if (distance > radius || (distance > 72 && !w.LineOfSight(a, c))) continue;
@@ -195,7 +196,7 @@ public static class EnemyMind
         bool facing = CombatGeometry.TryNormalize(a.Facing, out var forward);
         foreach (var b in w.Actors.Values.OrderBy(b => b.Id, StringComparer.Ordinal))
         {
-            if (b.Alive || b.Id == "player" || b.Region != a.Region || b.Faction != a.Faction || a.Knowledge.GetValueOrDefault(b.Id) == "found") continue;
+            if (b.Alive || b.Id == "player" || b.Region != a.Region || b.Faction != a.Faction || !World.SameTerritory(a,b) || a.Knowledge.GetValueOrDefault(b.Id) == "found") continue;
             float distance = Vector2.Distance(a.Position, b.Position);
             if (distance > p.Sight || !WithinLeash(a, b.Position, p)) continue;
             if (facing && distance > p.HearingDistance && p.SightHalfAngle < 180 && !CombatGeometry.InCone(a.Position, b.Position, forward, p.Sight, p.SightHalfAngle)) continue;
@@ -213,7 +214,7 @@ public static class EnemyMind
         Investigate(w, a, p, body.Position, CombatPresentationKind.Disturbed, "body", body.Id);
         foreach (var c in w.Actors.Values.OrderBy(c => c.Id, StringComparer.Ordinal))
         {
-            if (c.Id == a.Id || c.Id == "player" || !c.Alive || c.Region != a.Region || c.Faction != a.Faction ||
+            if (c.Id == a.Id || c.Id == "player" || !c.Alive || c.Region != a.Region || c.Faction != a.Faction || !World.SameTerritory(a,c) ||
                 c.Awareness is not (Awareness.Unaware or Awareness.Suspicious) || c.State is not (ActionState.Idle or ActionState.Moving)) continue;
             float distance = Vector2.Distance(a.Position, c.Position);
             if (distance > p.CallRadius || (distance > 72 && !w.LineOfSight(a, c))) continue;
@@ -234,7 +235,7 @@ public static class EnemyMind
         bool leader = w.FindProfile(dead.CombatProfile)?.Leader == true;
         foreach (var c in w.Actors.Values.OrderBy(c => c.Id, StringComparer.Ordinal))
         {
-            if (c.Id == dead.Id || c.Id == "player" || !c.Alive || c.Region != dead.Region || c.Faction != dead.Faction ||
+            if (c.Id == dead.Id || c.Id == "player" || !c.Alive || c.Region != dead.Region || c.Faction != dead.Faction || !World.SameTerritory(dead,c) ||
                 c.Awareness is not (Awareness.Alerted or Awareness.Engaged)) continue;
             if (Vector2.Distance(c.Position, dead.Position) > 240 || !w.LineOfSight(c, dead)) continue;
             // It watched this one die; the body will not surprise it later.
@@ -308,6 +309,7 @@ public static class EnemyMind
         }
         if (a.Awareness == Awareness.Engaged)
         {
+            if(a.EncounterSite!="" && quarry!=null && ReachEncounters.Protected(w.RegionsById[a.Region],quarry.Position,96)) { BeginReturn(w,a,"sanctuary");return null; }
             if (quarry == null)
             {
                 // The quarry fell or left; another in plain sight takes its place.

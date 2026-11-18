@@ -17,6 +17,8 @@ public enum Terrain
 public sealed class RegionState
 {
     public string Id { get; set; } = "reach";
+    public int ReachRevision { get; set; } // Zero in old saves: no retroactive hostiles.
+    public List<ReachSite> ReachSites { get; set; } = new();
     public TownState? Town { get; set; }
     public int Seed { get; set; }
     public int Width { get; set; }

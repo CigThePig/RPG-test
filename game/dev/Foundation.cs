@@ -411,7 +411,7 @@ public partial class Foundation : Node2D
         }
 
         Views.Clear();
-        foreach (var a in World.Actors.Values)
+        foreach (var a in World.Actors.Values.Where(a=>a.EncounterSite=="" || EcologyVisible(a)))
         {
             var view = new CharacterView();
             actors.AddChild(view);
@@ -425,6 +425,21 @@ public partial class Foundation : Node2D
         foreach (var view in Views.Values) view.RestoreWindup(World);
 
         drawnRegion = "";
+    }
+
+    bool EcologyVisible(ActorState a) => a.Region==World.Player.Region && NVector.DistanceSquared(a.Position,World.Player.Position)<1050*1050;
+    void SyncEcologyViews()
+    {
+        foreach(var pair in Views.Where(v=>v.Value.State.EncounterSite!="" && (!World.Actors.ContainsKey(v.Key)||!EcologyVisible(v.Value.State))).ToArray())
+        {
+            Views.Remove(pair.Key); actors.RemoveChild(pair.Value); pair.Value.QueueFree();
+        }
+        // Leave the scenery queue its frame budget; no full view rebuild on territory crossings.
+        var a=World.Actors.Values.FirstOrDefault(a=>a.EncounterSite!=""&&EcologyVisible(a)&&!Views.ContainsKey(a.Id));
+        if(a==null)return;
+        var view=new CharacterView();actors.AddChild(view);view.World=World;
+        view.ReducedMotion=()=>ui?.Preferences.ReducedMotion??false;view.Setup(a);ConfigureView(view);
+        Views[a.Id]=view;view.Equipment(items.Call("equipment_appearance",a.Id).AsString());view.RestoreWindup(World);
     }
 
     public void ChangeAppearance(string family, ulong seed)
@@ -489,6 +504,7 @@ public partial class Foundation : Node2D
         }
         else
         { accumulator = 0; ControllerVelocity=Vector2.Zero; ScreenInput=Vector2.Zero; if(!adventureVisual)World.CancelPlayerDodge(); World.ClearPlayerMotion(); }
+        SyncEcologyViews();
         presentation?.FlushPending();
         var player = World.Player;
         if (PresentationBlocked) CombatCamera.Reset();
@@ -739,6 +755,7 @@ public partial class Foundation : Node2D
         bool streamed = r.Id=="reach" && r.Width>=128 && r.Height>=128 && r.Rooms.Count==0;
         if(streamed)
         {
+            ground.AddChild(new ReachHabitatEvidence {World=World,ZIndex=1});
             ground.AddChild(new ReachAmbienceDriver {ReducedMotion=()=>Ui.Preferences.ReducedMotion});
             // Clouds span the whole region using one shared tiny texture; terrain and
             // foliage are created and released around the player in fixed-size chunks.

@@ -46,6 +46,7 @@ public partial class EnvironmentDecoration : Node2D
                 bool reach=tile==Terrain.Grass && r.Rooms.Count==0 && OverworldPropAtlas.Enabled;
                 uint pick=reach?(h>>3)%8:99;
                 string key=reach?(pick<3?"tree1":pick==3?"rock1":"bush1"):h%4==0?"tree1":h%4==1?"rock1":"bush1";
+                if(reach && ReachEncounters.ObscuresCombat(r,x,y,key))continue;
                 art.TryGetValue(key,out var texture);
                 result.Add(new EnvironmentDecoration
                 {

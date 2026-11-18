@@ -5,6 +5,7 @@ using MHLab.Spells.Definitions;
 namespace Mosslight;
 public sealed class World
 {
+    public ReachPopulation Population { get; } = new();
     public bool ProfileCombat { get; set; }
     public double TacticalMilliseconds { get; private set; }
     public double AvoidanceMilliseconds { get; private set; }
@@ -96,6 +97,7 @@ public sealed class World
         return value;
     }
 
+    public static bool SameTerritory(ActorState a, ActorState b) => a.EncounterSite == b.EncounterSite;
     public bool Hostile(ActorState a, ActorState b) => a.Id != b.Id && (Content.Factions.GetValueOrDefault(a.Faction + ":" + b.Faction) + a.Reputation.GetValueOrDefault(b.Faction)) < 0;
     public bool CanActivate(ActorState a, ActorState b, AbilityDef d) => a.Alive && b.Alive && a.Region == b.Region && a.Abilities.Contains(d.Id) && a.State is ActionState.Idle or ActionState.Moving && a.Mana >= d.Cost && a.Cooldowns.GetValueOrDefault(d.Id) <= 0 && (!d.RequiresWeapon || (a.Grasps && Items.Bonus(a, "damage") > 0)) && (d.Self ? a == b : Hostile(a, b)) && (d.Self || Vector2.Distance(a.Position, b.Position) <= d.Range + a.NaturalReach) && (d.Self || d.MinRange <= 0 || Vector2.Distance(a.Position, b.Position) >= d.MinRange) && (!Directed(d) || CombatGeometry.TryNormalize(b.Position - a.Position, out _)) && LineOfSight(a, b);
     /// <summary>Attacks that commit to a ground direction when they start.</summary>
@@ -556,7 +558,7 @@ public sealed class World
                 ApplyStatus(a, d.Status, a.Id);
             if (d.AllyRadius > 0 && d.Status != "")
             {
-                foreach (var ally in Actors.Values.Where(c => c.Id != a.Id && c.Alive && c.Region == a.Region && c.Faction == a.Faction && !Hostile(a, c) &&
+                foreach (var ally in Actors.Values.Where(c => c.Id != a.Id && c.Alive && c.Region == a.Region && c.Faction == a.Faction && SameTerritory(a,c) && !Hostile(a, c) &&
                     Vector2.DistanceSquared(a.Position, c.Position) <= d.AllyRadius * d.AllyRadius).OrderBy(c => c.Id, StringComparer.Ordinal))
                     ApplyStatus(ally, d.Status, a.Id);
                 Present(CombatPresentationKind.Rallied, a, a.Id, d.Id);
@@ -578,6 +580,7 @@ public sealed class World
         if (dt <= 0 || dt > .25f || !float.IsFinite(dt))
             throw new ArgumentOutOfRangeException(nameof(dt));
         Tick++;
+        Population.Update(this);
         Exploration.Discover(this);
         Time += dt;
         Spells.Update(dt);
@@ -726,7 +729,7 @@ public sealed class World
 
             if (a.Id != "player")
             {
-                bool near = a.Region == Player.Region && Vector2.DistanceSquared(a.Position, Player.Position) < 800 * 800;
+                bool near = a.Region == Player.Region && Vector2.DistanceSquared(a.Position, Player.Position) < 800 * 800 || a.EncounterSite != "" && a.Awareness is Awareness.Alerted or Awareness.Engaged or Awareness.Searching or Awareness.Returning;
                 if (near)
                 {
                     if ((Tick + ((uint)StableId(a.Id) % 12)) % 12 == 0)
@@ -757,7 +760,7 @@ public sealed class World
                     a.MotionX = 0;
                     a.MotionY = 0;
                     // Out of earshot a hunt simply ends; the actor is calm when next met.
-                    if (a.Awareness != Awareness.Unaware && a.State is ActionState.Idle or ActionState.Moving) EnemyMind.Calm(a);
+                    if (a.EncounterSite == "" && a.Awareness != Awareness.Unaware && a.State is ActionState.Idle or ActionState.Moving) EnemyMind.Calm(a);
                     if (Tick % 600 == 0)
                         UpdateSchedule(a);
                 }
@@ -1285,51 +1288,24 @@ public sealed class World
         };
         AnatomyAdapter.Apply(player);
         Actors.Add(player.Id, player);
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 2; i++)
         {
-            var p = Content.NpcProfiles[i < 2 ? 0 : 1];
-            var a = new ActorState
+            var profile = Content.NpcProfiles[0];
+            var warden = new ActorState
             {
-                Id = "npc:" + i,
-                Name = i < 2 ? "Reach warden" : "Mire prowler",
-                Profile = p.Id,
-                Profession = p.Profession,
-                Faction = p.Faction,
-                // The town's wardens remain by the street; prowlers start beyond
-                // its eastern plots rather than spawning among the houses.
-                X = r.Town != null && i >= 2 ? (r.Town.Houses.Max(h => h.X + h.Width) + 4) * 24 + (i - 2) * 54 : pos.X + 100 + i * 68,
-                Y = pos.Y + (i % 2) * 48,
-                Appearance = new()
-                {
-                    Family = p.Family,
-                    Seed = (ulong)(Seed + i * 17)
-                },
-                Abilities = new()
-                {
-                    i < 2 ? "slash" : "bite"
-                }
+                Id = "npc:" + i, Name = "Reach warden", Profile = profile.Id,
+                Profession = profile.Profession, Faction = profile.Faction,
+                X = pos.X + 100 + i * 68, Y = pos.Y + (i % 2) * 48,
+                Appearance = new() { Family = profile.Family, Seed = (ulong)(Seed + i * 17) },
+                Abilities = new() { "slash" }
             };
-            // The Reach's prowlers hunt as a loose pack with the authored senses of their kind.
-            if (i >= 2 && FindProfile("mire") is { } mire) { a.CombatProfile = mire.Id; a.Abilities = mire.Loadout(); }
-            a.HomeX = a.X;
-            a.HomeY = a.Y;
-            AnatomyAdapter.Apply(a);
-            var placed = r.FindPlacement(a.Position, a, Actors.Values);
-            a.X = a.HomeX = placed.X; a.Y = a.HomeY = placed.Y;
-            // The last of the pack is found dozing in the grass.
-            a.Sleeper = i == 7;
-            if (i >= 2)
-            {
-                float looking = EnemyMind.Hash01(StableId(a.Id), Seed, 4) * MathF.Tau;
-                a.FacingX = MathF.Cos(looking); a.FacingY = MathF.Sin(looking);
-            }
-            Actors.Add(a.Id, a);
-            if (i < 2)
-            {
-                Items.Add(a.Id, "iron_sword");
-                Items.Equip(a, "iron_sword", "weapon");
-                Items.Add(a.Id, "potion", 4);
-            }
+            AnatomyAdapter.Apply(warden);
+            var placed = r.FindPlacement(warden.Position, warden, Actors.Values);
+            warden.X = warden.HomeX = placed.X; warden.Y = warden.HomeY = placed.Y;
+            Actors.Add(warden.Id, warden);
+            Items.Add(warden.Id, "iron_sword");
+            Items.Equip(warden, "iron_sword", "weapon");
+            Items.Add(warden.Id, "potion", 4);
         }
 
         Items.Add("player", "iron_sword");
@@ -1339,6 +1315,8 @@ public sealed class World
         Items.Add("player", "coin", 20);
         Items.Add("player", "herb", 4);
         InitializeContainers(r);
+        r.ReachSites = ReachEncounters.Plan(r, out _);
+        r.ReachRevision = ReachEncounters.Revision;
     }
 }
 

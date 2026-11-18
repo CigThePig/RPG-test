@@ -69,6 +69,7 @@ jobs:
             docs/render-verification*.json
             build/dungeon/
             build/adventure/
+            build/ecology/
             build/encounter-measurements.json
             build/verification-*.log
             build/widescreen/
@@ -92,11 +93,15 @@ jobs:
       - run: python3 tools/setup-video.py --require-display
       - name: Production geography, interiors, streaming A/B and real-time movie
         run: xvfb-run -a -s '-screen 0 2560x1440x24' python3 tools/living-reach-verify.py
+      - name: Planned encounter gameplay and 2340x1080 recording
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' python3 tools/ecology-verify.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: living-reach-evidence
-          path: build/living-reach/
+          path: |
+            build/living-reach/
+            build/ecology/
           retention-days: 30
   preserved-reference:
     runs-on: ubuntu-24.04

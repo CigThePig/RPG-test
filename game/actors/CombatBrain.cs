@@ -106,7 +106,7 @@ public static class CombatBrain
         {
             // A mending status is for the wounded, itself included; any other is for allies in the fight.
             bool mends = w.Content.Statuses.Any(s => s.Id == rally.Status && s.Heal > 0);
-            if (w.Actors.Values.Any(c => c.Alive && c.Region == a.Region && c.Faction == a.Faction && !w.Hostile(a, c) && (mends || c.Id != a.Id) &&
+            if (w.Actors.Values.Any(c => c.Alive && c.Region == a.Region && c.Faction == a.Faction && World.SameTerritory(a,c) && !w.Hostile(a, c) && (mends || c.Id != a.Id) &&
                 (mends ? c.Health < c.MaxHealth * .8f : c.Awareness == Awareness.Engaged) &&
                 Vector2.DistanceSquared(a.Position, c.Position) <= rally.AllyRadius * rally.AllyRadius && !c.Statuses.Any(s => s.Id == rally.Status)))
                 return rally.Id;
