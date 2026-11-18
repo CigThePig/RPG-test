@@ -6,6 +6,8 @@ namespace Mosslight;
 /// snapshot; Upload, materials, meshes and all scene nodes stay on the main thread.</summary>
 public sealed record ChunkLookup(int Width,int Height,byte[] Ground,byte[]? Water,byte[]? Rock,double PrepareMs)
 {
+    public static double ImageCopyMilliseconds {get;private set;}
+    public static double TextureUploadMilliseconds {get;private set;}
     public long Bytes=>Ground.LongLength+(Water?.LongLength??0)+(Rock?.LongLength??0);
     public static ChunkLookup Build(RegionState r,Rect2I cells,CancellationToken cancellation=default)
     {
@@ -46,5 +48,11 @@ public sealed record ChunkLookup(int Width,int Height,byte[] Ground,byte[]? Wate
         return new(width,height,ground,wet,stone,timer.Elapsed.TotalMilliseconds);
     }
     public ImageTexture Upload(byte[] bytes,Image.Format format)
-    {using var image=Image.CreateFromData(Width,Height,false,format,bytes);return ImageTexture.CreateFromImage(image);}
+    {
+        var timer=System.Diagnostics.Stopwatch.StartNew();
+        using var image=Image.CreateFromData(Width,Height,false,format,bytes);
+        ImageCopyMilliseconds+=timer.Elapsed.TotalMilliseconds;timer.Restart();
+        var texture=ImageTexture.CreateFromImage(image);
+        TextureUploadMilliseconds+=timer.Elapsed.TotalMilliseconds;return texture;
+    }
 }

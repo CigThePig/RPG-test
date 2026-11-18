@@ -3,6 +3,10 @@ namespace Mosslight;
 /// <summary>Static untextured terrain goes through one colored triangle mesh, avoiding thousands of canvas commands.</summary>
 public sealed class TerrainBatch : IDisposable
 {
+    public static int MeshCount {get;private set;}
+    public static long ResidentVertices {get;private set;}
+    public static long ResidentVertexBytes {get;private set;}
+    public static double UploadMilliseconds {get;private set;}
     ArrayMesh? mesh;
     readonly List<Vector3> vertices = new();
     readonly List<Color> colors = new();
@@ -10,12 +14,14 @@ public sealed class TerrainBatch : IDisposable
     public Texture2D? Texture { get; init; }
     public void Rect(Rect2 rect, Color color)
     {
+        if(mesh!=null)Dispose();
         var a=rect.Position; var b=rect.End;
         Add(a); Add(new Vector2(b.X,a.Y)); Add(b); Add(a); Add(b); Add(new Vector2(a.X,b.Y));
         void Add(Vector2 p) { vertices.Add(new Vector3(p.X,p.Y,0)); colors.Add(color); }
     }
     public void Sprite(Rect2 destination, Rect2 source, Color? tint = null)
     {
+        if(mesh!=null)Dispose();
         var a=destination.Position;var b=destination.End;
         var u=source.Position/Texture!.GetSize();var v=source.End/Texture.GetSize();
         Add(a,u);Add(new Vector2(b.X,a.Y),new Vector2(v.X,u.Y));Add(b,v);
@@ -25,6 +31,7 @@ public sealed class TerrainBatch : IDisposable
     /// <summary>An untextured quad carrying raw coordinates in UV for a shader to read.</summary>
     public void Quad(Rect2 destination, Rect2 uv, Color color)
     {
+        if(mesh!=null)Dispose();
         var a=destination.Position;var b=destination.End;var u=uv.Position;var v=uv.End;
         Add(a,u);Add(new Vector2(b.X,a.Y),new Vector2(v.X,u.Y));Add(b,v);
         Add(a,u);Add(b,v);Add(new Vector2(a.X,b.Y),new Vector2(u.X,v.Y));
@@ -32,7 +39,12 @@ public sealed class TerrainBatch : IDisposable
     }
     public int VertexCount => vertices.Count;
     public long VertexBytes => vertices.Count * (Texture==null?28L:36L);
-    public void Dispose() { mesh?.Dispose(); mesh=null; }
+    public void Dispose()
+    {
+        if(mesh==null)return;
+        MeshCount--;ResidentVertices-=VertexCount;ResidentVertexBytes-=VertexBytes;
+        mesh.Dispose();mesh=null;
+    }
     public void Line(Vector2 a, Vector2 b, Color color, float width)
     {
         // Terrain edges in this projection are axis-aligned.
@@ -41,11 +53,14 @@ public sealed class TerrainBatch : IDisposable
     public void Upload()
     {
         if(vertices.Count==0 || mesh!=null)return;
+        var timer=System.Diagnostics.Stopwatch.StartNew();
         var arrays=new Godot.Collections.Array();arrays.Resize((int)Mesh.ArrayType.Max);
         arrays[(int)Mesh.ArrayType.Vertex]=vertices.ToArray();arrays[(int)Mesh.ArrayType.Color]=colors.ToArray();
         if(uvs.Count>0)arrays[(int)Mesh.ArrayType.TexUV]=uvs.ToArray();
         mesh?.Dispose();
         mesh=new ArrayMesh();mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles,arrays);
+        MeshCount++;ResidentVertices+=VertexCount;ResidentVertexBytes+=VertexBytes;
+        UploadMilliseconds+=timer.Elapsed.TotalMilliseconds;
     }
     public void Draw(CanvasItem target)
     {

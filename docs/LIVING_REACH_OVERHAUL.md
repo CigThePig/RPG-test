@@ -37,6 +37,11 @@ incrementally within the same budget. A merged low-detail terrain mesh prevents
 black holes on cold startup/teleport while detailed scenery catches up. Collision
 and gameplay always use fully resident RegionState terrain.
 
+Streaming traces identify the chunk and record preparation, image copies,
+texture submissions, mesh uploads, activation, deactivation and eviction separately.
+Frame traces include managed memory, texture memory and resident mesh/vertex counts.
+Upload timings measure the main-thread submission cost, not GPU execution time.
+
 The Developer performance overlay includes current/worst streaming CPU time,
 active/cache/prepared counts, estimated lookup bytes and reuse hits. To compare
 schedules, `tools/living-reach-verify.py` runs the frozen synchronous resource path

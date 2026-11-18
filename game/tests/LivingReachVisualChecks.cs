@@ -75,7 +75,7 @@ public static class LivingReachVisualChecks
                     await Frame();double now=timer.Elapsed.TotalMilliseconds;double frameMs=now-previous;samples.Add(frameMs);previous=now;
                     var current=app.GetTree().GetNodesInGroup("overworld-chunks").OfType<OverworldChunkStreamer>().Single();
                     if(!current.CoversVisible)missingVisibleFrames++;
-                    trace.Add(new {frame,ms=frameMs,streamMs=current.LastMainThreadMs,current.LoadedChunks,current.CachedChunks,current.LookupBytes,cpuManaged=GC.GetTotalMemory(false),textureBytes=Performance.GetMonitor(Performance.Monitor.RenderTextureMemUsed)});
+                    trace.Add(new {frame,ms=frameMs,streamMs=current.LastMainThreadMs,current.LoadedChunks,current.CachedChunks,current.LookupBytes,cpuManaged=GC.GetTotalMemory(false),TerrainBatch.MeshCount,TerrainBatch.ResidentVertices,TerrainBatch.ResidentVertexBytes,textureBytes=Performance.GetMonitor(Performance.Monitor.RenderTextureMemUsed)});
                     if(frame%30==0)await Shot("travel-"+(frame/30).ToString("D3"));
                     // Screenshot readback is excluded from the next measured frame.
                     previous=timer.Elapsed.TotalMilliseconds;

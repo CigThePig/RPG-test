@@ -51,14 +51,14 @@ public partial class OverworldChunkStreamer : Node2D
     public int CacheMisses {get;private set;}
     public long LookupBytes=>live.Values.Concat(cache.Values).Sum(c=>c.Bytes)+(building?.Bytes??0);
     public int LoadedCells=>live.Keys.Sum(id=>Cells(Region,id).Size.X*Cells(Region,id).Size.Y);
-    public readonly record struct Sample(string Stage,double Ms,int Active,int Cached,long LookupBytes);
+    public readonly record struct Sample(string Stage,double Ms,int Active,int Cached,long LookupBytes,string Chunk);
     public readonly List<Sample> Measurements=new();
     public double LastMainThreadMs {get;private set;}
     public double WorstMainThreadMs {get;private set;}
-    void Record(string stage,double ms)
+    void Record(string stage,double ms,Vector2I? id=null)
     {
         if(Measurements.Count>=4096)Measurements.RemoveRange(0,1024);
-        Measurements.Add(new(stage,ms,live.Count,cache.Count,LookupBytes));
+        Measurements.Add(new(stage,ms,live.Count,cache.Count,LookupBytes,(id??(building!=null?buildingId:new Vector2I(-1,-1))).ToString()));
     }
 
     public static Rect2I Cells(RegionState region,Vector2I id)
@@ -125,14 +125,14 @@ public partial class OverworldChunkStreamer : Node2D
         var wanted=visible.Concat(Required(Region,focus,viewport+new Vector2(768,768)*zoom,zoom)).Distinct().ToList();
         var required=wanted.ToHashSet();Record("plan",timer.Elapsed.TotalMilliseconds);
         foreach(var id in live.Keys.Where(id=>!required.Contains(id)).ToArray())
-        {var c=live[id];live.Remove(id);Visible(c,false);cache.Add(id,c);}
+        {var hide=Stopwatch.StartNew();var c=live[id];live.Remove(id);Visible(c,false);cache.Add(id,c);Record("deactivate",hide.Elapsed.TotalMilliseconds,id);}
         foreach(var id in wanted)
             if(cache.Remove(id,out var c)){live.Add(id,c);Visible(c,true);CacheHits++;}
         while(cache.Count>MaximumCachedChunks)
         {
             // Keep the closest chunks for a direction reversal.
             var id=cache.Keys.OrderByDescending(k=>new Vector2(k.X*32*24,k.Y*32*24).DistanceSquaredTo(focus)).First();
-            var c=cache[id];cache.Remove(id);Retire(c);
+            var evict=Stopwatch.StartNew();var c=cache[id];cache.Remove(id);Retire(c);Record("evict",evict.Elapsed.TotalMilliseconds,id);
         }
         if(building!=null&&!required.Contains(buildingId)){Retire(building);building=null;}
         foreach(var id in preparing.Keys.Where(id=>!required.Contains(id)&&preparing[id].IsCompleted).ToArray())
@@ -158,9 +158,13 @@ public partial class OverworldChunkStreamer : Node2D
         // scenery creation). Never construct several complete chunks in a frame.
         if(building!=null&&timer.Elapsed.TotalMilliseconds<MainThreadBudgetMilliseconds)
         {
+            double imageBefore=ChunkLookup.ImageCopyMilliseconds,textureBefore=ChunkLookup.TextureUploadMilliseconds,meshBefore=TerrainBatch.UploadMilliseconds;
             var step=Stopwatch.StartNew();string stage=BuildStep(buildingId,building);
             Record(stage,step.Elapsed.TotalMilliseconds);
-            if(building.Stage==6){Visible(building,true);building.Lookup=null;live.Add(buildingId,building);building=null;}
+            if(ChunkLookup.ImageCopyMilliseconds>imageBefore)Record("image-copy",ChunkLookup.ImageCopyMilliseconds-imageBefore);
+            if(ChunkLookup.TextureUploadMilliseconds>textureBefore)Record("texture-upload",ChunkLookup.TextureUploadMilliseconds-textureBefore);
+            if(TerrainBatch.UploadMilliseconds>meshBefore)Record("mesh-upload",TerrainBatch.UploadMilliseconds-meshBefore);
+            if(building.Stage==6){var activate=Stopwatch.StartNew();Visible(building,true);building.Lookup=null;live.Add(buildingId,building);building=null;Record("activate",activate.Elapsed.TotalMilliseconds,buildingId);}
         }
         // Release only one node per frame; cached resources remain alive in-tree,
         // since detaching them would run _ExitTree and dispose their materials.
