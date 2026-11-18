@@ -430,7 +430,7 @@ public partial class Foundation : Node2D
     bool EcologyVisible(ActorState a) => a.Region==World.Player.Region && NVector.DistanceSquared(a.Position,World.Player.Position)<1050*1050;
     void SyncEcologyViews()
     {
-        foreach(var pair in Views.Where(v=>v.Value.State.EncounterSite!="" && (!World.Actors.ContainsKey(v.Key)||!EcologyVisible(v.Value.State))).ToArray())
+        foreach(var pair in Views.Where(v=>v.Value.State.EncounterSite!="" && (!World.Actors.TryGetValue(v.Key,out var live)||!ReferenceEquals(live,v.Value.State)||!EcologyVisible(v.Value.State))).ToArray())
         {
             Views.Remove(pair.Key); actors.RemoveChild(pair.Value); pair.Value.QueueFree();
         }
@@ -468,7 +468,10 @@ public partial class Foundation : Node2D
     bool adventureVisual;
     public void RebuildViewsIfNeededForAdventure()
     {
-        if(Views.Count!=World.Actors.Count || Views.Any(v=>!World.Actors.TryGetValue(v.Key,out var state) || !ReferenceEquals(state,v.Value.State))) RebuildViews();
+        bool changedLegacy=World.Actors.Values.Any(a=>a.EncounterSite==""&&(!Views.TryGetValue(a.Id,out var v)||!ReferenceEquals(a,v.State))) ||
+            Views.Any(v=>v.Value.State.EncounterSite==""&&(!World.Actors.TryGetValue(v.Key,out var state)||!ReferenceEquals(state,v.Value.State)));
+        if(changedLegacy) RebuildViews();
+        else SyncEcologyViews();
     }
     public async void RunAdventureVisual()
     {

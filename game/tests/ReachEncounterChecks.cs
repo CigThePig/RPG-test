@@ -47,6 +47,14 @@ public static class ReachEncounterChecks
             var member=site0.Members[0];var actor=w.Actors[member.Id];
             check(actor.Sleeper&&actor.Awareness==Awareness.Unaware,"ecology activation is calm, not chunk alarm");
             actor.Health-=13;float hurt=actor.Health;
+            actor.Awareness=Awareness.Engaged;actor.Target="player";
+            Move(new V(7200,5300));w.Population.Update(w,true);
+            check(w.Actors.ContainsKey(actor.Id),"ecology active quarry pins a distant fight");
+            actor.Awareness=Awareness.Unaware;actor.Target="";
+            w.Projectiles.Add(new(){Source=actor.Id,Target="player",Region="reach",Ability="spit",X=actor.X,Y=actor.Y,Remaining=1});
+            w.Population.Update(w,true);check(w.Actors.ContainsKey(actor.Id),"ecology projectile source remains authoritative");w.Projectiles.Clear();
+            w.ApplyStatus(actor,"burn","player");w.Population.Update(w,true);
+            check(w.Actors.ContainsKey(actor.Id),"ecology live status pins a distant actor");actor.Statuses.Clear();
             Move(new V(7200,5300));w.Population.Update(w,true);
             check(w.Population.Dormant.ContainsKey(member.Id)&&!w.Actors.ContainsKey(member.Id),"ecology dormant outside authoritative actor loop");
             string dormant=Persistence.Capture(w,app.Narrative);Persistence.Restore(w,app.Narrative,dormant);
@@ -61,14 +69,19 @@ public static class ReachEncounterChecks
             check(w.Items.LootAll(actor.Id,"player")&&!w.Items.LootAll(actor.Id,"player"),"ecology loot claimed once");
             Move(new V(7200,5300));w.Population.Update(w,true);Activate(site0);
             check(!w.Actors[member.Id].Alive&&!w.Items.HasLoot(member.Id),"ecology looted corpse stays empty");
-            int peak=0;
+            int peak=0;var routeUpdates=new List<double>();
             foreach(var site in reach.ReachSites.Concat(reach.ReachSites.AsEnumerable().Reverse()))
             {
-                Activate(site);peak=Math.Max(peak,w.Actors.Values.Count(a=>a.EncounterSite!=""));
+                Activate(site);routeUpdates.Add(w.Population.LastUpdateMilliseconds);peak=Math.Max(peak,w.Actors.Values.Count(a=>a.EncounterSite!=""));
                 check(peak<=ReachPopulation.MaximumActors,"ecology long route bounded actors "+site.Id);
             }
             // Direction of traversal changes neither the plans nor identities/health of visited members.
             check(w.Actors.Keys.Concat(w.Population.Dormant.Keys).Distinct().Count()==w.Actors.Count+w.Population.Dormant.Count,"ecology no duplicate active/dormant IDs");
+            var saveTimer=System.Diagnostics.Stopwatch.StartNew();string routeSave=Persistence.Capture(w,app.Narrative);double captureMs=saveTimer.Elapsed.TotalMilliseconds;
+            saveTimer.Restart();Persistence.Restore(w,app.Narrative,routeSave);double restoreMs=saveTimer.Elapsed.TotalMilliseconds;
+            File.WriteAllText("build/ecology/lifecycle.json",JsonSerializer.Serialize(new{routeSites=routeUpdates.Count,peakActors=peak,dormant=w.Population.Dormant.Count,saveBytes=System.Text.Encoding.UTF8.GetByteCount(routeSave),captureMs,restoreMs,activationWorstMs=w.Population.WorstActivationMilliseconds,modelCache=PixelCreatures.Runtime.CreatureRuntime.Factory.ModelCacheStats.count},Content.Json));
+            // Save/restore swaps region instances; continue with the authoritative restored one.
+            reach=w.RegionsById["reach"];
             w.Enter(w.Player,"ruin");w.Population.Update(w,true);w.Enter(w.Player,"reach");w.Population.Update(w,true);
             check(reach.ReachSites.Count==42,"ecology dungeon return preserves sites");
             Persistence.Restore(w,app.Narrative,fresh);
@@ -86,12 +99,12 @@ public static class ReachEncounterChecks
                 var site=reach.ReachSites.First(s=>s.Template==template.Id);Activate(site);
                 var foes=site.Members.Select(m=>w.Actors[m.Id]).ToArray();
                 var main=foes[0];var direction=new V(site.Members[0].FacingX,site.Members[0].FacingY);
-                var start=main.Position+direction*(template.Id=="rocky-guardian"?180:template.Id=="poisoned-shore"?140:template.Id=="lone-hunter"?20:100);
+                var start=main.Position+direction*(template.Id=="rocky-guardian"?130:template.Id=="poisoned-shore"?140:template.Id=="lone-hunter"?20:template.Id=="woodland-ambush"?80:100);
                 if(!reach.CanTravel(main.Position,start,w.Player))start=main.Position+direction*48;
                 Move(start);w.Player.Health=w.Player.MaxHealth=100;w.Player.Invulnerable=0;
-                var abilities=new Dictionary<string,int>();int taken=0;int calls=0;int heals=0;
+                var abilities=new Dictionary<string,int>();int taken=0;int calls=0;int heals=0;int blocks=0;int charges=0;
                 void Observe(WorldEvent e){if(e.Kind=="ability_started"&&site.Members.Any(m=>m.Id==e.Actor))abilities[e.Value]=abilities.GetValueOrDefault(e.Value)+1;if(e.Kind=="damage"&&e.Target=="player")taken+=e.Count;}
-                void Present(CombatPresentationEvent e){if(e.Kind==CombatPresentationKind.Alerted&&e.Outcome=="called")calls++;}
+                void Present(CombatPresentationEvent e){if(e.Kind==CombatPresentationKind.ChargeStarted&&site.Members.Any(m=>m.Id==e.ActorId))charges++;if(e.Kind==CombatPresentationKind.Alerted&&e.Outcome=="called")calls++;if(e.Kind==CombatPresentationKind.Hit&&e.Outcome=="blocked"&&site.Members.Any(m=>m.Id==e.TargetId))blocks++;}
                 w.Events.Published+=Observe;w.Presentation+=Present;
                 int tick=0;float previous=foes.Sum(a=>a.Health);
                 try
@@ -99,7 +112,13 @@ public static class ReachEncounterChecks
                     for(;tick<3600&&w.Player.Alive&&foes.Any(a=>a.Alive);tick++)
                     {
                         // Begin with observation, then a normal-health duelist using production inputs.
-                        if(tick>(observe?(template.Id=="lone-hunter"?120:480):0))DuelStep(w,foes,tick);
+                        if(observe&&template.Id=="defended-refuge"&&tick>480&&tick<660)
+                        {
+                            var toward=V.Normalize(foes[0].Position-w.Player.Position);
+                            if(V.Distance(foes[0].Position,w.Player.Position)>40)w.PlayerMove(toward,1f/60);
+                            w.TryStartPlayerSlash(toward);
+                        }
+                        else if(tick>(observe?(template.Id=="lone-hunter"?120:480):0))DuelStep(w,foes,tick);
                         w.Step(1f/60);
                         float health=foes.Sum(a=>a.Health);if(health>previous+.01f)heals++;previous=health;
                     }
@@ -112,10 +131,19 @@ public static class ReachEncounterChecks
                     check(abilities.ContainsKey(defining),"ecology production defining ability "+template.Id+"/"+defining);
                     if(template.Id is "hunting-pack" or "alarmed-ground" or "pack-leader")check(calls>0,"ecology intended allies answer "+template.Id);
                 }
+                if(observe&&template.Id=="rocky-guardian")check(charges>0&&taken>0,"ecology brute completes a charge against exposed player");
                 if(observe&&template.Id=="defended-refuge")check(heals>0,"ecology mender actually restores ally health");
                 if(!observe&&template.Id=="lone-hunter")check(w.Player.Alive&&foes.All(a=>!a.Alive),"ecology starter duelist survives early hunter");
-                fights.Add(new{template=template.Id,policy=observe?"stationary opening then duelist":"normal-health duelist",seconds=tick/60f,abilities,calls,heals,damageTaken=taken,health=w.Player.Health,fallen=foes.Count(a=>!a.Alive),worstActivationMs=w.Population.WorstActivationMilliseconds});
+                fights.Add(new{template=template.Id,policy=observe?"stationary opening then duelist":"normal-health duelist",seconds=tick/60f,abilities,calls,heals,blocks,charges,damageTaken=taken,health=w.Player.Health,fallen=foes.Count(a=>!a.Alive),worstActivationMs=w.Population.WorstActivationMilliseconds});
             }
+            Persistence.Restore(w,app.Narrative,fresh);reach=w.RegionsById["reach"];
+            var pack=reach.ReachSites.First(s=>s.Template=="hunting-pack");Activate(pack);
+            var hunter=w.Actors[pack.Members[0].Id];var unrelatedSite=reach.ReachSites.First(s=>s.Id!=pack.Id&&s.Template=="lone-hunter");var unrelatedMember=unrelatedSite.Members[0];
+            var unrelated=EnemyRoster.Create(w,unrelatedMember.Id,unrelatedMember.Profile,"reach",hunter.Position+new V(0,40),-V.UnitX);
+            unrelated.EncounterSite=unrelatedSite.Id;w.Population.Dormant.Remove(unrelated.Id);w.Actors[unrelated.Id]=unrelated;
+            w.Damage(w.Player,hunter,1,"physical");
+            check(pack.Members.Skip(1).Any(m=>w.Actors[m.Id].Awareness==Awareness.Alerted),"ecology local alarm reaches pack");
+            check(!unrelated.Called&&unrelated.Awareness is not (Awareness.Alerted or Awareness.Engaged),"ecology alarm cannot recruit unrelated site even within earshot");
             File.WriteAllText("build/ecology/combat.json",JsonSerializer.Serialize(fights,Content.Json));
         }
         finally{Persistence.Restore(w,app.Narrative,original);app.RebuildViews();app.Ui.PauseForVerification();}

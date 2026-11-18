@@ -132,9 +132,24 @@ public sealed class AdventureRun(Foundation app)
         {
             if(UseDialogue) { foreach(int step in Choose("I can help"))yield return step; }
             else if(!N.Call("accept_quest",1).AsBool())throw new InvalidOperationException("Intro acceptance failed");
-            foreach(var enemy in W.Actors.Values.Where(a=>a.Profile=="beast").Take(2).ToArray())
+            var wilderness=W.RegionsById["reach"];
+            if(wilderness.ReachRevision>0)
             {
-                var r=W.RegionsById["reach"];foreach(int step in Travel(r.Index(enemy.Position)))yield return step;if(enemy.Alive)foreach(int step in Fight(enemy))yield return step;
+                // Discover real planned starter territories through ordinary travel. Their
+                // inhabitants need not exist in World.Actors while still distant from town.
+                foreach(var site in wilderness.ReachSites.Where(s=>s.Template=="lone-hunter")
+                    .OrderBy(s=>V.DistanceSquared(wilderness.Center(s.Tile),W.Player.Position)).Take(2).ToArray())
+                {
+                    foreach(int step in Travel(site.Tile))yield return step;
+                    foreach(var member in site.Members)
+                        if(W.Actors.TryGetValue(member.Id,out var enemy)&&enemy.Alive)
+                            foreach(int step in Fight(enemy))yield return step;
+                }
+            }
+            else foreach(var enemy in W.Actors.Values.Where(a=>a.Profile=="beast").Take(2).ToArray())
+            {
+                foreach(int step in Travel(wilderness.Index(enemy.Position)))yield return step;
+                if(enemy.Alive)foreach(int step in Fight(enemy))yield return step;
             }
             if(!N.Call("completed",1).AsBool())throw new InvalidOperationException("Adventure prerequisite failed");
             if(UseDialogue)
