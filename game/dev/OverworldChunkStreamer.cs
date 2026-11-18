@@ -72,9 +72,12 @@ public partial class OverworldChunkStreamer : Node2D
     /// props, camera smoothing and a normal movement step without a hard scenery edge.</summary>
     public static List<Vector2I> Required(RegionState region,Vector2 player,Vector2 viewport,Vector2 zoom,bool overscan=true)
     {
-        Vector2 centre=GodotConvert.GroundToScreen(player.X,player.Y);
-        Vector2 half=new(viewport.X/Math.Max(.1f,zoom.X)/2+(overscan?160:0),
-            viewport.Y/Math.Max(.1f,zoom.Y)/2+(overscan?132:0));
+        Vector2 visibleHalf=new(viewport.X/Math.Max(.1f,zoom.X)/2,viewport.Y/Math.Max(.1f,zoom.Y)/2);
+        // At world edges the camera moves away from the player to fill the viewport.
+        // Plan from that clamped centre so the far side is fully detailed when zoomed out.
+        Vector2 centre=DisplayLayout.CameraCenter(GodotConvert.GroundToScreen(player.X,player.Y),
+            GodotConvert.GroundToScreen(region.Width*24,region.Height*24),visibleHalf);
+        Vector2 half=visibleHalf+new Vector2(overscan?160:0,overscan?132:0);
         int nx=(region.Width+ChunkTiles-1)/ChunkTiles,ny=(region.Height+ChunkTiles-1)/ChunkTiles;
         int left=Math.Clamp(Mathf.FloorToInt((centre.X-half.X)/(ChunkTiles*24)),0,nx-1);
         int right=Math.Clamp(Mathf.FloorToInt((centre.X+half.X)/(ChunkTiles*24)),0,nx-1);

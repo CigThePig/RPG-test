@@ -1,4 +1,5 @@
 using Godot;
+using PixelCreatures.Runtime;
 namespace Mosslight;
 
 /// <summary>Expanded authored-world dimensions and chunk planning regressions.
@@ -43,6 +44,20 @@ public static class OverworldChunkChecks
             "chunk planning is unique and clips to world edges");
         check(!near.SequenceEqual(far) && near.Any(id=>id.X==0) && far.Any(id=>id.X==nx-1),
             "moving across the Reach changes the required loaded area");
+        // These are viewport corners after real camera clamping, not a rectangle
+        // centred on an off-centre player near the map boundary.
+        foreach(float z in new[]{.75f,1f,1.25f,2.75f})
+        foreach(var focus in new[]{Vector2.Zero,new Vector2(width*24-1,height*24-1),new Vector2(8*24,120*24)})
+        {
+            var viewport=new Vector2(2340f/1080*800,800);var half=viewport/z/2;
+            var centre=DisplayLayout.CameraCenter(GodotConvert.GroundToScreen(focus.X,focus.Y),new Vector2(width*24,height*12),half);
+            var required=OverworldChunkStreamer.Required(a,focus,viewport,Vector2.One*z,false).ToHashSet();
+            foreach(var point in new[]{centre-half,centre+half-new Vector2(.01f,.01f)})
+            {
+                int cx=Math.Clamp((int)MathF.Floor(point.X/(32*24)),0,nx-1),cy=Math.Clamp((int)MathF.Floor(point.Y/(32*12)),0,ny-1);
+                check(required.Contains(new(cx,cy)),"clamped viewport corner has detailed chunk at zoom "+z);
+            }
+        }
         check(a.Features.Keys.All(at=>at>=0 && at<a.Tiles.Length) &&
             a.Features.ContainsKey(a.Objective),"expanded world preserves feature indices");
     }
