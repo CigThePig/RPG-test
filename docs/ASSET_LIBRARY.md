@@ -4,6 +4,33 @@ Nearly a thousand procedurally painted modules for future content, in the Living
 
 None of it is placed in the game yet. It is a library to draw from.
 
+## Mosslight fit review
+
+The [curated catalog](asset-library/curation.csv) gives all 996 modules a decision and reason. It covers the unused library introduced in PR #10 and carried into PR #11. The review compares the sheets with the Living Reach, its modest town interiors and ruins, and the current mobile HUD. It rates whether an asset belongs on the shortlist. Placement and in-game readability still need to be checked when a module is chosen.
+
+| Decision | Modules | Use |
+| --- | ---: | --- |
+| Keep | 248 | Shortlist for the current setting. Start with mossy stone, cairns, hollow logs, weathered shrines, simple work furniture, cave rubble and nests. |
+| Reserve | 333 | Save for a specific region, room, item or mechanic. Frost trees, palms, cacti, coral, docks, mine gear and traps belong here. |
+| Rework | 392 | Adapt to Mosslight before use. Tone down jewel-bright magic props, give recoloured items distinct silhouettes, and match combat cues and interface art to the live game. |
+| Exclude | 23 | Leave these versions out of content briefs and placement shortlists. |
+
+### Exclude from the shortlist
+
+| Sheet | Module IDs | Reason |
+| --- | --- | --- |
+| Biomes | `snowman` | Seasonal novelty prop. |
+| Structures | `sandbags` | The stacked military barrier feels out of place alongside the Reach's timber and fieldstone defenses. |
+| Landmarks | `lighthouse` | The striped tower and hard beacon cone read as a modern coastal beacon. A stone signal tower could serve a future coast. |
+| Furnishings | `piano`, `floor-lamp` | These upright piano and shaded standing-lamp designs look out of period in the current interiors. The harp and candelabra suit specialist rooms. |
+| Delve | `iron-maiden` | A torture-device prop pushes the ruins toward a different tone. |
+| Materials | `bone-floor` | Repeating skulls overwhelm the floor pattern. Use sparse bone props on stone. |
+| Effects | `coin-spin-1` through `coin-spin-8` | The arcade reward animation competes with the game's quieter looting feedback. |
+| Items | `heart`, `star` | Generic pickup symbols carry little meaning as inventory items. |
+| Interface | `cursor-hand`, `cursor-sword`, `cursor-target`, `cursor-grab`, `speech-bubble`, `thought-bubble` | Desktop pointers and comic bubbles clash with the established touch controls and dialogue presentation. |
+
+Keep a full animation together when applying a decision. The catalog deliberately lists every frame so it can be joined directly to `manifest.json` by sheet and module name. When adding or renaming a recipe, review its catalog row alongside the next asset export.
+
 ## Using it
 
 - **In the game:** `AssetLibrary.Draw(canvas, "tree-autumn-1", foot)` draws a module with its ground contact at `foot`. `AssetLibrary.Texture(sheet)` gives the sheet texture (built once) and `sheet.Source(index)` its rectangle; `AssetLibrary.TryFind(name, ...)` looks a module up.

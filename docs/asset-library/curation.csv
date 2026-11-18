@@ -1,0 +1,997 @@
+sheet,module,decision,reason
+items,sword-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,dagger-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,axe-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,battleaxe-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,mace-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,spear-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,hammer-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,shield-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,helmet-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,cuirass-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,boots-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,gauntlets-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ingot-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ore-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,key-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ring-bronze,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,sword-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,dagger-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,axe-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,battleaxe-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,mace-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,spear-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,hammer-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,shield-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,helmet-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,cuirass-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,boots-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,gauntlets-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,ingot-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,ore-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,key-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,ring-iron,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,sword-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,dagger-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,axe-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,battleaxe-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,mace-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,spear-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,hammer-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,shield-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,helmet-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,cuirass-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,boots-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,gauntlets-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ingot-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ore-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,key-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ring-steel,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,sword-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,dagger-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,axe-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,battleaxe-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,mace-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,spear-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,hammer-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,shield-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,helmet-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,cuirass-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,boots-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,gauntlets-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ingot-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ore-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,key-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ring-gold,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,sword-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,dagger-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,axe-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,battleaxe-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,mace-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,spear-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,hammer-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,shield-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,helmet-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,cuirass-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,boots-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,gauntlets-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ingot-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ore-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,key-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,ring-mythril,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,potion-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,flask-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,vial-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,gem-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,jewel-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,essence-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,staff-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,wand-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,amulet-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,book-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,scroll-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,cloth-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,herb-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,crystal-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,slime-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,banner-red,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,potion-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,flask-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,vial-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,gem-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,jewel-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,essence-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,staff-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,wand-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,amulet-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,book-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,scroll-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,cloth-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,herb-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,crystal-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,slime-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,banner-blue,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,potion-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,flask-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,vial-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,gem-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,jewel-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,essence-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,staff-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,wand-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,amulet-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,book-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,scroll-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,cloth-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,herb-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,crystal-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,slime-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,banner-green,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,potion-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,flask-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,vial-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,gem-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,jewel-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,essence-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,staff-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,wand-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,amulet-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,book-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,scroll-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,cloth-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,herb-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,crystal-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,slime-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,banner-yellow,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,potion-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,flask-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,vial-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,gem-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,jewel-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,essence-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,staff-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,wand-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,amulet-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,book-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,scroll-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,cloth-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,herb-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,crystal-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,slime-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,banner-orange,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,potion-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,flask-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,vial-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,gem-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,jewel-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,essence-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,staff-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,wand-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,amulet-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,book-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,scroll-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,cloth-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,herb-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,crystal-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,slime-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,banner-violet,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,potion-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,flask-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,vial-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,gem-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,jewel-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,essence-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,staff-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,wand-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,amulet-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,book-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,scroll-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,cloth-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,herb-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,crystal-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,slime-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,banner-pink,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,potion-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,flask-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,vial-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,gem-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,jewel-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,essence-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,staff-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,wand-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,amulet-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,book-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,scroll-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,cloth-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,herb-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,crystal-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,slime-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,banner-teal,Rework,A palette swap alone gives too little distinction for separate inventory items.
+items,bow-short,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,bow-long,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,arrow,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,quiver,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,pickaxe,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,hatchet,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,shovel,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,hoe,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,sickle,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,fishing-rod,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,torch,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,lantern,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,bomb,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,rope,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,map,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,compass,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,apple,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,pear,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,orange,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,berries,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,bread,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,cheese,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,meat,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,fish,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,mushroom,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,carrot,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,egg,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,pie,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,stew,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,wine,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,ale,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,honey,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,log,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,plank,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,leather,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,thread,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,bone,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,feather,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,coal,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,stone,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,fang,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,claw,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,eye,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,wing,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,shell,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,pearl,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,scale,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,horn,Reserve,"Useful once the creature, food or crafting recipe exists."
+items,coin,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,coins,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,pouch,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,crown,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,heart,Exclude,Generic heart and star pickups read as arcade tokens. Reconsider only for a named item with new art.
+items,star,Exclude,Generic heart and star pickups read as arcade tokens. Reconsider only for a named item with new art.
+items,skull,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,candle,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,bell,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,hourglass,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,letter,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,quill,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,lute,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,dice,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+items,bucket,Keep,Useful icon reference for a named item that belongs in the current inventory. Follow the existing atlas style.
+items,chest-key-ring,Reserve,Requires an authored equipment tier or specific item with gameplay use.
+biomes,tree-autumn-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-autumn-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-autumn-3,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-golden-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-golden-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-golden-3,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-blossom-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-blossom-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-blossom-3,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-mystic-1,Rework,Reduce brightness and scale before use in a distinct magical habitat.
+biomes,tree-mystic-2,Rework,Reduce brightness and scale before use in a distinct magical habitat.
+biomes,tree-mystic-3,Rework,Reduce brightness and scale before use in a distinct magical habitat.
+biomes,tree-swamp-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-swamp-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-swamp-3,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-frost-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-frost-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,tree-frost-3,Reserve,Requires a distinct climate or seasonal region.
+biomes,pine-snow-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,pine-snow-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,pine-snow-3,Reserve,Requires a distinct climate or seasonal region.
+biomes,pine-tall,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,pine-young,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,tree-dead-1,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,tree-dead-2,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,tree-dead-snow,Reserve,Requires a distinct climate or seasonal region.
+biomes,palm-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,palm-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,willow-1,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,willow-2,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,bamboo-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,bamboo-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,cypress,Reserve,Requires a distinct climate or seasonal region.
+biomes,fruit-tree,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,cactus-saguaro,Reserve,Requires a distinct climate or seasonal region.
+biomes,cactus-twin,Reserve,Requires a distinct climate or seasonal region.
+biomes,cactus-barrel,Reserve,Requires a distinct climate or seasonal region.
+biomes,cactus-pear,Reserve,Requires a distinct climate or seasonal region.
+biomes,rock-desert-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,rock-desert-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,rock-mesa,Reserve,Requires a distinct climate or seasonal region.
+biomes,bush-dry,Reserve,Requires a distinct climate or seasonal region.
+biomes,tumbleweed,Reserve,Requires a distinct climate or seasonal region.
+biomes,beast-skull,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,ribs,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,dune-grass,Reserve,Requires a distinct climate or seasonal region.
+biomes,rock-snow-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,rock-snow-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,ice-crystal-1,Reserve,Requires a distinct climate or seasonal region.
+biomes,ice-crystal-2,Reserve,Requires a distinct climate or seasonal region.
+biomes,snowman,Exclude,Reads as a seasonal novelty prop.
+biomes,snow-drift,Reserve,Requires a distinct climate or seasonal region.
+biomes,bush-snow,Reserve,Requires a distinct climate or seasonal region.
+biomes,frozen-reeds,Reserve,Requires a distinct climate or seasonal region.
+biomes,rock-moss,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,boulder-pile,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,standing-stone-1,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,standing-stone-2,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,standing-stone-3,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,stone-arch,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,cairn,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,stump-mossy,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,bush-autumn,Reserve,Requires a distinct climate or seasonal region.
+biomes,bush-berry-red,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,bush-berry-blue,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,bush-rose,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,flowers-red,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,flowers-blue,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,flowers-yellow,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,flowers-white,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,mushroom-giant-red,Rework,Reduce brightness and scale before use in a distinct magical habitat.
+biomes,mushroom-giant-violet,Rework,Reduce brightness and scale before use in a distinct magical habitat.
+biomes,mushroom-giant-teal,Rework,Reduce brightness and scale before use in a distinct magical habitat.
+biomes,mushroom-ring,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,fern-large,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,reeds,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,vine-post,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,log-hollow,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,swamp-root,Reserve,Requires a distinct climate or seasonal region.
+biomes,lily-giant,Rework,Reduce brightness and scale before use in a distinct magical habitat.
+biomes,coral-red,Reserve,Requires a distinct climate or seasonal region.
+biomes,coral-violet,Reserve,Requires a distinct climate or seasonal region.
+biomes,driftwood,Keep,"Fits Reach paths, woods, ruins or encounter dressing as a restrained accent."
+biomes,shell-pile,Reserve,Requires a distinct climate or seasonal region.
+biomes,seaweed,Reserve,Requires a distinct climate or seasonal region.
+biomes,tide-rock,Reserve,Requires a distinct climate or seasonal region.
+biomes,wheat-1,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,wheat-2,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,wheat-3,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,corn-1,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,corn-2,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,corn-3,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,pumpkin,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,cabbage,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,sunflower,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,tomato-vine,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,grape-vine,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,beehive,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,haystack-large,Reserve,Use as part of an orchard or farm with a reason to exist.
+biomes,turnips,Reserve,Use as part of an orchard or farm with a reason to exist.
+structures,tent-red,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,tent-blue,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,tent-green,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,tent-violet,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,campfire-cold,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,campfire-1,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,campfire-2,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,campfire-3,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,campfire-4,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,bedroll,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,cooking-spit,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,lean-to,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,grave-cross,Rework,Use a setting-specific burial marker.
+structures,grave-round,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,grave-slab,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,grave-broken,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,tomb,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,shrine,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,obelisk,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,milestone,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,waystone-red,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,waystone-blue,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,waystone-green,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,waystone-violet,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,portal-red,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,portal-blue,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,portal-green,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,portal-violet,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,pylon-red,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,pylon-blue,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,pylon-green,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,pylon-violet,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,rune-circle-red,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,rune-circle-blue,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,rune-circle-green,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,rune-circle-violet,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,standard-red,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,standard-blue,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,standard-green,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,standard-violet,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,totem-1,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,totem-2,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,idol,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,offering-bowl,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,bridge-plank,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,bridge-post,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,dock,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,dock-post,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,rowboat,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,net-rack,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,crab-pot,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,buoy,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,palisade,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,palisade-side,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,palisade-gate,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,battlement,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,training-dummy,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,archery-target,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,weapon-rack,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,ballista,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,brazier-post-cold,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,brazier-post-1,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,brazier-post-2,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,brazier-post-3,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,brazier-post-4,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,spike-barricade,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,sandbags,Exclude,Stacked sandbags suggest a different military setting. Use timber or fieldstone defenses.
+structures,war-drum,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,coop,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,doghouse,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,trough,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,plough,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,wheelbarrow,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,milk-churns,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,grindstone,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,water-barrel,Keep,"Fits a trail stop, shrine or modest settlement detail. Place where the object has a purpose."
+structures,mine-cart,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,mine-cart-ore,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,rail,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,rail-side,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,mine-support,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,ore-pile-iron,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,ore-pile-gold,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,ore-pile-mythril,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,pavilion-red,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,pavilion-blue,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,pavilion-green,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,pavilion-violet,Rework,Unify saturated variants into one weathered design before assigning a gameplay meaning.
+structures,wagon,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,fish-stand,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,weapon-stand,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+structures,potion-stand,Reserve,"Requires a waterfront, mine, farm or defended site with supporting content."
+landmarks,windmill-1,Reserve,Needs a named location and layout built around its footprint.
+landmarks,windmill-2,Reserve,Needs a named location and layout built around its footprint.
+landmarks,watchtower,Reserve,Needs a named location and layout built around its footprint.
+landmarks,lighthouse,Exclude,The painted bands and hard beacon cone read as a modern coastal beacon.
+landmarks,mine-entrance,Keep,Strong match for local exploration when the site layout supports the landmark.
+landmarks,cave-mouth,Keep,Strong match for local exploration when the site layout supports the landmark.
+landmarks,great-tree,Reserve,Needs a named location and layout built around its footprint.
+landmarks,ruined-temple,Keep,Strong match for local exploration when the site layout supports the landmark.
+landmarks,wizard-tower,Rework,Redesign the silhouette or palette before using it as a world landmark.
+landmarks,castle-gate,Reserve,Needs a named location and layout built around its footprint.
+landmarks,sailing-ship,Rework,Redesign the silhouette or palette before using it as a world landmark.
+landmarks,war-tent,Rework,Redesign the silhouette or palette before using it as a world landmark.
+landmarks,stone-bridge,Reserve,Needs a named location and layout built around its footprint.
+landmarks,colossus-head,Reserve,Needs a named location and layout built around its footprint.
+landmarks,dragon-bones,Rework,Redesign the silhouette or palette before using it as a world landmark.
+landmarks,great-crystal,Rework,Redesign the silhouette or palette before using it as a world landmark.
+furnishings,bed-double-red,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,bed-double-blue,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,bed-double-green,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,bed-double-violet,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,bunk-bed,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,cradle,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,wardrobe,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,drawers,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,chair,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,chair-side,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,stool,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,armchair,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,dining-table,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,desk,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,workbench,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,map-table,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,bar-counter,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,keg-rack,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,wine-rack,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,cupboard,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,oven,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,bread-rack,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,butcher-hooks,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,washbasin,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,cooking-pot-1,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,cooking-pot-2,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,cauldron-green-1,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,cauldron-green-2,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,cauldron-violet-1,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,cauldron-violet-2,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,alchemy-table,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,scales,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,fireplace-1,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,fireplace-2,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,fireplace-3,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,fireplace-4,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,bookcase-tall,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,bookcase-scrolls,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,shop-shelf-potions,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,shop-shelf-wares,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,clock,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,mirror,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,coat-rack,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,ladder,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,plant-fern,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,plant-tree,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,plant-flower,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,vase,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,chandelier,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,candelabra,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,floor-lamp,Exclude,This upright piano and shaded floor lamp read as later-period domestic furniture.
+furnishings,birdcage,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,piano,Exclude,This upright piano and shaded floor lamp read as later-period domestic furniture.
+furnishings,harp,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,globe,Rework,Use an in-world chart or instrument that matches the Reach’s materials and setting.
+furnishings,telescope,Rework,Use an in-world chart or instrument that matches the Reach’s materials and setting.
+furnishings,loom,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,spinning-wheel,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,mannequin,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,sawhorse,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,bathtub,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,strongbox,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,toy-chest,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,easel,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,throne,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,armour-stand-iron,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,armour-stand-gold,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,armour-stand-mythril,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,trophy-antlers,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,shield-display,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,pillar,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,stairs-up,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,curtain-red,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,curtain-blue,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,curtain-green,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,curtain-violet,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,carpet-red,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,carpet-blue,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,carpet-green,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,carpet-violet,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,painting-landscape,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,painting-portrait,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,painting-ship,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,tapestry,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,barrel-apples,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,barrel-fish,Reserve,"Suit a specialist shop, affluent interior or named room."
+furnishings,crate-open,Keep,"Fits modest living spaces, workshops and market interiors. Match the existing room scale."
+furnishings,trapdoor,Reserve,"Suit a specialist shop, affluent interior or named room."
+delve,door-wood,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,door-wood-open,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,door-iron,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,door-iron-open,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,door-rune,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,door-rune-open,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,stairs-down,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,ladder-hole,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,spikes-down,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,spikes-up,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,plate-up,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,plate-down,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,dart-trap,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,flame-jet-1,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,flame-jet-2,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,wall-lever,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,chest-iron,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,chest-iron-open,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,chest-gold,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,chest-gold-open,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,mimic,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,treasure-small,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,treasure-large,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,treasure-hoard,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,sarcophagus,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,sarcophagus-open,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,coffin,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,urn-ashes,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,skeleton-sitting,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,skull-pile,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,bone-heap,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,ribcage-large,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,cage,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,cage-hanging,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,shackles,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,iron-maiden,Exclude,The torture-device silhouette changes the tone of the ruins.
+delve,web-corner,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,web-large,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,egg-sac,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,nest,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,crystal-cluster-red,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,crystal-cluster-blue,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,crystal-cluster-green,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,crystal-cluster-violet,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,stalagmite-1,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,stalagmite-2,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,stalagmite-3,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,obsidian-spire,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,glowcap-giant,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,cave-moss,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,root-tangle,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,rubble-large,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,pillar-broken-1,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,pillar-broken-2,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,statue-knight,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,statue-broken,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,gargoyle,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,dark-altar,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,dark-throne,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,evil-idol,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,mana-spring,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,healing-spring,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,dark-well,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,candle-stand,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,teleporter-red,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,teleporter-blue,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,teleporter-green,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,teleporter-violet,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,slime-pool-red,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,slime-pool-blue,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,slime-pool-green,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,slime-pool-violet,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,barrel-explosive,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+delve,bottle-rack,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,table-skull,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,bookshelf-ruined,Keep,Fits the existing ruins or creature dens as sparse environmental dressing.
+delve,lava-vent-1,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,lava-vent-2,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,mine-timber,Reserve,"Use where a scripted mechanic, a burial room or a distinct dungeon theme supports it."
+delve,boss-door,Rework,Tone down the arcade-like styling and tie the prop to a specific encounter or mechanic.
+effects,explosion-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,explosion-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,explosion-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,explosion-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,explosion-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,explosion-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,explosion-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,explosion-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,fire-burst-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,fire-burst-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,fire-burst-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,fire-burst-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,fire-burst-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,fire-burst-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,fire-burst-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,fire-burst-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,frost-burst-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,frost-burst-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,frost-burst-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,frost-burst-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,frost-burst-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,frost-burst-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,frost-burst-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,frost-burst-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,arcane-burst-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,arcane-burst-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,arcane-burst-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,arcane-burst-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,arcane-burst-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,arcane-burst-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,arcane-burst-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,arcane-burst-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,smoke-1,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,smoke-2,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,smoke-3,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,smoke-4,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,smoke-5,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,smoke-6,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,smoke-7,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,smoke-8,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,dust-1,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,dust-2,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,dust-3,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,dust-4,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,dust-5,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,dust-6,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,dust-7,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,dust-8,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-gold-1,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-gold-2,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-gold-3,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-gold-4,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-gold-5,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-gold-6,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-gold-7,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-gold-8,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-blue-1,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-blue-2,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-blue-3,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-blue-4,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-blue-5,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-blue-6,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-blue-7,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,sparkle-blue-8,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,slash-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,slash-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,slash-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,slash-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,slash-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,slash-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,slash-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,slash-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,hit-spark-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,hit-spark-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,hit-spark-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,hit-spark-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,hit-spark-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,hit-spark-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,hit-spark-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,hit-spark-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,heal-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,heal-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,heal-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,heal-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,heal-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,heal-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,heal-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,heal-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,level-up-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,level-up-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,level-up-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,level-up-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,level-up-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,level-up-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,level-up-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,level-up-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,lightning-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,lightning-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,lightning-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,lightning-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,lightning-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,lightning-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,lightning-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,lightning-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,splash-1,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,splash-2,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,splash-3,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,splash-4,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,splash-5,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,splash-6,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,splash-7,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,splash-8,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,ripple-1,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,ripple-2,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,ripple-3,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,ripple-4,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,ripple-5,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,ripple-6,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,ripple-7,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,ripple-8,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,poison-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,poison-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,poison-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,poison-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,poison-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,poison-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,poison-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,poison-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,portal-swirl-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,portal-swirl-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,portal-swirl-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,portal-swirl-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,portal-swirl-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,portal-swirl-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,portal-swirl-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,portal-swirl-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,shield-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,shield-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,shield-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,shield-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,shield-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,shield-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,shield-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,shield-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,ice-shards-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,ice-shards-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,ice-shards-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,ice-shards-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,ice-shards-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,ice-shards-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,ice-shards-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,ice-shards-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,leaves-1,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,leaves-2,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,leaves-3,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,leaves-4,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,leaves-5,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,leaves-6,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,leaves-7,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,leaves-8,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,missile-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,missile-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,missile-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,missile-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,missile-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,missile-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,missile-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,missile-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,teleport-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,teleport-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,teleport-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,teleport-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,teleport-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,teleport-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,teleport-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,teleport-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,coin-spin-1,Exclude,The spinning coin reads as an arcade reward. The inventory can carry this feedback.
+effects,coin-spin-2,Exclude,The spinning coin reads as an arcade reward. The inventory can carry this feedback.
+effects,coin-spin-3,Exclude,The spinning coin reads as an arcade reward. The inventory can carry this feedback.
+effects,coin-spin-4,Exclude,The spinning coin reads as an arcade reward. The inventory can carry this feedback.
+effects,coin-spin-5,Exclude,The spinning coin reads as an arcade reward. The inventory can carry this feedback.
+effects,coin-spin-6,Exclude,The spinning coin reads as an arcade reward. The inventory can carry this feedback.
+effects,coin-spin-7,Exclude,The spinning coin reads as an arcade reward. The inventory can carry this feedback.
+effects,coin-spin-8,Exclude,The spinning coin reads as an arcade reward. The inventory can carry this feedback.
+effects,torch-flame-1,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,torch-flame-2,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,torch-flame-3,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,torch-flame-4,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,torch-flame-5,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,torch-flame-6,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,torch-flame-7,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,torch-flame-8,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,curse-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,curse-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,curse-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,curse-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,curse-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,curse-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,curse-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,curse-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,blood-1,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,blood-2,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,blood-3,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,blood-4,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,blood-5,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,blood-6,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,blood-7,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,blood-8,Rework,"Match Mosslight’s existing timing, footprint and visual language before replacing live combat cues."
+effects,embers-1,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,embers-2,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,embers-3,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,embers-4,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,embers-5,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,embers-6,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,embers-7,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,embers-8,Keep,Candidate for subtle atmosphere or contact feedback. Preserve the existing cue and readability.
+effects,snowfall-1,Reserve,Use with a region or weather system that supports it.
+effects,snowfall-2,Reserve,Use with a region or weather system that supports it.
+effects,snowfall-3,Reserve,Use with a region or weather system that supports it.
+effects,snowfall-4,Reserve,Use with a region or weather system that supports it.
+effects,snowfall-5,Reserve,Use with a region or weather system that supports it.
+effects,snowfall-6,Reserve,Use with a region or weather system that supports it.
+effects,snowfall-7,Reserve,Use with a region or weather system that supports it.
+effects,snowfall-8,Reserve,Use with a region or weather system that supports it.
+materials,snow,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,ice,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,sand,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,dunes,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,mud,Keep,"Useful surface reference for local paths, ruins and interiors. Integrate through the existing terrain or room renderer."
+materials,swamp-water,Rework,Match the existing ground shaders or reduce the regular high-contrast pattern.
+materials,shallow-water,Rework,Match the existing ground shaders or reduce the regular high-contrast pattern.
+materials,deep-water,Rework,Match the existing ground shaders or reduce the regular high-contrast pattern.
+materials,lava,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,basalt,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,ash,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,obsidian,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,cobble,Keep,"Useful surface reference for local paths, ruins and interiors. Integrate through the existing terrain or room renderer."
+materials,stone-flags,Keep,"Useful surface reference for local paths, ruins and interiors. Integrate through the existing terrain or room renderer."
+materials,sandstone-tiles,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,brick,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,planks,Keep,"Useful surface reference for local paths, ruins and interiors. Integrate through the existing terrain or room renderer."
+materials,parquet,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,marble,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,marble-checker,Rework,Match the existing ground shaders or reduce the regular high-contrast pattern.
+materials,floor-carpet-red,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,floor-carpet-blue,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,straw,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,tilled-soil,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,grass-dark,Keep,"Useful surface reference for local paths, ruins and interiors. Integrate through the existing terrain or room renderer."
+materials,grass-dry,Keep,"Useful surface reference for local paths, ruins and interiors. Integrate through the existing terrain or room renderer."
+materials,autumn-leaves,Reserve,"Requires a separate climate, dungeon theme or furnished room."
+materials,gravel,Keep,"Useful surface reference for local paths, ruins and interiors. Integrate through the existing terrain or room renderer."
+materials,moss-stone,Keep,"Useful surface reference for local paths, ruins and interiors. Integrate through the existing terrain or room renderer."
+materials,crystal-floor,Rework,Match the existing ground shaders or reduce the regular high-contrast pattern.
+materials,metal-grate,Rework,Match the existing ground shaders or reduce the regular high-contrast pattern.
+materials,bone-floor,Exclude,Busy repeating skull marks read as a novelty floor. Use stone with sparse bone props.
+abilities,fireball,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,flame-wave,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,ignite,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,meteor,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,ice-lance,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,frost-nova,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,blizzard,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,ice-wall,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,thorns,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,regrowth,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,entangle,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,summon-wolf,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,arcane-missile,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,blink,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,mana-shield,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,rune,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,heal,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,smite,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,bless,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,sanctuary,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,shadow-bolt,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,curse,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,stealth,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,fear,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,bleed,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,drain-life,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,frenzy,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,vitality,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,strike,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,cleave,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,guard,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,dash,Rework,Consider as a reference for an existing action. Match the live icon and touch HUD treatments.
+abilities,whirlwind,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,shield-bash,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,taunt,Reserve,Requires an authored ability before it belongs in the ability UI.
+abilities,war-cry,Reserve,Requires an authored ability before it belongs in the ability UI.
+interface,panel-wood,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,panel-stone,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,panel-parchment,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,panel-dark,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,panel-royal,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,panel-frost,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,panel-leaf,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,panel-arcane,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,button-red,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,button-red-pressed,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,button-blue,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,button-blue-pressed,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,button-green,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,button-green-pressed,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,button-gold,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,button-gold-pressed,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,slot,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,slot-selected,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,slot-locked,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,slot-rare,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,slot-epic,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,slot-legendary,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,slot-cursed,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,slot-round,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,bar-health,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,bar-mana,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,bar-stamina,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,bar-xp,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,bar-empty,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,divider,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,corner-ornament,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,tab,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,cursor-hand,Exclude,Desktop cursor and comic bubble treatments clash with the landscape touch UI.
+interface,cursor-sword,Exclude,Desktop cursor and comic bubble treatments clash with the landscape touch UI.
+interface,cursor-target,Exclude,Desktop cursor and comic bubble treatments clash with the landscape touch UI.
+interface,cursor-grab,Exclude,Desktop cursor and comic bubble treatments clash with the landscape touch UI.
+interface,arrow-up,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,arrow-right,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,arrow-down,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,arrow-left,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,speech-bubble,Exclude,Desktop cursor and comic bubble treatments clash with the landscape touch UI.
+interface,thought-bubble,Exclude,Desktop cursor and comic bubble treatments clash with the landscape touch UI.
+interface,exclaim,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,question,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,status-poison,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,status-burn,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,status-freeze,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,status-stun,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,status-sleep,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,status-bleed,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,status-regen,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,status-shield,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,map-pin,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,map-flag,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,map-x,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
+interface,map-star,Rework,"Adapt the visual cue to the existing touch UI. Keep the current buttons, panels and HUD as references."
