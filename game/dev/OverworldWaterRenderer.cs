@@ -7,6 +7,7 @@ public partial class OverworldWaterRenderer : Node2D
 {
     public RegionState Region { get; init; } = null!;
     public Rect2I? Cells {get;init;}
+    public ChunkLookup? Prepared {get;set;}
     public OverworldGroundRenderer? Ground {get;init;}
     public Func<bool> ReducedMotion { get; init; } = () => true;
     static readonly bool visualVerification=OS.GetCmdlineUserArgs().Contains("--visual-check");
@@ -54,6 +55,8 @@ public partial class OverworldWaterRenderer : Node2D
         // Three canvas pixels per distance sample. GPU interpolates the scalar field,
         // then quantizes material at integer canvas pixels: crisp art, not a blurred image.
         int width=(ex-sx)*8+1,height=(ey-sy)*4+1;
+        if(Prepared!=null)field=Prepared.Upload(Prepared.Water!,Image.Format.Rgb8);
+        else
         using(var image=Image.CreateEmpty(width,height,false,OverworldWaterArt.Part1?Image.Format.Rg8:Image.Format.Rgb8))
         {
             for(int y=0;y<height;y++)for(int x=0;x<width;x++)
@@ -68,6 +71,7 @@ public partial class OverworldWaterRenderer : Node2D
             field=ImageTexture.CreateFromImage(image);
         }
         LastLookupBytes=(long)width*height*(OverworldWaterArt.Part1?2:3);
+        Prepared=null;
         // Exactly the authoritative water footprint. Adjacent water rows share one quad.
         for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;)
         {
@@ -75,6 +79,7 @@ public partial class OverworldWaterRenderer : Node2D
             int start=x;while(x<cells.End.X && OverworldWaterArt.Water(Region,x,y))x++;
             surface.Rect(new Rect2(start*24,y*12,(x-start)*24,12),Colors.White);
         }
+        surface.Upload();
         bool legacy=OverworldWaterArt.Part1;
         if(legacy)legacyShader ??= GD.Load<Shader>("res://game/art/overworld_water_part1.gdshader");
         else waterShader ??= GD.Load<Shader>("res://game/art/overworld_water.gdshader");

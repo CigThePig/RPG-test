@@ -72,6 +72,32 @@ jobs:
             build/encounter-measurements.json
             build/verification-*.log
             build/widescreen/
+  living-reach:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: |
+            8.0.408
+            9.0.203
+      - uses: chickensoft-games/setup-godot@ac93246ea68518a384c1c280a496e5989341f2f6
+        with:
+          version: 4.6.1
+          use-dotnet: true
+          include-templates: false
+      - run: dotnet build
+      - run: python3 tools/import-project.py
+      - run: python3 tools/setup-video.py --require-display
+      - name: Production geography, interiors, streaming A/B and real-time movie
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' python3 tools/living-reach-verify.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: living-reach-evidence
+          path: build/living-reach/
+          retention-days: 30
   preserved-reference:
     runs-on: ubuntu-24.04
     defaults:

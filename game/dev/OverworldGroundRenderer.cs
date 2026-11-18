@@ -7,6 +7,7 @@ public partial class OverworldGroundRenderer : Node2D
 {
     public RegionState Region {get;init;}=null!;
     public Rect2I? Cells {get;init;}
+    public ChunkLookup? Prepared {get;set;}
     Vector2 lookupOrigin;
     static readonly bool visualVerification=OS.GetCmdlineUserArgs().Contains("--visual-check");
     static readonly bool previousCommand=OS.GetCmdlineUserArgs().Contains("--part1-ground");
@@ -29,6 +30,8 @@ public partial class OverworldGroundRenderer : Node2D
         int ex=Math.Min(Region.Width,cells.End.X+3),ey=Math.Min(Region.Height,cells.End.Y+3);
         int width=(ex-sx)*8+1,height=(ey-sy)*4+1;
         lookupOrigin=new Vector2(sx*8,sy*4);
+        if(Prepared!=null)lookup=Prepared.Upload(Prepared.Ground,Image.Format.Rgba8);
+        else
         using(var image=Image.CreateEmpty(width,height,false,Image.Format.Rgba8))
         {
             for(int y=0;y<height;y++)for(int x=0;x<width;x++)
@@ -39,12 +42,14 @@ public partial class OverworldGroundRenderer : Node2D
             }
             lookup=ImageTexture.CreateFromImage(image);
         }
+        Prepared=null;
         for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;)
         {
             if(!OverworldGroundArt.Covered(Region,x,y)){x++;continue;}
             int start=x;while(x<cells.End.X&&OverworldGroundArt.Covered(Region,x,y))x++;
             batch.Rect(new Rect2(start*24,y*12,(x-start)*24,12),Colors.White);
         }
+        batch.Upload();
         shader??=GD.Load<Shader>("res://game/art/overworld_ground.gdshader");
         material=new ShaderMaterial{Shader=shader};Configure(material);ReachAmbience.Register(material);
         Material=material;LastLookupBytes=(long)width*height*4;LastVertexBytes=batch.VertexBytes;

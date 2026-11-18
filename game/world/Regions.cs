@@ -33,6 +33,8 @@ public sealed class RegionState
     public bool ExplorationInitialized { get; set; } = true;
     public HashSet<int> ExploredTiles { get; set; } = new();
     public HashSet<string> DiscoveredLandmarks { get; set; } = new(StringComparer.Ordinal);
+    public HashSet<int> Crossings {get;set;}=new(); // Optional saved bridge deck cells over water.
+    public int GeographyRevision { get; set; } // Missing in old saves: retain stored terrain verbatim.
     public int PlacementRevision { get; set; }
     public int Entrance { get; set; }
     public int Objective { get; set; }
@@ -59,7 +61,7 @@ public sealed class RegionState
         {
             Terrain.Wall => false,
             Terrain.Rock => false,
-            Terrain.Water => a.Flies || a.Swims,
+            Terrain.Water => a.Flies || a.Swims || Crossings.Contains(index),
             _ => true
         };
     }
@@ -220,6 +222,9 @@ public static class Regions
                     r.Tiles[n] = Terrain.Rock;
             }
 
+        bool large=width>=128 && height>=128;
+        if(large)LivingReachGeography.Generate(r);
+
         // A compact settlement and a winding, three-cell road preserve landscape
         // barriers without flattening a nine-cell strip across the entire region.
         for (int y = 1; y < height-1; y++)
@@ -227,7 +232,7 @@ public static class Regions
             {
                 float sx=(x-10)/7f, sy=(y-height/2)/4f;
                 int roadY = height/2 + (int)MathF.Round(MathF.Sin((x-8)*.14f)*2);
-                if(sx*sx+sy*sy < 1 || (x>=8 && x<=width-8 && Math.Abs(y-roadY)<=1))
+                if(sx*sx+sy*sy < 1 || (!large && x>=8 && x<=width-8 && Math.Abs(y-roadY)<=1))
                     r.Tiles[y*width+x]=Terrain.Earth;
             }
         r.Entrance = (height / 2) * width + 8;

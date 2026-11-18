@@ -90,7 +90,7 @@ public static class TownGenerationChecks
             }
             foreach(int seed in new[]{1,42,1337})
             {
-                var r=Regions.Overworld(seed); w.RegionsById["reach"]=r; player.Region="reach";
+                var r=Regions.Overworld(seed,320,240); w.RegionsById["reach"]=r; player.Region="reach";
                 var plan=TownStage.For(r)!;
                 foreach(var h in plan.Houses)
                 {
@@ -111,7 +111,7 @@ public static class TownGenerationChecks
                 }
                 var spawn=r.Center(r.Entrance);player.X=spawn.X;player.Y=spawn.Y;app.RebuildViews();app.ResumeGame();
                 await Frame("seed-"+seed+"-street");
-                player.X=20.5f*24;player.Y=(r.Height/2+3)*24;app.RebuildViews();app.ResumeGame();app.Camera.Zoom=zoom*.5f;
+                player.X=39.5f*24;player.Y=(r.Height/2+3)*24;app.RebuildViews();app.ResumeGame();app.Camera.Zoom=zoom*.5f;
                 await Frame("seed-"+seed+"-overview");app.Camera.Zoom=zoom;
             }
             GD.Print("GENERATED TOWN RENDERED CHECKS PASSED: 18 actual door entries and exits across seeds 1, 42, 1337");

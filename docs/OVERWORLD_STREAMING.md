@@ -22,7 +22,10 @@ Decoration and flora are planned per chunk from stable world hashes, not from
 gameplay RNG. House roofs, paving and landmarks continue using the existing
 shared actor sorting and save state.
 
-The streamer creates at most three chunks per frame. Distant scenery remains
+The streamer prepares lookup bytes on a managed worker and schedules one upload or
+construction stage per frame under a measured main-thread budget. Eight hidden
+chunks are retained for reversals; eviction releases nodes incrementally. See
+[LIVING_REACH_OVERHAUL.md](LIVING_REACH_OVERHAUL.md) for the current pipeline. Distant scenery remains
 unloaded, including its textures, meshes, decoration nodes and plant rows.
 Full-region collision and the eight authored starting NPCs remain active.
 This is **presentation streaming**, not full simulation or per-chunk save

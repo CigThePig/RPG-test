@@ -27,7 +27,7 @@ public sealed class TownState
         var t = r.Town;
         if (t == null) return; // Older worlds keep their original geography.
         void Require(bool valid) { if (!valid) throw new InvalidDataException("Invalid saved town in " + r.Id); }
-        Require(r.Id != "ruin" && t.Revision == 1 && t.Houses != null && t.Pieces != null && t.Paving != null);
+        Require(r.Id != "ruin" && t.Revision is 1 or 2 && t.Houses != null && t.Pieces != null && t.Paving != null);
         Require(t.Houses!.Count is > 0 and <= 64 && t.Pieces!.Count <= 2048 && t.Paving!.Count <= r.Tiles.Length);
         var occupied = new HashSet<int>();
         foreach (var h in t.Houses)
@@ -72,6 +72,7 @@ public static class TownGenerator
         // Keep a real wilderness and the portal east of the town. Small custom maps
         // retain the old roadside clearing rather than squeezing in broken houses.
         if (r.Id != "reach" || r.Width < 48 || r.Height < 44) return null;
+        if(r.Width>=128 && r.Height>=128)return GenerousTown(r);
         var rng = new Random(LayoutSeed(r.Seed));
         int mid = r.Height / 2;
         var plan = new TownPlan();
@@ -129,6 +130,64 @@ public static class TownGenerator
         foreach (var p in plan.Pieces) if (plan.HouseAt(p.X,p.Y)==null) r.Tiles[p.Y*r.Width+p.X]=Terrain.Earth;
         plan.Carve(r);
         r.Town = TownState.From(plan,r.Width);
+        if(r.Width>=128 && r.Height>=128)r.Town.Revision=2;
+    }
+
+    static TownPlan? GenerousTown(RegionState r)
+    {
+        var rng=new Random(LayoutSeed(r.Seed));var p=new TownPlan();int mid=r.Height/2;
+        var styles=new[]{HouseStyle.Cottage,HouseStyle.Inn,HouseStyle.Chapel,HouseStyle.Stone,HouseStyle.Smithy,HouseStyle.Barn};
+        if(rng.Next(2)==0)(styles[0],styles[2])=(styles[2],styles[0]);
+        for(int row=0;row<2;row++)for(int col=0;col<3;col++)
+        {
+            var style=styles[row*3+col];
+            var (minW,minH)=style switch {HouseStyle.Cottage=>(10,9),HouseStyle.Stone=>(11,10),HouseStyle.Inn=>(17,12),HouseStyle.Smithy=>(13,10),HouseStyle.Chapel=>(15,14),_=>(16,13)};
+            int w=minW+rng.Next(3),h=minH+rng.Next(3),dw=style==HouseStyle.Barn?3:2;
+            int x=4+col*24+rng.Next(3),y=row==0?mid-8-h:mid+9+rng.Next(2);
+            p.Build(style,x,y,w,h,(w-dw)/2,dw);
+        }
+        p.Pave(2,mid-2,74,5).Pave(2,mid-6,74,3).Pave(2,mid+29,74,3)
+            .Pave(2,mid-6,2,38).Pave(74,mid-6,2,38);
+        foreach(var h in p.Houses)
+        {
+            int front=h.Y+h.Height,lane=h.Y<mid?mid-5:mid+30;
+            p.Pave(h.X+h.Door-1,front,h.DoorWidth+2,lane-front+1);
+            SpaciousInterior(p,h,rng);
+        }
+        p.Add(TownProp.Well,26,mid-4).Add(TownProp.Stall,18,mid-4,rng.Next(3))
+            .Add(TownProp.Stall,38,mid-4,rng.Next(3)).Add(TownProp.Bench,30,mid-4)
+            .Add(TownProp.NoticeBoard,5,mid-3).Add(TownProp.Signpost,73,mid-1)
+            .Add(TownProp.LampPost,3,mid-3).Add(TownProp.LampPost,72,mid-3)
+            .Add(TownProp.Cart,70,mid+29).Add(TownProp.Garden,24,mid+30);
+        bool Protected(int x,int y)=>r.Features.ContainsKey(y*r.Width+x)||y*r.Width+x==r.Entrance||y*r.Width+x==r.Objective;
+        if(p.Houses.Any(h=>Enumerable.Range(h.Y,h.Height).Any(y=>Enumerable.Range(h.X,h.Width).Any(x=>Protected(x,y)))))return null;
+        p.Pieces.RemoveAll(a=>Protected(a.X,a.Y));return p;
+    }
+
+    static void SpaciousInterior(TownPlan p,TownHouse h,Random rng)
+    {
+        int l=h.X+2,r=h.X+h.Width-3,b=h.Y+2,f=h.Y+h.Height-3,c=h.X+h.Door;
+        // Keep a three-cell central aisle and the entire entrance apron empty.
+        switch(h.Style)
+        {
+            case HouseStyle.Inn:
+                p.Add(TownProp.Counter,l+1,b+1).Add(TownProp.Shelf,l,b).Add(TownProp.Hearth,r,b);
+                foreach(int y in new[]{b+4,f-1}){p.Add(TownProp.Table,l+1,y).Add(TownProp.Table,r-1,y);}
+                break;
+            case HouseStyle.Chapel:
+                p.Add(TownProp.Statue,c,b);
+                for(int y=b+4;y<=f-1;y+=3)p.Add(TownProp.Pew,l+1,y).Add(TownProp.Pew,r-1,y);
+                break;
+            case HouseStyle.Smithy:
+                p.Add(TownProp.Hearth,l,b).Add(TownProp.Anvil,l,b+3).Add(TownProp.Barrels,r,b).Add(TownProp.Crates,r,f);break;
+            case HouseStyle.Barn:
+                for(int y=b;y<f;y+=3)p.Add(TownProp.Hay,l,y,y%2).Add(TownProp.Sacks,r,y);
+                p.Add(TownProp.Crates,l+2,b);break;
+            default:
+                p.Add(TownProp.Bed,l,b,rng.Next(2)).Add(TownProp.Hearth,r,b).Add(TownProp.Table,r-1,b+4).Add(TownProp.Shelf,l,f);break;
+        }
+        p.Add(TownProp.Rug,c,f+1,rng.Next(2)).Add(TownProp.Planter,h.X,h.Y+h.Height+1,rng.Next(2));
+        if(h.Style is HouseStyle.Inn or HouseStyle.Smithy)p.Add(TownProp.TradeSign,r,h.Y+h.Height,h.Style==HouseStyle.Inn?0:1);
     }
 
     static void Furnish(TownPlan p, TownHouse h, Random rng)

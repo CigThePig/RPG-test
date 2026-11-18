@@ -137,6 +137,7 @@ public static class PlayabilityChecks
             // This deliberately replaces all geography to exercise legacy actor placement,
             // so discard the unrelated saved town composition with that geography.
             invalid["Regions"]!["reach"]!["Town"]=null;
+            invalid["Regions"]!["reach"]!["Crossings"]=new System.Text.Json.Nodes.JsonArray();
             var tiles=invalid["Regions"]!["reach"]!["Tiles"]!.AsArray();
             for(int i=0;i<tiles.Count;i++)tiles[i]=(int)Terrain.Wall;
             bool rejected=false;try { Persistence.Restore(w,app.Narrative,invalid.ToJsonString()); }catch(InvalidOperationException){rejected=true;}

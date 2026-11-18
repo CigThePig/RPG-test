@@ -366,10 +366,10 @@ try:
         if not adb('shell','pidof',package): raise RuntimeError('Android process exited during real combat damage')
         positions=re.findall(r'MOSSLIGHT_TOUCH_RELEASE x=([0-9.]+) y=([0-9.]+)',logs)
         current_x=float(positions[-1][0]) if positions else 0
-        # Seeded towns put prowlers beyond the eastern plots (around x=1000).
+        # Seeded towns put prowlers beyond the eastern plots (around x=1900 with the larger plots).
         # Continue down the central street until the wilderness, then let them
         # engage; retain the requirement for two authoritative damage events.
-        if current_x<1050 and approaches<40:
+        if current_x<2100 and approaches<60:
             joystick(280,'2000')
             approaches+=1
         else: time.sleep(.5)

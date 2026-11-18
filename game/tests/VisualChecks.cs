@@ -454,6 +454,8 @@ public static class VisualChecks
         { await LandmarkVisualChecks.Run(app); GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--enemy-preview"))
         { await EnemyPreview.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--living-reach-only"))
+        { await LivingReachVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--town-only"))
         { await TownArtChecks.Rendered(app);await TownGenerationChecks.Rendered(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--town-preview"))

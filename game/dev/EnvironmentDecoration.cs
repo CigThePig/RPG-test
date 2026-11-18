@@ -35,7 +35,10 @@ public partial class EnvironmentDecoration : Node2D
                 int at=y*r.Width+x;var tile=r.Tiles[at];
                 uint h=EnvironmentStyle.Hash(r.Seed,x,y,99);
                 // Ruins scatter their own clutter; see DungeonDressing.
-                if(tile!=Terrain.Grass || h%29!=0)continue;
+                if(tile!=Terrain.Grass)continue;
+                float forest=r.GeographyRevision>0?LivingReachGeography.Forest(r.Seed,x,y):.5f;
+                uint spacing=forest>.56f?13u:forest<.35f?79u:29u;
+                if(h%spacing!=0)continue;
                 if(TownStage.Occupied(r,x,y))continue;
                 // Keep all feature stands, doorway lanes and arrival clear of tall silhouettes.
                 if(r.Features.Keys.Any(f=>Math.Abs(f%r.Width-x)<3 && Math.Abs(f/r.Width-y)<3))continue;

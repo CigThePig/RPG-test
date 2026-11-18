@@ -38,14 +38,18 @@ public sealed class TerrainBatch : IDisposable
         // Terrain edges in this projection are axis-aligned.
         Rect(new Rect2(a.Min(b)-Vector2.One*width/2,(b-a).Abs()+Vector2.One*width),color);
     }
-    public void Draw(CanvasItem target)
+    public void Upload()
     {
-        if(vertices.Count==0)return;
+        if(vertices.Count==0 || mesh!=null)return;
         var arrays=new Godot.Collections.Array();arrays.Resize((int)Mesh.ArrayType.Max);
         arrays[(int)Mesh.ArrayType.Vertex]=vertices.ToArray();arrays[(int)Mesh.ArrayType.Color]=colors.ToArray();
         if(uvs.Count>0)arrays[(int)Mesh.ArrayType.TexUV]=uvs.ToArray();
         mesh?.Dispose();
         mesh=new ArrayMesh();mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles,arrays);
-        target.DrawMesh(mesh,Texture);
+    }
+    public void Draw(CanvasItem target)
+    {
+        Upload();
+        if(mesh!=null)target.DrawMesh(mesh,Texture);
     }
 }

@@ -10,6 +10,7 @@ public partial class OverworldRockRenderer : Node2D
     public const int Lift=10;
     public RegionState Region {get;init;}=null!;
     public Rect2I? Cells {get;init;}
+    public ChunkLookup? Prepared {get;set;}
     public static bool Enabled=>OverworldGroundRenderer.Enabled && OverworldPropAtlas.Enabled;
     public static long LastLookupBytes {get;private set;}
     public static long LastVertexBytes {get;private set;}
@@ -36,6 +37,8 @@ public partial class OverworldRockRenderer : Node2D
         int sx=Math.Max(0,cells.Position.X-3),sy=Math.Max(0,cells.Position.Y-3);
         int ex=Math.Min(Region.Width,cells.End.X+3),ey=Math.Min(Region.Height,cells.End.Y+3);
         int width=(ex-sx)*8+1,height=(ey-sy)*4+1;
+        if(Prepared!=null)lookup=Prepared.Upload(Prepared.Rock!,Image.Format.Rgb8);
+        else
         using(var image=Image.CreateEmpty(width,height,false,Image.Format.Rgb8))
         {
             for(int y=0;y<height;y++)for(int x=0;x<width;x++)
@@ -47,6 +50,7 @@ public partial class OverworldRockRenderer : Node2D
             }
             lookup=ImageTexture.CreateFromImage(image);
         }
+        Prepared=null;
         // Every cell an outcrop can paint: its own footprint, the lifted top to the
         // north and the cast shadow around it. Cells are disjoint, so nothing blends twice.
         bool Near(int x,int y)
@@ -66,6 +70,7 @@ public partial class OverworldRockRenderer : Node2D
                 boulders.Sprite(new Rect2(new Vector2(x*24+12,y*12+11)-OverworldPropArt.Pivot,new Vector2(OverworldPropArt.Width,OverworldPropArt.Height)),
                     OverworldPropArt.Source(OverworldPropArt.Module(ReachProp.Rock,EnvironmentStyle.Hash(Region.Seed,x,y))));
         if(boulders.VertexCount>0)AddChild(new WaterGlints {Batch=boulders,TextureFilter=TextureFilterEnum.Nearest});
+        batch.Upload();boulders.Upload();
         shader??=GD.Load<Shader>("res://game/art/overworld_rock.gdshader");
         material=new ShaderMaterial{Shader=shader};
         material.SetShaderParameter("rock_map",lookup);material.SetShaderParameter("rock_lookup_size",new Vector2(width,height));

@@ -35,6 +35,9 @@ public static class Persistence
                 throw new InvalidDataException($"Invalid region {id}");
         foreach (var region in s.Regions.Values)
         {
+            if(region.GeographyRevision is <0 or >LivingReachGeography.Revision || region.Crossings==null ||
+                region.Crossings.Any(i=>i<0||i>=region.Tiles.Length||region.Tiles[i]!=Terrain.Water))
+                throw new InvalidDataException("Invalid saved geography");
             Landmarks.ValidateSaved(region);
             TownState.Validate(region);
             if(region.DiscoveredLandmarks == null || region.ExploredTiles == null || region.ExploredTiles.Any(at=>at<0||at>=region.Tiles.Length) ||
