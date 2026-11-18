@@ -460,6 +460,8 @@ public static class VisualChecks
         { await LandmarkVisualChecks.Run(app); GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--enemy-preview"))
         { await EnemyPreview.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
+        if(OS.GetCmdlineUserArgs().Contains("--interaction-terrain-only"))
+        { await InteractionTerrainVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--ecology-only"))
         { await ReachEncounterVisualChecks.Run(app);GD.Print("VISUAL CHECKS PASSED");return; }
         if(OS.GetCmdlineUserArgs().Contains("--living-reach-only"))

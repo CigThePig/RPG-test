@@ -737,10 +737,16 @@ public partial class Foundation : Node2D
             return;
         }
 
-        World.Interact(a);
+        string previousRegion = a.Region;
+        bool changed = World.Interact(a);
         ui.Notify(World.InteractionFeedback);
         if (OS.HasFeature("android")) GD.Print($"MOSSLIGHT_INTERACT feedback={World.InteractionFeedback}");
-        drawnRegion = "";
+        // Resource/chest visuals already observe Spent/Lit in _PhysicsProcess.
+        // Replacing the streamed ground here, even for an unavailable interaction,
+        // discards its visible chunks and leaves a black frame while it restarts.
+        // Dungeon mechanisms still need their wall/surface geometry refreshed.
+        if (a.Region != previousRegion || (changed && World.RegionsById[a.Region].Rooms.Count > 0))
+            drawnRegion = "";
     }
 
     public override void _Notification(int what)

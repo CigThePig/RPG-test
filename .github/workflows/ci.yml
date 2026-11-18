@@ -54,6 +54,8 @@ jobs:
         run: xvfb-run -a -s '-screen 0 2560x1440x24' python3 tools/verify.py --visual --mobile --overworld-props-only
       - name: Town block houses and roofs in the Living Reach
         run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --town-only
+      - name: Interaction keeps streamed terrain visible and resource visuals current
+        run: xvfb-run -a -s '-screen 0 2560x1440x24' godot --path . --audio-driver Dummy -- --visual-check --mobile-ui --interaction-terrain-only
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -75,6 +77,7 @@ jobs:
             build/encounter-measurements.json
             build/verification-*.log
             build/widescreen/
+            build/interactions/
   living-reach:
     runs-on: ubuntu-24.04
     timeout-minutes: 25

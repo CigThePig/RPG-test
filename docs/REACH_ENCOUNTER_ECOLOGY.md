@@ -32,6 +32,12 @@ Ally calls, fallen-ally reactions and support effects are scoped to their ecolog
 
 ## Save contract
 
+### Interaction rendering
+
+Same-region overworld interactions retain the current terrain streamer. An empty Interact press, gathering, opening a chest or taking corpse loot must not discard visible chunks. Feature views already refresh their spent/selected state during the normal presentation update. Actual region transitions and successful dungeon changes still refresh the relevant terrain and mechanism surfaces.
+
+`--visual-check --mobile-ui --interaction-terrain-only` captures 48 immediate post-interaction frames at 2340×1080 and validates streamer identity, continuous terrain coverage and live resource/chest visuals. The regression fails against the previous implementation on its first empty Interact press. Its images and report are written to `build/interactions/` and retained with native CI evidence.
+
 Schema 1 and `rpg-regions-2` are unchanged. Optional region fields store the ecology revision and complete plan. The save contains both active and dormant actors, with an explicit dormant-ID list; all actors pass the existing validation before restore partitions them. This preserves damage, action state, death and inventories without inventing a second loot or reward system. Missing ecology fields mean no new population. Dormancy does not advance statuses or cooldowns; participants with live statuses remain active. Death and Gloot transfers remain production-owned and cannot repeat through reactivation. There is no respawn timer.
 
 The developer menu also exposes **Visit nearby hunter territory (F8)**. It moves the player to a collision-validated approach to a surviving real planned hunter. It does not create a laboratory enemy, heal the player or force detection. Android smoke uses this action, then OS joystick input and two damage events attributed to that exact planned creature; it no longer assumes enemies live at fixed eastern coordinates.
