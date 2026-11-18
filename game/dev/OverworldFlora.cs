@@ -25,7 +25,7 @@ public partial class OverworldFlora : Node2D
         for(int y=Math.Max(1,cells.Position.Y);y<Math.Min(r.Height-1,cells.End.Y);y++)
             for(int x=Math.Max(1,cells.Position.X);x<Math.Min(r.Width-1,cells.End.X);x++)
         {
-            int at=y*r.Width+x;uint h=EnvironmentStyle.Hash(r.Seed,x,y,9500);
+            int at=y*r.Width+x;if(r.Crossings.Contains(at))continue;uint h=EnvironmentStyle.Hash(r.Seed,x,y,9500);
             float jitter=((h>>20)%9)-4f;
             if(r.Tiles[at]==Terrain.Water)
             {

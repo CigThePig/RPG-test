@@ -66,6 +66,14 @@ public static class WidescreenChecks
         async System.Threading.Tasks.Task Measure(string name)
         {
             await Frames(20);
+            for(int wait=0;wait<2000;wait++)
+            {
+                var stream=app.GetTree().GetNodesInGroup("overworld-chunks").OfType<OverworldChunkStreamer>().SingleOrDefault();
+                if(stream==null || (stream.CoversVisible&&stream.Settled))break;
+                await Frames(1);
+                if(wait==1999)throw new InvalidOperationException("Widescreen scenery did not settle");
+            }
+            await Frames(2); // Flush the newly activated terrain's first draw.
             var timer=System.Diagnostics.Stopwatch.StartNew();var samples=new List<double>();
             int layouts=ui.LayoutPasses;long terrainBuilds=TerrainView.BuildCount;
             double previous=timer.Elapsed.TotalMilliseconds;

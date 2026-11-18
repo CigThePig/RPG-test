@@ -75,5 +75,20 @@ public static class LivingReachChecks
         for(int y=0;y<a.Height;y++)for(int x=offset;x<a.Width;x++)
             for(int k=0;k<4;k++)if(a.Ground[(y*a.Width+x)*4+k]!=c.Ground[(y*c.Width+x-offset)*4+k])seam=false;
         check(seam,"adjacent prepared ground halos match byte for byte");
+        var fixture=new RegionState {Seed=19,Width=68,Height=40,Tiles=Enumerable.Repeat(Terrain.Grass,68*40).ToArray()};
+        for(int y=2;y<25;y++)for(int x=27;x<39;x++)fixture.Tiles[y*68+x]=Terrain.Water;
+        for(int y=27;y<39;y++)for(int x=29;x<37;x++)fixture.Tiles[y*68+x]=Terrain.Rock;
+        var left=ChunkLookup.Build(fixture,OverworldChunkStreamer.Cells(fixture,new(0,0)));
+        var right=ChunkLookup.Build(fixture,OverworldChunkStreamer.Cells(fixture,new(1,0)));
+        foreach(var pair in new[]{(left.Water!,right.Water!),(left.Rock!,right.Rock!)})
+        {
+            bool same=true;int shift=29*8;
+            for(int y=0;y<left.Height;y++)for(int x=shift;x<left.Width;x++)for(int k=0;k<3;k++)
+                if(pair.Item1[(y*left.Width+x)*3+k]!=pair.Item2[(y*right.Width+x-shift)*3+k])same=false;
+            check(same,"water/rock lookup halos seamless across a wet/rocky chunk boundary");
+        }
+        using var cancelled=new System.Threading.CancellationTokenSource();cancelled.Cancel();bool stopped=false;
+        try{ChunkLookup.Build(fixture,new(0,0,32,32),cancelled.Token);}catch(OperationCanceledException){stopped=true;}
+        check(stopped,"discarded region preparation cancels without native resources");
     }
 }

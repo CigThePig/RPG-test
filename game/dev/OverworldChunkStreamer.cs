@@ -42,7 +42,8 @@ public partial class OverworldChunkStreamer : Node2D
     Loaded? building;
     Vector2I buildingId;
     public int LoadedChunks=>live.Count;
-    public bool CoversVisible=>Required(Region,PlayerPosition(),ViewportPixels(),Zoom()).All(live.ContainsKey);
+    public bool Settled=>building==null&&preparing.Count==0;
+    public bool CoversVisible=>Required(Region,PlayerPosition(),ViewportPixels(),Zoom(),false).All(live.ContainsKey);
     public int CachedChunks=>cache.Count;
     public int PreparedChunks=>preparing.Count(p=>p.Value.IsCompletedSuccessfully);
     public int PendingDisposals=>release.Count;
@@ -69,11 +70,11 @@ public partial class OverworldChunkStreamer : Node2D
 
     /// <summary>Camera-driven visible set. 160x132 screen pixels of overscan covers raised
     /// props, camera smoothing and a normal movement step without a hard scenery edge.</summary>
-    public static List<Vector2I> Required(RegionState region,Vector2 player,Vector2 viewport,Vector2 zoom)
+    public static List<Vector2I> Required(RegionState region,Vector2 player,Vector2 viewport,Vector2 zoom,bool overscan=true)
     {
         Vector2 centre=GodotConvert.GroundToScreen(player.X,player.Y);
-        Vector2 half=new(viewport.X/Math.Max(.1f,zoom.X)/2+160,
-            viewport.Y/Math.Max(.1f,zoom.Y)/2+132);
+        Vector2 half=new(viewport.X/Math.Max(.1f,zoom.X)/2+(overscan?160:0),
+            viewport.Y/Math.Max(.1f,zoom.Y)/2+(overscan?132:0));
         int nx=(region.Width+ChunkTiles-1)/ChunkTiles,ny=(region.Height+ChunkTiles-1)/ChunkTiles;
         int left=Math.Clamp(Mathf.FloorToInt((centre.X-half.X)/(ChunkTiles*24)),0,nx-1);
         int right=Math.Clamp(Mathf.FloorToInt((centre.X+half.X)/(ChunkTiles*24)),0,nx-1);

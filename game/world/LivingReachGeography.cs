@@ -6,14 +6,31 @@ namespace Mosslight;
 public static class LivingReachGeography
 {
     public const int Revision=1;
-    static float Phase(int seed,int slot)=>(EnvironmentStyle.Hash(seed,0,0,12000+slot)&65535)/65535f*MathF.Tau;
+    // Frozen geography hash. Cosmetic art revisions must never move terrain.
+    static uint Hash(int seed,int x,int y,int slot)
+    {
+        unchecked
+        {
+            uint Mix(uint n){n^=n>>16;n*=0x7feb352du;n^=n>>15;n*=0x846ca68bu;return n^(n>>16);}
+            uint h=Mix((uint)seed^0x6d6f7373u^(uint)Revision*0x9e3779b9u);
+            h=Mix(h^Mix((uint)x));h=Mix(h^Mix((uint)y));return Mix(h^(uint)slot);
+        }
+    }
+    static float Phase(int seed,int slot)=>(Hash(seed,0,0,12000+slot)&65535)/65535f*MathF.Tau;
     public static float RiverX(int seed,float y,int width,int height)
     {
         float t=y/height,p=Phase(seed,0);
         return width*(.57f+.075f*MathF.Sin(t*MathF.Tau*1.25f+p)+.025f*MathF.Sin(t*MathF.Tau*2.4f+p*.7f));
     }
     public static float RiverRadius(int seed,float y,int height)=>3.8f+1.2f*MathF.Sin(y/height*7+Phase(seed,1));
-    public static float Forest(int seed,int x,int y)=>OverworldGroundArt.Noise(seed,x/43f,y/38f,120);
+    public static float Forest(int seed,int x,int y)
+    {
+        float gx=x/43f,gy=y/38f;int ix=(int)MathF.Floor(gx),iy=(int)MathF.Floor(gy);
+        float fx=gx-ix,fy=gy-iy;fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);
+        float H(int a,int b)=>(Hash(seed,a,b,8271)&65535)/65535f;
+        float L(float a,float b,float t)=>a+(b-a)*t;
+        return L(L(H(ix,iy),H(ix+1,iy),fx),L(H(ix,iy+1),H(ix+1,iy+1),fx),fy);
+    }
     public static void Generate(RegionState r)
     {
         float p=Phase(r.Seed,2),q=Phase(r.Seed,3);

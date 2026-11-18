@@ -10,7 +10,8 @@ public static class LivingReachVisualChecks
     public static async System.Threading.Tasks.Task Run(Foundation app)
     {
         var w=app.World;string saved=Persistence.Capture(w,app.Narrative);
-        string tag=OS.GetCmdlineUserArgs().Contains("--stream-baseline")?"before":"after";
+        bool videoOnly=OS.GetCmdlineUserArgs().Contains("--living-reach-video");
+        string tag=videoOnly?"video":OS.GetCmdlineUserArgs().Contains("--stream-baseline")?"before":"after";
         string folder="build/living-reach/"+tag;Directory.CreateDirectory(folder);
         var window=app.GetWindow();var size=window.Size;var zoom=app.Camera.Zoom;
         var samples=new List<double>();var stages=new List<object>();var trace=new List<object>();int missingVisibleFrames=0;
@@ -45,6 +46,7 @@ public static class LivingReachVisualChecks
             w.Projectiles.Clear();w.Hazards.Clear();
             foreach(int seed in new[]{1,42,1337})
             {
+                if(videoOnly&&seed!=42)continue;
                 var r=Regions.Overworld(seed,320,240);w.RegionsById["reach"]=r;w.Player.Region="reach";
                 Position(160,120);app.Camera.Zoom=Vector2.One*.19f;app.RebuildViews();await Settle();
                 app.Ui.Visible=false;await Shot("seed-"+seed+"-world");app.Ui.Visible=true;
@@ -56,7 +58,7 @@ public static class LivingReachVisualChecks
                 foreach(var h in r.Town!.Houses)
                 {
                     Position(h.X+h.Door+.5f,h.Y+h.Height+1.5f);await Settle();await Shot("outside-"+h.Style);
-                    w.Move(w.Player,new System.Numerics.Vector2(0,-3*24));app.Views["player"].SnapPosition();await Frame(20);await Shot("inside-"+h.Style);
+                    w.Move(w.Player,new System.Numerics.Vector2(0,-3*24));app.Views["player"].SnapPosition();await Frame(20);app.Ui.Visible=false;await Shot("inside-"+h.Style);app.Ui.Visible=true;
                     w.Move(w.Player,new System.Numerics.Vector2(0,3*24));app.Views["player"].SnapPosition();await Frame(20);
                 }
                 Position(85,120);await Settle();
@@ -65,7 +67,10 @@ public static class LivingReachVisualChecks
                 for(int frame=0;frame<900;frame++)
                 {
                     float t=frame<450?frame:900-frame;
-                    Position(85+t*.16f,120+MathF.Sin(t/100f)*24);
+                    var destination=new System.Numerics.Vector2((85+t*.16f)*24,(120+MathF.Sin(t/100f)*24)*24);
+                    var offset=destination-w.Player.Position;
+                    w.PlayerMove(offset.Length()>1?System.Numerics.Vector2.Normalize(offset):System.Numerics.Vector2.Zero,1f/60);w.Step(1f/60);
+                    app.Views["player"].SnapPosition();
                     await Frame();double now=timer.Elapsed.TotalMilliseconds;double frameMs=now-previous;samples.Add(frameMs);previous=now;
                     var current=app.GetTree().GetNodesInGroup("overworld-chunks").OfType<OverworldChunkStreamer>().Single();
                     if(!current.CoversVisible)missingVisibleFrames++;
@@ -76,10 +81,29 @@ public static class LivingReachVisualChecks
                 }
                 var streamer=app.GetTree().GetNodesInGroup("overworld-chunks").OfType<OverworldChunkStreamer>().Single();
                 File.WriteAllText(folder+"/streaming.json",JsonSerializer.Serialize(new {streamer.CacheHits,streamer.CacheMisses,streamer.LoadedChunks,streamer.CachedChunks,streamer.PreparedChunks,streamer.PendingDisposals,streamer.LookupBytes,streamer.WorstMainThreadMs,streamer.Measurements},new JsonSerializerOptions{WriteIndented=true}));
+                if(tag=="after" && (streamer.CachedChunks>OverworldChunkStreamer.MaximumCachedChunks || streamer.LookupBytes>32_000_000))
+                    throw new InvalidOperationException("Unbounded scenery cache or lookup retention");
                 stages.Add(new {groundMs=OverworldGroundRenderer.LastBuildMilliseconds,waterMs=OverworldWaterRenderer.LastBuildMilliseconds,rockMs=OverworldRockRenderer.LastBuildMilliseconds});
             }
+            // Fast relocation, distant save/load, reduced motion and region teardown
+            // happen after the timed route, keeping the comparison uncontaminated.
+            Position(230,190);await Settle();
+            var distantRegion=w.RegionsById["reach"];var terrain=(Terrain[])distantRegion.Tiles.Clone();
+            var houses=distantRegion.Town!.Houses.ToArray();
+            distantRegion.ExploredTiles.Add(distantRegion.Index(w.Player.Position));
+            w.Player.Health=87;string distant=Persistence.Capture(w,app.Narrative);
+            Persistence.Restore(w,app.Narrative,distant);app.RebuildViews();await Settle();
+            if(w.Player.Health!=87 || !w.RegionsById["reach"].Tiles.SequenceEqual(terrain) || !w.RegionsById["reach"].Town!.Houses.SequenceEqual(houses))
+                throw new InvalidOperationException("Distant save/load changed authoritative world");
+            await Shot("distant-save-load");
+            bool reduced=app.Ui.Preferences.ReducedMotion;app.Ui.Preferences.ReducedMotion=true;
+            await Frame(10);await Shot("reduced-motion");app.Ui.Preferences.ReducedMotion=reduced;
+            w.Enter(w.Player,"ruin");app.RebuildViews();await Frame(12);await Shot("dungeon-transition");
+            if(app.GetTree().GetNodesInGroup("overworld-chunks").Count!=0)throw new InvalidOperationException("Overworld streamer survived dungeon transition");
+            w.Enter(w.Player,"reach");app.RebuildViews();await Settle();await Shot("return-from-dungeon");
+            if(!w.RegionsById["reach"].Tiles.SequenceEqual(terrain))throw new InvalidOperationException("Streaming teardown mutated terrain");
             File.WriteAllText(folder+"/frames.json",JsonSerializer.Serialize(trace));
-            if(missingVisibleFrames>0)throw new InvalidOperationException("Visible scenery missing during travel: "+missingVisibleFrames);
+            if(tag=="after"&&missingVisibleFrames>0)throw new InvalidOperationException("Visible scenery missing during travel: "+missingVisibleFrames);
             samples.Sort();double At(float p)=>samples[Math.Min(samples.Count-1,(int)(samples.Count*p))];
             File.WriteAllText(folder+"/performance.json",JsonSerializer.Serialize(new{environment="Godot 4.6.1 Linux, software GL; not Galaxy S25",missingVisibleFrames,p50=At(.5f),p95=At(.95f),p99=At(.99f),worst=samples.Last(),stages},new JsonSerializerOptions{WriteIndented=true}));
             GD.Print("LIVING REACH RENDERED CHECKS PASSED "+tag);
