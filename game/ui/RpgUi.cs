@@ -1192,6 +1192,7 @@ public partial class RpgUi : CanvasLayer
             App.World.Enter(App.World.Player, "reach");
             ClosePanels();
         });
+        Button(body, "Visit nearby hunter territory (F8)", App.VisitHunterTerritory);
         Button(body, "Combat archetypes test encounter (F9)", App.BeginCombatCourse);
         foreach(var encounter in new[]{"prowler","brute","spitter","two melee","mixed","four mixed","projectiles","crowd"})
         {

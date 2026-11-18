@@ -2,7 +2,7 @@
   {
     "id": 1,
     "quest_name": "Trouble in the Reach",
-    "quest_description": "The wardens need help clearing the causeway.",
+    "quest_description": "The wardens need help with hunters in the nearby woodland.",
     "quest_objective": "Defeat two mire prowlers.",
     "event_kind": "defeated",
     "target_value": "beast",

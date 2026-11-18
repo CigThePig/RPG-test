@@ -57,6 +57,33 @@ public partial class Foundation : Node2D
         var p=World.Player;p.Region=map.Id;p.X=300;p.Y=300;p.Health=p.MaxHealth;p.Mana=p.MaxMana;p.State=ActionState.Idle;p.StateRemaining=0;p.PendingAbility="";p.Statuses.Clear();p.Cooldowns.Clear();
         TouchMovement=ControllerVelocity=Vector2.Zero; Ui.Stick.Cancel();RebuildViews();Ui.ClosePanels();ResumeGame();Trace.Marker("course/start-or-reset");
     }
+    /// <summary>Developer inspection of a real planned site; no spawned fixture, healing or forced alarm.</summary>
+    public void VisitHunterTerritory()
+    {
+        if(InFeelCourse) LeaveFeelCourse();
+        if(!World.Player.Alive)return;
+        if(World.Player.Region!="reach")World.Enter(World.Player,"reach");
+        var region=World.RegionsById["reach"];var player=World.Player;
+        foreach(var site in region.ReachSites.Where(s=>s.Template=="lone-hunter")
+            .OrderBy(s=>NVector.DistanceSquared(region.Center(s.Tile),player.Position)).ThenBy(s=>s.Id,StringComparer.Ordinal))
+        {
+            var member=site.Members[0];
+            if(World.Actors.TryGetValue(member.Id,out var active)&&!active.Alive || World.Population.Dormant.TryGetValue(member.Id,out var dormant)&&!dormant.Alive)continue;
+            var home=region.Center(member.Tile);
+            foreach(float side in new[]{1f,-1f})
+            {
+                var approach=home+new NVector(side*180,0);
+                if(!region.CanTravel(home,approach,player))continue;
+                World.Cancel(player);World.ClearPlayerMotion();player.X=approach.X;player.Y=approach.Y;
+                TouchMovement=ControllerVelocity=Vector2.Zero;Ui.Stick.Cancel();Ui.ClosePanels();RebuildViews();
+                Views["player"].SnapPosition();Camera.ResetSmoothing();ResumeGame();
+                GD.Print(FormattableString.Invariant($"MOSSLIGHT_ENCOUNTER_READY site={site.Id} actor={member.Id} template={site.Template} homeX={home.X:0.0} homeY={home.Y:0.0} approachX={approach.X:0.0}"));
+                Ui.Notify("Hunter territory · approach quietly or draw it out");return;
+            }
+        }
+        Ui.Notify("No surviving planned hunter territory is available in this world");
+    }
+
     /// <summary>Keyboard walking pace while the sneak key is held: under the pace at which steps are heard.</summary>
     public const float SneakScale = .5f;
     public SenseView Senses { get; private set; } = null!;
@@ -356,7 +383,7 @@ public partial class Foundation : Node2D
             if(OS.HasFeature("android") && e.Kind=="ability_started" && e.Actor=="player")
                 GD.Print($"MOSSLIGHT_PLAYER_ABILITY id={e.Value} tick={World.Tick}");
             if (OS.HasFeature("android") && e.Kind == "damage" && e.Target == "player")
-                GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0}");
+                GD.Print($"MOSSLIGHT_PLAYER_DAMAGE tick={World.Tick} health={World.Player.Health:0.0} source={e.Actor}");
             if(Trace.Active && e.Kind is "region_entered" or "resource_depleted" or "ability_started" or "defeated")Trace.Marker(e.Kind+"/"+e.Value);
             Narrative.Call("receive", e.Kind, e.Actor, e.Target, e.Value, e.Count);
             if (e.Kind == "afflicted" && e.Target == "player")
@@ -580,6 +607,9 @@ public partial class Foundation : Node2D
 
     public override void _UnhandledInput(InputEvent e)
     {
+        if(e is InputEventKey ecologyKey && ecologyKey.Pressed && !ecologyKey.Echo &&
+            (ecologyKey.PhysicalKeycode==Key.F8 || ecologyKey.Keycode==Key.F8) && !Narrative.Get("speaking").AsBool())
+        { VisitHunterTerritory();GetViewport().SetInputAsHandled();return; }
         if(e is InputEventKey developerKey && developerKey.Pressed && !developerKey.Echo && (developerKey.PhysicalKeycode==Key.F9 || developerKey.Keycode==Key.F9) && !Narrative.Get("speaking").AsBool())
         { BeginCombatCourse(); GetViewport().SetInputAsHandled(); return; }
         // Development shortcut for the existing Diagnostics entry/return actions.

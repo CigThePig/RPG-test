@@ -34,6 +34,8 @@ Ally calls, fallen-ally reactions and support effects are scoped to their ecolog
 
 Schema 1 and `rpg-regions-2` are unchanged. Optional region fields store the ecology revision and complete plan. The save contains both active and dormant actors, with an explicit dormant-ID list; all actors pass the existing validation before restore partitions them. This preserves damage, action state, death and inventories without inventing a second loot or reward system. Missing ecology fields mean no new population. Dormancy does not advance statuses or cooldowns; participants with live statuses remain active. Death and Gloot transfers remain production-owned and cannot repeat through reactivation. There is no respawn timer.
 
+The developer menu also exposes **Visit nearby hunter territory (F8)**. It moves the player to a collision-validated approach to a surviving real planned hunter. It does not create a laboratory enemy, heal the player or force detection. Android smoke uses this action, then OS joystick input and two damage events attributed to that exact planned creature; it no longer assumes enemies live at fixed eastern coordinates.
+
 ## Reproduce verification
 
 - `python3 tools/verify.py --headless --test-only=ReachEncounterChecks` writes six seeded placement overviews, candidate rejection counts, lifecycle checks and normal-health production combat reports under `build/ecology/`.

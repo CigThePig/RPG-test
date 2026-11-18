@@ -40,6 +40,12 @@ public static class ReachEncounterChecks
             w.Player.Region="reach";w.Player.X=reach.Center(reach.Entrance).X;w.Player.Y=reach.Center(reach.Entrance).Y;
             w.Projectiles.Clear();w.Hazards.Clear();
             string fresh=Persistence.Capture(w,app.Narrative);
+            app.VisitHunterTerritory();
+            check(reach.CanStand(w.Player.Position,w.Player),"ecology developer inspection uses a reachable real-world approach");
+            var inspected=reach.ReachSites.Where(s=>s.Template=="lone-hunter").OrderBy(s=>V.DistanceSquared(reach.Center(s.Tile),w.Player.Position)).First();
+            check(MathF.Abs(V.Distance(w.Player.Position,reach.Center(inspected.Tile))-180)<.1f,"ecology inspection selects a planned hunter without a fixture");
+            check(w.Player.Health==100&&inspected.Members.All(m=>!w.Actors.ContainsKey(m.Id)),"ecology inspection does not force damage, healing or actor activation");
+            Persistence.Restore(w,app.Narrative,fresh);reach=w.RegionsById["reach"];
             var site0=reach.ReachSites.First(s=>s.Template=="lone-hunter");
             void Move(V p){w.Cancel(w.Player);w.Player.X=p.X;w.Player.Y=p.Y;}
             void Activate(ReachSite site){Move(reach.Center(site.Tile)+new V(-300,0));for(int i=0;i<60;i++)w.Population.Update(w,true);}

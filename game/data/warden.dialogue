@@ -2,7 +2,7 @@
 Warden: The old light kept these roads safe. Something in the ruins has stirred.
 - I can help with the prowlers. [if not accepted(1) /]
 	do accept_quest(1)
-	Warden: Defeat two mire prowlers on the causeway. Then we can discuss the ruins.
+	Warden: Look for lone mire prowlers resting beyond the town’s woodland edges. Defeat two, then we can discuss the ruins.
 	=> END
 - Tell me about the buried light. [if completed(1) and not accepted(2) /]
 	do accept_quest(2)
