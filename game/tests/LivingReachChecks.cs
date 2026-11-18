@@ -87,6 +87,9 @@ public static class LivingReachChecks
                 if(pair.Item1[(y*left.Width+x)*3+k]!=pair.Item2[(y*right.Width+x-shift)*3+k])same=false;
             check(same,"water/rock lookup halos seamless across a wet/rocky chunk boundary");
         }
+        Array.Fill(fixture.Tiles,Terrain.Grass);fixture.Tiles[12*fixture.Width+31]=fixture.Tiles[13*fixture.Width+31]=Terrain.Rock;
+        var spill=ChunkLookup.Build(fixture,OverworldChunkStreamer.Cells(fixture,new(1,0)));
+        check(spill.Rock!=null,"rock halo retains raised tops and shadows in a neighbour chunk with no core rock");
         using var cancelled=new System.Threading.CancellationTokenSource();cancelled.Cancel();bool stopped=false;
         try{ChunkLookup.Build(fixture,new(0,0,32,32),cancelled.Token);}catch(OperationCanceledException){stopped=true;}
         check(stopped,"discarded region preparation cancels without native resources");

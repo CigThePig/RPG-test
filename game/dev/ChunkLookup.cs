@@ -16,6 +16,9 @@ public sealed record ChunkLookup(int Width,int Height,byte[] Ground,byte[]? Wate
         bool water=false,rock=false;
         for(int y=cells.Position.Y;y<cells.End.Y;y++)for(int x=cells.Position.X;x<cells.End.X;x++)
         {water|=r.Tiles[y*r.Width+x]==Terrain.Water;rock|=r.Tiles[y*r.Width+x]==Terrain.Rock;}
+        // Raised rock tops and shadows spill into neighbouring cells. A chunk
+        // with no rock in its core still needs the outcrop layer at that edge.
+        for(int y=sy;y<ey&&!rock;y++)for(int x=sx;x<ex&&!rock;x++)rock|=r.Tiles[y*r.Width+x]==Terrain.Rock;
         var ground=new byte[width*height*4];var wet=water?new byte[width*height*3]:null;var stone=rock?new byte[width*height*3]:null;
         byte Byte(float value)=>(byte)(Math.Clamp(value,0,1)*255); // Matches Image's normalized byte conversion.
         for(int y=0;y<height;y++)
